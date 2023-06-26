@@ -1,0 +1,13 @@
+[package]
+name = "edgeless_bal"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de"]
+edition = "2021"
+
+[lib]
+name = "edgeless_bal"
+path = "src/lib.rs"
+
+[[bin]]
+name = "edgeless_bal_d"
+path = "src/bin/edgeless_bal_d.rs"

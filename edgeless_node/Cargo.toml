@@ -1,0 +1,18 @@
+[package]
+name = "edgeless_node"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de"]
+edition = "2021"
+
+[lib]
+name = "edgeless_node"
+path = "src/lib.rs"
+
+[[bin]]
+name = "edgeless_node_d"
+path = "src/bin/edgeless_node_d.rs"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+anyhow = "1.0"

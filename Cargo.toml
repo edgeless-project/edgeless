@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "edgeless_bal",
+    "edgeless_con",
+    "edgeless_node",
+    "edgeless_orc"
+]

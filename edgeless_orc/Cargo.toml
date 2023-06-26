@@ -1,0 +1,13 @@
+[package]
+name = "edgeless_orc"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de"]
+edition = "2021"
+
+[lib]
+name = "edgeless_orc"
+path = "src/lib.rs"
+
+[[bin]]
+name = "edgeless_orc_d"
+path = "src/bin/edgeless_orc_d.rs"
