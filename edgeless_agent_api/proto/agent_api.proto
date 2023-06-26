@@ -1,0 +1,17 @@
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+package agent_api;
+
+message FunctionId {
+    string node_id = 1;
+    string function_id = 2;
+}
+
+message SpawnRequest {
+    FunctionId function_id = 1;
+    string code = 2;
+}
+
+service Agent {
+    rpc StartFunctionInstance (SpawnRequest) returns (FunctionId);
+}

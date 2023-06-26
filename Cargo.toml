@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "edgeless_agent_api",
     "edgeless_bal",
     "edgeless_con",
     "edgeless_node",

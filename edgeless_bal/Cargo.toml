@@ -11,3 +11,6 @@ path = "src/lib.rs"
 [[bin]]
 name = "edgeless_bal_d"
 path = "src/bin/edgeless_bal_d.rs"
+
+[dependencies]
+log = "0.4"
