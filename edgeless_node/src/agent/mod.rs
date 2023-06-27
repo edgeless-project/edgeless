@@ -3,8 +3,8 @@ use futures::{Future, SinkExt, StreamExt};
 use crate::runner_api;
 
 enum AgentRequest {
-    SPAWN(edgeless_agent_api::SpawnFunctionRequest),
-    STOP(edgeless_agent_api::FunctionId),
+    SPAWN(edgeless_api::SpawnFunctionRequest),
+    STOP(edgeless_api::FunctionId),
 }
 
 pub struct Agent {
@@ -44,7 +44,7 @@ impl Agent {
         }
     }
 
-    pub fn get_api_client(&mut self) -> Box<dyn edgeless_agent_api::AgentAPI + Send> {
+    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::AgentAPI + Send> {
         Box::new(AgentClient {
             sender: self.sender.clone(),
             node_id: self.node_settings.node_id.clone(),
@@ -58,17 +58,17 @@ pub struct AgentClient {
 }
 
 #[async_trait::async_trait]
-impl edgeless_agent_api::AgentAPI for AgentClient {
-    async fn start_function_instance(&mut self, request: edgeless_agent_api::SpawnFunctionRequest) -> anyhow::Result<edgeless_agent_api::FunctionId> {
+impl edgeless_api::AgentAPI for AgentClient {
+    async fn start_function_instance(&mut self, request: edgeless_api::SpawnFunctionRequest) -> anyhow::Result<edgeless_api::FunctionId> {
         let mut request = request;
         if request.function_id.is_none() {
-            request.function_id = Some(edgeless_agent_api::FunctionId::new(self.node_id));
+            request.function_id = Some(edgeless_api::FunctionId::new(self.node_id));
         }
         let fid = request.function_id.clone().unwrap();
         let _ = self.sender.send(AgentRequest::SPAWN(request)).await;
         Ok(fid)
     }
-    async fn stop_function_instance(&mut self, id: edgeless_agent_api::FunctionId) -> anyhow::Result<()> {
+    async fn stop_function_instance(&mut self, id: edgeless_api::FunctionId) -> anyhow::Result<()> {
         let _ = self.sender.send(AgentRequest::STOP(id)).await;
         Ok(())
     }

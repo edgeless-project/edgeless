@@ -15,4 +15,4 @@ path = "src/bin/edgeless_orc_d.rs"
 [dependencies]
 log = "0.4"
 uuid = {version= "1.3", features = ["v4"] }
-edgeless_agent_api = {path = "../edgeless_agent_api", features = ["grpc_impl"]}
+edgeless_api = {path = "../edgeless_api", features = ["grpc_impl"]}

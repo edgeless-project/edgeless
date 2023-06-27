@@ -1,11 +1,11 @@
 [package]
-name = "edgeless_agent_api"
+name = "edgeless_api"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de"]
 edition = "2021"
 
 [lib]
-name = "edgeless_agent_api"
+name = "edgeless_api"
 path = "src/lib.rs"
 
 [features]
