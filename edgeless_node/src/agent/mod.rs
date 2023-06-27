@@ -59,7 +59,7 @@ pub struct AgentClient {
 
 #[async_trait::async_trait]
 impl edgeless_agent_api::AgentAPI for AgentClient {
-    async fn spawn(&mut self, request: edgeless_agent_api::SpawnFunctionRequest) -> anyhow::Result<edgeless_agent_api::FunctionId> {
+    async fn start_function_instance(&mut self, request: edgeless_agent_api::SpawnFunctionRequest) -> anyhow::Result<edgeless_agent_api::FunctionId> {
         let mut request = request;
         if request.function_id.is_none() {
             request.function_id = Some(edgeless_agent_api::FunctionId::new(self.node_id));
@@ -68,7 +68,7 @@ impl edgeless_agent_api::AgentAPI for AgentClient {
         let _ = self.sender.send(AgentRequest::SPAWN(request)).await;
         Ok(fid)
     }
-    async fn stop(&mut self, id: edgeless_agent_api::FunctionId) -> anyhow::Result<()> {
+    async fn stop_function_instance(&mut self, id: edgeless_agent_api::FunctionId) -> anyhow::Result<()> {
         let _ = self.sender.send(AgentRequest::STOP(id)).await;
         Ok(())
     }

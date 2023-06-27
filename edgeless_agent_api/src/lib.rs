@@ -17,13 +17,25 @@ impl FunctionId {
 }
 
 #[derive(Debug)]
+pub struct FunctionClassSpecification {
+    pub function_class_id: String,
+    pub function_class_type: String,
+    pub function_class_version: String,
+    pub function_class_inlude_code: Vec<u8>,
+    pub output_callback_declarations: Vec<String>,
+}
+
+#[derive(Debug)]
 pub struct SpawnFunctionRequest {
     pub function_id: Option<FunctionId>,
-    pub code: String,
+    pub code: FunctionClassSpecification,
+    pub output_callback_definitions: std::collections::HashMap<String, FunctionId>,
+    pub return_continuation: FunctionId,
+    pub annotations: std::collections::HashMap<String, String>,
 }
 
 #[async_trait::async_trait]
 pub trait AgentAPI: Sync {
-    async fn spawn(&mut self, request: SpawnFunctionRequest) -> anyhow::Result<FunctionId>;
-    async fn stop(&mut self, id: FunctionId) -> anyhow::Result<()>;
+    async fn start_function_instance(&mut self, request: SpawnFunctionRequest) -> anyhow::Result<FunctionId>;
+    async fn stop_function_instance(&mut self, id: FunctionId) -> anyhow::Result<()>;
 }

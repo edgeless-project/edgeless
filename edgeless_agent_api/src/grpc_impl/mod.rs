@@ -5,6 +5,75 @@ pub mod api {
     tonic::include_proto!("agent_api");
 }
 
+pub struct AgentAPIConverters {}
+
+impl AgentAPIConverters {
+    pub fn parse_function_id(api_id: &api::FunctionId) -> FunctionId {
+        FunctionId {
+            node_id: uuid::Uuid::parse_str(&api_id.node_id).unwrap(),
+            function_id: uuid::Uuid::parse_str(&api_id.function_id).unwrap(),
+        }
+    }
+
+    pub fn parse_function_class_specification(api_spec: &api::FunctionClassSpecification) -> crate::FunctionClassSpecification {
+        crate::FunctionClassSpecification {
+            function_class_id: api_spec.function_class_id.clone(),
+            function_class_type: api_spec.function_class_type.clone(),
+            function_class_version: api_spec.function_class_version.clone(),
+            function_class_inlude_code: api_spec.function_class_inline_code().to_vec(),
+            output_callback_declarations: api_spec.output_callback_declarations.clone(),
+        }
+    }
+
+    pub fn parse_api_request(api_request: &api::SpawnFunctionRequest) -> Option<crate::SpawnFunctionRequest> {
+        if api_request.code.is_none() {
+            return None;
+        }
+        Some(crate::SpawnFunctionRequest {
+            function_id: api_request.function_id.as_ref().and_then(|f| Some(Self::parse_function_id(f))),
+            code: Self::parse_function_class_specification(api_request.code.as_ref().unwrap()),
+            output_callback_definitions: api_request
+                .output_callback_definitions
+                .iter()
+                .map(|(key, value)| return (key.clone(), Self::parse_function_id(&value)))
+                .collect(),
+            return_continuation: Self::parse_function_id(&api_request.return_continuation.as_ref().unwrap()),
+            annotations: api_request.annotations.clone(),
+        })
+    }
+
+    pub fn serialize_function_id(function_id: &crate::FunctionId) -> api::FunctionId {
+        api::FunctionId {
+            node_id: function_id.node_id.to_string(),
+            function_id: function_id.function_id.to_string(),
+        }
+    }
+
+    pub fn serialize_function_class_specification(spec: &crate::FunctionClassSpecification) -> api::FunctionClassSpecification {
+        api::FunctionClassSpecification {
+            function_class_id: spec.function_class_id.clone(),
+            function_class_type: spec.function_class_type.clone(),
+            function_class_version: spec.function_class_version.clone(),
+            function_class_inline_code: Some(spec.function_class_inlude_code.clone()),
+            output_callback_declarations: spec.output_callback_declarations.clone(),
+        }
+    }
+
+    pub fn serialize_spawn_function_request(req: &crate::SpawnFunctionRequest) -> api::SpawnFunctionRequest {
+        api::SpawnFunctionRequest {
+            function_id: req.function_id.as_ref().and_then(|fid| Some(Self::serialize_function_id(fid))),
+            code: Some(Self::serialize_function_class_specification(&req.code)),
+            output_callback_definitions: req
+                .output_callback_definitions
+                .iter()
+                .map(|(key, value)| (key.clone(), Self::serialize_function_id(&value)))
+                .collect(),
+            return_continuation: Some(Self::serialize_function_id(&req.return_continuation)),
+            annotations: req.annotations.clone(),
+        }
+    }
+}
+
 pub struct AgentAPIClient {
     client: api::agent_client::AgentClient<tonic::transport::Channel>,
 }
@@ -18,29 +87,35 @@ impl AgentAPIClient {
 
 #[async_trait::async_trait]
 impl AgentAPI for AgentAPIClient {
-    async fn spawn(&mut self, request: crate::SpawnFunctionRequest) -> anyhow::Result<FunctionId> {
+    async fn start_function_instance(&mut self, request: crate::SpawnFunctionRequest) -> anyhow::Result<FunctionId> {
         if request.function_id.is_none() {
             return Err(anyhow::anyhow!("FunctionId not set"));
         }
-        let res = self
-            .client
-            .start_function_instance(tonic::Request::new(api::SpawnRequest {
-                function_id: Some(api::FunctionId {
-                    node_id: request.function_id.clone().unwrap().node_id.to_string(),
-                    function_id: request.function_id.clone().unwrap().function_id.to_string(),
-                }),
-                code: request.code,
-            }))
-            .await;
-        let inner_req = res.unwrap().into_inner();
-        Ok(crate::FunctionId {
-            node_id: uuid::Uuid::parse_str(&inner_req.node_id).unwrap(),
-            function_id: uuid::Uuid::parse_str(&inner_req.function_id).unwrap(),
-        })
+        let serialized_request = AgentAPIConverters::serialize_spawn_function_request(&request);
+
+        let res = self.client.start_function_instance(tonic::Request::new(serialized_request)).await;
+        match(res) {
+            Ok(function_id) => {
+                Ok(AgentAPIConverters::parse_function_id(&function_id.into_inner()))
+            },
+            Err(_) => {
+                Err(anyhow::anyhow!("Start Request Failed"))
+            }
+        }
+
     }
 
-    async fn stop(&mut self, _id: FunctionId) -> anyhow::Result<()> {
-        Ok(())
+    async fn stop_function_instance(&mut self, id: FunctionId) -> anyhow::Result<()> {
+        let serialized_id = AgentAPIConverters::serialize_function_id(&id);
+        let res = self.client.stop_function_instance(tonic::Request::new(serialized_id)).await;
+        match(res) {
+            Ok(_) => {
+                Ok(())
+            },
+            Err(_) => {
+                Err(anyhow::anyhow!("Stop Request Failed"))
+            }
+        }
     }
 }
 
@@ -72,27 +147,21 @@ impl AgentAPIServer {
 
 #[async_trait::async_trait]
 impl api::agent_server::Agent for AgentAPIServer {
-    async fn start_function_instance(&self, request: tonic::Request<api::SpawnRequest>) -> Result<tonic::Response<api::FunctionId>, tonic::Status> {
+    async fn start_function_instance(&self, request: tonic::Request<api::SpawnFunctionRequest>) -> Result<tonic::Response<api::FunctionId>, tonic::Status> {
         let inner_request = request.into_inner();
-        let function_id = FunctionId {
-            node_id: uuid::Uuid::parse_str(&inner_request.function_id.as_ref().unwrap().node_id).unwrap(),
-            function_id: uuid::Uuid::parse_str(&inner_request.function_id.as_ref().unwrap().function_id).unwrap(),
-        };
-        let fid_2 = function_id.clone();
-        let res = self
-            .root_api
-            .lock()
-            .await
-            .spawn(crate::SpawnFunctionRequest {
-                function_id: Some(function_id),
-                code: inner_request.code,
-            })
-            .await;
+        let parsed_request = AgentAPIConverters::parse_api_request(&inner_request).unwrap();
+        let res = self.root_api.lock().await.start_function_instance(parsed_request).await;
         match res {
-            Ok(_) => Ok(tonic::Response::new(api::FunctionId {
-                node_id: fid_2.node_id.to_string(),
-                function_id: fid_2.function_id.to_string(),
-            })),
+            Ok(fid) => Ok(tonic::Response::new(AgentAPIConverters::serialize_function_id(&fid))),
+            Err(_) => Err(tonic::Status::internal("Server Error")),
+        }
+    }
+
+    async fn stop_function_instance(&self, request: tonic::Request<api::FunctionId>) -> Result<tonic::Response<()>, tonic::Status> {
+        let stop_function_id = AgentAPIConverters::parse_function_id(&request.into_inner());
+        let res = self.root_api.lock().await.stop_function_instance(stop_function_id).await;
+        match res {
+            Ok(_fid) => Ok(tonic::Response::new(())),
             Err(_) => Err(tonic::Status::internal("Server Error")),
         }
     }

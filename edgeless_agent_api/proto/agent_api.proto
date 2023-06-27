@@ -7,11 +7,25 @@ message FunctionId {
     string function_id = 2;
 }
 
-message SpawnRequest {
+message FunctionClassSpecification {
+    string function_class_id  = 1;
+    string function_class_type = 2;
+    string function_class_version = 3;
+    optional bytes function_class_inline_code = 4;
+    // A function class is generic. However, to be able to interact with other functions beyond invacation+return value,
+    // we need to invoke callbacks whose targets can be dynamically set for each instance.
+    repeated string output_callback_declarations = 5;
+}
+
+message SpawnFunctionRequest {
     FunctionId function_id = 1;
-    string code = 2;
+    FunctionClassSpecification code = 2;
+    map<string, FunctionId> output_callback_definitions = 3;
+    FunctionId return_continuation = 4;
+    map<string, string> annotations = 5;
 }
 
 service Agent {
-    rpc StartFunctionInstance (SpawnRequest) returns (FunctionId);
+    rpc StartFunctionInstance (SpawnFunctionRequest) returns (FunctionId);
+    rpc StopFunctionInstance (FunctionId) returns (google.protobuf.Empty );
 }

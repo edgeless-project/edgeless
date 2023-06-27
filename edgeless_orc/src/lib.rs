@@ -11,10 +11,23 @@ pub struct EdgelessOrcSettings {
 pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     log::info!("Starting Edgeless Orchestrator");
     let mut client = edgeless_agent_api::grpc_impl::AgentAPIClient::new(&settings.nodes[0].api_addr).await;
+    let new_fid = edgeless_agent_api::FunctionId::new(settings.nodes[0].node_id.clone());
     let _ = client
-        .spawn(edgeless_agent_api::SpawnFunctionRequest {
-            function_id: Some(edgeless_agent_api::FunctionId::new(settings.nodes[0].node_id.clone())),
-            code: "foo".to_string(),
+        .start_function_instance(edgeless_agent_api::SpawnFunctionRequest {
+            function_id: Some(new_fid.clone()),
+            code: edgeless_agent_api::FunctionClassSpecification {
+                function_class_id: "example_1".to_string(),
+                function_class_type: "RUST_WASM".to_string(),
+                function_class_version: "0.1".to_string(),
+                function_class_inlude_code: vec![0, 1, 2, 3, 4],
+                output_callback_declarations: vec!["cb1".to_string(), "cb2".to_string()],
+            },
+            output_callback_definitions: std::collections::HashMap::from([
+                ("cb1".to_string(), new_fid.clone()),
+                ("cb2".to_string(), new_fid.clone()),
+            ]),
+            return_continuation: new_fid.clone(),
+            annotations: std::collections::HashMap::from([("foo".to_string(), "bar".to_string())]),
         })
         .await;
 }
