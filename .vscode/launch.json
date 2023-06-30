@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Edgeless In A Box",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--features=inabox",
+                    "--package=edgeless_node",
+                    "--bin=edgeless_node_d"
+                ],
+                "filter": {
+                    "name": "edgeless_node_d",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "env":{"RUST_LOG":"debug"}
+        },
+    ]
+}
