@@ -135,7 +135,14 @@ dependencies = [
 name = "edgeless_con"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
+ "edgeless_api",
+ "env_logger",
+ "futures",
  "log",
+ "tokio",
+ "uuid",
 ]
 
 [[package]]
@@ -159,8 +166,13 @@ dependencies = [
 name = "edgeless_orc"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "edgeless_api",
+ "env_logger",
+ "futures",
  "log",
+ "tokio",
  "uuid",
 ]
 

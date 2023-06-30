@@ -3,8 +3,8 @@ use futures::{Future, SinkExt, StreamExt};
 use crate::runner_api;
 
 enum AgentRequest {
-    SPAWN(edgeless_api::SpawnFunctionRequest),
-    STOP(edgeless_api::FunctionId),
+    SPAWN(edgeless_api::function_instance::SpawnFunctionRequest),
+    STOP(edgeless_api::function_instance::FunctionId),
 }
 
 pub struct Agent {
@@ -44,32 +44,47 @@ impl Agent {
         }
     }
 
-    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::AgentAPI + Send> {
+    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::agent::AgentAPI + Send> {
         Box::new(AgentClient {
-            sender: self.sender.clone(),
-            node_id: self.node_settings.node_id.clone(),
+            function_instance_client: Some(Box::new(FunctionInstanceClient {
+                sender: self.sender.clone(),
+                node_id: self.node_settings.node_id.clone(),
+            })),
         })
     }
 }
 
-pub struct AgentClient {
+pub struct FunctionInstanceClient {
     sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
     node_id: uuid::Uuid,
 }
 
+pub struct AgentClient {
+    function_instance_client: Option<Box<dyn edgeless_api::function_instance::FunctionInstanceAPI + Send>>,
+}
+
 #[async_trait::async_trait]
-impl edgeless_api::AgentAPI for AgentClient {
-    async fn start_function_instance(&mut self, request: edgeless_api::SpawnFunctionRequest) -> anyhow::Result<edgeless_api::FunctionId> {
+impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceClient {
+    async fn start_function_instance(
+        &mut self,
+        request: edgeless_api::function_instance::SpawnFunctionRequest,
+    ) -> anyhow::Result<edgeless_api::function_instance::FunctionId> {
         let mut request = request;
         if request.function_id.is_none() {
-            request.function_id = Some(edgeless_api::FunctionId::new(self.node_id));
+            request.function_id = Some(edgeless_api::function_instance::FunctionId::new(self.node_id));
         }
         let fid = request.function_id.clone().unwrap();
         let _ = self.sender.send(AgentRequest::SPAWN(request)).await;
         Ok(fid)
     }
-    async fn stop_function_instance(&mut self, id: edgeless_api::FunctionId) -> anyhow::Result<()> {
+    async fn stop_function_instance(&mut self, id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
         let _ = self.sender.send(AgentRequest::STOP(id)).await;
         Ok(())
+    }
+}
+
+impl edgeless_api::agent::AgentAPI for AgentClient {
+    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI + Send> {
+        self.function_instance_client.take().unwrap()
     }
 }

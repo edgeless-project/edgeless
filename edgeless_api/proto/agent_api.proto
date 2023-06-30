@@ -25,7 +25,40 @@ message SpawnFunctionRequest {
     map<string, string> annotations = 5;
 }
 
-service Agent {
+message WorkflowFunction {
+    string function_alias = 1;
+    FunctionClassSpecification function_class = 2;
+    map<string, string> output_callback_definitions = 3;
+    string return_continuation = 4;
+    map<string, string> function_annotations = 5;
+}
+
+message SpawnWorkflowRequest {
+    WorkflowId workflow_id = 1;
+    repeated WorkflowFunction workflow_functions = 2;
+    map<string, string> workflow_annotations = 3;
+}
+
+message WorkflowFunctionMapping {
+    string function_alias = 1;
+    repeated FunctionId instances = 2;
+}
+
+message WorkflowInstanceStatus {
+    WorkflowId workflow_id = 1;
+    repeated WorkflowFunctionMapping functions = 2;
+}
+
+message WorkflowId {
+    string workflow_id = 1;
+}
+
+service FunctionInstance {
     rpc StartFunctionInstance (SpawnFunctionRequest) returns (FunctionId);
     rpc StopFunctionInstance (FunctionId) returns (google.protobuf.Empty );
+}
+
+service WorkflowInstance {
+    rpc StartWorkflowInstance (SpawnWorkflowRequest) returns (WorkflowInstanceStatus);
+    rpc StopWorkflowInstance (WorkflowId) returns (google.protobuf.Empty);
 }

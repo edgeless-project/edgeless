@@ -3,8 +3,8 @@ use futures::{SinkExt, StreamExt};
 use crate::runner_api;
 
 enum RustRunnerRequest {
-    START(edgeless_api::FunctionId),
-    STOP(edgeless_api::FunctionId),
+    START(edgeless_api::function_instance::FunctionId),
+    STOP(edgeless_api::function_instance::FunctionId),
 }
 
 pub struct Runner {
@@ -44,11 +44,11 @@ struct RunnerClient {
 
 #[async_trait::async_trait]
 impl runner_api::RunnerAPI for RunnerClient {
-    async fn start(&mut self, function_id: edgeless_api::FunctionId) {
+    async fn start(&mut self, function_id: edgeless_api::function_instance::FunctionId) {
         let _ = self.sender.send(RustRunnerRequest::START(function_id)).await;
     }
 
-    async fn stop(&mut self, function_id: edgeless_api::FunctionId) {
+    async fn stop(&mut self, function_id: edgeless_api::function_instance::FunctionId) {
         let _ = self.sender.send(RustRunnerRequest::STOP(function_id)).await;
     }
 }
