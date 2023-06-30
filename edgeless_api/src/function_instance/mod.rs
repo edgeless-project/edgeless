@@ -31,8 +31,16 @@ pub struct SpawnFunctionRequest {
     pub annotations: std::collections::HashMap<String, String>,
 }
 
+#[derive(Debug)]
+pub struct UpdateFunctionLinksRequest {
+    pub function_id: Option<FunctionId>,
+    pub output_callback_definitions: std::collections::HashMap<String, FunctionId>,
+    pub return_continuation: FunctionId,
+}
+
 #[async_trait::async_trait]
 pub trait FunctionInstanceAPI: Sync {
-    async fn start_function_instance(&mut self, request: SpawnFunctionRequest) -> anyhow::Result<FunctionId>;
+    async fn start_function_instance(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<FunctionId>;
     async fn stop_function_instance(&mut self, id: FunctionId) -> anyhow::Result<()>;
+    async fn update_function_instance_links(&mut self, update: UpdateFunctionLinksRequest) -> anyhow::Result<()>;
 }

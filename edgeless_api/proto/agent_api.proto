@@ -25,6 +25,12 @@ message SpawnFunctionRequest {
     map<string, string> annotations = 5;
 }
 
+message UpdateFunctionLinksRequest {
+    FunctionId function_id = 1;
+    map<string, FunctionId> output_callback_definitions = 3;
+    FunctionId return_continuation = 4;
+}
+
 message WorkflowFunction {
     string function_alias = 1;
     FunctionClassSpecification function_class = 2;
@@ -56,6 +62,7 @@ message WorkflowId {
 service FunctionInstance {
     rpc StartFunctionInstance (SpawnFunctionRequest) returns (FunctionId);
     rpc StopFunctionInstance (FunctionId) returns (google.protobuf.Empty );
+    rpc UpdateFunctionInstanceLinks (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
 }
 
 service WorkflowInstance {

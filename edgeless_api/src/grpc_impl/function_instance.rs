@@ -1,3 +1,5 @@
+
+
 pub struct FunctonInstanceConverters {}
 
 impl FunctonInstanceConverters {
@@ -37,6 +39,20 @@ impl FunctonInstanceConverters {
         })
     }
 
+    pub fn parse_api_function_link_update(
+        api_update: &crate::grpc_impl::api::UpdateFunctionLinksRequest,
+    ) -> Option<crate::function_instance::UpdateFunctionLinksRequest> {
+        Some(crate::function_instance::UpdateFunctionLinksRequest {
+            function_id: api_update.function_id.as_ref().and_then(|f| Some(Self::parse_function_id(f))),
+            output_callback_definitions: api_update
+                .output_callback_definitions
+                .iter()
+                .map(|(key, value)| return (key.clone(), Self::parse_function_id(&value)))
+                .collect(),
+            return_continuation: Self::parse_function_id(&api_update.return_continuation.as_ref().unwrap()),
+        })
+    }
+
     pub fn serialize_function_id(function_id: &crate::function_instance::FunctionId) -> crate::grpc_impl::api::FunctionId {
         crate::grpc_impl::api::FunctionId {
             node_id: function_id.node_id.to_string(),
@@ -67,6 +83,20 @@ impl FunctonInstanceConverters {
                 .collect(),
             return_continuation: Some(Self::serialize_function_id(&req.return_continuation)),
             annotations: req.annotations.clone(),
+        }
+    }
+
+    pub fn serialize_update_function_links_request(
+        crate_update: &crate::function_instance::UpdateFunctionLinksRequest,
+    ) -> crate::grpc_impl::api::UpdateFunctionLinksRequest {
+        crate::grpc_impl::api::UpdateFunctionLinksRequest {
+            function_id: crate_update.function_id.as_ref().and_then(|fid| Some(Self::serialize_function_id(fid))),
+            output_callback_definitions: crate_update
+                .output_callback_definitions
+                .iter()
+                .map(|(key, value)| (key.clone(), Self::serialize_function_id(&value)))
+                .collect(),
+            return_continuation: Some(Self::serialize_function_id(&crate_update.return_continuation)),
         }
     }
 }
@@ -107,6 +137,16 @@ impl crate::function_instance::FunctionInstanceAPI for FunctionInstanceAPIClient
             Err(_) => Err(anyhow::anyhow!("Stop Request Failed")),
         }
     }
+
+    async fn update_function_instance_links(&mut self, update: crate::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+        let serialized_update = FunctonInstanceConverters::serialize_update_function_links_request(&update);
+
+        let res = self.client.update_function_instance_links(tonic::Request::new(serialized_update)).await;
+        match res {
+            Ok(_) => Ok(()),
+            Err(_) => Err(anyhow::anyhow!("Start Request Failed")),
+        }
+    }
 }
 
 pub struct FunctionInstanceAPIServer {
@@ -131,6 +171,18 @@ impl crate::grpc_impl::api::function_instance_server::FunctionInstance for Funct
     async fn stop_function_instance(&self, request: tonic::Request<crate::grpc_impl::api::FunctionId>) -> Result<tonic::Response<()>, tonic::Status> {
         let stop_function_id = FunctonInstanceConverters::parse_function_id(&request.into_inner());
         let res = self.root_api.lock().await.stop_function_instance(stop_function_id).await;
+        match res {
+            Ok(_fid) => Ok(tonic::Response::new(())),
+            Err(_) => Err(tonic::Status::internal("Server Error")),
+        }
+    }
+
+    async fn update_function_instance_links(
+        &self,
+        update: tonic::Request<crate::grpc_impl::api::UpdateFunctionLinksRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let parsed_update = FunctonInstanceConverters::parse_api_function_link_update(&update.into_inner()).unwrap();
+        let res = self.root_api.lock().await.update_function_instance_links(parsed_update).await;
         match res {
             Ok(_fid) => Ok(tonic::Response::new(())),
             Err(_) => Err(tonic::Status::internal("Server Error")),

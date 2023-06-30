@@ -11,6 +11,7 @@ enum OrchestratorRequest {
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::function_instance::FunctionId>>,
     ),
     STOP(edgeless_api::function_instance::FunctionId),
+    UPDATE(edgeless_api::function_instance::UpdateFunctionLinksRequest),
 }
 
 pub struct OrchestratorClient {
@@ -65,6 +66,10 @@ impl Orchestrator {
                     log::debug!("Orchestrator Stop {:?}", stop_function_id);
                     fn_client.stop_function_instance(stop_function_id).await;
                 }
+                OrchestratorRequest::UPDATE(update) => {
+                    log::debug!("Orchestrator Update {:?}", update);
+                    fn_client.update_function_instance_links(update).await;
+                }
             }
         }
     }
@@ -89,6 +94,11 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFuncti
     }
     async fn stop_function_instance(&mut self, id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
         let _ = self.sender.send(OrchestratorRequest::STOP(id)).await;
+        Ok(())
+    }
+
+    async fn update_function_instance_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+        let _ = self.sender.send(OrchestratorRequest::UPDATE(update)).await;
         Ok(())
     }
 }

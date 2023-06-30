@@ -5,6 +5,7 @@ use crate::runner_api;
 enum AgentRequest {
     SPAWN(edgeless_api::function_instance::SpawnFunctionRequest),
     STOP(edgeless_api::function_instance::FunctionId),
+    UPDATE(edgeless_api::function_instance::UpdateFunctionLinksRequest),
 }
 
 pub struct Agent {
@@ -34,11 +35,15 @@ impl Agent {
             match req {
                 AgentRequest::SPAWN(spawn_req) => {
                     log::debug!("Agent Spawn {:?}", spawn_req);
-                    runner.start(spawn_req.function_id.unwrap()).await;
+                    runner.start(spawn_req).await;
                 }
                 AgentRequest::STOP(stop_function_id) => {
                     log::debug!("Agent Stop {:?}", stop_function_id);
                     runner.stop(stop_function_id).await;
+                }
+                AgentRequest::UPDATE(update) => {
+                    log::debug!("Agent Update {:?}", update);
+                    runner.update(update).await;
                 }
             }
         }
@@ -79,6 +84,11 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
     }
     async fn stop_function_instance(&mut self, id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
         let _ = self.sender.send(AgentRequest::STOP(id)).await;
+        Ok(())
+    }
+
+    async fn update_function_instance_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+        let _ = self.sender.send(AgentRequest::UPDATE(update)).await;
         Ok(())
     }
 }

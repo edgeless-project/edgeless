@@ -3,8 +3,9 @@ use futures::{SinkExt, StreamExt};
 use crate::runner_api;
 
 enum RustRunnerRequest {
-    START(edgeless_api::function_instance::FunctionId),
+    START(edgeless_api::function_instance::SpawnFunctionRequest),
     STOP(edgeless_api::function_instance::FunctionId),
+    UPDATE(edgeless_api::function_instance::UpdateFunctionLinksRequest),
 }
 
 pub struct Runner {
@@ -21,11 +22,14 @@ impl Runner {
                 log::info!("Starting Edgeless Rust Runner");
                 while let Some(req) = receiver.next().await {
                     match req {
-                        RustRunnerRequest::START(function_id) => {
-                            log::debug!("Runner Start Function {:?}", function_id);
+                        RustRunnerRequest::START(spawn_request) => {
+                            log::debug!("Runner Start {:?}", spawn_request);
                         }
                         RustRunnerRequest::STOP(function_id) => {
-                            log::debug!("Runner Stop Function {:?}", function_id);
+                            log::debug!("Runner Stop {:?}", function_id);
+                        }
+                        RustRunnerRequest::UPDATE(update) => {
+                            log::debug!("Runner Update {:?}", update);
                         }
                     }
                 }
@@ -44,11 +48,17 @@ struct RunnerClient {
 
 #[async_trait::async_trait]
 impl runner_api::RunnerAPI for RunnerClient {
-    async fn start(&mut self, function_id: edgeless_api::function_instance::FunctionId) {
-        let _ = self.sender.send(RustRunnerRequest::START(function_id)).await;
+    async fn start(&mut self, request: edgeless_api::function_instance::SpawnFunctionRequest) {
+        let _ = self.sender.send(RustRunnerRequest::START(request)).await;
     }
 
     async fn stop(&mut self, function_id: edgeless_api::function_instance::FunctionId) {
         let _ = self.sender.send(RustRunnerRequest::STOP(function_id)).await;
     }
+
+    async fn update(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) {
+        let _ = self.sender.send(RustRunnerRequest::UPDATE(update)).await;
+    }
+}
+
 }
