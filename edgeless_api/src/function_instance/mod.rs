@@ -39,8 +39,26 @@ pub struct UpdateFunctionLinksRequest {
 }
 
 #[async_trait::async_trait]
-pub trait FunctionInstanceAPI: Sync {
+pub trait FunctionInstanceAPI: FunctionInstanceAPIClone + Sync + Send {
     async fn start_function_instance(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<FunctionId>;
     async fn stop_function_instance(&mut self, id: FunctionId) -> anyhow::Result<()>;
     async fn update_function_instance_links(&mut self, update: UpdateFunctionLinksRequest) -> anyhow::Result<()>;
+}
+
+// https://stackoverflow.com/a/30353928
+pub trait FunctionInstanceAPIClone {
+    fn clone_box(&self) -> Box<dyn FunctionInstanceAPI>;
+}
+impl<T> FunctionInstanceAPIClone for T
+where
+    T: 'static + FunctionInstanceAPI + Clone,
+{
+    fn clone_box(&self) -> Box<dyn FunctionInstanceAPI> {
+        Box::new(self.clone())
+    }
+}
+impl Clone for Box<dyn FunctionInstanceAPI> {
+    fn clone(&self) -> Box<dyn FunctionInstanceAPI> {
+        self.clone_box()
+    }
 }

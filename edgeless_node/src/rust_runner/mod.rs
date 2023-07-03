@@ -48,16 +48,25 @@ struct RunnerClient {
 
 #[async_trait::async_trait]
 impl runner_api::RunnerAPI for RunnerClient {
-    async fn start(&mut self, request: edgeless_api::function_instance::SpawnFunctionRequest) {
-        let _ = self.sender.send(RustRunnerRequest::START(request)).await;
+    async fn start(&mut self, request: edgeless_api::function_instance::SpawnFunctionRequest) -> anyhow::Result<()> {
+        match self.sender.send(RustRunnerRequest::START(request)).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
+        }
     }
 
-    async fn stop(&mut self, function_id: edgeless_api::function_instance::FunctionId) {
-        let _ = self.sender.send(RustRunnerRequest::STOP(function_id)).await;
+    async fn stop(&mut self, function_id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
+        match self.sender.send(RustRunnerRequest::STOP(function_id)).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
+        }
     }
 
-    async fn update(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) {
-        let _ = self.sender.send(RustRunnerRequest::UPDATE(update)).await;
+    async fn update(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+        match self.sender.send(RustRunnerRequest::UPDATE(update)).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
+        }
     }
 }
 

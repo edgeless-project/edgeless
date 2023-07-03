@@ -49,7 +49,7 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
                 workflow_annotations: std::collections::HashMap::from([("bar".to_string(), "baz".to_string())]),
             })
             .await;
-        log::debug!("{:?}", res.unwrap());
+        log::debug!("{:?}", res);
     };
     futures::join!(controller_task, server_task, test_task);
 }

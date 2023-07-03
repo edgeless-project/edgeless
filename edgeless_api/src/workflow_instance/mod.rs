@@ -34,7 +34,25 @@ pub struct SpawnWorkflowRequest {
 }
 
 #[async_trait::async_trait]
-pub trait WorkflowInstanceAPI: Sync {
+pub trait WorkflowInstanceAPI: WorkflowInstanceAPIClone + Send + Sync {
     async fn start_workflow_instance(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<WorkflowInstance>;
     async fn stop_workflow_instance(&mut self, id: WorkflowId) -> anyhow::Result<()>;
+}
+
+// https://stackoverflow.com/a/30353928
+pub trait WorkflowInstanceAPIClone {
+    fn clone_box(&self) -> Box<dyn WorkflowInstanceAPI>;
+}
+impl<T> WorkflowInstanceAPIClone for T
+where
+    T: 'static + WorkflowInstanceAPI + Clone,
+{
+    fn clone_box(&self) -> Box<dyn WorkflowInstanceAPI> {
+        Box::new(self.clone())
+    }
+}
+impl Clone for Box<dyn WorkflowInstanceAPI> {
+    fn clone(&self) -> Box<dyn WorkflowInstanceAPI> {
+        self.clone_box()
+    }
 }

@@ -21,13 +21,13 @@ impl Agent {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
-            Self::processing_loop(receiver, runner).await;
+            Self::main_task(receiver, runner).await;
         });
 
         (Agent { sender, node_settings }, main_task)
     }
 
-    async fn processing_loop(receiver: futures::channel::mpsc::UnboundedReceiver<AgentRequest>, runner: Box<dyn runner_api::RunnerAPI + Send>) {
+    async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<AgentRequest>, runner: Box<dyn runner_api::RunnerAPI + Send>) {
         let mut receiver = std::pin::pin!(receiver);
         let mut runner = runner;
         log::info!("Starting Edgeless Agent");
@@ -35,15 +35,30 @@ impl Agent {
             match req {
                 AgentRequest::SPAWN(spawn_req) => {
                     log::debug!("Agent Spawn {:?}", spawn_req);
-                    runner.start(spawn_req).await;
+                    match runner.start(spawn_req).await {
+                        Ok(_) => {}
+                        Err(err) => {
+                            log::error!("Unhandled Start Error: {}", err);
+                        }
+                    }
                 }
                 AgentRequest::STOP(stop_function_id) => {
                     log::debug!("Agent Stop {:?}", stop_function_id);
-                    runner.stop(stop_function_id).await;
+                    match runner.stop(stop_function_id).await {
+                        Ok(_) => {}
+                        Err(err) => {
+                            log::error!("Unhandled Stop Error: {}", err);
+                        }
+                    }
                 }
                 AgentRequest::UPDATE(update) => {
                     log::debug!("Agent Update {:?}", update);
-                    runner.update(update).await;
+                    match runner.update(update).await {
+                        Ok(_) => {}
+                        Err(err) => {
+                            log::error!("Unhandled Update Error: {}", err);
+                        }
+                    }
                 }
             }
         }
@@ -51,21 +66,23 @@ impl Agent {
 
     pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::agent::AgentAPI + Send> {
         Box::new(AgentClient {
-            function_instance_client: Some(Box::new(FunctionInstanceClient {
+            function_instance_client: Box::new(FunctionInstanceClient {
                 sender: self.sender.clone(),
                 node_id: self.node_settings.node_id.clone(),
-            })),
+            }),
         })
     }
 }
 
+#[derive(Clone)]
 pub struct FunctionInstanceClient {
     sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
     node_id: uuid::Uuid,
 }
 
+#[derive(Clone)]
 pub struct AgentClient {
-    function_instance_client: Option<Box<dyn edgeless_api::function_instance::FunctionInstanceAPI + Send>>,
+    function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceAPI>,
 }
 
 #[async_trait::async_trait]
@@ -75,26 +92,36 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::function_instance::FunctionId> {
         let mut request = request;
-        if request.function_id.is_none() {
-            request.function_id = Some(edgeless_api::function_instance::FunctionId::new(self.node_id));
+        let f_id = match request.function_id.clone() {
+            Some(id) => id,
+            None => {
+                let new_id = edgeless_api::function_instance::FunctionId::new(self.node_id);
+                request.function_id = Some(new_id.clone());
+                new_id
+            }
+        };
+        match self.sender.send(AgentRequest::SPAWN(request)).await {
+            Ok(_) => Ok(f_id),
+            Err(_) => Err(anyhow::anyhow!("Agent Channel Error")),
         }
-        let fid = request.function_id.clone().unwrap();
-        let _ = self.sender.send(AgentRequest::SPAWN(request)).await;
-        Ok(fid)
     }
     async fn stop_function_instance(&mut self, id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
-        let _ = self.sender.send(AgentRequest::STOP(id)).await;
-        Ok(())
+        match self.sender.send(AgentRequest::STOP(id)).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(anyhow::anyhow!("Agent Channel Error")),
+        }
     }
 
     async fn update_function_instance_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
-        let _ = self.sender.send(AgentRequest::UPDATE(update)).await;
-        Ok(())
+        match self.sender.send(AgentRequest::UPDATE(update)).await {
+            Ok(_) => Ok(()),
+            Err(_) => Err(anyhow::anyhow!("Agent Channel Error")),
+        }
     }
 }
 
 impl edgeless_api::agent::AgentAPI for AgentClient {
-    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI + Send> {
-        self.function_instance_client.take().unwrap()
+    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI> {
+        self.function_instance_client.clone()
     }
 }
