@@ -30,23 +30,35 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
                 workflow_id: edgeless_api::workflow_instance::WorkflowId {
                     workflow_id: uuid::Uuid::new_v4(),
                 },
-                workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
-                    function_alias: "test_fun_1".to_string(),
-                    function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                        function_class_id: "example_1".to_string(),
-                        function_class_type: "RUST_WASM".to_string(),
-                        function_class_version: "0.1".to_string(),
-                        function_class_inlude_code: vec![0, 1, 2, 3, 4],
-                        output_callback_declarations: vec!["cb1".to_string(), "cb2".to_string()],
+                workflow_functions: vec![
+                    edgeless_api::workflow_instance::WorkflowFunction {
+                        function_alias: "ponger".to_string(),
+                        function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                            function_class_id: "ponger".to_string(),
+                            function_class_type: "RUST_WASM".to_string(),
+                            function_class_version: "0.1".to_string(),
+                            function_class_inlude_code: std::fs::read("examples/ping_pong/pong/pong.wasm").unwrap(),
+                            output_callback_declarations: vec![],
+                        },
+                        output_callback_definitions: std::collections::HashMap::new(),
+                        return_continuation: "unused".to_string(),
+                        function_annotations: std::collections::HashMap::new(),
                     },
-                    output_callback_definitions: std::collections::HashMap::from([
-                        ("cb1".to_string(), "test_fun_1".to_string()),
-                        ("cb2".to_string(), "test_fun_1".to_string()),
-                    ]),
-                    return_continuation: "test_fun_1".to_string(),
-                    function_annotations: std::collections::HashMap::from([("foo".to_string(), "bar".to_string())]),
-                }],
-                workflow_annotations: std::collections::HashMap::from([("bar".to_string(), "baz".to_string())]),
+                    edgeless_api::workflow_instance::WorkflowFunction {
+                        function_alias: "pinger".to_string(),
+                        function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                            function_class_id: "pinger".to_string(),
+                            function_class_type: "RUST_WASM".to_string(),
+                            function_class_version: "0.1".to_string(),
+                            function_class_inlude_code: std::fs::read("examples/ping_pong/ping/ping.wasm").unwrap(),
+                            output_callback_declarations: vec!["ponger".to_string()],
+                        },
+                        output_callback_definitions: std::collections::HashMap::from([("ponger".to_string(), "ponger".to_string())]),
+                        return_continuation: "unused".to_string(),
+                        function_annotations: std::collections::HashMap::new(),
+                    },
+                ],
+                workflow_annotations: std::collections::HashMap::new(),
             })
             .await;
         log::debug!("{:?}", res);

@@ -1,0 +1,15 @@
+cargo-features = ["per-package-target"]
+[package]
+name = "edgeless_sample_ping"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de"]
+edition = "2021"
+forced-target = "wasm32-unknown-unknown"
+
+[lib]
+name = "edgeless_sample_ping"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen = "0.8"

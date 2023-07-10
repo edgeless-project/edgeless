@@ -22,7 +22,7 @@ pub struct FunctionClassSpecification {
     pub output_callback_declarations: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SpawnFunctionRequest {
     pub function_id: Option<FunctionId>,
     pub code: FunctionClassSpecification,

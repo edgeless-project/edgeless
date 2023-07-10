@@ -4,5 +4,7 @@ members = [
     "edgeless_bal",
     "edgeless_con",
     "edgeless_node",
-    "edgeless_orc"
+    "edgeless_orc",
+    "examples/ping_pong/ping",
+    "examples/ping_pong/pong",
 ]

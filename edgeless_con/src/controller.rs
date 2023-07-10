@@ -54,10 +54,10 @@ impl Controller {
                                 output_callback_definitions: fun
                                     .output_callback_definitions
                                     .iter()
-                                    .map(|(output_id, _output_alias)| {
+                                    .map(|(output_id, output_alias)| {
                                         (
                                             output_id.to_string(),
-                                            edgeless_api::function_instance::FunctionId::new(uuid::Uuid::new_v4()),
+                                            f_ids.iter().filter(|item| &item.function_alias == output_alias).next().unwrap().instances[0].clone(),
                                         )
                                     })
                                     .collect(),
