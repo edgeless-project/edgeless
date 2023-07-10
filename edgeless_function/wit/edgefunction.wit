@@ -1,6 +1,6 @@
-package edgeless:edgefun
+package edgeless:edgefunction
 
-world edgefun {
+world edgefunction {
   
   record fid {
     node: string,

@@ -5,6 +5,7 @@ members = [
     "edgeless_con",
     "edgeless_node",
     "edgeless_orc",
+    "edgeless_function",
     "examples/ping_pong/ping",
     "examples/ping_pong/pong",
 ]

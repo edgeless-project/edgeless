@@ -12,4 +12,4 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-wit-bindgen = "0.8"
+edgeless_function = { path = "../../../edgeless_function" }

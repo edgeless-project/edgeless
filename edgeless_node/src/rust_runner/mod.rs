@@ -6,7 +6,7 @@ use crate::{
 };
 
 mod api {
-    wasmtime::component::bindgen!({async: true});
+    wasmtime::component::bindgen!({path: "../edgeless_function/wit/edgefunction.wit", async: true});
 }
 
 enum RustRunnerRequest {
@@ -102,7 +102,7 @@ struct FunctionInstance {
     component: wasmtime::component::Component,
     linker: wasmtime::component::Linker<FunctionState>,
     store: wasmtime::Store<FunctionState>,
-    binding: api::Edgefun,
+    binding: api::Edgefunction,
     instance: wasmtime::component::Instance,
     data_plane: data_plane::DataPlaneChainHandle,
 }
@@ -129,7 +129,7 @@ impl FunctionInstance {
         let engine = wasmtime::Engine::new(&config)?;
         let component = wasmtime::component::Component::from_binary(&engine, &spawn_req.code.function_class_inlude_code)?;
         let mut linker = wasmtime::component::Linker::new(&engine);
-        api::Edgefun::add_to_linker(&mut linker, |state: &mut FunctionState| state)?;
+        api::Edgefunction::add_to_linker(&mut linker, |state: &mut FunctionState| state)?;
         let mut store = wasmtime::Store::new(
             &engine,
             FunctionState {
@@ -138,7 +138,7 @@ impl FunctionInstance {
                 alias_map: spawn_req.output_callback_definitions,
             },
         );
-        let (binding, instance) = api::Edgefun::instantiate_async(&mut store, &component, &linker).await?;
+        let (binding, instance) = api::Edgefunction::instantiate_async(&mut store, &component, &linker).await?;
         binding.call_handle_init(&mut store, "test").await?;
         Ok(Self {
             config,
@@ -188,7 +188,7 @@ impl FunctionInstance {
 }
 
 #[async_trait::async_trait]
-impl api::EdgefunImports for FunctionState {
+impl api::EdgefunctionImports for FunctionState {
     async fn call_alias(&mut self, alias: String, msg: String) -> wasmtime::Result<()> {
         if let Some(target) = self.alias_map.get(&alias) {
             self.data_plane.send(target.clone(), msg).await;

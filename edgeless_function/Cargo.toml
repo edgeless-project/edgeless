@@ -1,0 +1,12 @@
+[package]
+name = "edgeless_function"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de"]
+edition = "2021"
+
+[lib]
+name = "edgeless_function"
+path = "src/lib.rs"
+
+[dependencies]
+wit-bindgen = "0.8"

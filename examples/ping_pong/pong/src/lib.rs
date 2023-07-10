@@ -1,8 +1,7 @@
-wit_bindgen::generate!("edgefun");
-
+use edgeless_function::api::*;
 struct PongerFun;
 
-impl Edgefun for PongerFun {
+impl Edgefunction for PongerFun {
     fn handle_call(src: Fid, encoded_message: String) {
         log(&format!("Ponger: 'Call' called, MSG: {}", encoded_message));
         call(&src, "PONG");
@@ -16,5 +15,4 @@ impl Edgefun for PongerFun {
         log("Ponger: 'Stop' called");
     }
 }
-
-export_edgefun!(PongerFun);
+    edgeless_function::export!(PongerFun);

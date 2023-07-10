@@ -1,8 +1,8 @@
-wit_bindgen::generate!("edgefun");
+use edgeless_function::api::*;
 
 struct PingerFun;
 
-impl Edgefun for PingerFun {
+impl Edgefunction for PingerFun {
     fn handle_call(_src: Fid, encoded_message: String) {
         log(&format!("Pinger: 'Call' called, MSG: {}", encoded_message));
         if encoded_message == "wakeup" {
@@ -21,4 +21,4 @@ impl Edgefun for PingerFun {
     }
 }
 
-export_edgefun!(PingerFun);
+edgeless_function::export!(PingerFun);
