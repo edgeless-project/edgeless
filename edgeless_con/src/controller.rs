@@ -44,37 +44,79 @@ impl Controller {
         while let Some(req) = receiver.next().await {
             match req {
                 ControllerRequest::START(spawn_workflow_request, reply_sender) => {
-                    let mut f_ids = Vec::<edgeless_api::workflow_instance::WorkflowFunctionMapping>::new();
-                    for fun in spawn_workflow_request.workflow_functions {
+                    let mut f_ids = std::collections::HashMap::<String, edgeless_api::workflow_instance::WorkflowFunctionMapping>::new();
+                    let mut to_patch = Vec::<String>::new();
+                    for fun in spawn_workflow_request.workflow_functions.clone() {
+                        let outputs: std::collections::HashMap<String, edgeless_api::function_instance::FunctionId> = fun
+                            .output_callback_definitions
+                            .iter()
+                            .filter_map(|(output_id, output_alias)| match f_ids.get(output_alias) {
+                                Some(mapping) => Some((output_id.to_string(), mapping.instances[0].clone())),
+                                None => None,
+                            })
+                            .collect();
+                        if outputs.len() != fun.output_callback_definitions.len() {
+                            to_patch.push(fun.function_alias.clone());
+                        }
                         let f_id = fn_client
                             .start_function_instance(edgeless_api::function_instance::SpawnFunctionRequest {
                                 function_id: None,
                                 code: fun.function_class_specification,
                                 annotations: fun.function_annotations,
-                                output_callback_definitions: fun
-                                    .output_callback_definitions
-                                    .iter()
-                                    .map(|(output_id, output_alias)| {
-                                        (
-                                            output_id.to_string(),
-                                            f_ids.iter().filter(|item| &item.function_alias == output_alias).next().unwrap().instances[0].clone(),
-                                        )
-                                    })
-                                    .collect(),
+                                output_callback_definitions: outputs,
                                 return_continuation: edgeless_api::function_instance::FunctionId::new(uuid::Uuid::new_v4()),
                             })
                             .await;
                         if let Ok(id) = f_id {
-                            f_ids.push(edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                                function_alias: fun.function_alias.clone(),
-                                instances: vec![id],
-                            });
+                            f_ids.insert(
+                                fun.function_alias.clone(),
+                                edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                                    function_alias: fun.function_alias.clone(),
+                                    instances: vec![id],
+                                },
+                            );
                         }
                     }
-                    active_workflows.insert(spawn_workflow_request.workflow_id.workflow_id.to_string(), f_ids.clone());
+                    for workflow_fid_alias in to_patch {
+                        if let Some(mapping) = f_ids.get(&workflow_fid_alias) {
+                            if let Some(config) = spawn_workflow_request
+                                .workflow_functions
+                                .iter()
+                                .filter(|fun| fun.function_alias == workflow_fid_alias)
+                                .next()
+                            {
+                                for instance in &mapping.instances {
+                                    let res = fn_client
+                                        .update_function_instance_links(edgeless_api::function_instance::UpdateFunctionLinksRequest {
+                                            function_id: Some(instance.clone()),
+                                            output_callback_definitions: config
+                                                .output_callback_definitions
+                                                .iter()
+                                                .filter_map(|(output_id, output_alias)| match f_ids.get(output_alias) {
+                                                    Some(peer_function) => Some((output_id.to_string(), peer_function.instances[0].clone())),
+                                                    None => None,
+                                                })
+                                                .collect(),
+                                            return_continuation: edgeless_api::function_instance::FunctionId::new(uuid::Uuid::new_v4()),
+                                        })
+                                        .await;
+                                    match res {
+                                        Ok(_) => {}
+                                        Err(err) => {
+                                            log::error!("Unhandled: {:?}", err);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    active_workflows.insert(
+                        spawn_workflow_request.workflow_id.workflow_id.to_string(),
+                        f_ids.clone().into_values().collect(),
+                    );
                     match reply_sender.send(Ok(edgeless_api::workflow_instance::WorkflowInstance {
                         workflow_id: spawn_workflow_request.workflow_id,
-                        functions: f_ids.clone(),
+                        functions: f_ids.into_values().collect(),
                     })) {
                         Ok(_) => {}
                         Err(err) => {

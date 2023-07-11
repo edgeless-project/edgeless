@@ -1,4 +1,4 @@
-use futures::{SinkExt, StreamExt};
+use futures::{FutureExt, SinkExt, StreamExt};
 
 use crate::{
     data_plane::{self},
@@ -13,6 +13,7 @@ enum RustRunnerRequest {
     START(edgeless_api::function_instance::SpawnFunctionRequest),
     STOP(edgeless_api::function_instance::FunctionId),
     UPDATE(edgeless_api::function_instance::UpdateFunctionLinksRequest),
+    FUNCTION_EXIT(edgeless_api::function_instance::FunctionId),
 }
 
 pub struct Runner {
@@ -25,11 +26,13 @@ impl Runner {
         data_plane_provider: data_plane::DataPlaneChainProvider,
     ) -> (Self, futures::future::BoxFuture<'static, ()>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
+        let cloned_sender = sender.clone();
         (
             Runner { sender },
             Box::pin(async move {
                 let mut receiver = receiver;
                 let mut data_plane_provider = data_plane_provider;
+                let mut functions = std::collections::HashMap::<uuid::Uuid, FunctionInstance>::new();
                 log::info!("Starting Edgeless Rust Runner");
                 while let Some(req) = receiver.next().await {
                     match req {
@@ -42,20 +45,26 @@ impl Runner {
                             };
                             log::debug!("Start Function {:?}", spawn_request);
                             let cloned_req = spawn_request.clone();
-                            let handle = data_plane_provider.get_chain_for(function_id.clone()).await;
-                            tokio::spawn(async move {
-                                if let Ok(mut f) = FunctionInstance::new(cloned_req, handle).await {
-                                    f.run().await;
-                                } else {
-                                    log::info!("Function Spawn Error {:?}", function_id);
-                                }
-                            });
+                            let data_plane = data_plane_provider.get_chain_for(function_id.clone()).await;
+                            let instance = FunctionInstance::launch(cloned_req, data_plane, cloned_sender.clone()).await;
+                            functions.insert(function_id.function_id.clone(), instance.unwrap());
                         }
                         RustRunnerRequest::STOP(function_id) => {
                             log::debug!("Stop Function {:?}", function_id);
+                            if let Some(instance) = functions.get_mut(&function_id.function_id) {
+                                instance.stop().await;
+                            }
+                            // This will also create a FUNCTION_EXIT event.
+                            functions.remove(&function_id.function_id);
                         }
                         RustRunnerRequest::UPDATE(update) => {
                             log::debug!("Update Function {:?}", update);
+                            if let Some(instance) = functions.get_mut(&update.function_id.as_ref().unwrap().function_id) {
+                                instance.update(update).await;
+                            }
+                        }
+                        RustRunnerRequest::FUNCTION_EXIT(id) => {
+                            log::debug!("Function Exit Event: {:?}", id);
                         }
                     }
                 }
@@ -96,7 +105,8 @@ impl runner_api::RunnerAPI for RunnerClient {
     }
 }
 
-struct FunctionInstance {
+struct FunctionInstanceTaskState {
+    function_id: edgeless_api::function_instance::FunctionId,
     config: wasmtime::Config,
     engine: wasmtime::Engine,
     component: wasmtime::component::Component,
@@ -105,42 +115,107 @@ struct FunctionInstance {
     binding: api::Edgefunction,
     instance: wasmtime::component::Instance,
     data_plane: data_plane::DataPlaneChainHandle,
+    runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
+}
+
+struct FunctionInstanceCallbackTable {
+    alias_map: std::collections::HashMap<String, edgeless_api::function_instance::FunctionId>,
+}
+
+struct FunctionInstance {
+    task_handle: Option<tokio::task::JoinHandle<()>>,
+    callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
+    stop_handle: Option<futures::channel::oneshot::Sender<()>>,
+}
+
+impl FunctionInstance {
+    async fn launch(
+        spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
+        data_plane: data_plane::DataPlaneChainHandle,
+        runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
+    ) -> anyhow::Result<Self> {
+        let callback_table = std::sync::Arc::new(tokio::sync::Mutex::new(FunctionInstanceCallbackTable {
+            alias_map: spawn_req.output_callback_definitions.clone(),
+        }));
+        let function_id = match spawn_req.function_id.clone() {
+            Some(id) => id,
+            None => {
+                return Err(anyhow::anyhow!("No FunctionId!"));
+            }
+        };
+        let cloned_callbacks = callback_table.clone();
+        let (sender, receiver) = futures::channel::oneshot::channel::<()>();
+        let task = tokio::spawn(async move {
+            let receiver = receiver;
+            if let Ok(mut f) = FunctionInstanceTaskState::new(
+                function_id.clone(),
+                &spawn_req.code.function_class_inlude_code,
+                cloned_callbacks,
+                data_plane,
+                runner_api,
+            )
+            .await
+            {
+                f.run(receiver).await;
+            } else {
+                log::info!("Function Spawn Error {:?}", function_id);
+            }
+        });
+        Ok(Self {
+            task_handle: Some(task),
+            callback_table: callback_table,
+            stop_handle: Some(sender),
+        })
+    }
+
+    async fn stop(&mut self) {
+        if let Some(poison) = self.stop_handle.take() {
+            poison.send(()).unwrap();
+        }
+        if let Some(handle) = self.task_handle.take() {
+            handle.await.unwrap();
+        }
+    }
+
+    async fn update(&mut self, update_req: edgeless_api::function_instance::UpdateFunctionLinksRequest) {
+        self.callback_table.lock().await.alias_map = update_req.output_callback_definitions;
+    }
 }
 
 struct FunctionState {
     function_id: edgeless_api::function_instance::FunctionId,
     data_plane: data_plane::DataPlaneChainWriteHandle,
-    alias_map: std::collections::HashMap<String, edgeless_api::function_instance::FunctionId>,
+    callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
 }
 
-impl FunctionInstance {
+impl FunctionInstanceTaskState {
     async fn new(
-        spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
+        function_id: edgeless_api::function_instance::FunctionId,
+        binary: &[u8],
+        callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
         data_plane: data_plane::DataPlaneChainHandle,
+        runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
     ) -> anyhow::Result<Self> {
-        let function_id = match spawn_req.function_id {
-            Some(id) => id,
-            None => return Err(anyhow::anyhow!("No FunctionId.")),
-        };
         let mut data_plane = data_plane;
         let mut config = wasmtime::Config::new();
         config.async_support(true);
         config.wasm_component_model(true);
         let engine = wasmtime::Engine::new(&config)?;
-        let component = wasmtime::component::Component::from_binary(&engine, &spawn_req.code.function_class_inlude_code)?;
+        let component = wasmtime::component::Component::from_binary(&engine, binary)?;
         let mut linker = wasmtime::component::Linker::new(&engine);
         api::Edgefunction::add_to_linker(&mut linker, |state: &mut FunctionState| state)?;
         let mut store = wasmtime::Store::new(
             &engine,
             FunctionState {
-                function_id: function_id,
+                function_id: function_id.clone(),
                 data_plane: data_plane.new_write_handle().await,
-                alias_map: spawn_req.output_callback_definitions,
+                callback_table: callback_table,
             },
         );
         let (binding, instance) = api::Edgefunction::instantiate_async(&mut store, &component, &linker).await?;
         binding.call_handle_init(&mut store, "test").await?;
         Ok(Self {
+            function_id,
             config,
             engine,
             component,
@@ -149,19 +224,34 @@ impl FunctionInstance {
             binding,
             instance,
             data_plane,
+            runner_api,
         })
     }
 
-    async fn run(&mut self) {
+    async fn run(&mut self, poison_pill_receiver: futures::channel::oneshot::Receiver<()>) {
+        let mut poison_pill_receiver = poison_pill_receiver;
         loop {
-            let (src, msg) = self.data_plane.receive_next().await;
-            match self.activate(Event::Call(src, msg)).await {
-                Ok(_) => {}
-                Err(_) => {
-                    return;
+            futures::select! {
+                _ = poison_pill_receiver => {
+                    break;
+                },
+                (src, msg) =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                    match self.activate(Event::Call(src, msg)).await {
+                        Ok(_) => {}
+                        Err(_) => {
+                            break;
+                        }
+                    }
                 }
             }
+            // let .await;
         }
+        match self.runner_api.send(RustRunnerRequest::FUNCTION_EXIT(self.function_id.clone())).await {
+            Ok(_) => {}
+            Err(_) => {
+                log::error!("FunctionInstance outlived runner.")
+            }
+        };
     }
 
     async fn activate(&mut self, event: Event) -> anyhow::Result<()> {
@@ -190,11 +280,12 @@ impl FunctionInstance {
 #[async_trait::async_trait]
 impl api::EdgefunctionImports for FunctionState {
     async fn call_alias(&mut self, alias: String, msg: String) -> wasmtime::Result<()> {
-        if let Some(target) = self.alias_map.get(&alias) {
+        if let Some(target) = self.callback_table.lock().await.alias_map.get(&alias) {
             self.data_plane.send(target.clone(), msg).await;
             Ok(())
         } else {
-            Err(anyhow::anyhow!("Unknown alias."))
+            log::warn!("Unknown alias.");
+            Ok(())
         }
     }
 

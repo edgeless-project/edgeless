@@ -25,11 +25,12 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
         let mut con_client = edgeless_api::grpc_impl::con::ControllerAPIClient::new(&settings.controller_grpc_api_addr).await;
         let mut con_wf_client = con_client.workflow_instance_api();
+        let my_wf_id = edgeless_api::workflow_instance::WorkflowId {
+            workflow_id: uuid::Uuid::new_v4(),
+        };
         let res = con_wf_client
             .start_workflow_instance(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                workflow_id: edgeless_api::workflow_instance::WorkflowId {
-                    workflow_id: uuid::Uuid::new_v4(),
-                },
+                workflow_id: my_wf_id.clone(),
                 workflow_functions: vec![
                     edgeless_api::workflow_instance::WorkflowFunction {
                         function_alias: "ponger".to_string(),
@@ -38,9 +39,9 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
                             function_class_type: "RUST_WASM".to_string(),
                             function_class_version: "0.1".to_string(),
                             function_class_inlude_code: std::fs::read("examples/ping_pong/pong/pong.wasm").unwrap(),
-                            output_callback_declarations: vec![],
+                            output_callback_declarations: vec!["pinger".to_string()],
                         },
-                        output_callback_definitions: std::collections::HashMap::new(),
+                        output_callback_definitions: std::collections::HashMap::from([("pinger".to_string(), "pinger".to_string())]),
                         return_continuation: "unused".to_string(),
                         function_annotations: std::collections::HashMap::new(),
                     },
@@ -62,6 +63,8 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
             })
             .await;
         log::debug!("{:?}", res);
+        tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+        con_wf_client.stop_workflow_instance(my_wf_id).await.unwrap();
     };
     futures::join!(controller_task, server_task, test_task);
 }

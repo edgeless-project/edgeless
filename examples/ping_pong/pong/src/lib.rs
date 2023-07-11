@@ -2,9 +2,10 @@ use edgeless_function::api::*;
 struct PongerFun;
 
 impl Edgefunction for PongerFun {
-    fn handle_call(src: Fid, encoded_message: String) {
+    fn handle_call(_src: Fid, encoded_message: String) {
         log(&format!("Ponger: 'Call' called, MSG: {}", encoded_message));
-        call(&src, "PONG");
+        // call(&src, "PONG");
+        call_alias("pinger", "PONG2");
     }
 
     fn handle_init(_payload: String) {
@@ -15,4 +16,4 @@ impl Edgefunction for PongerFun {
         log("Ponger: 'Stop' called");
     }
 }
-    edgeless_function::export!(PongerFun);
+edgeless_function::export!(PongerFun);
