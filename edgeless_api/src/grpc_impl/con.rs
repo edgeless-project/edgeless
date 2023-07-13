@@ -31,7 +31,10 @@ impl WorkflowInstanceAPIServer {
                     log::info!("Start ControllerAPI GRPC Server");
 
                     match tonic::transport::Server::builder()
-                        .add_service(crate::grpc_impl::api::workflow_instance_server::WorkflowInstanceServer::new(workflow_api))
+                        .add_service(
+                            crate::grpc_impl::api::workflow_instance_server::WorkflowInstanceServer::new(workflow_api)
+                                .max_decoding_message_size(usize::MAX),
+                        )
                         .serve(host)
                         .await
                     {

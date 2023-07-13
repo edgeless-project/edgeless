@@ -28,10 +28,11 @@ impl OrchestratorAPIServer {
             let function_api = function_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&listen_addr) {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start ControllerAPI GRPC Server");
-
                     match tonic::transport::Server::builder()
-                        .add_service(crate::grpc_impl::api::function_instance_server::FunctionInstanceServer::new(function_api))
+                        .add_service(
+                            crate::grpc_impl::api::function_instance_server::FunctionInstanceServer::new(function_api)
+                                .max_decoding_message_size(usize::MAX),
+                        )
                         .serve(host)
                         .await
                     {

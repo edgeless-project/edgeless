@@ -142,7 +142,10 @@ impl FunctionInstanceAPIClient {
     pub async fn new(server_addr: &str) -> Self {
         loop {
             match crate::grpc_impl::api::function_instance_client::FunctionInstanceClient::connect(server_addr.to_string()).await {
-                Ok(client) => return Self { client },
+                Ok(client) => {
+                    let client = client.max_decoding_message_size(usize::MAX);
+                    return Self { client };
+                }
                 Err(_) => {
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 }

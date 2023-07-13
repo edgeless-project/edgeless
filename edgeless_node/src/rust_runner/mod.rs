@@ -43,14 +43,14 @@ impl Runner {
                                     continue;
                                 }
                             };
-                            log::debug!("Start Function {:?}", spawn_request);
+                            log::info!("Start Function {:?}", spawn_request.function_id);
                             let cloned_req = spawn_request.clone();
                             let data_plane = data_plane_provider.get_chain_for(function_id.clone()).await;
                             let instance = FunctionInstance::launch(cloned_req, data_plane, cloned_sender.clone()).await;
                             functions.insert(function_id.function_id.clone(), instance.unwrap());
                         }
                         RustRunnerRequest::STOP(function_id) => {
-                            log::debug!("Stop Function {:?}", function_id);
+                            log::info!("Stop Function {:?}", function_id);
                             if let Some(instance) = functions.get_mut(&function_id.function_id) {
                                 instance.stop().await;
                             }
@@ -58,13 +58,13 @@ impl Runner {
                             functions.remove(&function_id.function_id);
                         }
                         RustRunnerRequest::UPDATE(update) => {
-                            log::debug!("Update Function {:?}", update);
+                            log::info!("Update Function {:?}", update.function_id);
                             if let Some(instance) = functions.get_mut(&update.function_id.as_ref().unwrap().function_id) {
                                 instance.update(update).await;
                             }
                         }
                         RustRunnerRequest::FUNCTION_EXIT(id) => {
-                            log::debug!("Function Exit Event: {:?}", id);
+                            log::info!("Function Exit Event: {:?}", id);
                         }
                     }
                 }
@@ -235,11 +235,20 @@ impl FunctionInstanceTaskState {
                 _ = poison_pill_receiver => {
                     break;
                 },
-                (src, msg) =  Box::pin(self.data_plane.receive_next()).fuse() => {
-                    match self.activate(Event::Call(src, msg)).await {
-                        Ok(_) => {}
-                        Err(_) => {
-                            break;
+                (src, stream_id, msg) =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                    if stream_id == 0 {
+                        match self.activate(Event::Cast(src, msg)).await {
+                            Ok(_) => {}
+                            Err(_) => {
+                                break;
+                            }
+                        }
+                    } else {
+                        match self.activate(Event::Call(stream_id, src, msg)).await {
+                            Ok(_) => {}
+                            Err(_) => {
+                                break;
+                            }
                         }
                     }
                 }
@@ -256,9 +265,9 @@ impl FunctionInstanceTaskState {
 
     async fn activate(&mut self, event: Event) -> anyhow::Result<()> {
         match event {
-            Event::Call(src, msg) => {
+            Event::Cast(src, msg) => {
                 self.binding
-                    .call_handle_call(
+                    .call_handle_cast(
                         &mut self.store,
                         &api::Fid {
                             node: src.node_id.to_string(),
@@ -269,8 +278,29 @@ impl FunctionInstanceTaskState {
                     .await?;
                 Ok(())
             }
-            Event::Stop() => {
-                self.binding.call_handle_stop(&mut self.store).await?;
+            Event::Call(channel_id, src, msg) => {
+                let res = self
+                    .binding
+                    .call_handle_call(
+                        &mut self.store,
+                        &api::Fid {
+                            node: src.node_id.to_string(),
+                            function: src.function_id.to_string(),
+                        },
+                        &msg,
+                    )
+                    .await?;
+                let mut wh = self.data_plane.new_write_handle().await;
+                wh.reply(
+                    src,
+                    channel_id,
+                    match res {
+                        api::CallRet::Err => data_plane::CallRet::Err,
+                        api::CallRet::Noreply => data_plane::CallRet::NoReply,
+                        api::CallRet::Reply(msg) => data_plane::CallRet::Reply(msg),
+                    },
+                )
+                .await;
                 Ok(())
             }
         }
@@ -279,7 +309,7 @@ impl FunctionInstanceTaskState {
 
 #[async_trait::async_trait]
 impl api::EdgefunctionImports for FunctionState {
-    async fn call_alias(&mut self, alias: String, msg: String) -> wasmtime::Result<()> {
+    async fn cast_alias(&mut self, alias: String, msg: String) -> wasmtime::Result<()> {
         if let Some(target) = self.callback_table.lock().await.alias_map.get(&alias) {
             self.data_plane.send(target.clone(), msg).await;
             Ok(())
@@ -289,10 +319,34 @@ impl api::EdgefunctionImports for FunctionState {
         }
     }
 
-    async fn call(&mut self, target: api::Fid, msg: String) -> wasmtime::Result<()> {
+    async fn cast(&mut self, target: api::Fid, msg: String) -> wasmtime::Result<()> {
         let parsed_target = parse_wit_function_id(&target)?;
         self.data_plane.send(parsed_target, msg).await;
         Ok(())
+    }
+
+    async fn call(&mut self, target: api::Fid, msg: String) -> wasmtime::Result<api::CallRet> {
+        let parsed_target = parse_wit_function_id(&target)?;
+        let res = self.data_plane.call(parsed_target, msg).await;
+        Ok(match res {
+            data_plane::CallRet::Reply(msg) => api::CallRet::Reply(msg),
+            data_plane::CallRet::NoReply => api::CallRet::Noreply,
+            data_plane::CallRet::Err => api::CallRet::Err,
+        })
+    }
+
+    async fn call_alias(&mut self, alias: String, msg: String) -> wasmtime::Result<api::CallRet> {
+        if let Some(target) = self.callback_table.lock().await.alias_map.get(&alias) {
+            let res = self.data_plane.call(target.clone(), msg).await;
+            Ok(match res {
+                data_plane::CallRet::Reply(msg) => api::CallRet::Reply(msg),
+                data_plane::CallRet::NoReply => api::CallRet::Noreply,
+                data_plane::CallRet::Err => api::CallRet::Err,
+            })
+        } else {
+            log::warn!("Unknown alias.");
+            Ok(api::CallRet::Err)
+        }
     }
 
     async fn log(&mut self, msg: String) -> wasmtime::Result<()> {
@@ -307,7 +361,7 @@ impl api::EdgefunctionImports for FunctionState {
         })
     }
 
-    async fn delayed_call(&mut self, delay: u64, target: api::Fid, payload: String) -> wasmtime::Result<()> {
+    async fn delayed_cast(&mut self, delay: u64, target: api::Fid, payload: String) -> wasmtime::Result<()> {
         let mut cloned_plane = self.data_plane.clone();
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
@@ -329,6 +383,6 @@ fn parse_wit_function_id(fid: &api::Fid) -> anyhow::Result<edgeless_api::functio
 }
 
 enum Event {
-    Call(edgeless_api::function_instance::FunctionId, String),
-    Stop(),
+    Cast(edgeless_api::function_instance::FunctionId, String),
+    Call(u64, edgeless_api::function_instance::FunctionId, String),
 }

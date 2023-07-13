@@ -7,13 +7,22 @@ world edgefunction {
     function: string
   }
 
-  import call-alias: func(alias: string, msg: string)
-  import call: func(target: fid, msg: string)
+  variant call-ret {
+    reply(string),
+    noreply,
+    err
+  }
+
+  import cast-alias: func(alias: string, msg: string)
+  import cast: func(target: fid, msg: string)
+  import call: func(target: fid, msg: string) -> call-ret
+  import call-alias: func(alias: string, msg: string) -> call-ret
   import log: func(msg: string)
   import slf: func() -> fid
-  import delayed-call: func(delayms: u64, target: fid, payload: string)
+  import delayed-cast: func(delayms: u64, target: fid, payload: string)
 
-  export handle-call: func(source: fid, msg: string)
+  export handle-cast: func(source: fid, msg: string)
+  export handle-call: func(source: fid, msg: string) -> call-ret
   export handle-init: func(payload: string)
   export handle-stop: func()
 }

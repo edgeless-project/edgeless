@@ -33,7 +33,10 @@ impl AgentAPIServer {
                     log::info!("Start AgentAPI GRPC Server");
 
                     match tonic::transport::Server::builder()
-                        .add_service(crate::grpc_impl::api::function_instance_server::FunctionInstanceServer::new(function_api))
+                        .add_service(
+                            crate::grpc_impl::api::function_instance_server::FunctionInstanceServer::new(function_api)
+                                .max_decoding_message_size(usize::MAX),
+                        )
                         .serve(host)
                         .await
                     {

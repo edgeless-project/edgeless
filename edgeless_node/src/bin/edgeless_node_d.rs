@@ -4,7 +4,7 @@ fn main() -> anyhow::Result<()> {
     let node_id = uuid::Uuid::new_v4();
     let api_addr = "http://127.0.0.1:7001".to_string();
 
-    let async_runtime = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
+    let async_runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(8).enable_all().build()?;
     let mut async_tasks = vec![];
 
     let node_config = edgeless_node::EdgelessNodeSettings {
