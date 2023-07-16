@@ -1,0 +1,42 @@
+{
+    "alias": "ping_pong",
+    "functions": [
+        {
+            "alias": "ponger",
+            "class_specification": {
+                "id": "ponger",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./pong/pong.wasm",
+                "output_callbacks": [
+                    "pinger"
+                ]
+            },
+            "output_callback_definitions": {
+                "pinger": "pinger"
+            },
+            "annotations": {
+
+            }
+        },
+        {
+            "alias": "pinger",
+            "class_specification": {
+                "id": "pinger",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./ping/ping.wasm",
+                "output_callbacks": [
+                    "ponger"
+                ]
+            },
+            "output_callback_definitions": {
+                "ponger": "ponger"
+            },
+            "annotations": {
+
+            }
+        }
+    ],
+    "annotations": {}
+}

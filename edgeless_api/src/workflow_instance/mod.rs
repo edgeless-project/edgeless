@@ -17,7 +17,7 @@ pub struct WorkflowInstance {
     pub functions: Vec<WorkflowFunctionMapping>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, serde::Deserialize)]
 pub struct WorkflowFunction {
     pub function_alias: String,
     pub function_class_specification: crate::function_instance::FunctionClassSpecification,

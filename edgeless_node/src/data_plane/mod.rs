@@ -148,18 +148,17 @@ impl DataPlaneChainHandle {
                             match sender.send((from.clone(), msg.clone())) {
                                 Ok(_) => {
                                     continue;
-                                },
+                                }
                                 Err(_) => {
                                     log::error!("Tried to use expired overwrite send handle.");
                                 }
                             }
-
                         } else {
                             log::error!("Tried to use expired overwrite send handle.");
                         }
                     }
                     match main_sender.send((from, stream_id, msg)).await {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(_) => {
                             break;
                         }

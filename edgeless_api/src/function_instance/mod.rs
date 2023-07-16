@@ -13,7 +13,7 @@ impl FunctionId {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct FunctionClassSpecification {
     pub function_class_id: String,
     pub function_class_type: String,
