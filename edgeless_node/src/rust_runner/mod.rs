@@ -2,7 +2,7 @@ use futures::{FutureExt, SinkExt, StreamExt};
 
 use crate::{
     data_plane::{self},
-    runner_api,
+    runner_api, state_management,
 };
 
 mod api {
@@ -24,6 +24,7 @@ impl Runner {
     pub fn new(
         _settings: crate::EdgelessNodeSettings,
         data_plane_provider: data_plane::DataPlaneChainProvider,
+        state_manager: state_management::StateManager
     ) -> (Self, futures::future::BoxFuture<'static, ()>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let cloned_sender = sender.clone();
@@ -33,6 +34,7 @@ impl Runner {
                 let mut receiver = receiver;
                 let mut data_plane_provider = data_plane_provider;
                 let mut functions = std::collections::HashMap::<uuid::Uuid, FunctionInstance>::new();
+                let mut state_manager = state_manager;
                 log::info!("Starting Edgeless Rust Runner");
                 while let Some(req) = receiver.next().await {
                     match req {
@@ -46,7 +48,7 @@ impl Runner {
                             log::info!("Start Function {:?}", spawn_request.function_id);
                             let cloned_req = spawn_request.clone();
                             let data_plane = data_plane_provider.get_chain_for(function_id.clone()).await;
-                            let instance = FunctionInstance::launch(cloned_req, data_plane, cloned_sender.clone()).await;
+                            let instance = FunctionInstance::launch(cloned_req, data_plane, cloned_sender.clone(), state_manager.get_handle(spawn_request.state_specification.state_policy, spawn_request.state_specification.state_id).await).await;
                             functions.insert(function_id.function_id.clone(), instance.unwrap());
                         }
                         RustRunnerRequest::STOP(function_id) => {
@@ -133,6 +135,7 @@ impl FunctionInstance {
         spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
         data_plane: data_plane::DataPlaneChainHandle,
         runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
+        state_handle: state_management::StateHandle
     ) -> anyhow::Result<Self> {
         let callback_table = std::sync::Arc::new(tokio::sync::Mutex::new(FunctionInstanceCallbackTable {
             alias_map: spawn_req.output_callback_definitions.clone(),
@@ -153,6 +156,7 @@ impl FunctionInstance {
                 cloned_callbacks,
                 data_plane,
                 runner_api,
+                state_handle
             )
             .await
             {
@@ -186,6 +190,7 @@ struct FunctionState {
     function_id: edgeless_api::function_instance::FunctionId,
     data_plane: data_plane::DataPlaneChainWriteHandle,
     callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
+    state_handle: state_management::StateHandle
 }
 
 impl FunctionInstanceTaskState {
@@ -195,25 +200,29 @@ impl FunctionInstanceTaskState {
         callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
         data_plane: data_plane::DataPlaneChainHandle,
         runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
+        state_handle: state_management::StateHandle
     ) -> anyhow::Result<Self> {
         let mut data_plane = data_plane;
         let mut config = wasmtime::Config::new();
+        let mut state_handle = state_handle;
         config.async_support(true);
         config.wasm_component_model(true);
         let engine = wasmtime::Engine::new(&config)?;
         let component = wasmtime::component::Component::from_binary(&engine, binary)?;
         let mut linker = wasmtime::component::Linker::new(&engine);
         api::Edgefunction::add_to_linker(&mut linker, |state: &mut FunctionState| state)?;
+        let serialized_state = state_handle.get().await;
         let mut store = wasmtime::Store::new(
             &engine,
             FunctionState {
                 function_id: function_id.clone(),
                 data_plane: data_plane.new_write_handle().await,
                 callback_table: callback_table,
+                state_handle: state_handle
             },
         );
         let (binding, instance) = api::Edgefunction::instantiate_async(&mut store, &component, &linker).await?;
-        binding.call_handle_init(&mut store, "test").await?;
+        binding.call_handle_init(&mut store, "test", serialized_state.as_deref()).await?;
         Ok(Self {
             function_id,
             config,
@@ -371,6 +380,12 @@ impl api::EdgefunctionImports for FunctionState {
                 log::error!("Unhandled failure in delayed message.")
             }
         });
+        Ok(())
+    }
+
+    async fn sync(&mut self, serialized_state: String) -> wasmtime::Result<()> {
+        self.state_handle.set(serialized_state.clone()).await;
+        log::info!("Function State Sync: {}", serialized_state);
         Ok(())
     }
 }

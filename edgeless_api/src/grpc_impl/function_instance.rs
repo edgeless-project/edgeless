@@ -53,6 +53,12 @@ impl FunctonInstanceConverters {
                 }
             })?,
             annotations: api_request.annotations.clone(),
+            state_specification: Self::parse_api_state_specification(match &api_request.state_specification {
+                Some(val) => val,
+                None => {
+                    return Err(anyhow::anyhow!("Request does not contain state_spec."));
+                }
+            })?
         })
     }
 
@@ -82,6 +88,19 @@ impl FunctonInstanceConverters {
                     return Err(anyhow::anyhow!("Update does not contain continuation."));
                 }
             })?,
+        })
+    }
+
+    pub fn parse_api_state_specification(
+        api_spec: &crate::grpc_impl::api::StateSpecification,
+    ) -> anyhow::Result<crate::function_instance::StateSpecification> {
+        Ok(crate::function_instance::StateSpecification {
+                state_id: uuid::Uuid::parse_str(&api_spec.state_id)?,
+                state_policy: match api_spec.policy {
+                    1 => crate::function_instance::StatePolicy::NodeLocal,
+                    2 => crate::function_instance::StatePolicy::Global,
+                    _ => crate::function_instance::StatePolicy::Transient,
+                }
         })
     }
 
@@ -115,6 +134,7 @@ impl FunctonInstanceConverters {
                 .collect(),
             return_continuation: Some(Self::serialize_function_id(&req.return_continuation)),
             annotations: req.annotations.clone(),
+            state_specification: Some(Self::serialize_state_specification(&req.state_specification))
         }
     }
 
@@ -129,6 +149,19 @@ impl FunctonInstanceConverters {
                 .map(|(key, value)| (key.clone(), Self::serialize_function_id(&value)))
                 .collect(),
             return_continuation: Some(Self::serialize_function_id(&crate_update.return_continuation)),
+        }
+    }
+
+    pub fn serialize_state_specification(
+        crate_spec: &crate::function_instance::StateSpecification,
+    ) -> crate::grpc_impl::api::StateSpecification {
+        crate::grpc_impl::api::StateSpecification {
+            state_id: crate_spec.state_id.to_string(),
+            policy: match crate_spec.state_policy {
+                crate::function_instance::StatePolicy::Transient => crate::grpc_impl::api::StatePolicy::Transient as i32,
+                crate::function_instance::StatePolicy::Global => crate::grpc_impl::api::StatePolicy::Global as i32,
+                crate::function_instance::StatePolicy::NodeLocal => crate::grpc_impl::api::StatePolicy::NodeLocal as i32,
+            }
         }
     }
 }

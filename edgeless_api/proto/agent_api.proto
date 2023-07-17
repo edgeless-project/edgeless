@@ -7,6 +7,17 @@ message FunctionId {
     string function_id = 2;
 }
 
+enum StatePolicy {
+   TRANSIENT = 0;
+   NODE_LOCAL = 1;
+   GLOBAL = 2;
+}
+
+message StateSpecification {
+    string state_id = 1;
+    StatePolicy policy = 2;
+}
+
 message FunctionClassSpecification {
     string function_class_id  = 1;
     string function_class_type = 2;
@@ -23,6 +34,7 @@ message SpawnFunctionRequest {
     map<string, FunctionId> output_callback_definitions = 3;
     FunctionId return_continuation = 4;
     map<string, string> annotations = 5;
+    StateSpecification state_specification = 6;
 }
 
 message UpdateFunctionLinksRequest {

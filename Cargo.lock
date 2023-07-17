@@ -688,6 +688,8 @@ name = "edgeless_sample_ping"
 version = "0.1.0"
 dependencies = [
  "edgeless_function",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

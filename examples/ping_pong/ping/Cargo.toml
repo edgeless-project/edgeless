@@ -13,3 +13,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 edgeless_function = { path = "../../../edgeless_function" }
+serde = "1"
+serde_json = "1"

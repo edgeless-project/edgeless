@@ -8,12 +8,13 @@ impl Edgefunction for PongerFun {
         cast_alias("pinger", "PONG2");
     }
 
-    fn handle_call(_src: Fid, _encoded_message: String) -> CallRet {
-        log("Ponger: 'Call' called");
+    fn handle_call(_src: Fid, encoded_message: String) -> CallRet {
+        // log("Ponger: 'Call' called");
+        log(&format!("Ponger: 'Call' called, MSG: {}", encoded_message));
         CallRet::Reply("PONG3".to_string())
     }
 
-    fn handle_init(_payload: String) {
+    fn handle_init(_payload: String, serialized_state: Option<String>) {
         log("Ponger: 'Init' called");
     }
 
