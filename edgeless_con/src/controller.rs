@@ -64,7 +64,7 @@ impl Controller {
                         let state_id = match fun.function_alias.as_str() {
                             "pinger" => uuid::Uuid::from_str("86699b23-6c24-4ca2-a2a0-b843b7c5e193").unwrap(),
                             "ponger" => uuid::Uuid::from_str("7dd076cc-2606-40ae-b46b-97628e0094be").unwrap(),
-                            _ => uuid::Uuid::new_v4()
+                            _ => uuid::Uuid::new_v4(),
                         };
 
                         let f_id = fn_client
@@ -74,10 +74,10 @@ impl Controller {
                                 annotations: fun.function_annotations,
                                 output_callback_definitions: outputs,
                                 return_continuation: edgeless_api::function_instance::FunctionId::new(uuid::Uuid::new_v4()),
-                                state_specification: edgeless_api::function_instance::StateSpecification{
+                                state_specification: edgeless_api::function_instance::StateSpecification {
                                     state_id: state_id,
-                                    state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal
-                                }
+                                    state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
+                                },
                             })
                             .await;
                         if let Ok(id) = f_id {

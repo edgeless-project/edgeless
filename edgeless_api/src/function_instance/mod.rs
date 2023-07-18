@@ -17,13 +17,13 @@ impl FunctionId {
 pub enum StatePolicy {
     Transient,
     NodeLocal,
-    Global
+    Global,
 }
 
 #[derive(Debug, Clone)]
 pub struct StateSpecification {
     pub state_id: uuid::Uuid,
-    pub state_policy: StatePolicy
+    pub state_policy: StatePolicy,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -42,7 +42,7 @@ pub struct SpawnFunctionRequest {
     pub output_callback_definitions: std::collections::HashMap<String, FunctionId>,
     pub return_continuation: FunctionId,
     pub annotations: std::collections::HashMap<String, String>,
-    pub state_specification: StateSpecification
+    pub state_specification: StateSpecification,
 }
 
 #[derive(Debug)]

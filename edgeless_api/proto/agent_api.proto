@@ -71,6 +71,26 @@ message WorkflowId {
     string workflow_id = 1;
 }
 
+enum EventType {
+    CALL = 0;
+    CAST = 1;
+    CALL_RET = 2;
+    CALL_NO_RET = 3;
+    ERR = 4;
+}
+
+message EventData {
+    EventType event_type = 1;
+    string payload = 2;
+}
+
+message Event {
+    FunctionId target = 1;
+    FunctionId source = 2;
+    uint64 stream_id =3;
+    EventData msg = 4;
+}
+
 service FunctionInstance {
     rpc StartFunctionInstance (SpawnFunctionRequest) returns (FunctionId);
     rpc StopFunctionInstance (FunctionId) returns (google.protobuf.Empty );
@@ -80,4 +100,8 @@ service FunctionInstance {
 service WorkflowInstance {
     rpc StartWorkflowInstance (SpawnWorkflowRequest) returns (WorkflowInstanceStatus);
     rpc StopWorkflowInstance (WorkflowId) returns (google.protobuf.Empty);
+}
+
+service FunctionInvocation {
+    rpc HandleEvent (Event) returns (google.protobuf.Empty); 
 }

@@ -14,7 +14,7 @@ impl Edgefunction for PongerFun {
         CallRet::Reply("PONG3".to_string())
     }
 
-    fn handle_init(_payload: String, serialized_state: Option<String>) {
+    fn handle_init(_payload: String, _serialized_state: Option<String>) {
         log("Ponger: 'Init' called");
     }
 

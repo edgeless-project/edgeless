@@ -8,6 +8,8 @@ pub mod con;
 
 pub mod workflow_instance;
 
+pub mod invocation;
+
 pub mod api {
     tonic::include_proto!("agent_api");
 }

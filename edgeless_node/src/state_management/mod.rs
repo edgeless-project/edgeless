@@ -1,16 +1,16 @@
 #[derive(Clone)]
 pub struct StateManager {
-    handlers: std::sync::Arc<tokio::sync::Mutex<StateProviders>>
+    handlers: std::sync::Arc<tokio::sync::Mutex<StateProviders>>,
 }
 
 #[async_trait::async_trait]
-trait StateProvider : Sync + Send {
+trait StateProvider: Sync + Send {
     fn get(&mut self, state_id: uuid::Uuid) -> Option<String>;
     fn set(&mut self, state_id: uuid::Uuid, serialized_state: String);
 }
 
 struct FileStateProvider {
-    base_path: std::path::PathBuf
+    base_path: std::path::PathBuf,
 }
 
 impl FileStateProvider {
@@ -19,7 +19,7 @@ impl FileStateProvider {
             std::fs::DirBuilder::new().create("./function_state/").unwrap();
         }
         Self {
-            base_path: std::path::PathBuf::from("./function_state/")
+            base_path: std::path::PathBuf::from("./function_state/"),
         }
     }
 }
@@ -40,22 +40,16 @@ impl StateProvider for FileStateProvider {
 
 struct StateProviders {
     node_local: Option<Box<dyn StateProvider>>,
-    global: Option<Box<dyn StateProvider>>
+    global: Option<Box<dyn StateProvider>>,
 }
 
-
 impl StateManager {
-
     pub async fn new() -> Self {
         Self {
-            handlers:  std::sync::Arc::new(
-                tokio::sync::Mutex::new(
-                    StateProviders {
-                        node_local: Some(Box::new(FileStateProvider::new())),
-                        global: None
-                    }
-                )
-            )
+            handlers: std::sync::Arc::new(tokio::sync::Mutex::new(StateProviders {
+                node_local: Some(Box::new(FileStateProvider::new())),
+                global: None,
+            })),
         }
     }
 
@@ -63,7 +57,7 @@ impl StateManager {
         StateHandle {
             state_policy,
             state_id,
-            handlers: self.handlers.clone()
+            handlers: self.handlers.clone(),
         }
     }
 }
@@ -71,7 +65,7 @@ impl StateManager {
 pub struct StateHandle {
     handlers: std::sync::Arc<tokio::sync::Mutex<StateProviders>>,
     state_id: uuid::Uuid,
-    state_policy: edgeless_api::function_instance::StatePolicy
+    state_policy: edgeless_api::function_instance::StatePolicy,
 }
 
 impl StateHandle {
@@ -83,9 +77,7 @@ impl StateHandle {
                     return provider.get(self.state_id);
                 }
             }
-            _ => {
-
-            }
+            _ => {}
         }
         None
     }
@@ -98,9 +90,7 @@ impl StateHandle {
                     return provider.set(self.state_id, serialized_state);
                 }
             }
-            _ => {
-
-            }
+            _ => {}
         }
     }
 }
