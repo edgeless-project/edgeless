@@ -23,7 +23,7 @@ fn main() -> anyhow::Result<()> {
         log::info!("Edgeless In A Box Mode");
         let orc_api_addr = "http://127.0.0.1:7011".to_string();
         let con_api_addr = "http://127.0.0.1:7021".to_string();
-        let bal_invocation_url = "http://127.0.0.1:7031".to_string();
+        let bal_invocation_url = "http://127.0.0.1:7032".to_string();
 
         let bal_settings = edgeless_bal::EdgelessBalSettings {
             balancer_id: conf.node_id.clone(),
