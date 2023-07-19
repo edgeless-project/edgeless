@@ -28,6 +28,10 @@ To deploy the example functions (in a separate shell):
 
 `RUST_LOG=info cargo run --bin=edgeless_cli workflow start examples/ping_pong/workflow.json`
 
+## How to create functions:
+
+Please refer to [documentation/rust_functions.md](documentation/rust_functions.md).
+
 ## Repository Layout
 
 Each of the main services is implemented as its own crate (library + binary wrapper) that can be found at the root of the project:
@@ -62,7 +66,7 @@ In addition to the services/binaries, the repository contains the following libr
     * Tier1 Guests: Rust Functions compiled to WASM
     * Interface to the functions relies on the WASM component model.
 
-Fianlly, `examples` contains example guests and `edgeless_conf` contains reference configurations for the services.
+Finally, `examples` contains example guests and `edgeless_conf` contains reference configurations for the services.
 
 ## License
 
