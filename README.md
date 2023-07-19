@@ -1,10 +1,22 @@
 # Edgeless MVP Implementation
 
+This repository contains a research prototype of the Edgeless platform.
+
+*There currently are no guarantees on Stability and API-Stability!*
+
 ## How to build:
 
 The Implementation relies on Rust (Nightly) and the ProtoBuf compiler.
 
 The easiest way to get started is the devcontainer shipped as part of this repository. 
+
+Build Steps:
+
+Build host and example guest code:
+`cargo build`
+
+Link guest code:
+`./link_examples.sh`
 
 ## How to run:
 
@@ -49,3 +61,9 @@ In addition to the services/binaries, the repository contains the following libr
 * `edgeless_function`: Crate defining the interfaces for the tier1 guests
     * Tier1 Guests: Rust Functions compiled to WASM
     * Interface to the functions relies on the WASM component model.
+
+Fianlly, `examples` contains example guests and `edgeless_conf` contains reference configurations for the services.
+
+## License
+
+The Repository is licensed under the MIT License. Please refer to [LICENSE-MIT.txt](LICENSE-MIT.txt) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
