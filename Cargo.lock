@@ -608,7 +608,17 @@ dependencies = [
 name = "edgeless_bal"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "edgeless_api",
+ "env_logger",
+ "futures",
  "log",
+ "serde",
+ "tokio",
+ "toml 0.7.6",
+ "uuid",
 ]
 
 [[package]]
@@ -635,11 +645,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "clap",
  "edgeless_api",
  "env_logger",
  "futures",
  "log",
+ "serde",
  "tokio",
+ "toml 0.7.6",
  "uuid",
 ]
 
@@ -656,6 +669,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "clap",
  "edgeless_api",
  "edgeless_bal",
  "edgeless_con",
@@ -663,7 +677,9 @@ dependencies = [
  "env_logger",
  "futures",
  "log",
+ "serde",
  "tokio",
+ "toml 0.7.6",
  "uuid",
  "wasmtime",
  "wasmtime-wasi",
@@ -675,11 +691,14 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "async-trait",
+ "clap",
  "edgeless_api",
  "env_logger",
  "futures",
  "log",
+ "serde",
  "tokio",
+ "toml 0.7.6",
  "uuid",
 ]
 
@@ -2282,6 +2301,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fa2982af2eec27de306107c027578ff7f423d65f7250e40ce0fea8f45248b81"
 dependencies = [
  "getrandom",
+ "serde",
 ]
 
 [[package]]

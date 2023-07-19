@@ -31,7 +31,7 @@ impl Controller {
         for orc in &settings.orchestrators {
             orc_clients.insert(
                 orc.domain_id.to_string(),
-                Box::new(edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&orc.api_addr).await),
+                Box::new(edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&orc.orchestrator_url).await),
             );
         }
         let mut receiver = receiver;

@@ -1,0 +1,5 @@
+domain_id = "domain-1"
+orchestrator_url = "http://localhost:7011"
+nodes = [
+    {node_id = "fda6ce79-46df-4f96-a0d2-456f720f606c", agent_url = "http://localhost:7001" }
+]

@@ -36,18 +36,24 @@ impl DataPlaneLink for NodeLocalLink {
         stream_id: u64,
     ) -> LinkProcessingResult {
         if target.node_id == self.node_id {
-            return self.router.lock().await.handle_event(edgeless_api::invocation::Event {
-                target: target.clone(),
-                source: src.clone(),
-                stream_id,
-                data: match msg {
-                    Message::Call(data) => edgeless_api::invocation::EventData::Call(data),
-                    Message::Cast(data) => edgeless_api::invocation::EventData::Cast(data),
-                    Message::CallRet(data) => edgeless_api::invocation::EventData::CallRet(data),
-                    Message::CallNoRet => edgeless_api::invocation::EventData::CallNoRet,
-                    Message::Err => edgeless_api::invocation::EventData::Err,
-                },
-            }).await.unwrap();
+            return self
+                .router
+                .lock()
+                .await
+                .handle_event(edgeless_api::invocation::Event {
+                    target: target.clone(),
+                    source: src.clone(),
+                    stream_id,
+                    data: match msg {
+                        Message::Call(data) => edgeless_api::invocation::EventData::Call(data),
+                        Message::Cast(data) => edgeless_api::invocation::EventData::Cast(data),
+                        Message::CallRet(data) => edgeless_api::invocation::EventData::CallRet(data),
+                        Message::CallNoRet => edgeless_api::invocation::EventData::CallNoRet,
+                        Message::Err => edgeless_api::invocation::EventData::Err,
+                    },
+                })
+                .await
+                .unwrap();
         } else {
             return LinkProcessingResult::PASSED;
         }
@@ -145,7 +151,7 @@ impl edgeless_api::invocation::InvocationAPI for InvocationEventHandler {
 }
 
 impl RemoteLinkProvider {
-    async fn new(peers: std::collections::HashMap<uuid::Uuid, String>) -> Self {
+    async fn new(invocation_url: String, peers: std::collections::HashMap<uuid::Uuid, String>) -> Self {
         let locals = std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalRouter {
             receivers: std::collections::HashMap::<
                 uuid::Uuid,
@@ -158,7 +164,7 @@ impl RemoteLinkProvider {
 
         let _server = tokio::spawn(edgeless_api::grpc_impl::invocation::InvocationAPIServer::run(
             Box::new(InvocationEventHandler { locals: locals.clone() }),
-            "http://127.0.0.1:7002".to_string(),
+            invocation_url,
         ));
 
         let cloned_remotes = remotes.clone();
@@ -376,11 +382,18 @@ pub struct DataPlaneChainProvider {
 }
 
 impl DataPlaneChainProvider {
-    pub async fn new(node_id: uuid::Uuid) -> Self {
+    pub async fn new(_node_id: uuid::Uuid, invocation_url: String, peers: Vec<crate::EdgelessNodeSettingsPeer>) -> Self {
         Self {
             local_provider: std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalLinkProvider::new())),
             remote_provider: std::sync::Arc::new(tokio::sync::Mutex::new(
-                RemoteLinkProvider::new(std::collections::HashMap::from([(node_id, "http://127.0.0.1:7002".to_string())])).await,
+                RemoteLinkProvider::new(
+                    invocation_url,
+                    peers
+                        .iter()
+                        .map(|peer_conf| (peer_conf.id, peer_conf.invocation_url.to_string()))
+                        .collect(),
+                )
+                .await, // RemoteLinkProvider::new(std::collections::HashMap::from([(node_id, "http://127.0.0.1:7002".to_string())])).await,
             )),
         }
     }

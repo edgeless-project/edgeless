@@ -45,7 +45,7 @@ impl Orchestrator {
         for node in &orchestrator_settings.nodes {
             clients.insert(
                 node.node_id,
-                Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&node.api_addr).await),
+                Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&node.agent_url).await),
             );
         }
         let mut receiver = receiver;
