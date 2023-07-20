@@ -6,17 +6,18 @@ This repository contains a research prototype of the Edgeless platform.
 
 ## How to build:
 
-The Implementation relies on Rust (Nightly) and the ProtoBuf compiler.
+The Implementation relies on Rust and the ProtoBuf compiler.
 
 The easiest way to get started is the devcontainer shipped as part of this repository. 
 
 Build Steps:
 
-Build host and example guest code:
+Build host code / tools:
 `cargo build`
 
-Link guest code:
-`./link_examples.sh`
+Use the CLI to build a guest:
+`cargo run --bin=edgeless_cli function build examples/ping_pong/ping/function.json`
+`cargo run --bin=edgeless_cli function build examples/ping_pong/pong/function.json`
 
 ## How to run:
 

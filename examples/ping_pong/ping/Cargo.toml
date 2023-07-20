@@ -1,10 +1,14 @@
-cargo-features = ["per-package-target"]
+[workspace]
+
+[profile.release]
+lto = true
+opt-level = "s"
+
 [package]
 name = "edgeless_sample_ping"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de"]
 edition = "2021"
-forced-target = "wasm32-unknown-unknown"
 
 [lib]
 name = "edgeless_sample_ping"
@@ -13,5 +17,5 @@ crate-type = ["cdylib"]
 
 [dependencies]
 edgeless_function = { path = "../../../edgeless_function" }
-serde = "1"
+serde = {version="1", features=["derive"] }
 serde_json = "1"

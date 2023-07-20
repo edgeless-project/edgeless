@@ -2,7 +2,9 @@
 
 ## Function Framework
 
-A Function needs to implement the trait `edgeless_function::api::Edgefunction`, which consists of the four callbacks shown below. In-runtime state (not saved using sync) is currently purely the responsibility of the function (the component model does not support methods yet); The `OnceLock` used below is one way to achieve this. The `export!` macro (last line) must be called.
+A Function needs to implement the trait `edgeless_function::api::Edgefunction`, which consists of the four callbacks shown below.
+In-runtime state (not saved using sync) is currently purely the responsibility of the function (the component model does not support methods yet);
+The `OnceLock` used below is one way to achieve this. The `export!` macro (last line) must be called.
 
 ```rust
 use edgeless_function::api::*;
@@ -101,24 +103,27 @@ Return value from calls / value to be returned from `handle_call`.
 ## Project Structure
 
 The function can be built as a `wasm32-unknown-unknown` library crate. The snippet below shows an example `Cargo.toml` file.
-The repository currently uses the nightly feature `per-package-target`. This is not needed if the crate is manually built for the wasm target.
 
 ```toml
-cargo-features = ["per-package-target"]
+[workspace]
+
+[profile.release]
+lto = true
+opt-level = "s"
+
 [package]
-name = "edgeless_example"
+name = "edgeless_sample_function"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de"]
 edition = "2021"
-forced-target = "wasm32-unknown-unknown"
 
 [lib]
-name = "edgeless_example"
+name = "edgeless_sample_function"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-edgeless_function = { path = "../edgeless_function" }
-serde = "1"
+edgeless_function = { path = "../../../edgeless_function" }
+serde = {version="1", features=["derive"] }
 serde_json = "1"
 ```
