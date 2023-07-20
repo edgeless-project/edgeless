@@ -115,7 +115,7 @@ async fn main() -> anyhow::Result<()> {
                 let pack = ws.current()?;
                 
                 let lib_name = match pack.library() {
-                    Some(val) => val,
+                    Some(val) => val.name(),
                     None => {
                         return Err(anyhow::anyhow!("Cargo package does not contain library."));
                     }
