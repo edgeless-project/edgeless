@@ -10,10 +10,10 @@ mod api {
 }
 
 enum RustRunnerRequest {
-    START(edgeless_api::function_instance::SpawnFunctionRequest),
-    STOP(edgeless_api::function_instance::FunctionId),
-    UPDATE(edgeless_api::function_instance::UpdateFunctionLinksRequest),
-    FUNCTION_EXIT(edgeless_api::function_instance::FunctionId),
+    Start(edgeless_api::function_instance::SpawnFunctionRequest),
+    Stop(edgeless_api::function_instance::FunctionId),
+    Update(edgeless_api::function_instance::UpdateFunctionLinksRequest),
+    FunctionExit(edgeless_api::function_instance::FunctionId),
 }
 
 pub struct Runner {
@@ -38,7 +38,7 @@ impl Runner {
                 log::info!("Starting Edgeless Rust Runner");
                 while let Some(req) = receiver.next().await {
                     match req {
-                        RustRunnerRequest::START(spawn_request) => {
+                        RustRunnerRequest::Start(spawn_request) => {
                             let function_id = match spawn_request.function_id.clone() {
                                 Some(id) => id,
                                 None => {
@@ -59,7 +59,7 @@ impl Runner {
                             .await;
                             functions.insert(function_id.function_id.clone(), instance.unwrap());
                         }
-                        RustRunnerRequest::STOP(function_id) => {
+                        RustRunnerRequest::Stop(function_id) => {
                             log::info!("Stop Function {:?}", function_id);
                             if let Some(instance) = functions.get_mut(&function_id.function_id) {
                                 instance.stop().await;
@@ -67,13 +67,13 @@ impl Runner {
                             // This will also create a FUNCTION_EXIT event.
                             functions.remove(&function_id.function_id);
                         }
-                        RustRunnerRequest::UPDATE(update) => {
+                        RustRunnerRequest::Update(update) => {
                             log::info!("Update Function {:?}", update.function_id);
                             if let Some(instance) = functions.get_mut(&update.function_id.as_ref().unwrap().function_id) {
                                 instance.update(update).await;
                             }
                         }
-                        RustRunnerRequest::FUNCTION_EXIT(id) => {
+                        RustRunnerRequest::FunctionExit(id) => {
                             log::info!("Function Exit Event: {:?}", id);
                         }
                     }
@@ -94,21 +94,21 @@ struct RunnerClient {
 #[async_trait::async_trait]
 impl runner_api::RunnerAPI for RunnerClient {
     async fn start(&mut self, request: edgeless_api::function_instance::SpawnFunctionRequest) -> anyhow::Result<()> {
-        match self.sender.send(RustRunnerRequest::START(request)).await {
+        match self.sender.send(RustRunnerRequest::Start(request)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
         }
     }
 
     async fn stop(&mut self, function_id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
-        match self.sender.send(RustRunnerRequest::STOP(function_id)).await {
+        match self.sender.send(RustRunnerRequest::Stop(function_id)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
         }
     }
 
     async fn update(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
-        match self.sender.send(RustRunnerRequest::UPDATE(update)).await {
+        match self.sender.send(RustRunnerRequest::Update(update)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
         }
@@ -117,13 +117,13 @@ impl runner_api::RunnerAPI for RunnerClient {
 
 struct FunctionInstanceTaskState {
     function_id: edgeless_api::function_instance::FunctionId,
-    config: wasmtime::Config,
-    engine: wasmtime::Engine,
-    component: wasmtime::component::Component,
-    linker: wasmtime::component::Linker<FunctionState>,
+    // config: wasmtime::Config,
+    // engine: wasmtime::Engine,
+    // component: wasmtime::component::Component,
+    // linker: wasmtime::component::Linker<FunctionState>,
     store: wasmtime::Store<FunctionState>,
     binding: api::Edgefunction,
-    instance: wasmtime::component::Instance,
+    // instance: wasmtime::component::Instance,
     data_plane: data_plane::DataPlaneChainHandle,
     runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
 }
@@ -229,17 +229,17 @@ impl FunctionInstanceTaskState {
                 state_handle: state_handle,
             },
         );
-        let (binding, instance) = api::Edgefunction::instantiate_async(&mut store, &component, &linker).await?;
+        let (binding, _instance) = api::Edgefunction::instantiate_async(&mut store, &component, &linker).await?;
         binding.call_handle_init(&mut store, "test", serialized_state.as_deref()).await?;
         Ok(Self {
             function_id,
-            config,
-            engine,
-            component,
-            linker,
+            // config,
+            // engine,
+            // component,
+            // linker,
             store,
             binding,
-            instance,
+            // instance,
             data_plane,
             runner_api,
         })
@@ -272,7 +272,7 @@ impl FunctionInstanceTaskState {
             }
             // let .await;
         }
-        match self.runner_api.send(RustRunnerRequest::FUNCTION_EXIT(self.function_id.clone())).await {
+        match self.runner_api.send(RustRunnerRequest::FunctionExit(self.function_id.clone())).await {
             Ok(_) => {}
             Err(_) => {
                 log::error!("FunctionInstance outlived runner.")
