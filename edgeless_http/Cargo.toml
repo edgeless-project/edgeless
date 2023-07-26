@@ -1,0 +1,19 @@
+[package]
+name = "edgeless_http"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de"]
+edition = "2021"
+
+[lib]
+name = "edgeless_http"
+path = "src/lib.rs"
+
+[features]
+hyper = ["dep:hyper"]
+
+[dependencies]
+anyhow = "1.0"
+async-trait = "0.1"
+serde = {version="1.0", features=["derive"]}
+serde_json = "1.0"
+hyper = { version = "1.0.0-rc.4", features = ["full"], optional = true }

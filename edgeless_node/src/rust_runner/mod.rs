@@ -1,9 +1,6 @@
 use futures::{FutureExt, SinkExt, StreamExt};
 
-use crate::{
-    data_plane::{self},
-    runner_api, state_management,
-};
+use crate::{runner_api, state_management};
 
 mod api {
     wasmtime::component::bindgen!({path: "../edgeless_function/wit/edgefunction.wit", async: true});
@@ -23,7 +20,7 @@ pub struct Runner {
 impl Runner {
     pub fn new(
         _settings: crate::EdgelessNodeSettings,
-        data_plane_provider: data_plane::DataPlaneChainProvider,
+        data_plane_provider: edgeless_dataplane::DataPlaneChainProvider,
         state_manager: state_management::StateManager,
     ) -> (Self, futures::future::BoxFuture<'static, ()>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
@@ -124,7 +121,7 @@ struct FunctionInstanceTaskState {
     store: wasmtime::Store<FunctionState>,
     binding: api::Edgefunction,
     // instance: wasmtime::component::Instance,
-    data_plane: data_plane::DataPlaneChainHandle,
+    data_plane: edgeless_dataplane::DataPlaneChainHandle,
     runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
 }
 
@@ -141,7 +138,7 @@ struct FunctionInstance {
 impl FunctionInstance {
     async fn launch(
         spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
-        data_plane: data_plane::DataPlaneChainHandle,
+        data_plane: edgeless_dataplane::DataPlaneChainHandle,
         runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
         state_handle: state_management::StateHandle,
     ) -> anyhow::Result<Self> {
@@ -196,7 +193,7 @@ impl FunctionInstance {
 
 struct FunctionState {
     function_id: edgeless_api::function_instance::FunctionId,
-    data_plane: data_plane::DataPlaneChainWriteHandle,
+    data_plane: edgeless_dataplane::DataPlaneChainWriteHandle,
     callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
     state_handle: state_management::StateHandle,
 }
@@ -206,7 +203,7 @@ impl FunctionInstanceTaskState {
         function_id: edgeless_api::function_instance::FunctionId,
         binary: &[u8],
         callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
-        data_plane: data_plane::DataPlaneChainHandle,
+        data_plane: edgeless_dataplane::DataPlaneChainHandle,
         runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
         state_handle: state_management::StateHandle,
     ) -> anyhow::Result<Self> {
@@ -312,9 +309,9 @@ impl FunctionInstanceTaskState {
                     src,
                     channel_id,
                     match res {
-                        api::CallRet::Err => data_plane::CallRet::Err,
-                        api::CallRet::Noreply => data_plane::CallRet::NoReply,
-                        api::CallRet::Reply(msg) => data_plane::CallRet::Reply(msg),
+                        api::CallRet::Err => edgeless_dataplane::CallRet::Err,
+                        api::CallRet::Noreply => edgeless_dataplane::CallRet::NoReply,
+                        api::CallRet::Reply(msg) => edgeless_dataplane::CallRet::Reply(msg),
                     },
                 )
                 .await;
@@ -346,9 +343,9 @@ impl api::EdgefunctionImports for FunctionState {
         let parsed_target = parse_wit_function_id(&target)?;
         let res = self.data_plane.call(parsed_target, msg).await;
         Ok(match res {
-            data_plane::CallRet::Reply(msg) => api::CallRet::Reply(msg),
-            data_plane::CallRet::NoReply => api::CallRet::Noreply,
-            data_plane::CallRet::Err => api::CallRet::Err,
+            edgeless_dataplane::CallRet::Reply(msg) => api::CallRet::Reply(msg),
+            edgeless_dataplane::CallRet::NoReply => api::CallRet::Noreply,
+            edgeless_dataplane::CallRet::Err => api::CallRet::Err,
         })
     }
 
@@ -356,9 +353,9 @@ impl api::EdgefunctionImports for FunctionState {
         if let Some(target) = self.callback_table.lock().await.alias_map.get(&alias) {
             let res = self.data_plane.call(target.clone(), msg).await;
             Ok(match res {
-                data_plane::CallRet::Reply(msg) => api::CallRet::Reply(msg),
-                data_plane::CallRet::NoReply => api::CallRet::Noreply,
-                data_plane::CallRet::Err => api::CallRet::Err,
+                edgeless_dataplane::CallRet::Reply(msg) => api::CallRet::Reply(msg),
+                edgeless_dataplane::CallRet::NoReply => api::CallRet::Noreply,
+                edgeless_dataplane::CallRet::Err => api::CallRet::Err,
             })
         } else {
             log::warn!("Unknown alias.");

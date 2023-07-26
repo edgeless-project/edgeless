@@ -6,6 +6,7 @@ impl WorkflowInstanceConverters {
             workflow_id: uuid::Uuid::parse_str(&api_id.workflow_id)?,
         })
     }
+
     pub fn parse_workflow_function(
         api_function: &crate::grpc_impl::api::WorkflowFunction,
     ) -> anyhow::Result<crate::workflow_instance::WorkflowFunction> {
@@ -22,6 +23,18 @@ impl WorkflowInstanceConverters {
             function_annotations: api_function.function_annotations.clone(),
         })
     }
+
+    pub fn parse_workflow_resource(
+        api_workflow: &crate::grpc_impl::api::WorkflowResource,
+    ) -> anyhow::Result<crate::workflow_instance::WorkflowResource> {
+        Ok(crate::workflow_instance::WorkflowResource {
+            alias: api_workflow.alias.clone(),
+            resource_class_type: api_workflow.resource_class_type.clone(),
+            output_callback_definitions: api_workflow.output_callback_definitions.clone(),
+            configurations: api_workflow.configurations.clone(),
+        })
+    }
+
     pub fn parse_workflow_spawn_request(
         api_request: &crate::grpc_impl::api::SpawnWorkflowRequest,
     ) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowRequest> {
@@ -37,6 +50,14 @@ impl WorkflowInstanceConverters {
                 .iter()
                 .map(|fun| WorkflowInstanceConverters::parse_workflow_function(fun))
                 .filter_map(|f| match f {
+                    Ok(val) => Some(val),
+                    Err(_) => None,
+                })
+                .collect(),
+            workflow_resources: api_request
+                .workflow_resources
+                .iter()
+                .filter_map(|f| match WorkflowInstanceConverters::parse_workflow_resource(f) {
                     Ok(val) => Some(val),
                     Err(_) => None,
                 })
@@ -90,6 +111,7 @@ impl WorkflowInstanceConverters {
             workflow_id: crate_id.workflow_id.to_string(),
         }
     }
+
     pub fn serialize_workflow_function(crate_function: &crate::workflow_instance::WorkflowFunction) -> crate::grpc_impl::api::WorkflowFunction {
         crate::grpc_impl::api::WorkflowFunction {
             function_alias: crate_function.function_alias.clone(),
@@ -103,6 +125,16 @@ impl WorkflowInstanceConverters {
             return_continuation: crate_function.return_continuation.clone(),
         }
     }
+
+    pub fn serialize_workflow_resource(crate_resource: &crate::workflow_instance::WorkflowResource) -> crate::grpc_impl::api::WorkflowResource {
+        crate::grpc_impl::api::WorkflowResource {
+            alias: crate_resource.alias.clone(),
+            resource_class_type: crate_resource.resource_class_type.clone(),
+            output_callback_definitions: crate_resource.output_callback_definitions.clone(),
+            configurations: crate_resource.configurations.clone(),
+        }
+    }
+
     pub fn serialize_workflow_spawn_request(
         crate_request: &crate::workflow_instance::SpawnWorkflowRequest,
     ) -> crate::grpc_impl::api::SpawnWorkflowRequest {
@@ -112,6 +144,11 @@ impl WorkflowInstanceConverters {
                 .workflow_functions
                 .iter()
                 .map(|fun| Self::serialize_workflow_function(fun))
+                .collect(),
+            workflow_resources: crate_request
+                .workflow_resources
+                .iter()
+                .map(|res| Self::serialize_workflow_resource(res))
                 .collect(),
             workflow_annotations: crate_request.workflow_annotations.clone(),
         }

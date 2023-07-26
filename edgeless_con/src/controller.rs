@@ -15,6 +15,12 @@ enum ControllerRequest {
     STOP(edgeless_api::workflow_instance::WorkflowId),
 }
 
+struct ResourceHandle {
+    resource_type: String,
+    _output_callback_declarations: Vec<String>,
+    config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send>,
+}
+
 impl Controller {
     pub fn new(controller_settings: crate::EdgelessConSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
@@ -28,12 +34,28 @@ impl Controller {
 
     async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<ControllerRequest>, settings: crate::EdgelessConSettings) {
         let mut orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::orc::OrchestratorAPI + Send>>::new();
+        let mut resources = std::collections::HashMap::<String, ResourceHandle>::new();
+
         for orc in &settings.orchestrators {
             orc_clients.insert(
                 orc.domain_id.to_string(),
                 Box::new(edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&orc.orchestrator_url).await),
             );
         }
+
+        for resource in &settings.resources {
+            resources.insert(
+                resource.resource_provider_id.clone(),
+                ResourceHandle {
+                    resource_type: resource.resource_class_type.clone(),
+                    _output_callback_declarations: resource.output_callback_declarations.clone(),
+                    config_api: Box::new(
+                        edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationClient::new(&resource.resource_configuration_url).await,
+                    ),
+                },
+            );
+        }
+
         let mut receiver = receiver;
         let mut client = match orc_clients.into_values().next() {
             Some(c) => c,
@@ -41,6 +63,7 @@ impl Controller {
                 return;
             }
         };
+
         let mut fn_client = client.function_instance_api();
         let mut active_workflows = std::collections::HashMap::<String, Vec<edgeless_api::workflow_instance::WorkflowFunctionMapping>>::new();
         while let Some(req) = receiver.next().await {
@@ -90,6 +113,27 @@ impl Controller {
                             );
                         }
                     }
+
+                    for resource in spawn_workflow_request.workflow_resources {
+                        if let Some((provider_id, handle)) = resources
+                            .iter_mut()
+                            .find(|(_id, spec)| spec.resource_type == resource.resource_class_type)
+                        {
+                            let _res = handle
+                                .config_api
+                                .start_resource_instance(edgeless_api::resource_configuration::ResourceInstanceSpecification {
+                                    provider_id: provider_id.clone(),
+                                    output_callback_definitions: resource
+                                        .output_callback_definitions
+                                        .iter()
+                                        .map(|(callback, alias)| (callback.to_string(), f_ids.get(alias).unwrap().instances[0].clone()))
+                                        .collect(),
+                                    configuration: resource.configurations.clone(),
+                                })
+                                .await;
+                        }
+                    }
+
                     for workflow_fid_alias in to_patch {
                         if let Some(mapping) = f_ids.get(&workflow_fid_alias) {
                             if let Some(config) = spawn_workflow_request

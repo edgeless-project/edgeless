@@ -1,0 +1,35 @@
+{
+    "alias": "ping_pong",
+    "functions": [
+        {
+            "alias": "http_processor",
+            "class_specification": {
+                "id": "http_processor",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./processing_function/http_processor.wasm",
+                "output_callbacks": [
+                ]
+            },
+            "output_callback_definitions": {
+            },
+            "annotations": {
+
+            }
+        }
+    ],
+    "resources": [
+        {
+            "alias": "http-ingress-1-1",
+            "resource_class_type": "http-ingress",
+            "output_callback_definitions": {
+                "new_request": "http_processor" 
+            },
+            "configurations": {
+                "host": "demo.edgeless.com",
+                "methods": "POST"
+            }
+        }
+    ],
+    "annotations": {}
+}

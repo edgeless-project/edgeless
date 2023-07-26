@@ -1,0 +1,20 @@
+[workspace]
+
+[profile.release]
+lto = true
+opt-level = "s"
+
+[package]
+name = "edgeless_sample_http_processor"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de"]
+edition = "2021"
+
+[lib]
+name = "edgeless_sample_http_processor"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { path = "../../../edgeless_function" }
+edgeless_http = { path = "../../../edgeless_http" }

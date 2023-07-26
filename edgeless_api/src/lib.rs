@@ -5,6 +5,8 @@ pub mod function_instance;
 
 pub mod workflow_instance;
 
+pub mod resource_configuration;
+
 pub mod agent;
 
 pub mod orc;

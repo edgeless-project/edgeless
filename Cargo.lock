@@ -146,8 +146,8 @@ dependencies = [
  "bytes",
  "futures-util",
  "http",
- "http-body",
- "hyper",
+ "http-body 0.4.5",
+ "hyper 0.14.26",
  "itoa",
  "matchit",
  "memchr",
@@ -172,7 +172,7 @@ dependencies = [
  "bytes",
  "futures-util",
  "http",
- "http-body",
+ "http-body 0.4.5",
  "mime",
  "rustversion",
  "tower-layer",
@@ -911,10 +911,16 @@ dependencies = [
  "async-trait",
  "clap",
  "edgeless_api",
+ "edgeless_dataplane",
+ "edgeless_http",
  "env_logger",
  "futures",
+ "http-body-util",
+ "hyper 1.0.0-rc.4",
+ "hyper-util",
  "log",
  "serde",
+ "serde_json",
  "tokio",
  "toml 0.7.6",
  "uuid",
@@ -957,10 +963,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "edgeless_dataplane"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "edgeless_api",
+ "env_logger",
+ "futures",
+ "log",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml 0.7.6",
+ "uuid",
+]
+
+[[package]]
 name = "edgeless_function"
 version = "0.1.0"
 dependencies = [
  "wit-bindgen",
+]
+
+[[package]]
+name = "edgeless_http"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "hyper 1.0.0-rc.4",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -973,6 +1008,7 @@ dependencies = [
  "edgeless_api",
  "edgeless_bal",
  "edgeless_con",
+ "edgeless_dataplane",
  "edgeless_orc",
  "env_logger",
  "futures",
@@ -2137,6 +2173,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "http-body"
+version = "1.0.0-rc.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "951dfc2e32ac02d67c90c0d65bd27009a635dc9b381a2cc7d284ab01e3a0150d"
+dependencies = [
+ "bytes",
+ "http",
+]
+
+[[package]]
+name = "http-body-util"
+version = "0.1.0-rc.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08ef12f041acdd397010e5fb6433270c147d3b8b2d0a840cd7fff8e531dca5c8"
+dependencies = [
+ "bytes",
+ "futures-util",
+ "http",
+ "http-body 1.0.0-rc.2",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "httparse"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2166,7 +2225,7 @@ dependencies = [
  "futures-util",
  "h2",
  "http",
- "http-body",
+ "http-body 0.4.5",
  "httparse",
  "httpdate",
  "itoa",
@@ -2179,15 +2238,54 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyper"
+version = "1.0.0-rc.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d280a71f348bcc670fc55b02b63c53a04ac0bf2daff2980795aeaf53edae10e6"
+dependencies = [
+ "bytes",
+ "futures-channel",
+ "futures-util",
+ "h2",
+ "http",
+ "http-body 1.0.0-rc.2",
+ "httparse",
+ "httpdate",
+ "itoa",
+ "pin-project-lite",
+ "tokio",
+ "tracing",
+ "want",
+]
+
+[[package]]
 name = "hyper-timeout"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbb958482e8c7be4bc3cf272a766a2b0bf1a6755e7a6ae777f017a31d11b13b1"
 dependencies = [
- "hyper",
+ "hyper 0.14.26",
  "pin-project-lite",
  "tokio",
  "tokio-io-timeout",
+]
+
+[[package]]
+name = "hyper-util"
+version = "0.0.0"
+source = "git+https://github.com/hyperium/hyper-util.git#f898015fc9eca9f459ddac521db278d904099e89"
+dependencies = [
+ "futures-channel",
+ "futures-util",
+ "http",
+ "hyper 1.0.0-rc.4",
+ "once_cell",
+ "pin-project-lite",
+ "socket2",
+ "tokio",
+ "tower",
+ "tower-service",
+ "tracing",
 ]
 
 [[package]]
@@ -3757,8 +3855,8 @@ dependencies = [
  "futures-util",
  "h2",
  "http",
- "http-body",
- "hyper",
+ "http-body 0.4.5",
+ "hyper 0.14.26",
  "hyper-timeout",
  "percent-encoding",
  "pin-project",

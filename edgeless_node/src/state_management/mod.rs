@@ -76,7 +76,7 @@ impl StateHandle {
                 if let Some(provider) = &mut handles.node_local {
                     return provider.get(self.state_id);
                 }
-            },
+            }
             edgeless_api::function_instance::StatePolicy::Global => {
                 if let Some(provider) = &mut handles.global {
                     return provider.get(self.state_id);
@@ -94,7 +94,7 @@ impl StateHandle {
                 if let Some(provider) = &mut handles.node_local {
                     return provider.set(self.state_id, serialized_state);
                 }
-            },
+            }
             edgeless_api::function_instance::StatePolicy::Global => {
                 if let Some(provider) = &mut handles.global {
                     return provider.set(self.state_id, serialized_state);

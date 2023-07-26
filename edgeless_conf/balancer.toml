@@ -1,2 +1,7 @@
-balancer_id = "fda6ce79-46df-4f96-a0d2-456f720f606c"
+balancer_id = "2bb0867f-e9ee-4a3a-8872-dbaa5228ee23"
 invocation_url = "http://127.0.0.1:7032"
+resource_configuration_url = "http://127.0.0.1:7033"
+http_ingress_url = "http://127.0.0.1:7035"
+nodes = [
+    {id = "fda6ce79-46df-4f96-a0d2-456f720f606c", invocation_url="http://127.0.0.1:7002" }
+]

@@ -11,7 +11,7 @@ enum WorkflowCommands {
 
 #[derive(Debug, clap::Subcommand)]
 enum FunctionCommands {
-    Build { spec_file: String }
+    Build { spec_file: String },
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -23,7 +23,7 @@ enum Commands {
     Function {
         #[command(subcommand)]
         function_command: FunctionCommands,
-    }
+    },
 }
 
 #[derive(Debug, clap::Parser)]
@@ -81,6 +81,16 @@ async fn main() -> anyhow::Result<()> {
                                 }
                             })
                             .collect(),
+                        workflow_resources: workflow
+                            .resources
+                            .into_iter()
+                            .map(|wr| edgeless_api::workflow_instance::WorkflowResource {
+                                alias: wr.alias,
+                                resource_class_type: wr.resource_class_type,
+                                output_callback_definitions: wr.output_callback_definitions,
+                                configurations: wr.configurations,
+                            })
+                            .collect(),
                         workflow_annotations: workflow.annotations.clone(),
                     })
                     .await;
@@ -100,11 +110,10 @@ async fn main() -> anyhow::Result<()> {
         },
         Commands::Function { function_command } => match function_command {
             FunctionCommands::Build { spec_file } => {
-
                 let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
                 let cargo_project_path = spec_file_path.parent().unwrap().to_path_buf();
                 let cargo_manifest = cargo_project_path.join("Cargo.toml");
-                
+
                 let function_spec: workflow_spec::WorkflowSpecFunctionClass = serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
                 let build_dir = std::env::temp_dir().join(format!("edgeless-{}-{}", function_spec.id, uuid::Uuid::new_v4()));
 
@@ -113,7 +122,7 @@ async fn main() -> anyhow::Result<()> {
                 ws.set_target_dir(cargo::util::Filesystem::new(build_dir.clone()));
 
                 let pack = ws.current()?;
-                
+
                 let lib_name = match pack.library() {
                     Some(val) => val.name(),
                     None => {
@@ -126,7 +135,7 @@ async fn main() -> anyhow::Result<()> {
                     None,
                     false,
                     &vec!["wasm32-unknown-unknown".to_string()],
-                    cargo::core::compiler::CompileMode::Build
+                    cargo::core::compiler::CompileMode::Build,
                 )?;
                 build_config.requested_profile = cargo::util::interning::InternedString::new("release");
 
@@ -146,18 +155,25 @@ async fn main() -> anyhow::Result<()> {
 
                 cargo::ops::compile(&ws, &compile_options)?;
 
-                let raw_result = build_dir.join(format!("wasm32-unknown-unknown/release/{}.wasm", lib_name)).to_str().unwrap().to_string();
-                let out_file = cargo_project_path.join(format!("{}.wasm", function_spec.id)).to_str().unwrap().to_string();
+                let raw_result = build_dir
+                    .join(format!("wasm32-unknown-unknown/release/{}.wasm", lib_name))
+                    .to_str()
+                    .unwrap()
+                    .to_string();
+                let out_file = cargo_project_path
+                    .join(format!("{}.wasm", function_spec.id))
+                    .to_str()
+                    .unwrap()
+                    .to_string();
 
-                println!("{:?}", std::process::Command::new("wasm-tools").args([
-                    "component",
-                    "new",
-                    &raw_result,
-                    "-o",
-                    &out_file
-                ]).status()?);
+                println!(
+                    "{:?}",
+                    std::process::Command::new("wasm-tools")
+                        .args(["component", "new", &raw_result, "-o", &out_file])
+                        .status()?
+                );
             }
-        }
+        },
     }
     Ok(())
 }

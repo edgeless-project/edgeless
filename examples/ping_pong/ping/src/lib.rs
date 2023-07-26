@@ -27,8 +27,8 @@ impl Edgefunction for PingerFun {
         }
     }
 
-    fn handle_call(_src: Fid, _encoded_message: String) -> CallRet {
-        log("Ponger: 'Call' called");
+    fn handle_call(_src: Fid, encoded_message: String) -> CallRet {
+        log(&format!("Pinger: 'Call' called, MSG: {}", encoded_message));
         CallRet::Noreply
     }
 

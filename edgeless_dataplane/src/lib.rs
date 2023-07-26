@@ -26,6 +26,12 @@ enum Message {
     Err,
 }
 
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct EdgelessDataplaneSettingsPeer {
+    pub id: uuid::Uuid,
+    pub invocation_url: String,
+}
+
 #[async_trait::async_trait]
 impl DataPlaneLink for NodeLocalLink {
     async fn handle_send(
@@ -382,7 +388,7 @@ pub struct DataPlaneChainProvider {
 }
 
 impl DataPlaneChainProvider {
-    pub async fn new(_node_id: uuid::Uuid, invocation_url: String, peers: Vec<crate::EdgelessNodeSettingsPeer>) -> Self {
+    pub async fn new(_node_id: uuid::Uuid, invocation_url: String, peers: Vec<crate::EdgelessDataplaneSettingsPeer>) -> Self {
         Self {
             local_provider: std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalLinkProvider::new())),
             remote_provider: std::sync::Arc::new(tokio::sync::Mutex::new(

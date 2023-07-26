@@ -1,4 +1,4 @@
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionId {
     pub node_id: uuid::Uuid,
     pub function_id: uuid::Uuid,

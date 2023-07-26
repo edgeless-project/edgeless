@@ -9,11 +9,11 @@
                 "version": "0.1",
                 "include_code_file": "./pong/ponger.wasm",
                 "output_callbacks": [
-                    "pinger"
+                    "ping"
                 ]
             },
             "output_callback_definitions": {
-                "pinger": "pinger"
+                "ping": "pinger"
             },
             "annotations": {
 
@@ -37,6 +37,8 @@
 
             }
         }
+    ],
+    "resources": [
     ],
     "annotations": {}
 }

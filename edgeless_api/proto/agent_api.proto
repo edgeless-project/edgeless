@@ -43,6 +43,13 @@ message UpdateFunctionLinksRequest {
     FunctionId return_continuation = 4;
 }
 
+message WorkflowResource {
+    string alias = 1;
+    string resource_class_type = 2;
+    map<string, string> output_callback_definitions = 3;
+    map<string, string> configurations = 4;
+}
+
 message WorkflowFunction {
     string function_alias = 1;
     FunctionClassSpecification function_class = 2;
@@ -54,7 +61,8 @@ message WorkflowFunction {
 message SpawnWorkflowRequest {
     WorkflowId workflow_id = 1;
     repeated WorkflowFunction workflow_functions = 2;
-    map<string, string> workflow_annotations = 3;
+    repeated WorkflowResource workflow_resources = 3;
+    map<string, string> workflow_annotations = 4;
 }
 
 message WorkflowFunctionMapping {
@@ -91,6 +99,18 @@ message Event {
     EventData msg = 4;
 }
 
+message ResourceProviderSpecification {
+    string provider_id = 1;
+    string resource_class_type = 2;
+    repeated string output_callback_declarations = 3;
+}
+
+message ResourceInstanceSpecification {
+    string provider_id = 1;
+    map<string, string> configuration = 2;
+    map<string, FunctionId> output_callback_definitions = 3;
+}
+
 service FunctionInstance {
     rpc StartFunctionInstance (SpawnFunctionRequest) returns (FunctionId);
     rpc StopFunctionInstance (FunctionId) returns (google.protobuf.Empty );
@@ -104,4 +124,9 @@ service WorkflowInstance {
 
 service FunctionInvocation {
     rpc HandleEvent (Event) returns (google.protobuf.Empty); 
+}
+
+service ResourceConfiguration {
+    rpc StartResourceInstance (ResourceInstanceSpecification) returns (FunctionId);
+    rpc StopResourceInstance (FunctionId) returns (google.protobuf.Empty);
 }

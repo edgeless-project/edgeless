@@ -29,6 +29,7 @@ serde = "1.0"
 clap = { version = "4.3", features=["derive"] }
 toml = "0.7"
 edgeless_api = {path = "../edgeless_api", features = ["grpc_impl"]}
+edgeless_dataplane = {path = "../edgeless_dataplane" }
 edgeless_bal = {path = "../edgeless_bal", optional = true}
 edgeless_con = {path = "../edgeless_con", optional = true}
 edgeless_orc = {path = "../edgeless_orc", optional = true}
