@@ -26,7 +26,7 @@ impl Edgefunction for ExampleFunction {
     }
 
     fn handle_call(src: Fid, encoded_message: String) -> CallRet {
-        log(&format!("Example: 'Cast' called, MSG: {}", encoded_message));
+        log(&format!("Example: 'Call' called, MSG: {}", encoded_message));
         CallRet::Noreply
     }
 
