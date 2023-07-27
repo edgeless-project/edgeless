@@ -2,9 +2,10 @@
 members = [
     "edgeless_api",
     "edgeless_bal",
-    "edgeless_con",
-    "edgeless_node",
-    "edgeless_orc",
     "edgeless_cli",
-    "edgeless_function"
+    "edgeless_function",
+    "edgeless_con",
+    "edgeless_inabox",
+    "edgeless_node",
+    "edgeless_orc"
 ]

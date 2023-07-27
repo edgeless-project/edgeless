@@ -1,16 +1,12 @@
 [package]
-name = "edgeless_node"
+name = "edgeless_inabox"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de"]
 edition = "2021"
 
-[lib]
-name = "edgeless_node"
-path = "src/lib.rs"
-
 [[bin]]
-name = "edgeless_node_d"
-path = "src/bin/edgeless_node_d.rs"
+name = "edgeless_inabox"
+path = "src/bin/edgeless_inabox.rs"
 
 [dependencies]
 log = "0.4"
@@ -25,5 +21,9 @@ wasmtime-wasi = { version = "10" }
 serde = "1.0"
 clap = { version = "4.3", features=["derive"] }
 toml = "0.7"
-edgeless_api = {path = "../edgeless_api", features = ["grpc_impl"]}
-edgeless_dataplane = {path = "../edgeless_dataplane" }
+edgeless_api = {path = "../edgeless_api" }
+edgeless_dataplane = {path = "../edgeless_dataplane"  }
+edgeless_bal = {path = "../edgeless_bal" }
+edgeless_con = {path = "../edgeless_con" }
+edgeless_orc = {path = "../edgeless_orc" }
+edgeless_node = {path = "../edgeless_node" }
