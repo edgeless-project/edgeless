@@ -54,6 +54,7 @@ impl ResourceConfigurationClient {
                     return Self { client };
                 }
                 Err(_) => {
+                    log::warn!("could not connect to {:?}, retrying", server_addr);
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 }
             }
