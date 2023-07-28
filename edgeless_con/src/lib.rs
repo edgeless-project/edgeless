@@ -22,7 +22,7 @@ pub struct EdgelessConSettings {
 }
 
 pub async fn edgeless_con_main(settings: EdgelessConSettings) {
-    log::info!("Starting Edgeless Controller");
+    log::info!("Starting Edgeless Controller at {}", settings.controller_url);
     log::debug!("Settings: {:?}", settings);
 
     let (mut controller, controller_task) = controller::Controller::new(settings.clone());
