@@ -113,7 +113,6 @@ impl Controller {
                             );
                         }
                     }
-
                     for resource in spawn_workflow_request.workflow_resources {
                         if let Some((provider_id, handle)) = resources
                             .iter_mut()
@@ -133,7 +132,6 @@ impl Controller {
                                 .await;
                         }
                     }
-
                     for workflow_fid_alias in to_patch {
                         if let Some(mapping) = f_ids.get(&workflow_fid_alias) {
                             if let Some(config) = spawn_workflow_request
@@ -193,6 +191,8 @@ impl Controller {
                                 }
                             }
                         }
+                    } else {
+                        log::warn!("cannot stop non-existing workflow: {:?}", workflow_id);
                     }
                 }
             }
