@@ -1,10 +1,14 @@
 #!/bin/bash
 
+logs="build.log edgeless_bal.log edgeless_con.log edgeless_orc.log edgeless_node.log"
+
 echo "compiling"
 cargo build >& build.log
 
 echo "starting orchestrator, controller, and a node"
 pids=()
+RUST_LOG=info target/debug/edgeless_bal_d >& edgeless_bal.log & 
+pids+=($!)
 RUST_LOG=info target/debug/edgeless_con_d >& edgeless_con.log & 
 pids+=($!)
 RUST_LOG=info target/debug/edgeless_orc_d >& edgeless_orc.log & 
@@ -45,3 +49,7 @@ for pid in "${pids[@]}" ; do
     kill $pid
 done
 wait
+
+read -s -n 1 -p "press any key to remove all log files (Ctrl+C if you want to keep them)"
+echo ""
+rm $logs 2> /dev/null
