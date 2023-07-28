@@ -13,21 +13,43 @@ The easiest way to get started is the devcontainer shipped as part of this repos
 Build Steps:
 
 Build host code / tools:
-`cargo build`
 
-Use the CLI to build a guest:
-`cargo run --bin=edgeless_cli function build examples/ping_pong/ping/function.json`
-`cargo run --bin=edgeless_cli function build examples/ping_pong/pong/function.json`
+```
+cargo build
+```
 
 ## How to run:
 
-This section will be expanded upon later. To get the basic system running:
+This section will be expanded upon later. To get the basic system first create default configuration files:
 
-`RUST_LOG=info cargo run --bin=edgeless_node_d --features=inabox`
+```
+cargo run --bin=edgeless_inabox -- -t 
+```
 
-To deploy the example functions (in a separate shell):
+and then run the EDGELESS-in-a-box:
 
-`RUST_LOG=info cargo run --bin=edgeless_cli workflow start examples/ping_pong/workflow.json`
+```
+RUST_LOG=info cargo run --bin=edgeless_inabox
+```
+
+To deploy the example workflow (in a separate shell) first create the default configuration file for the CLI:
+
+```
+cargo run --bin=edgeless_cli -- -t cli.toml
+```
+
+then build the guest functions:
+
+```
+cargo run --bin=edgeless_cli function build examples/ping_pong/ping/function.json
+cargo run --bin=edgeless_cli function build examples/ping_pong/pong/function.json
+```
+
+and finally request the controller to start the workflow:
+
+```
+RUST_LOG=info cargo run --bin=edgeless_cli workflow start examples/ping_pong/workflow.json
+```
 
 ## How to create functions/workflows:
 
@@ -40,7 +62,6 @@ Each of the main services is implemented as its own crate (library + binary wrap
 * `edgeless_node`:  Worker Node including the agent and function runtime.
     * Exposes the `AgentAPI` consisting of the `FunctionInstanceAPI`
     * Exposes the `InvocationAPI` (data plane)
-    * Has the feature `inabox` to run a standalone Edgeless environment with preconfigured instances of all required services inside a single binary. This is the easiest way to spawn up a development instance of edgeless.
     * Binary: `edgeless_node_d`
 
 * `edgeless_orc`: e-Orchestrator
@@ -58,6 +79,8 @@ Each of the main services is implemented as its own crate (library + binary wrap
 
 * `edgeless_cli`: CLI to interact with the e-Controller
     * Binary: `edgeless_cli`
+
+* `edgeless_inabox`:a standalone EDGELESS environment with preconfigured instances of all required services inside a single binary. This is the easiest way to spawn up a development instance of edgeless
 
 In addition to the services/binaries, the repository contains the following libraries:
 
@@ -77,7 +100,7 @@ In addition to the services/binaries, the repository contains the following libr
 * `edgeless_http`: Crate containing HTTP-related types.
     * Specifies the interface between the Ingress and the functions consuming HTTP Events.
 
-Finally, `examples` contains example guests, and `edgeless_conf` contains reference configurations for the services.
+Finally, `examples` contains example guests.
 
 ## Contributing
 
