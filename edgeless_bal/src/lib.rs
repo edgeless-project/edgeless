@@ -23,3 +23,16 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
     let api_server = edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationServer::run(ingress, settings.resource_configuration_url);
     api_server.await;
 }
+
+pub fn edgeless_bal_default_conf() -> String {
+    String::from(
+        r##"balancer_id = "2bb0867f-e9ee-4a3a-8872-dbaa5228ee23"
+invocation_url = "http://127.0.0.1:7032"
+resource_configuration_url = "http://127.0.0.1:7033"
+http_ingress_url = "http://127.0.0.1:7035"
+nodes = [
+        {id = "fda6ce79-46df-4f96-a0d2-456f720f606c", invocation_url="http://127.0.0.1:7002" }
+]
+"##,
+    )
+}

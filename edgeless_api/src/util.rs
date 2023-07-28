@@ -21,3 +21,14 @@ pub fn parse_http_host(raw: &str) -> anyhow::Result<(HttpProto, String, u16)> {
         }
     }
 }
+
+pub fn create_template(path: &str, content: &str) -> anyhow::Result<()> {
+    assert!(!path.is_empty());
+    match std::path::Path::new(&path).exists() {
+        true => anyhow::bail!("cannot overwrite configuration file: {}", path),
+        false => {
+            std::fs::write(path, content)?;
+            Ok(())
+        }
+    }
+}

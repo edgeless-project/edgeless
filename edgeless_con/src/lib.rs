@@ -31,3 +31,16 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
 
     futures::join!(controller_task, server_task);
 }
+
+pub fn edgeless_con_default_conf() -> String {
+    String::from(
+        r##"controller_url = "http://127.0.0.1:7021"
+orchestrators = [
+    { domain_id = "domain-1", orchestrator_url="http://127.0.0.1:7011" }
+]
+resources = [
+    { resource_provider_id = "http-ingress-1",  resource_class_type = "http-ingress", output_callback_declarations = ["new_request"], resource_configuration_url = "http://127.0.0.1:7033" }
+]
+"##,
+    )
+}
