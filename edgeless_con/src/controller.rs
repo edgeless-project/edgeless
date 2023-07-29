@@ -199,7 +199,7 @@ impl Controller {
         }
     }
 
-    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::con::ControllerAPI + Send> {
+    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::controller::ControllerAPI + Send> {
         Box::new(ControllerClient {
             workflow_instance_client: Box::new(ControllerWorkflowInstanceClient { sender: self.sender.clone() }),
         })
@@ -210,7 +210,7 @@ pub struct ControllerClient {
     workflow_instance_client: Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>,
 }
 
-impl edgeless_api::con::ControllerAPI for ControllerClient {
+impl edgeless_api::controller::ControllerAPI for ControllerClient {
     fn workflow_instance_api(&mut self) -> Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI> {
         self.workflow_instance_client.clone()
     }

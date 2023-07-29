@@ -4,7 +4,7 @@ pub mod agent;
 
 pub mod orc;
 
-pub mod con;
+pub mod controller;
 
 pub mod workflow_instance;
 
