@@ -1,0 +1,21 @@
+[workspace]
+
+[profile.release]
+lto = true
+opt-level = "s"
+
+[package]
+name = "edgeless_sample_pong_async"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de"]
+edition = "2021"
+
+[lib]
+name = "edgeless_sample_pong_async"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { path = "../../../edgeless_function" }
+serde = {version="1", features=["derive"] }
+serde_json = "1"
