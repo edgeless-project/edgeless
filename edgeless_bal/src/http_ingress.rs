@@ -51,6 +51,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
             }) {
                 let msg = edgeless_http::EdgelessHTTPRequest {
                     host: host.to_string(),
+                    protocol: edgeless_http::EdgelessHTTPProtocol::Unknown,
                     method: method.clone(),
                     path: parts.uri.to_string(),
                     body: Some(Vec::from(data)),
