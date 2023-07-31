@@ -8,12 +8,11 @@
             "cargo": {
                 "args": [
                     "build",
-                    "--features=inabox",
-                    "--package=edgeless_node",
-                    "--bin=edgeless_node_d"
+                    "--package=edgeless_inabox",
+                    "--bin=edgeless_inabox"
                 ],
                 "filter": {
-                    "name": "edgeless_node_d",
+                    "name": "edgeless_inabox",
                     "kind": "bin"
                 }
             },
