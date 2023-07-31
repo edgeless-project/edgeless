@@ -118,7 +118,7 @@ impl Controller {
                             .iter_mut()
                             .find(|(_id, spec)| spec.resource_type == resource.resource_class_type)
                         {
-                            let _res = handle
+                            let wf_id = handle
                                 .config_api
                                 .start_resource_instance(edgeless_api::resource_configuration::ResourceInstanceSpecification {
                                     provider_id: provider_id.clone(),
@@ -130,6 +130,16 @@ impl Controller {
                                     configuration: resource.configurations.clone(),
                                 })
                                 .await;
+                            if let Ok(id) = wf_id {
+                                log::info!("Insert {}", resource.alias.clone());
+                                f_ids.insert(
+                                    resource.alias.clone(),
+                                    edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                                        function_alias: resource.alias.clone(),
+                                        instances: vec![id],
+                                    },
+                                );
+                            }
                         }
                     }
                     for workflow_fid_alias in to_patch {

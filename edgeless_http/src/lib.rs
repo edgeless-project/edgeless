@@ -1,4 +1,4 @@
-#[derive(Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum EdgelessHTTPMethod {
     Get,
     Head,
@@ -49,6 +49,17 @@ pub fn string_method_to_edgeless(method: &str) -> anyhow::Result<EdgelessHTTPMet
     })
 }
 
+pub fn edgeless_method_to_string(method: EdgelessHTTPMethod) -> String {
+    match method {
+        EdgelessHTTPMethod::Get => "GET".to_string(),
+        EdgelessHTTPMethod::Head => "HEAD".to_string(),
+        EdgelessHTTPMethod::Post => "POST".to_string(),
+        EdgelessHTTPMethod::Put => "PUT".to_string(),
+        EdgelessHTTPMethod::Delete => "DELETE".to_string(),
+        EdgelessHTTPMethod::Patch => "PATCH".to_string(),
+    }
+}
+
 pub fn request_to_string(request: &EdgelessHTTPRequest) -> String {
     serde_json::to_string(request).unwrap()
 }
@@ -65,9 +76,17 @@ pub fn response_from_string(response_str: &str) -> anyhow::Result<EdgelessHTTPRe
     Ok(serde_json::from_str(response_str)?)
 }
 
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub enum EdgelessHTTPProtocol {
+    Unknown,
+    HTTP,
+    HTTPS,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
 pub struct EdgelessHTTPRequest {
     pub method: EdgelessHTTPMethod,
+    pub protocol: EdgelessHTTPProtocol,
     pub host: String,
     pub path: String,
     pub body: Option<Vec<u8>>,

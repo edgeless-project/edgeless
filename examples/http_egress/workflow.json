@@ -1,0 +1,30 @@
+{
+    "alias": "http_egress",
+    "functions": [
+        {
+            "alias": "http_requestor",
+            "class_specification": {
+                "id": "http_requestor",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./requestor/http_requestor.wasm",
+                "output_callbacks": [
+                    "http_e"
+                ]
+            },
+            "output_callback_definitions": {
+                "http_e": "http-egress-1-1"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "alias": "http-egress-1-1",
+            "resource_class_type": "http-egress",
+            "output_callback_definitions": {},
+            "configurations": {}
+        }
+    ],
+    "annotations": {}
+}
