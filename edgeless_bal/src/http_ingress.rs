@@ -1,13 +1,6 @@
-use std::net::SocketAddr;
 use std::str::FromStr;
 
-use http_body_util::{BodyExt, Full};
-use hyper::body::Bytes;
-
-use hyper::server::conn::http1;
-
-use hyper_util::rt::TokioIo;
-use tokio::net::TcpListener;
+use http_body_util::BodyExt;
 
 struct IngressState {
     interests: Vec<HTTPIngressInterest>,
@@ -72,7 +65,9 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                 match res {
                     edgeless_dataplane::CallRet::Reply(data) => {
                         let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_str(&data)?;
-                        let mut response_builder = hyper::Response::new(Full::new(Bytes::from(processor_response.body.unwrap_or(vec![]))));
+                        let mut response_builder = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from(
+                            processor_response.body.unwrap_or(vec![]),
+                        )));
                         *response_builder.status_mut() = hyper::StatusCode::from_u16(processor_response.status)?;
                         {
                             let headers = response_builder.headers_mut();
@@ -91,7 +86,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                 }
             }
 
-            let mut not_found = hyper::Response::new(Full::new(Bytes::from("Not Found")));
+            let mut not_found = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from("Not Found")));
             *not_found.status_mut() = hyper::StatusCode::NOT_FOUND;
             Ok(not_found)
         })
@@ -105,7 +100,7 @@ pub async fn ingress_task(
 ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI> {
     let mut provider = dataplane_provider;
     let (_, host, port) = edgeless_api::util::parse_http_host(&ingress_url).unwrap();
-    let addr = SocketAddr::from((std::net::IpAddr::from_str(&host).unwrap(), port));
+    let addr = std::net::SocketAddr::from((std::net::IpAddr::from_str(&host).unwrap(), port));
 
     let mut dataplane = provider.get_chain_for(ingress_id.clone()).await;
     let dataplane_write = dataplane.new_write_handle().await;
@@ -119,7 +114,7 @@ pub async fn ingress_task(
     let cloned_interests = ingress_state.clone();
 
     let _web_task: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
-        let listener = TcpListener::bind(addr).await?;
+        let listener = tokio::net::TcpListener::bind(addr).await?;
         loop {
             let (stream, _) = match listener.accept().await {
                 Ok(val) => val,
@@ -128,12 +123,12 @@ pub async fn ingress_task(
                     continue;
                 }
             };
-            let io = TokioIo::new(stream);
+            let io = hyper_util::rt::TokioIo::new(stream);
             let cloned_interests = cloned_interests.clone();
             let cloned_host = host.clone();
             let cloned_port = port.clone();
             tokio::task::spawn(async move {
-                if let Err(err) = http1::Builder::new()
+                if let Err(err) = hyper::server::conn::http1::Builder::new()
                     .serve_connection(
                         io,
                         IngressService {
