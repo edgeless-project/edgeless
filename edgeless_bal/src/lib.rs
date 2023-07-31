@@ -14,13 +14,22 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
     log::debug!("Settings: {:?}", settings);
     let data_plane =
         edgeless_dataplane::DataPlaneChainProvider::new(settings.balancer_id.clone(), settings.invocation_url.clone(), settings.nodes.clone()).await;
+
     let ingress = http_ingress::ingress_task(
         data_plane.clone(),
         edgeless_api::function_instance::FunctionId::new(settings.balancer_id.clone()),
         settings.http_ingress_url.clone(),
     )
     .await;
-    let api_server = edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationServer::run(ingress, settings.resource_configuration_url);
+
+    let multi_resouce_api = Box::new(edgeless_api::resource_configuration::MultiResouceConfigurationAPI::new(
+        std::collections::HashMap::<String, Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI>>::from([
+            ("http-ingress-1".to_string(), ingress)
+        ]),
+    ));
+
+    let api_server =
+        edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationServer::run(multi_resouce_api, settings.resource_configuration_url);
     api_server.await;
 }
 
