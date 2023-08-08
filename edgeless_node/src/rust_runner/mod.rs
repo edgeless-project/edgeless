@@ -22,6 +22,7 @@ impl Runner {
         _settings: crate::EdgelessNodeSettings,
         data_plane_provider: edgeless_dataplane::DataPlaneChainProvider,
         state_manager: state_management::StateManager,
+        telemtry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
     ) -> (Self, futures::future::BoxFuture<'static, ()>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let cloned_sender = sender.clone();
@@ -32,6 +33,7 @@ impl Runner {
                 let mut data_plane_provider = data_plane_provider;
                 let mut functions = std::collections::HashMap::<uuid::Uuid, FunctionInstance>::new();
                 let mut state_manager = state_manager;
+                let mut telemetry_handle = telemtry_handle;
                 log::info!("Starting Edgeless Rust Runner");
                 while let Some(req) = receiver.next().await {
                     match req {
@@ -52,6 +54,10 @@ impl Runner {
                                 state_manager
                                     .get_handle(spawn_request.state_specification.state_policy, spawn_request.state_specification.state_id)
                                     .await,
+                                telemetry_handle.fork(std::collections::BTreeMap::from([(
+                                    "FUNCTION_ID".to_string(),
+                                    function_id.function_id.to_string(),
+                                )])),
                             )
                             .await;
                             functions.insert(function_id.function_id.clone(), instance.unwrap());
@@ -123,6 +129,7 @@ struct FunctionInstanceTaskState {
     // instance: wasmtime::component::Instance,
     data_plane: edgeless_dataplane::DataPlaneChainHandle,
     runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
+    telemetry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
 }
 
 struct FunctionInstanceCallbackTable {
@@ -141,6 +148,7 @@ impl FunctionInstance {
         data_plane: edgeless_dataplane::DataPlaneChainHandle,
         runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
         state_handle: state_management::StateHandle,
+        telemetry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
     ) -> anyhow::Result<Self> {
         let callback_table = std::sync::Arc::new(tokio::sync::Mutex::new(FunctionInstanceCallbackTable {
             alias_map: spawn_req.output_callback_definitions.clone(),
@@ -152,6 +160,7 @@ impl FunctionInstance {
             }
         };
         let cloned_callbacks = callback_table.clone();
+        let cloned_telemetry = telemetry_handle.clone();
         let (sender, receiver) = futures::channel::oneshot::channel::<()>();
         let task = tokio::spawn(async move {
             let receiver = receiver;
@@ -162,6 +171,7 @@ impl FunctionInstance {
                 data_plane,
                 runner_api,
                 state_handle,
+                cloned_telemetry,
             )
             .await
             {
@@ -196,6 +206,7 @@ struct FunctionState {
     data_plane: edgeless_dataplane::DataPlaneChainWriteHandle,
     callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
     state_handle: state_management::StateHandle,
+    telemetry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
 }
 
 impl FunctionInstanceTaskState {
@@ -206,10 +217,13 @@ impl FunctionInstanceTaskState {
         data_plane: edgeless_dataplane::DataPlaneChainHandle,
         runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
         state_handle: state_management::StateHandle,
+        telemetry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
     ) -> anyhow::Result<Self> {
+        let start = tokio::time::Instant::now();
         let mut data_plane = data_plane;
         let mut config = wasmtime::Config::new();
         let mut state_handle = state_handle;
+        let mut telemetry_handle = telemetry_handle;
         config.async_support(true);
         config.wasm_component_model(true);
         let engine = wasmtime::Engine::new(&config)?;
@@ -224,10 +238,20 @@ impl FunctionInstanceTaskState {
                 data_plane: data_plane.new_write_handle().await,
                 callback_table: callback_table,
                 state_handle: state_handle,
+                telemetry_handle: telemetry_handle.clone(),
             },
         );
         let (binding, _instance) = api::Edgefunction::instantiate_async(&mut store, &component, &linker).await?;
+        telemetry_handle.observe(
+            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInstantiate(start.elapsed()),
+            std::collections::BTreeMap::new(),
+        );
+        let start = tokio::time::Instant::now();
         binding.call_handle_init(&mut store, "test", serialized_state.as_deref()).await?;
+        telemetry_handle.observe(
+            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInit(start.elapsed()),
+            std::collections::BTreeMap::new(),
+        );
         Ok(Self {
             function_id,
             // config,
@@ -239,6 +263,7 @@ impl FunctionInstanceTaskState {
             // instance,
             data_plane,
             runner_api,
+            telemetry_handle,
         })
     }
 
@@ -247,6 +272,12 @@ impl FunctionInstanceTaskState {
         loop {
             futures::select! {
                 _ = poison_pill_receiver => {
+                    match self.activate(Event::Stop).await {
+                        Ok(_) => {}
+                        Err(_) => {
+                            break;
+                        }
+                    }
                     break;
                 },
                 (src, stream_id, msg) =  Box::pin(self.data_plane.receive_next()).fuse() => {
@@ -275,11 +306,16 @@ impl FunctionInstanceTaskState {
                 log::error!("FunctionInstance outlived runner.")
             }
         };
+        self.telemetry_handle.observe(
+            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionExit,
+            std::collections::BTreeMap::new(),
+        );
     }
 
     async fn activate(&mut self, event: Event) -> anyhow::Result<()> {
         match event {
             Event::Cast(src, msg) => {
+                let start = tokio::time::Instant::now();
                 self.binding
                     .call_handle_cast(
                         &mut self.store,
@@ -290,9 +326,15 @@ impl FunctionInstanceTaskState {
                         &msg,
                     )
                     .await?;
+                self.telemetry_handle.observe(
+                    edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(start.elapsed()),
+                    std::collections::BTreeMap::from([("EVENT_TYPE".to_string(), "CAST".to_string())]),
+                );
                 Ok(())
             }
+
             Event::Call(channel_id, src, msg) => {
+                let start = tokio::time::Instant::now();
                 let res = self
                     .binding
                     .call_handle_call(
@@ -304,6 +346,10 @@ impl FunctionInstanceTaskState {
                         &msg,
                     )
                     .await?;
+                self.telemetry_handle.observe(
+                    edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(start.elapsed()),
+                    std::collections::BTreeMap::from([("EVENT_TYPE".to_string(), "CALL".to_string())]),
+                );
                 let mut wh = self.data_plane.new_write_handle().await;
                 wh.reply(
                     src,
@@ -315,6 +361,16 @@ impl FunctionInstanceTaskState {
                     },
                 )
                 .await;
+                Ok(())
+            }
+
+            Event::Stop => {
+                let start = tokio::time::Instant::now();
+                self.binding.call_handle_stop(&mut self.store).await?;
+                self.telemetry_handle.observe(
+                    edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionStop(start.elapsed()),
+                    std::collections::BTreeMap::new(),
+                );
                 Ok(())
             }
         }
@@ -363,8 +419,12 @@ impl api::EdgefunctionImports for FunctionState {
         }
     }
 
-    async fn log(&mut self, msg: String) -> wasmtime::Result<()> {
-        log::info!("Function Log: {}", msg);
+    async fn telemetry_log(&mut self, lvl: String, target: String, msg: String) -> wasmtime::Result<()> {
+        let parsed_level = edgeless_telemetry::telemetry_events::api_to_telemetry(lvl);
+        self.telemetry_handle.observe(
+            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionLogEntry(parsed_level, target, msg),
+            std::collections::BTreeMap::new(),
+        );
         Ok(())
     }
 
@@ -405,4 +465,5 @@ fn parse_wit_function_id(fid: &api::Fid) -> anyhow::Result<edgeless_api::functio
 enum Event {
     Cast(edgeless_api::function_instance::FunctionId, String),
     Call(u64, edgeless_api::function_instance::FunctionId, String),
+    Stop,
 }

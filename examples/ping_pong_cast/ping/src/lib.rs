@@ -11,27 +11,28 @@ struct PingerState {
 
 impl Edgefunction for PingerFun {
     fn handle_cast(_src: Fid, encoded_message: String) {
-        log(&format!("AsyncPinger: 'Cast' called, MSG: {}", encoded_message));
+        log::info!("AsyncPinger: 'Cast' called, MSG: {}", encoded_message);
         if encoded_message == "wakeup" {
             cast_alias("ponger", "PING");
             delayed_cast(1000, &slf(), "wakeup");
         } else {
-            log("Got Response");
+            log::info!("Got Response");
         }
     }
 
     fn handle_call(_src: Fid, encoded_message: String) -> CallRet {
-        log(&format!("AsyncPinger: 'Call' called, MSG: {}", encoded_message));
+        log::info!("AsyncPinger: 'Call' called, MSG: {}", encoded_message);
         CallRet::Noreply
     }
 
     fn handle_init(_payload: String, serialized_state: Option<String>) {
-        log("AsyncPinger: 'Init' called");
+        edgeless_function::init_logger();
+        log::info!("AsyncPinger: 'Init' called");
         cast(&slf(), "wakeup");
     }
 
     fn handle_stop() {
-        log("AsyncPinger: 'Stop' called");
+        log::info!("AsyncPinger: 'Stop' called");
     }
 }
 

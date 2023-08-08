@@ -10,6 +10,7 @@ pub struct EdgelessNodeSettings {
     pub node_id: uuid::Uuid,
     pub agent_url: String,
     pub invocation_url: String,
+    pub metrics_url: String,
     pub peers: Vec<edgeless_dataplane::EdgelessDataplaneSettingsPeer>,
 }
 
@@ -19,7 +20,16 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let state_manager = state_management::StateManager::new().await;
     let data_plane =
         edgeless_dataplane::DataPlaneChainProvider::new(settings.node_id.clone(), settings.invocation_url.clone(), settings.peers.clone()).await;
-    let (mut rust_runner, rust_runner_task) = rust_runner::Runner::new(settings.clone(), data_plane.clone(), state_manager.clone());
+    let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.metrics_url.clone()).await;
+    let (mut rust_runner, rust_runner_task) = rust_runner::Runner::new(
+        settings.clone(),
+        data_plane.clone(),
+        state_manager.clone(),
+        telemetry_provider.get_handle(std::collections::BTreeMap::from([
+            ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
+            ("NODE_ID".to_string(), settings.node_id.to_string()),
+        ])),
+    );
     let (mut agent, agent_task) = agent::Agent::new(rust_runner.get_api_client(), settings.clone());
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.agent_url);
 
@@ -31,6 +41,7 @@ pub fn edgeless_node_default_conf() -> String {
         r##"node_id = "fda6ce79-46df-4f96-a0d2-456f720f606c"
 agent_url = "http://127.0.0.1:7001"
 invocation_url = "http://127.0.0.1:7002"
+metrics_url = "http://127.0.0.1:7003"
 peers = [
         {id = "fda6ce79-46df-4f96-a0d2-456f720f606c", invocation_url="http://127.0.0.1:7002" },
         {id = "2bb0867f-e9ee-4a3a-8872-dbaa5228ee23", invocation_url="http://127.0.0.1:7032" }
