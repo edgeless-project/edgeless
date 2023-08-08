@@ -6,11 +6,11 @@ struct ProcesorFun;
 
 impl Edgefunction for ProcesorFun {
     fn handle_cast(_src: Fid, encoded_message: String) {
-        log(&format!("HTTP_Processor: 'Cast' called, MSG: {}", encoded_message));
+        log::info!("HTTP_Processor: 'Cast' called, MSG: {}", encoded_message);
     }
 
     fn handle_call(_src: Fid, encoded_message: String) -> CallRet {
-        log(&format!("HTTP_Processor: 'Call' called, MSG: {}", encoded_message));
+        log::info!("HTTP_Processor: 'Call' called, MSG: {}", encoded_message);
         let req : EdgelessHTTPRequest = edgeless_http::request_from_string(&encoded_message).unwrap();
 
         let resp = if req.path == "/hello" {
@@ -31,11 +31,11 @@ impl Edgefunction for ProcesorFun {
     }
 
     fn handle_init(_payload: String, serialized_state: Option<String>) {
-        log("HTTP_Processor: 'Init' called");
+        log::info!("HTTP_Processor: 'Init' called");
     }
 
     fn handle_stop() {
-        log("HTTP_Processor: 'Stop' called");
+        log::info!("HTTP_Processor: 'Stop' called");
     }
 }
 

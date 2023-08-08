@@ -3,20 +3,21 @@ struct PongerFun;
 
 impl Edgefunction for PongerFun {
     fn handle_cast(_src: Fid, encoded_message: String) {
-        log(&format!("Ponger: 'Cast' called, MSG: {}", encoded_message));
+        log::info!("Ponger: 'Cast' called, MSG: {}", encoded_message);
     }
 
     fn handle_call(_src: Fid, encoded_message: String) -> CallRet {
-        log(&format!("Ponger: 'Call' called, MSG: {}", encoded_message));
+        log::info!("Ponger: 'Call' called, MSG: {}", encoded_message);
         CallRet::Reply("PONG".to_string())
     }
 
     fn handle_init(_payload: String, _serialized_state: Option<String>) {
-        log("Ponger: 'Init' called");
+        edgeless_function::init_logger();
+        log::info!("Ponger: 'Init' called");
     }
 
     fn handle_stop() {
-        log("Ponger: 'Stop' called");
+        log::info!("Ponger: 'Stop' called");
     }
 }
 edgeless_function::export!(PongerFun);

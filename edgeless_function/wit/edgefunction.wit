@@ -17,7 +17,7 @@ world edgefunction {
   import cast: func(target: fid, msg: string)
   import call: func(target: fid, msg: string) -> call-ret
   import call-alias: func(alias: string, msg: string) -> call-ret
-  import log: func(msg: string)
+  import telemetry-log: func(lvl: string, target: string, message: string)
   import slf: func() -> fid
   import delayed-cast: func(delayms: u64, target: fid, payload: string)
   import sync: func(state: string)

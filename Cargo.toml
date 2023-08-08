@@ -7,5 +7,6 @@ members = [
     "edgeless_con",
     "edgeless_inabox",
     "edgeless_node",
-    "edgeless_orc"
+    "edgeless_orc",
+    "edgeless_telemetry"
 ]

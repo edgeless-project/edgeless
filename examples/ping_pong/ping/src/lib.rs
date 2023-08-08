@@ -13,7 +13,7 @@ static STATE: std::sync::OnceLock<std::sync::Mutex<PingerState>> = std::sync::On
 
 impl Edgefunction for PingerFun {
     fn handle_cast(_src: Fid, encoded_message: String) {
-        log(&format!("Pinger: 'Cast' called, MSG: {}", encoded_message));
+        log::info!("Pinger: 'Cast' called, MSG: {}", encoded_message);
         if encoded_message == "wakeup" {
 
             let id = STATE.get().unwrap().lock().unwrap().count;
@@ -23,7 +23,7 @@ impl Edgefunction for PingerFun {
             
             let res = call_alias("ponger", &format!("PING-{}", id));
             if let CallRet::Reply(_msg) = res {
-                log("Got Reply");
+                log::info!("Got Reply");
             }
             
             delayed_cast(1000, &slf(), "wakeup");
@@ -31,13 +31,14 @@ impl Edgefunction for PingerFun {
     }
 
     fn handle_call(_src: Fid, encoded_message: String) -> CallRet {
-        log(&format!("Pinger: 'Call' called, MSG: {}", encoded_message));
+        log::info!("Pinger: 'Call' called, MSG: {}", encoded_message);
         CallRet::Noreply
     }
 
     fn handle_init(_payload: String, serialized_state: Option<String>) {
-        log("Pinger: 'Init' called");
-        
+        edgeless_function::init_logger();
+        log::info!("Pinger: 'Init' called");
+
         if let Some(serialized) = serialized_state {
             STATE.set(std::sync::Mutex::new(serde_json::from_str(&serialized).unwrap())).unwrap();
         } else {
@@ -48,7 +49,7 @@ impl Edgefunction for PingerFun {
     }
 
     fn handle_stop() {
-        log("Pinger: 'Stop' called");
+        log::info!("Pinger: 'Stop' called");
     }
 }
 
