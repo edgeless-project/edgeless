@@ -14,6 +14,7 @@ impl Edgefunction for NoopFunction {
     }
 
     fn handle_init(payload: String, _serialized_state: Option<String>) {
+        edgeless_function::init_logger();
         log::info!("Noop initialized, payload: {}", payload);
     }
 
