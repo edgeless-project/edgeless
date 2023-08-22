@@ -1,0 +1,19 @@
+{
+    "alias": "noop_workflow",
+    "functions": [
+        {
+            "alias": "noop",
+            "class_specification": {
+                "id": "noop",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./noop_function/noop.wasm",
+                "output_callbacks": []
+            },
+            "output_callback_definitions": {},
+            "annotations": {}
+        }
+    ],
+    "resources": [],
+    "annotations": {}
+}
