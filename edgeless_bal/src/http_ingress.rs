@@ -4,8 +4,7 @@ use http_body_util::BodyExt;
 
 struct IngressState {
     interests: Vec<HTTPIngressInterest>,
-    _dataplane: edgeless_dataplane::DataPlaneChainHandle,
-    dataplane_write: edgeless_dataplane::DataPlaneChainWriteHandle,
+    dataplane: edgeless_dataplane::handle::DataplaneHandle,
 }
 
 struct IngressService {
@@ -61,9 +60,9 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                         .collect(),
                 };
                 let serialized_msg = serde_json::to_string(&msg)?;
-                let res = lck.dataplane_write.call(target.clone(), serialized_msg).await;
+                let res = lck.dataplane.call(target.clone(), serialized_msg).await;
                 match res {
-                    edgeless_dataplane::CallRet::Reply(data) => {
+                    edgeless_dataplane::core::CallRet::Reply(data) => {
                         let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_str(&data)?;
                         let mut response_builder = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from(
                             processor_response.body.unwrap_or(vec![]),
@@ -94,7 +93,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
 }
 
 pub async fn ingress_task(
-    dataplane_provider: edgeless_dataplane::DataPlaneChainProvider,
+    dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     ingress_id: edgeless_api::function_instance::FunctionId,
     ingress_url: String,
 ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI> {
@@ -102,13 +101,11 @@ pub async fn ingress_task(
     let (_, host, port) = edgeless_api::util::parse_http_host(&ingress_url).unwrap();
     let addr = std::net::SocketAddr::from((std::net::IpAddr::from_str(&host).unwrap(), port));
 
-    let mut dataplane = provider.get_chain_for(ingress_id.clone()).await;
-    let dataplane_write = dataplane.new_write_handle().await;
+    let dataplane = provider.get_handle_for(ingress_id.clone()).await;
 
     let ingress_state = std::sync::Arc::new(tokio::sync::Mutex::new(IngressState {
         interests: Vec::<HTTPIngressInterest>::new(),
-        _dataplane: dataplane,
-        dataplane_write,
+        dataplane: dataplane,
     }));
 
     let cloned_interests = ingress_state.clone();

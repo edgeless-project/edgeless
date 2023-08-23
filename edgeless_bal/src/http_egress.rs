@@ -1,6 +1,8 @@
+use edgeless_dataplane::core::Message;
+
 pub struct EgressResourceProvider {
     resource_provider_id: edgeless_api::function_instance::FunctionId,
-    dataplane_provider: edgeless_dataplane::DataPlaneChainProvider,
+    dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     egress_instances: std::collections::HashMap<edgeless_api::function_instance::FunctionId, EgressResource>,
 }
 
@@ -15,33 +17,45 @@ impl Drop for EgressResource {
 }
 
 impl EgressResource {
-    async fn new(dataplane_handle: edgeless_dataplane::DataPlaneChainHandle) -> Self {
+    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle) -> Self {
         let mut dataplane_handle = dataplane_handle;
 
         let handle = tokio::spawn(async move {
             loop {
-                let (fid, channel, message) = dataplane_handle.receive_next().await;
-                if channel == 0 {
-                    continue;
-                }
-                let mut dataplane_write_handle = dataplane_handle.new_write_handle().await;
-                let req = match edgeless_http::request_from_string(&message) {
-                    Ok(val) => val,
-                    Err(_) => {
-                        dataplane_write_handle.reply(fid, channel, edgeless_dataplane::CallRet::Err).await;
+                let edgeless_dataplane::core::DataplaneEvent {
+                    source_id,
+                    channel_id,
+                    message,
+                } = dataplane_handle.receive_next().await;
+                let message_data = match message {
+                    Message::Call(data) => data,
+                    _ => {
                         continue;
                     }
                 };
+
+                let req = match edgeless_http::request_from_string(&message_data) {
+                    Ok(val) => val,
+                    Err(_) => {
+                        dataplane_handle
+                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
+                            .await;
+                        continue;
+                    }
+                };
+                let mut cloned_dataplane = dataplane_handle.clone();
                 tokio::spawn(async move {
                     match Self::perform_request(req).await {
                         Ok(resp) => {
                             let serialized_resp = edgeless_http::response_to_string(&resp);
-                            dataplane_write_handle
-                                .reply(fid, channel, edgeless_dataplane::CallRet::Reply(serialized_resp))
+                            cloned_dataplane
+                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(serialized_resp))
                                 .await;
                         }
                         Err(_) => {
-                            dataplane_write_handle.reply(fid, channel, edgeless_dataplane::CallRet::Err).await;
+                            cloned_dataplane
+                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
+                                .await;
                         }
                     }
                 });
@@ -100,7 +114,7 @@ impl EgressResource {
 
 impl EgressResourceProvider {
     pub async fn new(
-        dataplane_provider: edgeless_dataplane::DataPlaneChainProvider,
+        dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
         resource_provider_id: edgeless_api::function_instance::FunctionId,
     ) -> Self {
         Self {
@@ -118,7 +132,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for EgressRe
         _instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::function_instance::FunctionId> {
         let new_id = edgeless_api::function_instance::FunctionId::new(self.resource_provider_id.node_id);
-        let dataplane_handle = self.dataplane_provider.get_chain_for(new_id.clone()).await;
+        let dataplane_handle = self.dataplane_provider.get_handle_for(new_id.clone()).await;
 
         self.egress_instances.insert(new_id.clone(), EgressResource::new(dataplane_handle).await);
 
