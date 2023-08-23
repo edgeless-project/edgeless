@@ -11,7 +11,7 @@ pub struct EdgelessNodeSettings {
     pub agent_url: String,
     pub invocation_url: String,
     pub metrics_url: String,
-    pub peers: Vec<edgeless_dataplane::EdgelessDataplaneSettingsPeer>,
+    pub peers: Vec<edgeless_dataplane::core::EdgelessDataplanePeerSettings>,
 }
 
 pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
@@ -19,7 +19,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     log::debug!("Settings: {:?}", settings);
     let state_manager = state_management::StateManager::new().await;
     let data_plane =
-        edgeless_dataplane::DataPlaneChainProvider::new(settings.node_id.clone(), settings.invocation_url.clone(), settings.peers.clone()).await;
+        edgeless_dataplane::handle::DataplaneProvider::new(settings.node_id.clone(), settings.invocation_url.clone(), settings.peers.clone()).await;
     let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.metrics_url.clone()).await;
     let (mut rust_runner, rust_runner_task) = rust_runner::Runner::new(
         settings.clone(),

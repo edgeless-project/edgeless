@@ -1,6 +1,7 @@
 use futures::{FutureExt, SinkExt, StreamExt};
 
 use crate::{runner_api, state_management};
+use edgeless_dataplane::core::CallRet;
 
 mod api {
     wasmtime::component::bindgen!({path: "../edgeless_function/wit/edgefunction.wit", async: true});
@@ -20,7 +21,7 @@ pub struct Runner {
 impl Runner {
     pub fn new(
         _settings: crate::EdgelessNodeSettings,
-        data_plane_provider: edgeless_dataplane::DataPlaneChainProvider,
+        data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
         state_manager: state_management::StateManager,
         telemtry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
     ) -> (Self, futures::future::BoxFuture<'static, ()>) {
@@ -46,7 +47,7 @@ impl Runner {
                             };
                             log::info!("Start Function {:?}", spawn_request.function_id);
                             let cloned_req = spawn_request.clone();
-                            let data_plane = data_plane_provider.get_chain_for(function_id.clone()).await;
+                            let data_plane = data_plane_provider.get_handle_for(function_id.clone()).await;
                             let instance = FunctionInstance::launch(
                                 cloned_req,
                                 data_plane,
@@ -127,7 +128,7 @@ struct FunctionInstanceTaskState {
     store: wasmtime::Store<FunctionState>,
     binding: api::Edgefunction,
     // instance: wasmtime::component::Instance,
-    data_plane: edgeless_dataplane::DataPlaneChainHandle,
+    data_plane: edgeless_dataplane::handle::DataplaneHandle,
     runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
     telemetry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
 }
@@ -145,7 +146,7 @@ struct FunctionInstance {
 impl FunctionInstance {
     async fn launch(
         spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
-        data_plane: edgeless_dataplane::DataPlaneChainHandle,
+        data_plane: edgeless_dataplane::handle::DataplaneHandle,
         runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
         state_handle: state_management::StateHandle,
         telemetry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
@@ -203,7 +204,7 @@ impl FunctionInstance {
 
 struct FunctionState {
     function_id: edgeless_api::function_instance::FunctionId,
-    data_plane: edgeless_dataplane::DataPlaneChainWriteHandle,
+    data_plane: edgeless_dataplane::handle::DataplaneHandle,
     callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
     state_handle: state_management::StateHandle,
     telemetry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
@@ -214,13 +215,12 @@ impl FunctionInstanceTaskState {
         function_id: edgeless_api::function_instance::FunctionId,
         binary: &[u8],
         callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
-        data_plane: edgeless_dataplane::DataPlaneChainHandle,
+        data_plane: edgeless_dataplane::handle::DataplaneHandle,
         runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
         state_handle: state_management::StateHandle,
         telemetry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
     ) -> anyhow::Result<Self> {
         let start = tokio::time::Instant::now();
-        let mut data_plane = data_plane;
         let mut config = wasmtime::Config::new();
         let mut state_handle = state_handle;
         let mut telemetry_handle = telemetry_handle;
@@ -235,7 +235,7 @@ impl FunctionInstanceTaskState {
             &engine,
             FunctionState {
                 function_id: function_id.clone(),
-                data_plane: data_plane.new_write_handle().await,
+                data_plane: data_plane.clone(),
                 callback_table: callback_table,
                 state_handle: state_handle,
                 telemetry_handle: telemetry_handle.clone(),
@@ -280,25 +280,30 @@ impl FunctionInstanceTaskState {
                     }
                     break;
                 },
-                (src, stream_id, msg) =  Box::pin(self.data_plane.receive_next()).fuse() => {
-                    if stream_id == 0 {
-                        match self.activate(Event::Cast(src, msg)).await {
-                            Ok(_) => {}
-                            Err(_) => {
-                                break;
+                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message} =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                    match message {
+                        edgeless_dataplane::core::Message::Cast(payload) => {
+                            match self.activate(Event::Cast(source_id, payload)).await {
+                                Ok(_) => {}
+                                Err(_) => {
+                                    break;
+                                }
                             }
                         }
-                    } else {
-                        match self.activate(Event::Call(stream_id, src, msg)).await {
-                            Ok(_) => {}
-                            Err(_) => {
-                                break;
+                        edgeless_dataplane::core::Message::Call(payload) => {
+                            match self.activate(Event::Call(channel_id, source_id, payload)).await {
+                                Ok(_) => {}
+                                Err(_) => {
+                                    break;
+                                }
                             }
+                        },
+                        _ => {
+                            log::debug!("Unprocessed Message");
                         }
                     }
                 }
             }
-            // let .await;
         }
         match self.runner_api.send(RustRunnerRequest::FunctionExit(self.function_id.clone())).await {
             Ok(_) => {}
@@ -350,14 +355,14 @@ impl FunctionInstanceTaskState {
                     edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(start.elapsed()),
                     std::collections::BTreeMap::from([("EVENT_TYPE".to_string(), "CALL".to_string())]),
                 );
-                let mut wh = self.data_plane.new_write_handle().await;
+                let mut wh = self.data_plane.clone();
                 wh.reply(
                     src,
                     channel_id,
                     match res {
-                        api::CallRet::Err => edgeless_dataplane::CallRet::Err,
-                        api::CallRet::Noreply => edgeless_dataplane::CallRet::NoReply,
-                        api::CallRet::Reply(msg) => edgeless_dataplane::CallRet::Reply(msg),
+                        api::CallRet::Err => CallRet::Err,
+                        api::CallRet::Noreply => CallRet::NoReply,
+                        api::CallRet::Reply(msg) => CallRet::Reply(msg),
                     },
                 )
                 .await;
@@ -399,9 +404,9 @@ impl api::EdgefunctionImports for FunctionState {
         let parsed_target = parse_wit_function_id(&target)?;
         let res = self.data_plane.call(parsed_target, msg).await;
         Ok(match res {
-            edgeless_dataplane::CallRet::Reply(msg) => api::CallRet::Reply(msg),
-            edgeless_dataplane::CallRet::NoReply => api::CallRet::Noreply,
-            edgeless_dataplane::CallRet::Err => api::CallRet::Err,
+            CallRet::Reply(msg) => api::CallRet::Reply(msg),
+            CallRet::NoReply => api::CallRet::Noreply,
+            CallRet::Err => api::CallRet::Err,
         })
     }
 
@@ -409,9 +414,9 @@ impl api::EdgefunctionImports for FunctionState {
         if let Some(target) = self.callback_table.lock().await.alias_map.get(&alias) {
             let res = self.data_plane.call(target.clone(), msg).await;
             Ok(match res {
-                edgeless_dataplane::CallRet::Reply(msg) => api::CallRet::Reply(msg),
-                edgeless_dataplane::CallRet::NoReply => api::CallRet::Noreply,
-                edgeless_dataplane::CallRet::Err => api::CallRet::Err,
+                CallRet::Reply(msg) => api::CallRet::Reply(msg),
+                CallRet::NoReply => api::CallRet::Noreply,
+                CallRet::Err => api::CallRet::Err,
             })
         } else {
             log::warn!("Unknown alias.");
