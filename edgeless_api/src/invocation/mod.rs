@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub enum EventData {
     Call(String),
     Cast(String),
@@ -6,6 +7,7 @@ pub enum EventData {
     Err,
 }
 
+#[derive(Clone)]
 pub struct Event {
     pub target: crate::function_instance::FunctionId,
     pub source: crate::function_instance::FunctionId,
@@ -13,6 +15,7 @@ pub struct Event {
     pub data: EventData,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum LinkProcessingResult {
     FINAL,
     PROCESSED,

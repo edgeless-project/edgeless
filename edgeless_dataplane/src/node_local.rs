@@ -104,3 +104,45 @@ impl NodeLocalLinkProvider {
         })
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::NodeLocalLinkProvider;
+
+    #[tokio::test]
+    async fn basic_forwarding() {
+        let node_id = uuid::Uuid::new_v4();
+        let fid_1 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+        let fid_2 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+        let fid_3 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+
+        let provider = NodeLocalLinkProvider::new();
+
+        let (sender_1, mut receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
+        let mut handle_1 = provider.new_link(fid_1.clone(), sender_1).await;
+
+        let (sender_2, mut receiver_2) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
+        let _handle_2 = provider.new_link(fid_2.clone(), sender_2).await;
+
+        assert!(receiver_1.try_next().is_err());
+        assert!(receiver_2.try_next().is_err());
+
+        let ret_1 = handle_1
+            .handle_send(&fid_3, crate::core::Message::Cast("".to_string()), &fid_1, 0)
+            .as_mut()
+            .await;
+
+        assert_eq!(ret_1, crate::core::LinkProcessingResult::PASSED);
+        assert!(receiver_1.try_next().is_err());
+        assert!(receiver_2.try_next().is_err());
+
+        let ret_2 = handle_1
+            .handle_send(&fid_2, crate::core::Message::Cast("".to_string()), &fid_1, 0)
+            .as_mut()
+            .await;
+
+        assert_eq!(ret_2, crate::core::LinkProcessingResult::FINAL);
+        assert!(receiver_1.try_next().is_err());
+        assert!(receiver_2.try_next().unwrap().is_some());
+    }
+}
