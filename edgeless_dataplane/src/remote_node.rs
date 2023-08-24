@@ -1,5 +1,6 @@
 use crate::core::*;
 use crate::node_local::NodeLocalRouter;
+use edgeless_api::function_instance::{NodeId, NodeLocalComponentId};
 use edgeless_api::invocation::InvocationAPI;
 
 // Link allowing to send messages to a remote node using the InvocationAPI.
@@ -38,22 +39,28 @@ impl DataPlaneLink for RemoteLink {
 }
 
 pub struct RemoteRouter {
-    receivers: std::collections::HashMap<uuid::Uuid, Box<dyn edgeless_api::invocation::InvocationAPI>>,
+    receivers: std::collections::HashMap<NodeId, Box<dyn edgeless_api::invocation::InvocationAPI>>,
 }
 
 pub struct RemoteLinkProvider {
+    own_node_id: edgeless_api::function_instance::NodeId,
     remotes: std::sync::Arc<tokio::sync::Mutex<RemoteRouter>>,
     locals: std::sync::Arc<tokio::sync::Mutex<NodeLocalRouter>>,
 }
 
 struct InvocationEventHandler {
+    node_id: edgeless_api::function_instance::NodeId,
     locals: std::sync::Arc<tokio::sync::Mutex<NodeLocalRouter>>,
 }
 
 #[async_trait::async_trait]
 impl edgeless_api::invocation::InvocationAPI for InvocationEventHandler {
     async fn handle_event(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
-        self.locals.lock().await.handle_event(event).await
+        if event.target.node_id == self.node_id {
+            self.locals.lock().await.handle_event(event).await
+        } else {
+            Err(anyhow::anyhow!("Wrong Node ID"))
+        }
     }
 }
 
@@ -70,31 +77,20 @@ impl edgeless_api::invocation::InvocationAPI for RemoteRouter {
 }
 
 impl RemoteLinkProvider {
-    pub async fn new(invocation_url: String, peers: std::collections::HashMap<uuid::Uuid, String>) -> Self {
+    pub async fn new(
+        own_node_id: edgeless_api::function_instance::NodeId,
+        peers: std::collections::HashMap<NodeId, Box<dyn edgeless_api::invocation::InvocationAPI>>,
+    ) -> Self {
         let locals = std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalRouter {
-            receivers: std::collections::HashMap::<uuid::Uuid, futures::channel::mpsc::UnboundedSender<DataplaneEvent>>::new(),
-        }));
-        let remotes = std::sync::Arc::new(tokio::sync::Mutex::new(RemoteRouter {
-            receivers: std::collections::HashMap::new(),
+            receivers: std::collections::HashMap::<NodeLocalComponentId, futures::channel::mpsc::UnboundedSender<DataplaneEvent>>::new(),
         }));
 
-        let _server = tokio::spawn(edgeless_api::grpc_impl::invocation::InvocationAPIServer::run(
-            Box::new(InvocationEventHandler { locals: locals.clone() }),
-            invocation_url,
-        ));
-
-        let cloned_remotes = remotes.clone();
-        tokio::spawn(async move {
-            let mut peer_clients = std::collections::HashMap::<uuid::Uuid, Box<dyn edgeless_api::invocation::InvocationAPI>>::new();
-            for (id, addr) in &peers {
-                peer_clients.insert(*id, Box::new(edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&addr).await));
-            }
-            cloned_remotes.lock().await.receivers = peer_clients;
-        });
+        let remotes = std::sync::Arc::new(tokio::sync::Mutex::new(RemoteRouter { receivers: peers }));
 
         Self {
-            remotes: remotes,
-            locals: locals,
+            own_node_id,
+            remotes,
+            locals,
         }
     }
 
@@ -107,5 +103,141 @@ impl RemoteLinkProvider {
         Box::new(RemoteLink {
             remotes: self.remotes.clone(),
         })
+    }
+
+    pub async fn incomming_api(&mut self) -> Box<dyn edgeless_api::invocation::InvocationAPI> {
+        Box::new(InvocationEventHandler {
+            node_id: self.own_node_id.clone(),
+            locals: self.locals.clone(),
+        })
+    }
+
+    pub async fn add_peer(&mut self, peer_id: NodeId, peer_api: Box<dyn edgeless_api::invocation::InvocationAPI>) {
+        self.remotes.lock().await.receivers.insert(peer_id, peer_api);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use futures::SinkExt;
+
+    use crate::remote_node::*;
+
+    #[tokio::test]
+    async fn incomming_message() {
+        let node_id = uuid::Uuid::new_v4();
+        let node_id_2 = uuid::Uuid::new_v4();
+        let node_id_3 = uuid::Uuid::new_v4();
+        let fid_target = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+        let fid_source = edgeless_api::function_instance::FunctionId::new(node_id_2.clone());
+        let fid_wrong_component_id = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+        let fid_wrong_node_id = edgeless_api::function_instance::FunctionId {
+            node_id: node_id_3.clone(),
+            function_id: fid_target.function_id.clone(),
+        };
+
+        let mut provider = RemoteLinkProvider::new(node_id.clone(), std::collections::HashMap::new()).await;
+        let mut api = provider.incomming_api().await;
+
+        let (sender_1, mut receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
+        provider.new_link(fid_target.clone(), sender_1).await;
+
+        api.handle_event(edgeless_api::invocation::Event {
+            target: fid_wrong_component_id.clone(),
+            source: fid_source.clone(),
+            stream_id: 0,
+            data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
+        })
+        .await
+        .unwrap();
+
+        assert!(receiver_1.try_next().is_err());
+
+        assert!(api
+            .handle_event(edgeless_api::invocation::Event {
+                target: fid_wrong_node_id.clone(),
+                source: fid_source.clone(),
+                stream_id: 0,
+                data: edgeless_api::invocation::EventData::Cast("Test".to_string())
+            })
+            .await
+            .is_err());
+
+        assert!(receiver_1.try_next().is_err());
+
+        api.handle_event(edgeless_api::invocation::Event {
+            target: fid_target.clone(),
+            source: fid_source.clone(),
+            stream_id: 0,
+            data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
+        })
+        .await
+        .unwrap();
+
+        assert!(receiver_1.try_next().unwrap().is_some());
+    }
+
+    struct MockInvocationAPI {
+        own_node_id: edgeless_api::function_instance::NodeId,
+        events: futures::channel::mpsc::UnboundedSender<edgeless_api::invocation::Event>,
+    }
+
+    #[async_trait::async_trait]
+    impl edgeless_api::invocation::InvocationAPI for MockInvocationAPI {
+        async fn handle_event(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<LinkProcessingResult> {
+            self.events.send(event.clone()).await.unwrap();
+            if event.target.node_id == self.own_node_id {
+                Ok(LinkProcessingResult::FINAL)
+            } else {
+                Ok(LinkProcessingResult::PASSED)
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn outgoing_message() {
+        let node_id = uuid::Uuid::new_v4();
+
+        let node_id_2 = uuid::Uuid::new_v4();
+        let node_id_3 = uuid::Uuid::new_v4();
+        let fid_source = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+
+        let fid_target = edgeless_api::function_instance::FunctionId::new(node_id_2.clone());
+        let fid_wrong_component_id = edgeless_api::function_instance::FunctionId::new(node_id_2.clone());
+        let fid_wrong_node_id = edgeless_api::function_instance::FunctionId {
+            node_id: node_id_3.clone(),
+            function_id: fid_target.function_id.clone(),
+        };
+
+        let (api_sender_node_2, mut api_receiver_node_2) = futures::channel::mpsc::unbounded::<edgeless_api::invocation::Event>();
+        let node_2_api: Box<dyn edgeless_api::invocation::InvocationAPI> = Box::new(MockInvocationAPI {
+            own_node_id: node_id_2.clone(),
+            events: api_sender_node_2,
+        });
+        let provider = RemoteLinkProvider::new(node_id.clone(), std::collections::HashMap::from([(node_id_2.clone(), node_2_api)])).await;
+        // let mut api = provider.incomming_api().await;
+
+        let (sender_1, _receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
+        let mut link = provider.new_link(fid_source.clone(), sender_1).await;
+
+        let res = link.handle_send(&fid_target, Message::Cast("Test".to_string()), &fid_source, 0).await;
+        assert_eq!(res, LinkProcessingResult::FINAL);
+        assert!(api_receiver_node_2.try_next().unwrap().is_some());
+
+        let res = link
+            .handle_send(&fid_wrong_component_id, Message::Cast("Test".to_string()), &fid_source, 0)
+            .await;
+        assert_eq!(res, LinkProcessingResult::FINAL);
+        assert!(api_receiver_node_2.try_next().unwrap().is_some());
+
+        let res = link
+            .handle_send(&fid_wrong_node_id, Message::Cast("Test".to_string()), &fid_source, 0)
+            .await;
+        assert_eq!(res, LinkProcessingResult::PASSED);
+        assert!(api_receiver_node_2.try_next().is_err());
+
+        let res = link.handle_send(&fid_target, Message::Cast("Test".to_string()), &fid_source, 0).await;
+        assert_eq!(res, LinkProcessingResult::FINAL);
+        assert!(api_receiver_node_2.try_next().unwrap().is_some());
     }
 }

@@ -76,6 +76,7 @@ impl InvocationAPIClient {
                     return Self { client };
                 }
                 Err(_) => {
+                    log::debug!("Waiting for InvocationAPI");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 }
             }

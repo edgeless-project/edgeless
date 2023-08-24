@@ -1,7 +1,11 @@
+// TODO(raphaelhetzel) These should be actual types in the future to allow for type-safety.
+pub type NodeId = uuid::Uuid;
+pub type NodeLocalComponentId = uuid::Uuid;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FunctionId {
-    pub node_id: uuid::Uuid,
-    pub function_id: uuid::Uuid,
+    pub node_id: NodeId,
+    pub function_id: NodeLocalComponentId,
 }
 
 impl FunctionId {

@@ -1,5 +1,3 @@
-use std::any;
-
 use warp::Filter;
 
 pub struct PrometheusEventTarget {

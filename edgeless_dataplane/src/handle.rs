@@ -25,7 +25,7 @@ impl DataplaneHandle {
         let receiver_overwrites = std::sync::Arc::new(tokio::sync::Mutex::new(TemporaryReceivers {
             temporary_receivers: std::collections::HashMap::new(),
         }));
-        
+
         let clone_overwrites = receiver_overwrites.clone();
         // This task intercepts the messages received and routes responses towards temporary receivers while routing other events towards the main receiver used in `receive_next`.
         tokio::spawn(async move {
@@ -165,19 +165,25 @@ pub struct DataplaneProvider {
 }
 
 impl DataplaneProvider {
-    pub async fn new(_node_id: uuid::Uuid, invocation_url: String, peers: Vec<EdgelessDataplanePeerSettings>) -> Self {
+    pub async fn new(node_id: uuid::Uuid, invocation_url: String, peers: Vec<EdgelessDataplanePeerSettings>) -> Self {
+        let remote_provider = std::sync::Arc::new(tokio::sync::Mutex::new(
+            RemoteLinkProvider::new(node_id, std::collections::HashMap::new()).await,
+        ));
+
+        let clone_provider = remote_provider.clone();
+        let _server = tokio::spawn(edgeless_api::grpc_impl::invocation::InvocationAPIServer::run(
+            clone_provider.lock().await.incomming_api().await,
+            invocation_url,
+        ));
+
+        for peer in peers {
+            let (id, api) = Self::connect_peer(&peer).await;
+            remote_provider.lock().await.add_peer(id, api).await;
+        }
+
         Self {
             local_provider: std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalLinkProvider::new())),
-            remote_provider: std::sync::Arc::new(tokio::sync::Mutex::new(
-                RemoteLinkProvider::new(
-                    invocation_url,
-                    peers
-                        .iter()
-                        .map(|peer_conf| (peer_conf.id, peer_conf.invocation_url.to_string()))
-                        .collect(),
-                )
-                .await, // RemoteLinkProvider::new(std::collections::HashMap::from([(node_id, "http://127.0.0.1:7002".to_string())])).await,
-            )),
+            remote_provider: remote_provider,
         }
     }
 
@@ -188,5 +194,124 @@ impl DataplaneProvider {
             self.remote_provider.lock().await.new_link(target.clone(), sender.clone()).await,
         ];
         DataplaneHandle::new(target, output_chain, receiver).await
+    }
+
+    async fn connect_peer(
+        target: &EdgelessDataplanePeerSettings,
+    ) -> (edgeless_api::function_instance::NodeId, Box<dyn edgeless_api::invocation::InvocationAPI>) {
+        (
+            target.id.clone(),
+            Box::new(edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&target.invocation_url).await),
+        )
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::handle::*;
+
+    #[tokio::test]
+    async fn local_normal_path() {
+        let node_id = uuid::Uuid::new_v4();
+        let fid_1 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+        let fid_2 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+
+        let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7096".to_string(), vec![]).await;
+
+        let mut handle_1 = provider.get_handle_for(fid_1.clone()).await;
+        let mut handle_2 = provider.get_handle_for(fid_2.clone()).await;
+
+        handle_1.send(fid_2, "Test".to_string()).await;
+
+        let res = handle_2.receive_next().await;
+        assert_eq!(
+            std::mem::discriminant(&res.message),
+            std::mem::discriminant(&crate::core::Message::Cast("".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn local_call_with_return() {
+        let node_id = uuid::Uuid::new_v4();
+        let fid_1 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+        let fid_2 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+
+        let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7097".to_string(), vec![]).await;
+
+        let mut handle_1 = provider.get_handle_for(fid_1.clone()).await;
+        let mut handle_2 = provider.get_handle_for(fid_2.clone()).await;
+
+        let return_handle = tokio::spawn(async move { handle_1.call(fid_2, "Test".to_string()).await });
+
+        let req = handle_2.receive_next().await;
+        assert_eq!(
+            std::mem::discriminant(&req.message),
+            std::mem::discriminant(&crate::core::Message::Call("".to_string()))
+        );
+
+        handle_2.reply(req.source_id, req.channel_id, CallRet::NoReply).await;
+
+        let repl = return_handle.await.unwrap();
+        assert_eq!(std::mem::discriminant(&CallRet::NoReply), std::mem::discriminant(&repl));
+    }
+
+    #[tokio::test]
+    async fn grpc_impl_e2e() {
+        let node_id = uuid::Uuid::new_v4();
+        let node_id_2 = uuid::Uuid::new_v4();
+        let fid_1 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+        let fid_2 = edgeless_api::function_instance::FunctionId::new(node_id_2.clone());
+
+        let provider1_f = tokio::spawn(DataplaneProvider::new(
+            node_id.clone(),
+            "http://127.0.0.1:7099".to_string(),
+            vec![EdgelessDataplanePeerSettings {
+                id: node_id_2.clone(),
+                invocation_url: "http://127.0.0.1:7098".to_string(),
+            }],
+        ));
+
+        let provider2_f = tokio::spawn(DataplaneProvider::new(
+            node_id_2.clone(),
+            "http://127.0.0.1:7098".to_string(),
+            vec![EdgelessDataplanePeerSettings {
+                id: node_id.clone(),
+                invocation_url: "http://127.0.0.1:7099".to_string(),
+            }],
+        ));
+
+        // This test got stuck during initial testing. I suspect that this was due to the use of common ports across the testsuite
+        // but the timeouts should prevent it from blocking the entire testsuite if that was not the reason (timeout will lead to failure).
+        let (provider_1_r, provider_2_r) = futures::join!(
+            tokio::time::timeout(tokio::time::Duration::from_secs(5), provider1_f),
+            tokio::time::timeout(tokio::time::Duration::from_secs(5), provider2_f)
+        );
+        let mut provider_1 = provider_1_r.unwrap().unwrap();
+        let mut provider_2 = provider_2_r.unwrap().unwrap();
+
+        let mut handle_1 = provider_1.get_handle_for(fid_1.clone()).await;
+        let mut handle_2 = provider_2.get_handle_for(fid_2.clone()).await;
+
+        handle_1.send(fid_2.clone(), "Test".to_string()).await;
+        let cast_req = handle_2.receive_next().await;
+        assert_eq!(
+            std::mem::discriminant(&cast_req.message),
+            std::mem::discriminant(&crate::core::Message::Cast("".to_string()))
+        );
+
+        let cloned_id_1 = fid_1.clone();
+        let mut cloned_handle_2 = handle_2.clone();
+
+        let return_handle = tokio::spawn(async move { cloned_handle_2.call(cloned_id_1, "Test".to_string()).await });
+
+        let call_req = handle_1.receive_next().await;
+        assert_eq!(
+            std::mem::discriminant(&call_req.message),
+            std::mem::discriminant(&crate::core::Message::Call("".to_string()))
+        );
+        handle_1.reply(call_req.source_id, call_req.channel_id, CallRet::NoReply).await;
+
+        let repl = return_handle.await.unwrap();
+        assert_eq!(std::mem::discriminant(&CallRet::NoReply), std::mem::discriminant(&repl));
     }
 }
