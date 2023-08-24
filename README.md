@@ -20,35 +20,94 @@ cargo build
 
 ## How to run:
 
-This section will be expanded upon later. To get the basic system first create default configuration files:
+It is recommended that you enable at least info-level log directives with:
 
 ```
-cargo run --bin=edgeless_inabox -- -t 
+export RUST_LOG=info
 ```
 
-and then run the EDGELESS-in-a-box:
+To get the basic system, first create default configuration files:
 
 ```
-RUST_LOG=info cargo run --bin=edgeless_inabox
+target/debug/edgeless_inabox -t 
+target/debug/edgeless_cli -t cli.toml
 ```
 
-To deploy the example workflow (in a separate shell) first create the default configuration file for the CLI:
+that will create:
+
+- `balancer.toml`
+- `controller.toml`
+- `node.toml`
+- `orchestrator.toml`
+- `cli.toml`
+
+Then you can run the EDGELESS-in-a-box:
 
 ```
-cargo run --bin=edgeless_cli -- -t cli.toml
+target/debug/edgeless_inabox
 ```
 
-then build the guest functions:
+Congratulations, now a full EDGELESS system in running for you, though it is not doing much.
+Below you will find two examples of workflows that can be created.
+
+### Ping-pong examples
+
+The example creates a chain of two functions: ping and pong. The ping function wakes up every 1 second and invokes the pong function, which merely terminates after replying.
+
+First, you have to locally build the WASM binaries:
 
 ```
-cargo run --bin=edgeless_cli function build examples/ping_pong/ping/function.json
-cargo run --bin=edgeless_cli function build examples/ping_pong/pong/function.json
+target/debug/edgeless_cli function build examples/ping_pong/ping/function.json
+target/debug/edgeless_cli function build examples/ping_pong/pong/function.json
 ```
 
-and finally request the controller to start the workflow:
+which will generate the files:
+
+- `examples/ping_pong/ping/pinger.wasm`
+- `examples/ping_pong/pong/ponger.wasm`
+
+Then, you can request the controller to start the workflow:
 
 ```
-RUST_LOG=info cargo run --bin=edgeless_cli workflow start examples/ping_pong/workflow.json
+ID=$(target/debug/edgeless_cli workflow start examples/ping_pong/workflow.json)
+```
+
+Now `$ID` contains the workflow identifier assigned by the controller.
+
+You will observe on the logs that the pinger workflow is, indeed, invoked every 1 second. Furthermore, a counter is increased at every new invocation. This counter is the _state_ of the workflow, which is shared across multiple instances of this workflow and persists after their termination.
+
+For example, if you stop the worfklow:
+
+```
+target/debug/edgeless_cli workflow stop $ID
+```
+
+and you start again the workflow later, you will see the counter resuming from the previous value (search for `{"count":NUM}` in the EDGELESS-in-a-box logs):
+
+```
+target/debug/edgeless_cli workflow start examples/ping_pong/workflow.json
+```
+
+### HTTP hello world example
+
+The example creates a chain of one function that waits for POST commands matching a given host addressed to the balancer HTTP end-point and replies with a 200 OK.
+
+First build the WASM binary:
+
+```
+target/debug/edgeless_cli function build examples/http_ingress/processing_function/function.json
+```
+
+Then you can start the workflow:
+
+```
+target/debug/edgeless_cli workflow start examples/http_ingress/workflow.json
+```
+
+and verify that it works with curl:
+
+```
+curl -H "Host: demo.edgeless.com" -XPOST http://127.0.0.1:7035/hello
 ```
 
 ## How to create functions/workflows:
