@@ -88,6 +88,12 @@ and you start again the workflow later, you will see the counter resuming from t
 target/debug/edgeless_cli workflow start examples/ping_pong/workflow.json
 ```
 
+You can always list the active workflows with:
+
+```
+target/debug/edgeless_cli workflow list
+```
+
 ### HTTP hello world example
 
 The example creates a chain of one function that waits for POST commands matching a given host addressed to the balancer HTTP end-point and replies with a 200 OK.

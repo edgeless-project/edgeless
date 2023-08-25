@@ -7,6 +7,7 @@ use edgeless_api::controller::ControllerAPI;
 enum WorkflowCommands {
     Start { spec_file: String },
     Stop { id: String },
+    List {},
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -48,6 +49,8 @@ pub fn edgeless_cli_default_conf() -> String {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    env_logger::init();
+
     let args = Args::parse();
     if !args.template.is_empty() {
         edgeless_api::util::create_template(&args.template, edgeless_cli_default_conf().as_str())?;
@@ -107,7 +110,8 @@ async fn main() -> anyhow::Result<()> {
                             })
                             .await;
                         if let Ok(instance) = res {
-                            println!("{}", instance.workflow_id.workflow_id.to_string())
+                            println!("{}", instance.workflow_id.workflow_id.to_string());
+                            log::info!("{:?}", instance)
                         }
                     }
                     WorkflowCommands::Stop { id } => {
@@ -117,6 +121,19 @@ async fn main() -> anyhow::Result<()> {
                             .await;
                         if let Ok(_) = res {
                             println!("Workflow Stopped");
+                        }
+                    }
+                    WorkflowCommands::List {} => {
+                        let res = con_wf_client
+                            .list_workflow_instances(edgeless_api::workflow_instance::WorkflowId::none())
+                            .await;
+                        if let Ok(instances) = res {
+                            for instance in instances.iter() {
+                                println!("workflow: {}", instance.workflow_id.to_string());
+                                for function in instance.functions.iter() {
+                                    println!("\t{:?}", function);
+                                }
+                            }
                         }
                     }
                 }

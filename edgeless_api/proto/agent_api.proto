@@ -79,6 +79,10 @@ message WorkflowId {
     string workflow_id = 1;
 }
 
+message WorkflowInstanceList {
+    repeated WorkflowInstanceStatus workflow_statuses = 1;
+}
+
 enum EventType {
     CALL = 0;
     CAST = 1;
@@ -120,6 +124,7 @@ service FunctionInstance {
 service WorkflowInstance {
     rpc StartWorkflowInstance (SpawnWorkflowRequest) returns (WorkflowInstanceStatus);
     rpc StopWorkflowInstance (WorkflowId) returns (google.protobuf.Empty);
+    rpc ListWorkflowInstances (WorkflowId) returns (WorkflowInstanceList);
 }
 
 service FunctionInvocation {

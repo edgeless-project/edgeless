@@ -1,8 +1,35 @@
+use std::str::FromStr;
+
 use crate::function_instance::FunctionId;
+
+const WORKFLOW_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
 
 #[derive(Debug, Clone)]
 pub struct WorkflowId {
     pub workflow_id: uuid::Uuid,
+}
+
+impl WorkflowId {
+    pub fn from_string(s: &str) -> Self {
+        Self {
+            workflow_id: uuid::Uuid::from_str(s).unwrap(),
+        }
+    }
+    pub fn to_string(&self) -> String {
+        self.workflow_id.to_string()
+    }
+    pub fn none() -> Self {
+        Self {
+            workflow_id: WORKFLOW_ID_NONE,
+        }
+    }
+    pub fn is_valid(&self) -> Option<&WorkflowId> {
+        if self.workflow_id == WORKFLOW_ID_NONE {
+            None
+        } else {
+            Some(self)
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -46,6 +73,7 @@ pub struct SpawnWorkflowRequest {
 pub trait WorkflowInstanceAPI: WorkflowInstanceAPIClone + Send + Sync {
     async fn start_workflow_instance(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<WorkflowInstance>;
     async fn stop_workflow_instance(&mut self, id: WorkflowId) -> anyhow::Result<()>;
+    async fn list_workflow_instances(&mut self, id: WorkflowId) -> anyhow::Result<Vec<WorkflowInstance>>;
 }
 
 // https://stackoverflow.com/a/30353928

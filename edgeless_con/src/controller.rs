@@ -1,5 +1,6 @@
 use std::str::FromStr;
 
+use edgeless_api::workflow_instance::WorkflowInstance;
 use futures::{Future, SinkExt, StreamExt};
 
 pub struct Controller {
@@ -13,6 +14,10 @@ enum ControllerRequest {
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::workflow_instance::WorkflowInstance>>,
     ),
     STOP(edgeless_api::workflow_instance::WorkflowId),
+    LIST(
+        edgeless_api::workflow_instance::WorkflowId,
+        tokio::sync::oneshot::Sender<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>,
+    ),
 }
 
 struct ResourceHandle {
@@ -205,6 +210,31 @@ impl Controller {
                         log::warn!("cannot stop non-existing workflow: {:?}", workflow_id);
                     }
                 }
+                ControllerRequest::LIST(workflow_id, reply_sender) => {
+                    let mut ret: Vec<WorkflowInstance> = vec![];
+                    if let Some(w_id) = workflow_id.is_valid() {
+                        if let Some(f_ids) = active_workflows.get(&w_id.to_string()) {
+                            ret = vec![WorkflowInstance {
+                                workflow_id: w_id.clone(),
+                                functions: f_ids.clone(),
+                            }];
+                        }
+                    } else {
+                        ret = active_workflows
+                            .iter()
+                            .map(|(w_id, f_ids)| WorkflowInstance {
+                                workflow_id: edgeless_api::workflow_instance::WorkflowId::from_string(w_id.as_str()),
+                                functions: f_ids.clone(),
+                            })
+                            .collect();
+                    }
+                    match reply_sender.send(Ok(ret)) {
+                        Ok(_) => {}
+                        Err(err) => {
+                            log::error!("Unhandled: {:?}", err);
+                        }
+                    }
+                }
             }
         }
     }
@@ -252,6 +282,19 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
     async fn stop_workflow_instance(&mut self, id: edgeless_api::workflow_instance::WorkflowId) -> anyhow::Result<()> {
         match self.sender.send(ControllerRequest::STOP(id)).await {
             Ok(_) => Ok(()),
+            Err(_) => Err(anyhow::anyhow!("Controller Channel Error")),
+        }
+    }
+    async fn list_workflow_instances(&mut self, id: edgeless_api::workflow_instance::WorkflowId) -> anyhow::Result<Vec<WorkflowInstance>> {
+        let (reply_sender, reply_receiver) =
+            tokio::sync::oneshot::channel::<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>();
+        match self.sender.send(ControllerRequest::LIST(id.clone(), reply_sender)).await {
+            Ok(_) => {}
+            Err(_) => return Err(anyhow::anyhow!("Controller Channel Error")),
+        }
+        let reply = reply_receiver.await;
+        match reply {
+            Ok(ret) => ret,
             Err(_) => Err(anyhow::anyhow!("Controller Channel Error")),
         }
     }
