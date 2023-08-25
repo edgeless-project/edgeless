@@ -19,16 +19,15 @@ RUN su $USERNAME -l -c "cargo install wasm-tools"
 RUN sudo dnf -y install tmux # because life without tmux is painful
 RUN sudo dnf -y install zsh
 RUN sudo dnf -y install wget
-RUN sudo dnf -y install powerline powerline-fonts # installing the fonts
+RUN sudo dnf -y install vim
 ENV HOME /home/$USERNAME
 
-# setup the zsh with some goodies
+# setup the zsh with some goodies (plugins)
 ENV SHELL /bin/zsh
 RUN wget https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh -O - | zsh || true
-RUN git clone https://github.com/romkatv/powerlevel10k.git ~/.oh-my-zsh/custom/themes/powerlevel10k
-RUN cd $HOME && curl -fsSLO https://raw.githubusercontent.com/romkatv/dotfiles-public/master/.purepower
+RUN git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
+RUN git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
 ADD .zshrc $HOME
-ADD .p10k.zsh $HOME
 # --- End
 
 ENTRYPOINT ["zsh"]
