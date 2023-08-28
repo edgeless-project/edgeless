@@ -43,6 +43,11 @@ struct StateProviders {
     global: Option<Box<dyn StateProvider>>,
 }
 
+#[async_trait::async_trait]
+pub trait StateManagerAPI: Send {
+    async fn get_handle(&mut self, state_policy: edgeless_api::function_instance::StatePolicy, state_id: uuid::Uuid) -> Box<dyn StateHandleAPI>;
+}
+
 impl StateManager {
     pub async fn new() -> Self {
         Self {
@@ -52,14 +57,23 @@ impl StateManager {
             })),
         }
     }
+}
 
-    pub async fn get_handle(&mut self, state_policy: edgeless_api::function_instance::StatePolicy, state_id: uuid::Uuid) -> StateHandle {
-        StateHandle {
+#[async_trait::async_trait]
+impl StateManagerAPI for StateManager {
+    async fn get_handle(&mut self, state_policy: edgeless_api::function_instance::StatePolicy, state_id: uuid::Uuid) -> Box<dyn StateHandleAPI> {
+        Box::new(StateHandle {
             state_policy,
             state_id,
             handlers: self.handlers.clone(),
-        }
+        })
     }
+}
+
+#[async_trait::async_trait]
+pub trait StateHandleAPI: Send {
+    async fn get(&mut self) -> Option<String>;
+    async fn set(&mut self, serialized_state: String);
 }
 
 pub struct StateHandle {
@@ -68,8 +82,9 @@ pub struct StateHandle {
     state_policy: edgeless_api::function_instance::StatePolicy,
 }
 
-impl StateHandle {
-    pub async fn get(&mut self) -> Option<String> {
+#[async_trait::async_trait]
+impl StateHandleAPI for StateHandle {
+    async fn get(&mut self) -> Option<String> {
         let mut handles = self.handlers.lock().await;
         match self.state_policy {
             edgeless_api::function_instance::StatePolicy::NodeLocal => {
@@ -87,7 +102,7 @@ impl StateHandle {
         None
     }
 
-    pub async fn set(&mut self, serialized_state: String) {
+    async fn set(&mut self, serialized_state: String) {
         let mut handles = self.handlers.lock().await;
         match self.state_policy {
             edgeless_api::function_instance::StatePolicy::NodeLocal => {

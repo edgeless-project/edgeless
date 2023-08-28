@@ -17,18 +17,17 @@ pub struct EdgelessNodeSettings {
 pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     log::info!("Starting Edgeless Node");
     log::debug!("Settings: {:?}", settings);
-    let state_manager = state_management::StateManager::new().await;
+    let state_manager = Box::new(state_management::StateManager::new().await);
     let data_plane =
         edgeless_dataplane::handle::DataplaneProvider::new(settings.node_id.clone(), settings.invocation_url.clone(), settings.peers.clone()).await;
     let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.metrics_url.clone()).await;
     let (mut rust_runner, rust_runner_task) = rust_runner::Runner::new(
-        settings.clone(),
         data_plane.clone(),
         state_manager.clone(),
-        telemetry_provider.get_handle(std::collections::BTreeMap::from([
+        Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
             ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
             ("NODE_ID".to_string(), settings.node_id.to_string()),
-        ])),
+        ]))),
     );
     let (mut agent, agent_task) = agent::Agent::new(rust_runner.get_api_client(), settings.clone());
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.agent_url);
