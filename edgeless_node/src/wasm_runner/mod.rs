@@ -10,7 +10,7 @@ use futures::{FutureExt, SinkExt, StreamExt};
 use crate::{runner_api, state_management};
 use edgeless_dataplane::core::CallRet;
 
-enum RustRunnerRequest {
+enum WasmRunnerRequest {
     Start(edgeless_api::function_instance::SpawnFunctionRequest),
     Stop(edgeless_api::function_instance::FunctionId),
     Update(edgeless_api::function_instance::UpdateFunctionLinksRequest),
@@ -18,7 +18,7 @@ enum RustRunnerRequest {
 }
 
 pub struct Runner {
-    sender: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
+    sender: futures::channel::mpsc::UnboundedSender<WasmRunnerRequest>,
 }
 
 impl Runner {
@@ -37,10 +37,10 @@ impl Runner {
                 let mut functions = std::collections::HashMap::<uuid::Uuid, FunctionInstance>::new();
                 let mut state_manager = state_manager;
                 let mut telemetry_handle = telemtry_handle;
-                log::info!("Starting Edgeless Rust Runner");
+                log::info!("Starting Edgeless WASM Runner");
                 while let Some(req) = receiver.next().await {
                     match req {
-                        RustRunnerRequest::Start(spawn_request) => {
+                        WasmRunnerRequest::Start(spawn_request) => {
                             let function_id = match spawn_request.function_id.clone() {
                                 Some(id) => id,
                                 None => {
@@ -65,7 +65,7 @@ impl Runner {
                             .await;
                             functions.insert(function_id.function_id.clone(), instance.unwrap());
                         }
-                        RustRunnerRequest::Stop(function_id) => {
+                        WasmRunnerRequest::Stop(function_id) => {
                             log::info!("Stop Function {:?}", function_id);
                             if let Some(instance) = functions.get_mut(&function_id.function_id) {
                                 instance.stop().await;
@@ -73,13 +73,13 @@ impl Runner {
                             // This will also create a FUNCTION_EXIT event.
                             functions.remove(&function_id.function_id);
                         }
-                        RustRunnerRequest::Update(update) => {
+                        WasmRunnerRequest::Update(update) => {
                             log::info!("Update Function {:?}", update.function_id);
                             if let Some(instance) = functions.get_mut(&update.function_id.as_ref().unwrap().function_id) {
                                 instance.update(update).await;
                             }
                         }
-                        RustRunnerRequest::FunctionExit(id) => {
+                        WasmRunnerRequest::FunctionExit(id) => {
                             log::info!("Function Exit Event: {:?}", id);
                         }
                     }
@@ -94,27 +94,27 @@ impl Runner {
 }
 
 struct RunnerClient {
-    sender: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
+    sender: futures::channel::mpsc::UnboundedSender<WasmRunnerRequest>,
 }
 
 #[async_trait::async_trait]
 impl runner_api::RunnerAPI for RunnerClient {
     async fn start(&mut self, request: edgeless_api::function_instance::SpawnFunctionRequest) -> anyhow::Result<()> {
-        match self.sender.send(RustRunnerRequest::Start(request)).await {
+        match self.sender.send(WasmRunnerRequest::Start(request)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
         }
     }
 
     async fn stop(&mut self, function_id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
-        match self.sender.send(RustRunnerRequest::Stop(function_id)).await {
+        match self.sender.send(WasmRunnerRequest::Stop(function_id)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
         }
     }
 
     async fn update(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
-        match self.sender.send(RustRunnerRequest::Update(update)).await {
+        match self.sender.send(WasmRunnerRequest::Update(update)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
         }
@@ -131,7 +131,7 @@ struct FunctionInstanceTaskState {
     binding: api::Edgefunction,
     // instance: wasmtime::component::Instance,
     data_plane: edgeless_dataplane::handle::DataplaneHandle,
-    runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
+    runner_api: futures::channel::mpsc::UnboundedSender<WasmRunnerRequest>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
 }
 
@@ -149,7 +149,7 @@ impl FunctionInstance {
     async fn launch(
         spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
         data_plane: edgeless_dataplane::handle::DataplaneHandle,
-        runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
+        runner_api: futures::channel::mpsc::UnboundedSender<WasmRunnerRequest>,
         state_handle: Box<dyn state_management::StateHandleAPI>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     ) -> anyhow::Result<Self> {
@@ -219,7 +219,7 @@ impl FunctionInstanceTaskState {
         binary: &[u8],
         callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
         data_plane: edgeless_dataplane::handle::DataplaneHandle,
-        runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
+        runner_api: futures::channel::mpsc::UnboundedSender<WasmRunnerRequest>,
         state_handle: Box<dyn state_management::StateHandleAPI>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     ) -> anyhow::Result<Self> {
@@ -308,7 +308,7 @@ impl FunctionInstanceTaskState {
                 }
             }
         }
-        match self.runner_api.send(RustRunnerRequest::FunctionExit(self.function_id.clone())).await {
+        match self.runner_api.send(WasmRunnerRequest::FunctionExit(self.function_id.clone())).await {
             Ok(_) => {}
             Err(_) => {
                 log::error!("FunctionInstance outlived runner.")

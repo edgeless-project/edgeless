@@ -2,7 +2,7 @@ use futures::join;
 
 pub mod agent;
 pub mod runner_api;
-pub mod rust_runner;
+pub mod wasm_runner;
 pub mod state_management;
 
 #[derive(Debug, Clone, serde::Deserialize)]
@@ -21,7 +21,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let data_plane =
         edgeless_dataplane::handle::DataplaneProvider::new(settings.node_id.clone(), settings.invocation_url.clone(), settings.peers.clone()).await;
     let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.metrics_url.clone()).await;
-    let (mut rust_runner, rust_runner_task) = rust_runner::Runner::new(
+    let (mut rust_runner, rust_runner_task) = wasm_runner::Runner::new(
         data_plane.clone(),
         state_manager.clone(),
         Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
