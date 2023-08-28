@@ -4,7 +4,7 @@ use edgeless_api::function_instance::FunctionId;
 use edgeless_dataplane::handle::DataplaneHandle;
 use edgeless_telemetry::telemetry_events::TelemetryEvent;
 
-use crate::rust_runner::*;
+use crate::wasm_runner::*;
 
 struct MockTelemetryHandle {
     sender: std::sync::mpsc::Sender<(
