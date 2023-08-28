@@ -13,14 +13,14 @@ pub trait DataPlaneLink: Send + Sync {
     ) -> LinkProcessingResult;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CallRet {
     NoReply,
     Reply(String),
     Err,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message {
     Cast(String),
     Call(String),

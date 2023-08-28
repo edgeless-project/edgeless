@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TelemetryLogLevel {
     Error,
     Warn,
@@ -27,7 +27,7 @@ pub fn telemetry_to_api(lvl: TelemetryLogLevel) -> String {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum TelemetryEvent {
     FunctionInstantiate(std::time::Duration),
     FunctionInit(std::time::Duration),
@@ -43,8 +43,13 @@ pub struct TelemetryHandle {
     sender: tokio::sync::mpsc::UnboundedSender<TelemetryProcessorInput>,
 }
 
-impl TelemetryHandle {
-    pub fn observe(&mut self, event: TelemetryEvent, event_tags: std::collections::BTreeMap<String, String>) {
+pub trait TelemetryHandleAPI: Send {
+    fn observe(&mut self, event: TelemetryEvent, event_tags: std::collections::BTreeMap<String, String>);
+    fn fork(&mut self, child_tags: std::collections::BTreeMap<String, String>) -> Box<dyn TelemetryHandleAPI>;
+}
+
+impl TelemetryHandleAPI for TelemetryHandle {
+    fn observe(&mut self, event: TelemetryEvent, event_tags: std::collections::BTreeMap<String, String>) {
         let mut event_tags = event_tags;
         let mut merged_tags = self.handle_tags.clone();
         merged_tags.append(&mut event_tags);
@@ -52,14 +57,14 @@ impl TelemetryHandle {
         self.sender.send(TelemetryProcessorInput::TelemetryEvent(event, merged_tags)).unwrap();
     }
 
-    pub fn fork(&mut self, child_tags: std::collections::BTreeMap<String, String>) -> TelemetryHandle {
+    fn fork(&mut self, child_tags: std::collections::BTreeMap<String, String>) -> Box<dyn TelemetryHandleAPI> {
         let mut child_tags = child_tags;
         let mut merged_tags = self.handle_tags.clone();
         merged_tags.append(&mut child_tags);
-        TelemetryHandle {
+        Box::new(TelemetryHandle {
             handle_tags: merged_tags,
             sender: self.sender.clone(),
-        }
+        })
     }
 }
 

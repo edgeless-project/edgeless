@@ -1,0 +1,20 @@
+[workspace]
+
+[profile.release]
+lto = true
+opt-level = "s"
+
+[package]
+name = "edgeless_test_state"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de"]
+edition = "2021"
+
+[lib]
+name = "edgeless_test_state"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { path = "../../../edgeless_function" }
+log = "0.4"

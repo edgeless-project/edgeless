@@ -1,11 +1,14 @@
+mod api {
+    wasmtime::component::bindgen!({path: "../edgeless_function/wit/edgefunction.wit", async: true});
+}
+
+#[cfg(test)]
+mod test;
+
 use futures::{FutureExt, SinkExt, StreamExt};
 
 use crate::{runner_api, state_management};
 use edgeless_dataplane::core::CallRet;
-
-mod api {
-    wasmtime::component::bindgen!({path: "../edgeless_function/wit/edgefunction.wit", async: true});
-}
 
 enum RustRunnerRequest {
     Start(edgeless_api::function_instance::SpawnFunctionRequest),
@@ -20,10 +23,9 @@ pub struct Runner {
 
 impl Runner {
     pub fn new(
-        _settings: crate::EdgelessNodeSettings,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
-        state_manager: state_management::StateManager,
-        telemtry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
+        state_manager: Box<dyn state_management::StateManagerAPI>,
+        telemtry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     ) -> (Self, futures::future::BoxFuture<'static, ()>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let cloned_sender = sender.clone();
@@ -130,7 +132,7 @@ struct FunctionInstanceTaskState {
     // instance: wasmtime::component::Instance,
     data_plane: edgeless_dataplane::handle::DataplaneHandle,
     runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
-    telemetry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
+    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
 }
 
 struct FunctionInstanceCallbackTable {
@@ -148,9 +150,10 @@ impl FunctionInstance {
         spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
         data_plane: edgeless_dataplane::handle::DataplaneHandle,
         runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
-        state_handle: state_management::StateHandle,
-        telemetry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
+        state_handle: Box<dyn state_management::StateHandleAPI>,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     ) -> anyhow::Result<Self> {
+        let mut telemetry_handle = telemetry_handle;
         let callback_table = std::sync::Arc::new(tokio::sync::Mutex::new(FunctionInstanceCallbackTable {
             alias_map: spawn_req.output_callback_definitions.clone(),
         }));
@@ -160,8 +163,8 @@ impl FunctionInstance {
                 return Err(anyhow::anyhow!("No FunctionId!"));
             }
         };
-        let cloned_callbacks = callback_table.clone();
-        let cloned_telemetry = telemetry_handle.clone();
+        let cloned_callbacks: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>> = callback_table.clone();
+        let cloned_telemetry = telemetry_handle.fork(std::collections::BTreeMap::new());
         let (sender, receiver) = futures::channel::oneshot::channel::<()>();
         let task = tokio::spawn(async move {
             let receiver = receiver;
@@ -206,8 +209,8 @@ struct FunctionState {
     function_id: edgeless_api::function_instance::FunctionId,
     data_plane: edgeless_dataplane::handle::DataplaneHandle,
     callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
-    state_handle: state_management::StateHandle,
-    telemetry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
+    state_handle: Box<dyn state_management::StateHandleAPI>,
+    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
 }
 
 impl FunctionInstanceTaskState {
@@ -217,8 +220,8 @@ impl FunctionInstanceTaskState {
         callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
         data_plane: edgeless_dataplane::handle::DataplaneHandle,
         runner_api: futures::channel::mpsc::UnboundedSender<RustRunnerRequest>,
-        state_handle: state_management::StateHandle,
-        telemetry_handle: edgeless_telemetry::telemetry_events::TelemetryHandle,
+        state_handle: Box<dyn state_management::StateHandleAPI>,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     ) -> anyhow::Result<Self> {
         let start = tokio::time::Instant::now();
         let mut config = wasmtime::Config::new();
@@ -238,7 +241,7 @@ impl FunctionInstanceTaskState {
                 data_plane: data_plane.clone(),
                 callback_table: callback_table,
                 state_handle: state_handle,
-                telemetry_handle: telemetry_handle.clone(),
+                telemetry_handle: telemetry_handle.fork(std::collections::BTreeMap::new()),
             },
         );
         let (binding, _instance) = api::Edgefunction::instantiate_async(&mut store, &component, &linker).await?;
