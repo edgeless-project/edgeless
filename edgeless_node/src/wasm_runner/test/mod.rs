@@ -1,10 +1,12 @@
+use futures::SinkExt;
 use std::time::Duration;
 
 use edgeless_api::function_instance::FunctionId;
 use edgeless_dataplane::handle::DataplaneHandle;
 use edgeless_telemetry::telemetry_events::TelemetryEvent;
 
-use crate::wasm_runner::*;
+use crate::{runner_api::RunnerAPI, wasm_runner::runner::*};
+use edgeless_dataplane::core::CallRet;
 
 struct MockTelemetryHandle {
     sender: std::sync::mpsc::Sender<(
@@ -28,12 +30,12 @@ struct MockStateMananger {
 }
 
 #[async_trait::async_trait]
-impl state_management::StateManagerAPI for MockStateMananger {
+impl crate::state_management::StateManagerAPI for MockStateMananger {
     async fn get_handle(
         &mut self,
         _state_policy: edgeless_api::function_instance::StatePolicy,
         state_id: uuid::Uuid,
-    ) -> Box<dyn state_management::StateHandleAPI> {
+    ) -> Box<dyn crate::state_management::StateHandleAPI> {
         Box::new(MockStateHandle {
             state_id: state_id,
             output_mocks: self.output_mocks.clone(),
@@ -49,7 +51,7 @@ struct MockStateHandle {
 }
 
 #[async_trait::async_trait]
-impl state_management::StateHandleAPI for MockStateHandle {
+impl crate::state_management::StateHandleAPI for MockStateHandle {
     async fn get(&mut self) -> Option<String> {
         self.output_mocks.lock().await.get(&self.state_id).cloned()
     }
@@ -75,11 +77,9 @@ async fn basic_lifecycle() {
         sender: telemetry_mock_sender,
     });
 
-    let (mut rt, rt_task) = Runner::new(dataplane_provider, state_manager, telemetry_handle);
+    let (mut client, rt_task) = Runner::new(dataplane_provider, state_manager, telemetry_handle);
 
     tokio::spawn(rt_task);
-
-    let mut client = rt.get_api_client();
 
     let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
         function_id: Some(fid.clone()),
@@ -211,11 +211,9 @@ async fn messaging_test_setup() -> (
         sender: telemetry_mock_sender,
     });
 
-    let (mut rt, rt_task) = Runner::new(dataplane_provider, state_manager, telemetry_handle);
+    let (mut client, rt_task) = Runner::new(dataplane_provider, state_manager, telemetry_handle);
 
     tokio::spawn(rt_task);
-
-    let mut client = rt.get_api_client();
 
     let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
         function_id: Some(fid.clone()),
@@ -436,12 +434,9 @@ async fn state_management() {
     let test_peer_fid = edgeless_api::function_instance::FunctionId::new(node_id);
     let mut test_peer_handle = dataplane_provider.get_handle_for(test_peer_fid.clone()).await;
 
-    let (mut rt, rt_task) = Runner::new(dataplane_provider, mock_state_manager, telemetry_handle);
+    let (mut client, rt_task) = Runner::new(dataplane_provider, mock_state_manager, telemetry_handle);
 
     tokio::spawn(rt_task);
-
-    let mut client = rt.get_api_client();
-
     let mut spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
         function_id: Some(fid.clone()),
         code: edgeless_api::function_instance::FunctionClassSpecification {

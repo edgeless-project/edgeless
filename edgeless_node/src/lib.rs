@@ -2,8 +2,8 @@ use futures::join;
 
 pub mod agent;
 pub mod runner_api;
-pub mod wasm_runner;
 pub mod state_management;
+pub mod wasm_runner;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct EdgelessNodeSettings {
@@ -21,7 +21,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let data_plane =
         edgeless_dataplane::handle::DataplaneProvider::new(settings.node_id.clone(), settings.invocation_url.clone(), settings.peers.clone()).await;
     let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.metrics_url.clone()).await;
-    let (mut rust_runner, rust_runner_task) = wasm_runner::Runner::new(
+    let (rust_runner_client, rust_runner_task) = wasm_runner::runner::Runner::new(
         data_plane.clone(),
         state_manager.clone(),
         Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
@@ -29,7 +29,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
             ("NODE_ID".to_string(), settings.node_id.to_string()),
         ]))),
     );
-    let (mut agent, agent_task) = agent::Agent::new(rust_runner.get_api_client(), settings.clone());
+    let (mut agent, agent_task) = agent::Agent::new(Box::new(rust_runner_client.clone()), settings.clone());
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.agent_url);
 
     join!(rust_runner_task, agent_task, agent_api_server);
