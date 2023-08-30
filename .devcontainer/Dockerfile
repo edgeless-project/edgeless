@@ -13,22 +13,15 @@ RUN su $USERNAME -l -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.r
 RUN su $USERNAME -l -c "rustup target add wasm32-unknown-unknown"
 RUN su $USERNAME -l -c "cargo install wasm-tools"
 
-# Some more tools to make the experience better
-# --- Start
-# RUN sudo dnf -y install tmux # because life without tmux is painful
-# RUN sudo dnf -y install zsh
-# RUN sudo dnf -y install wget
-# RUN sudo dnf -y install vim
-# ENV HOME /home/$USERNAME
-
-# setup the zsh with some goodies (plugins)
-# ENV SHELL /bin/zsh
-# RUN wget https://github.com/robbyrussell/oh-my-zsh/raw/master/tools/install.sh -O - | zsh || true
-# RUN git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
-# RUN git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
-# ADD .zshrc $HOME
-# ENTRYPOINT ["zsh"]
-# --- End
+# These are lightweight and nice to have anyways
+# to get further enhancments, run the scripts/enhance_dev_container.sh script
+RUN sudo dnf -y install zsh
+RUN sudo dnf -y install wget
+RUN sudo dnf -y install vim
+ENV HOME /home/$USERNAME
+ENV SHELL /bin/zsh
+ENTRYPOINT ["zsh"]
 
 USER $USERNAME
 WORKDIR /home/$USERNAME
+
