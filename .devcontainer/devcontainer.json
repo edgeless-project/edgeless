@@ -7,8 +7,7 @@
     "--cap-add=SYS_PTRACE",
     "--security-opt",
     "seccomp=unconfined",
-    "--name",
-    "edgeless_devcontainer"
+    "--name=edgeless_devcontainer"
   ],
   "customizations": {
     "vscode": {
