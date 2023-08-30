@@ -6,7 +6,9 @@
   "runArgs": [
     "--cap-add=SYS_PTRACE",
     "--security-opt",
-    "seccomp=unconfined"
+    "seccomp=unconfined",
+    "--name",
+    "edgeless_devcontainer"
   ],
   "customizations": {
     "vscode": {
@@ -23,10 +25,12 @@
     "forwardPorts": [
       7001,
       7011,
-      7021
+      7021,
+      7035
     ],
     "mounts": [
-      "type=volume,target=${containerWorkspaceFolder}/target"
+      "type=volume,target=${containerWorkspaceFolder}/target",
+      "source=edgeless-zshhistory,target=/commandhistory,type=volume"
     ],
     "remoteUser": "edgeless",
     "postStartCommand": "sudo chown -R edgeless:edgeless ${containerWorkspaceFolder}/target"
