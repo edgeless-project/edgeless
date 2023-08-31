@@ -8,11 +8,13 @@ This repository contains a research prototype of the Edgeless platform.
 
 The Implementation relies on Rust and the ProtoBuf compiler.
 
-The easiest way to get started is the devcontainer shipped as part of this repository. 
+The easiest way to get started is the devcontainer shipped as part of this
+repository. See [Extra](#extra) for tips on how to properly set up the dev
+container.
 
 Build Steps:
 
-Build host code / tools:
+Build edgeless core components and tools:
 
 ```
 cargo build
@@ -26,14 +28,15 @@ It is recommended that you enable at least info-level log directives with:
 export RUST_LOG=info
 ```
 
-To get the basic system, first create default configuration files:
+To get the basic system running, first create the default configuration files
+(they have fixed hardcoded values):
 
 ```
 target/debug/edgeless_inabox -t 
 target/debug/edgeless_cli -t cli.toml
 ```
 
-that will create:
+which will create:
 
 - `balancer.toml`
 - `controller.toml`
@@ -41,113 +44,81 @@ that will create:
 - `orchestrator.toml`
 - `cli.toml`
 
-Then you can run the EDGELESS-in-a-box:
+Then you can run the **EDGELESS-in-a-box**, which is a convenience binary that
+runs every necessary components as one, using the generated configuration files:
 
 ```
 target/debug/edgeless_inabox
 ```
 
-Congratulations, now a full EDGELESS system in running for you, though it is not doing much.
-Below you will find two examples of workflows that can be created.
+Congratulations, now a full EDGELESS system in running for you, although it is
+not doing much.
 
-### Ping-pong examples
+To see examples of simple workflows composed of simple functions, look into the
+`examples/` directory. There you will find a `README` file with a short
+description of each example. Then, each example directory will contain a
+detailed description of the example application.
 
-The example creates a chain of two functions: ping and pong. The ping function wakes up every 1 second and invokes the pong function, which merely terminates after replying.
 
-First, you have to locally build the WASM binaries:
+## How to create new functions/workflows:
 
-```
-target/debug/edgeless_cli function build examples/ping_pong/ping/function.json
-target/debug/edgeless_cli function build examples/ping_pong/pong/function.json
-```
+Please refer to
+[documentation/rust_functions.md](documentation/rust_functions.md) and
+[documentation/workflows.md](documentation/workflows.md).
 
-which will generate the files:
-
-- `examples/ping_pong/ping/pinger.wasm`
-- `examples/ping_pong/pong/ponger.wasm`
-
-Then, you can request the controller to start the workflow:
-
-```
-ID=$(target/debug/edgeless_cli workflow start examples/ping_pong/workflow.json)
-```
-
-Now `$ID` contains the workflow identifier assigned by the controller.
-
-You will observe on the logs that the pinger workflow is, indeed, invoked every 1 second. Furthermore, a counter is increased at every new invocation. This counter is the _state_ of the workflow, which is shared across multiple instances of this workflow and persists after their termination.
-
-For example, if you stop the worfklow:
-
-```
-target/debug/edgeless_cli workflow stop $ID
-```
-
-and you start again the workflow later, you will see the counter resuming from the previous value (search for `{"count":NUM}` in the EDGELESS-in-a-box logs):
-
-```
-target/debug/edgeless_cli workflow start examples/ping_pong/workflow.json
-```
-
-You can always list the active workflows with:
-
-```
-target/debug/edgeless_cli workflow list
-```
-
-### HTTP hello world example
-
-The example creates a chain of one function that waits for POST commands matching a given host addressed to the balancer HTTP end-point and replies with a 200 OK.
-
-First build the WASM binary:
-
-```
-target/debug/edgeless_cli function build examples/http_ingress/processing_function/function.json
-```
-
-Then you can start the workflow:
-
-```
-target/debug/edgeless_cli workflow start examples/http_ingress/workflow.json
-```
-
-and verify that it works with curl:
-
-```
-curl -H "Host: demo.edgeless.com" -XPOST http://127.0.0.1:7035/hello
-```
-
-## How to create functions/workflows:
-
-Please refer to [documentation/rust_functions.md](documentation/rust_functions.md) and [documentation/workflows.md](documentation/workflows.md).
 
 ## Repository Layout
 
-Each of the main services is implemented as its own crate (library + binary wrapper) that can be found at the root of the project:
+Each of the main services is implemented as its own crate (library + (optional)
+binary wrapper). Refer to the `README` file of a particular component to find
+out more. To learn more about the conventions of Rust's module system, visit
+[link](https://doc.rust-lang.org/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html).
 
-* `edgeless_node`:  Worker Node including the agent and function runtime.
-    * Exposes the `AgentAPI` consisting of the `FunctionInstanceAPI`
-    * Exposes the `InvocationAPI` (data plane)
-    * Binary: `edgeless_node_d`
+### Core Components
+These represent the core components of the EDGELESS project, as proposed in the
+design phase.
+TODO: extend the descriptions
 
-* `edgeless_orc`: e-Orchestrator
+#### edgeless_node
+Worker Node including the agent and the function runtime.
+  * Exposes the `AgentAPI` consisting of the `FunctionInstanceAPI`
+  * Exposes the `InvocationAPI` (data plane)
+  * Binary: `edgeless_node_d`
+
+#### edgeless_orc
+e-Orchestrator. 
     * Exposes the `OrchestratorAPI` consisting of the `FunctionInstanceAPI`
     * Binary: `edgeless_orc_d`
 
-* `edgeless_con`: e-Controller
+#### edgeless_con
+e-Controller
     * Exposes the `ControllerAPI` consisting of the `WorkflowInstanceAPI`
     * Binary: `edgeless_con_d`
 
-* `edgeless_bal`: e-Balancer
-    * TODO: Implement Event Balancer
-    * Contains the HTTP-Ingress and exposes a `ResourceConfigurationAPI` to configure it.
+#### edgeless_bal
+e-Balancer
+    * Contains the HTTP-Ingress and exposes a `ResourceConfigurationAPI` to
+      configure it.
     * Binary: `edgeless_bal_d`
 
-* `edgeless_cli`: CLI to interact with the e-Controller
+
+
+### Tools
+The following tools allow users to test and interact with the EDGELESS project.
+
+#### edgeless_cli
+CLI to interact with the e-Controller
     * Binary: `edgeless_cli`
 
-* `edgeless_inabox`:a standalone EDGELESS environment with preconfigured instances of all required services inside a single binary. This is the easiest way to spawn up a development instance of edgeless
+#### edgeless_inabox
+a standalone EDGELESS environment with preconfigured
+  instances of all required services inside a single binary. This is the easiest
+  way to spawn up a development instance of edgeless
 
-In addition to the services/binaries, the repository contains the following libraries:
+
+### Libraries
+In addition to the core components and tools, the repository contains the
+following libraries:
 
 * `edgeless_api`: Crate defining all inter-service APIs
     * Contains GRPC implementations of those inter-service APIs
@@ -163,23 +134,51 @@ In addition to the services/binaries, the repository contains the following libr
     * Provides a remote communication provider based on the `InvocationAPI`
 
 * `edgeless_http`: Crate containing HTTP-related types.
-    * Specifies the interface between the Ingress and the functions consuming HTTP Events.
+    * Specifies the interface between the Ingress and the functions consuming
+      HTTP Events.
 
-Finally, `examples` contains example guests.
+
+## Extra
+
+1. It makes sense to clone the repository directly into a devcontainer to avoid
+bind mounts and possibly make builds faster. To do this install VSCode, and
+select: `DevContainers: Clone Repository in Named Container Volume`. It should
+prompt you to a github page in your browser where you can authentificate. On an
+M1 Max the achieved speedup was around x10 for `cargo build`.
+
+2. There is a script to configure some plugins for zsh:
+`scripts/enhance_zsh_dev_container.sh`, which is entirely optional. After
+running it things like autocompletion and shell syntax highlighting are
+available. Fell free to modify it to your liking!
+
+3. If your build times are still horrible, try to allocate more CPUs and RAM to
+   the Docker dev_container.
 
 ## Contributing
 
-This section contains some rules you should adhere to when contributing to this repository.
+This section contains some rules you should adhere to when contributing to this
+repository.
 
-* Run the rust formatter before committing. This ensures we minimize the noise coming from, e.g., whitespace changes.
-* Try to limit the number of warnings (ideally, there should not be any warnings). A good way to do this is to run `cargo fix` before running the formatter.
-    *  Suggested workflow: `cargo fix --allow-staged --allow-dirty && cargo fmt && git commit`
-* Do not introduce merge commits to the main branch. Merges to the main branch must be fast-forward.
-    *   This can be achieved by rebasing your branch onto the main branch before merging.
+* Run the rust formatter before committing - `cargo fmt`. This ensures we
+  minimize the noise coming from, e.g., whitespace changes.
+* Try to limit the number of warnings (ideally, there should not be any
+  warnings). A good way to do this is to run `cargo fix` before running the
+  formatter.
+    *  Suggested workflow: `cargo fix --allow-staged --allow-dirty && cargo fmt
+       && git commit`
+* When working on a new feature / issue, TODO: add a Git workflow here
+* Protect the main branch
+* Do not introduce merge commits on the main branch. Merges to the main branch
+  must be fast-forwarded. A good practice is also to squash the commits o
+    * This can be achieved by rebasing your branch onto the main branch before
+        merging.
+    * Don't forget to delete the branch that you've just merged - it keeps the
+      repository clean.
 * Add yourself to the list of contributors & adhere to the license.
     * Do not taint this repository with incompatible licenses!
     * Everything not MIT-licensed must be kept external to this repository.
 
 ## License
 
-The Repository is licensed under the MIT License. Please refer to [LICENSE-MIT.txt](LICENSE-MIT.txt) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
+The Repository is licensed under the MIT License. Please refer to
+[LICENSE-MIT.txt](LICENSE-MIT.txt) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
