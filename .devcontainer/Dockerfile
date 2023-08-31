@@ -20,6 +20,8 @@ RUN sudo dnf -y install wget
 RUN sudo dnf -y install vim
 ENV HOME /home/$USERNAME
 ENV SHELL /bin/zsh
+RUN echo "unset rc" >> $HOME/.zshrc
+RUN echo '. "$HOME/.cargo/env"' >> $HOME/.zshrc
 ENTRYPOINT ["zsh"]
 
 USER $USERNAME
