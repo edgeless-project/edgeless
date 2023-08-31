@@ -26,11 +26,17 @@ It is recommended that you enable at least info-level log directives with:
 export RUST_LOG=info
 ```
 
+First move to the directory where the executables have been built:
+
+```
+cd target/debug/
+```
+
 To get the basic system, first create default configuration files:
 
 ```
-target/debug/edgeless_inabox -t 
-target/debug/edgeless_cli -t cli.toml
+edgeless_inabox -t 
+./edgeless_cli -t cli.toml
 ```
 
 that will create:
@@ -44,7 +50,7 @@ that will create:
 Then you can run the EDGELESS-in-a-box:
 
 ```
-target/debug/edgeless_inabox
+./edgeless_inabox
 ```
 
 Congratulations, now a full EDGELESS system in running for you, though it is not doing much.
@@ -57,8 +63,8 @@ The example creates a chain of two functions: ping and pong. The ping function w
 First, you have to locally build the WASM binaries:
 
 ```
-target/debug/edgeless_cli function build examples/ping_pong/ping/function.json
-target/debug/edgeless_cli function build examples/ping_pong/pong/function.json
+./edgeless_cli function build ../../examples/ping_pong/ping/function.json
+./edgeless_cli function build ../../examples/ping_pong/pong/function.json
 ```
 
 which will generate the files:
@@ -69,7 +75,7 @@ which will generate the files:
 Then, you can request the controller to start the workflow:
 
 ```
-ID=$(target/debug/edgeless_cli workflow start examples/ping_pong/workflow.json)
+ID=$(./edgeless_cli workflow start ../../examples/ping_pong/workflow.json)
 ```
 
 Now `$ID` contains the workflow identifier assigned by the controller.
@@ -79,19 +85,19 @@ You will observe on the logs that the pinger workflow is, indeed, invoked every 
 For example, if you stop the worfklow:
 
 ```
-target/debug/edgeless_cli workflow stop $ID
+./edgeless_cli workflow stop $ID
 ```
 
 and you start again the workflow later, you will see the counter resuming from the previous value (search for `{"count":NUM}` in the EDGELESS-in-a-box logs):
 
 ```
-target/debug/edgeless_cli workflow start examples/ping_pong/workflow.json
+./edgeless_cli workflow start ../../examples/ping_pong/workflow.json
 ```
 
 You can always list the active workflows with:
 
 ```
-target/debug/edgeless_cli workflow list
+./edgeless_cli workflow list
 ```
 
 ### HTTP hello world example
@@ -101,13 +107,13 @@ The example creates a chain of one function that waits for POST commands matchin
 First build the WASM binary:
 
 ```
-target/debug/edgeless_cli function build examples/http_ingress/processing_function/function.json
+./edgeless_cli function build ../../examples/http_ingress/processing_function/function.json
 ```
 
 Then you can start the workflow:
 
 ```
-target/debug/edgeless_cli workflow start examples/http_ingress/workflow.json
+./edgeless_cli workflow start ../../examples/http_ingress/workflow.json
 ```
 
 and verify that it works with curl:
