@@ -49,7 +49,7 @@ mean in more detail further down).
             "resource_class_type": "http-ingress",
             "output_callback_definitions": {
                 // specified where the new_requests to the ingress should go to
-                "new_request": "http_processor_stage_1" 
+                "new_request": "stage_1_function" 
             },
             "configurations": {
                 "host": "demo.edgeless.com",
@@ -110,7 +110,7 @@ following elements:
 
 The example above shows a workflow consisting of an http-ingress and two
 processing functions. When a new request matching the configuration is received
-by the ingress, it sends an event to the `http_processor_stage_1` function as
+by the ingress, it sends an event to the `stage_1_function` function as
 this is configured in the (http-ingresses') resource's
 `output_callback_definitions` (specified under `new_request`). This function
 subsequently sends a specific set of events (`success_cb`) towards the
