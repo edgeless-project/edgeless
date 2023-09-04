@@ -18,6 +18,16 @@ Build host code / tools:
 cargo build
 ```
 
+### NixOS
+
+If using Nix / on NixOS then there is a simple [`flake.nix`](./flake.nix) that is invoked via the `direnv` [`.envrc`](./.envrc) to autoinstall Nix package dependencies and give you a bulid shell once you `direnv allow` in this directory.
+
+To build the function examples under `./examples` you will need to add the WASM toolchain via `rustup`:
+
+```shell
+rustup target add wasm32-unknown-unknown
+```
+
 ## How to run:
 
 It is recommended that you enable at least info-level log directives with:
@@ -76,7 +86,7 @@ Now `$ID` contains the workflow identifier assigned by the controller.
 
 You will observe on the logs that the pinger workflow is, indeed, invoked every 1 second. Furthermore, a counter is increased at every new invocation. This counter is the _state_ of the workflow, which is shared across multiple instances of this workflow and persists after their termination.
 
-For example, if you stop the worfklow:
+For example, if you stop the workflow:
 
 ```
 target/debug/edgeless_cli workflow stop $ID
