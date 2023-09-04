@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+cargo fmt -- --check
+if [[ $? -ne 0 ]]; then
+  printf 'Format checking failed; please run `cargo fmt`.\n'
+fi
+
+cargo clippy -- --no-deps
+if [[ $? -ne 0 ]]; then
+  printf 'Linting failed; please run `cargo clippy` to see why.\n'
+fi
