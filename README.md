@@ -86,7 +86,7 @@ Now `$ID` contains the workflow identifier assigned by the controller.
 
 You will observe on the logs that the pinger workflow is, indeed, invoked every 1 second. Furthermore, a counter is increased at every new invocation. This counter is the _state_ of the workflow, which is shared across multiple instances of this workflow and persists after their termination.
 
-For example, if you stop the worfklow:
+For example, if you stop the workflow:
 
 ```
 target/debug/edgeless_cli workflow stop $ID
