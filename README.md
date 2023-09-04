@@ -20,7 +20,7 @@ cargo build
 
 ### NixOS
 
-If using Nix / on NixOS then there is a simple (`flake.nix`)[./flake.nix] that is invoked via the `direnv` (`.envrc`)[./.envrc] to autoinstall Nix package dependencies and give you a bulid shell once you `direnv allow` in this directory.
+If using Nix / on NixOS then there is a simple [`flake.nix`](./flake.nix) that is invoked via the `direnv` [`.envrc`](./.envrc) to autoinstall Nix package dependencies and give you a bulid shell once you `direnv allow` in this directory.
 
 ## How to run:
 
