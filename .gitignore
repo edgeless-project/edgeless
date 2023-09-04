@@ -6,3 +6,4 @@ function_state/
 /node.toml
 /orchestrator.toml
 /cli.toml
+.direnv
