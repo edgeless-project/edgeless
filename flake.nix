@@ -15,7 +15,6 @@
             openssl.dev
             pkg-config
             protobuf
-            wasm-tools
           ];
         };
       });
