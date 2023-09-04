@@ -15,6 +15,7 @@
             openssl.dev
             pkg-config
             protobuf
+            rustup
           ];
         };
       });
