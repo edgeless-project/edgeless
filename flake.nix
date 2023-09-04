@@ -11,7 +11,12 @@
       let pkgs = nixpkgs.legacyPackages.${system};
       in {
         devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [ openssl.dev protobuf pkg-config ];
+          buildInputs = with pkgs; [
+            openssl.dev
+            pkg-config
+            protobuf
+            wasm-tools
+          ];
         };
       });
 }
