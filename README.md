@@ -22,6 +22,12 @@ cargo build
 
 If using Nix / on NixOS then there is a simple [`flake.nix`](./flake.nix) that is invoked via the `direnv` [`.envrc`](./.envrc) to autoinstall Nix package dependencies and give you a bulid shell once you `direnv allow` in this directory.
 
+To build the function examples under `./examples` you will need to add the WASM toolchain via `rustup`:
+
+```shell
+rustup target add wasm32-unknown-unknown
+```
+
 ## How to run:
 
 It is recommended that you enable at least info-level log directives with:
