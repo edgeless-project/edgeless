@@ -87,7 +87,6 @@ out more. To learn more about the conventions of Rust's module system, visit
 ### Core Components
 These represent the core components of the EDGELESS project, as proposed in the
 design phase.
-TODO: extend the descriptions
 
 #### edgeless_node
 Worker Node including the agent and the function runtime.
@@ -121,7 +120,7 @@ CLI to interact with the e-Controller
     * Binary: `edgeless_cli`
 
 #### edgeless_inabox
-a standalone EDGELESS environment with preconfigured
+A standalone EDGELESS environment with preconfigured
   instances of all required services inside a single binary. This is the easiest
   way to spawn up a development instance of edgeless
 
@@ -176,23 +175,20 @@ repository.
   formatter.
     *  Suggested workflow: `cargo fix --allow-staged --allow-dirty && cargo fmt
        && git commit`
-* When working on a new feature / issue, TODO: add a Git workflow here
-* Protect the main branch
+* When working on a new feature / issue, create a branch from the github issue
+  and add your changes there. To merge the changes into the main, create a pull
+  request and assign someone as a reviewer. The reviewer should then reject or
+  accept the changes / leave some comments. After the changes are accepted by
+  the reviewer, he should take care to merge them and remove the dangling
+  feature branch.
 * Do not introduce merge commits on the main branch. Merges to the main branch
-  must be fast-forwarded. A good practice is also to squash the commits o
-    * This can be achieved by rebasing your branch onto the main branch before
-        merging.
-    * Don't forget to delete the branch that you've just merged - it keeps the
-      repository clean.
+  must be fast-forwarded. A good practice is also to squash the commits on the
+  feature branch (can be done while merging on github).
 * Add yourself to the list of contributors & adhere to the license.
     * Do not taint this repository with incompatible licenses!
     * Everything not MIT-licensed must be kept external to this repository.
 
 ## License
 
-<<<<<<< HEAD
 The Repository is licensed under the MIT License. Please refer to
 [LICENSE-MIT.txt](LICENSE-MIT.txt) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
-=======
-The Repository is licensed under the MIT License. Please refer to [LICENSE-MIT.txt](LICENSE-MIT.txt) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
->>>>>>> main
