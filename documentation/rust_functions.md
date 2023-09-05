@@ -2,9 +2,9 @@
 
 ## Function Framework
 
-A Function needs to implement the trait `edgeless_function::api::Edgefunction`, which consists of the four callbacks shown below.
-In-runtime state (not saved using sync) is currently purely the responsibility of the function (the component model does not support methods yet);
-The `OnceLock` used below is one way to achieve this. The `export!` macro (last line) must be called.
+A Function needs to implement the trait `edgeless_function::api::Edgefunction`, which consists of the four callbacks shown below. The naming cast and call have been borrowed from Erlang's [gen_server](https://www.erlang.org/doc/man/gen_server.html) nomenclature.
+In-runtime state (not saved using sync) is currently purely the responsibility of the function (the component model - TODO: what is the component model? does not support methods yet);
+The `OnceLock` used below is one way to achieve this TODO: to achieve what?: clarify. The `export!` macro (last line) must be called. `OnceLock` is a Rust synchronization primitive, that ensures that the passed struct is initialized only once, but can be shared multiple times: [explanation](https://www.dotnetperls.com/oncelock-rust).
 
 ```rust
 use edgeless_function::api::*;
@@ -42,23 +42,44 @@ impl Edgefunction for ExampleFunction {
 edgeless_function::export!(ExampleFunction);
 ```
 
+## Types
+
+```rust
+struct Fid {
+    node: String,
+    function: String
+}
+```
+
+Basic function identifier comprised of node_id & function_id. 
+
+```rust
+enum CallRet {
+    Reply(string),
+    Noreply,
+    Err
+}
+```
+
+Return value from calls / value to be returned from `handle_call`.
+
 ## Available Methods
 
 `async fn cast_alias(&mut self, alias: String, msg: String);`
 
-Send a message to the function registered (in the workflow) for the `alias` without expecting a return value.
+Send a message to the function registered (in the workflow) under `alias`, **without expecting a return value**.
 
 `async fn cast(&mut self, target: Fid, msg: String);`
 
-Send a message to the function identified by `target` without expecting a return value.
+Send a message to the function identified by `target`, **without expecting a return value.**
 
 `async fn call(&mut self, target: Fid, msg: String) -> CallRet;`
 
-Blockingly send a message to the function identified by `target` and wait for a return value.
+Blockingly / Synchronously send a message to the function identified by `target` **and wait for a return value.**
 
 `async fn call_alias(&mut self, alias: String, msg: String) -> CallRet;`
 
-Blockingly send a message to the function registered (in the workflow) for the `alias` and wait for a return value.
+Blockingly / Synchronously send a message to the function registered (in the workflow) under `alias` and **wait for a return value.**
 
 `async fn log(&mut self, msg: String);`
 
@@ -71,38 +92,17 @@ Retrieve the function's own `Fid` (used for continuation-passing, self-invocatio
 
 `async fn delayed_cast(&mut self, delay: u64, target: Fid, payload: String);`
 
-After `delay` milliseconds, send a message to the function identified by `target` without expecting a return value.
-This is useful for self-invocation and creating a continuously running function.
+After `delay` milliseconds, send a message to the function identified by `target` **without expecting a return value**.
+This is useful for self-invocation and creating a periodically running function.
 
 `async fn sync(&mut self, serialized_state: String);`
 
 Write the state to disk/database (depending on the state policy).
 The function is responsible for serializing the state to a string format.
 
-## Types
-
-```rust
-struct Fid {
-    node: String,
-    function: String
-}
-```
-
-Basic function identifier comprised of node_id & function_id.
-
-```rust
-enum CallRet {
-    Reply(string),
-    Noreply,
-    Err
-}
-```
-
-Return value from calls / value to be returned from `handle_call`.
-
 ## Project Structure
 
-The function can be built as a `wasm32-unknown-unknown` library crate. The snippet below shows an example `Cargo.toml` file.
+The function can be built as a `wasm32-unknown-unknown` (for background on the naming [see here](https://github.com/rustwasm/wasm-bindgen/issues/979)) library crate. The snippet below shows an example `Cargo.toml` file that can be used to build such a function.
 
 ```toml
 [workspace]
@@ -127,3 +127,4 @@ edgeless_function = { path = "../../../edgeless_function" }
 serde = {version="1", features=["derive"] }
 serde_json = "1"
 ```
+
