@@ -12,9 +12,9 @@ struct RemoteLink {
 impl DataPlaneLink for RemoteLink {
     async fn handle_send(
         &mut self,
-        target: &edgeless_api::function_instance::FunctionId,
+        target: &edgeless_api::function_instance::InstanceId,
         msg: Message,
-        src: &edgeless_api::function_instance::FunctionId,
+        src: &edgeless_api::function_instance::InstanceId,
         stream_id: u64,
     ) -> LinkProcessingResult {
         return self
@@ -96,7 +96,7 @@ impl RemoteLinkProvider {
 
     pub async fn new_link(
         &self,
-        target: edgeless_api::function_instance::FunctionId,
+        target: edgeless_api::function_instance::InstanceId,
         sender: futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
     ) -> Box<dyn DataPlaneLink> {
         self.locals.lock().await.receivers.insert(target.function_id.clone(), sender);
@@ -128,10 +128,10 @@ mod test {
         let node_id = uuid::Uuid::new_v4();
         let node_id_2 = uuid::Uuid::new_v4();
         let node_id_3 = uuid::Uuid::new_v4();
-        let fid_target = edgeless_api::function_instance::FunctionId::new(node_id.clone());
-        let fid_source = edgeless_api::function_instance::FunctionId::new(node_id_2.clone());
-        let fid_wrong_component_id = edgeless_api::function_instance::FunctionId::new(node_id.clone());
-        let fid_wrong_node_id = edgeless_api::function_instance::FunctionId {
+        let fid_target = edgeless_api::function_instance::InstanceId::new(node_id.clone());
+        let fid_source = edgeless_api::function_instance::InstanceId::new(node_id_2.clone());
+        let fid_wrong_component_id = edgeless_api::function_instance::InstanceId::new(node_id.clone());
+        let fid_wrong_node_id = edgeless_api::function_instance::InstanceId {
             node_id: node_id_3.clone(),
             function_id: fid_target.function_id.clone(),
         };
@@ -200,11 +200,11 @@ mod test {
 
         let node_id_2 = uuid::Uuid::new_v4();
         let node_id_3 = uuid::Uuid::new_v4();
-        let fid_source = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+        let fid_source = edgeless_api::function_instance::InstanceId::new(node_id.clone());
 
-        let fid_target = edgeless_api::function_instance::FunctionId::new(node_id_2.clone());
-        let fid_wrong_component_id = edgeless_api::function_instance::FunctionId::new(node_id_2.clone());
-        let fid_wrong_node_id = edgeless_api::function_instance::FunctionId {
+        let fid_target = edgeless_api::function_instance::InstanceId::new(node_id_2.clone());
+        let fid_wrong_component_id = edgeless_api::function_instance::InstanceId::new(node_id_2.clone());
+        let fid_wrong_node_id = edgeless_api::function_instance::InstanceId {
             node_id: node_id_3.clone(),
             function_id: fid_target.function_id.clone(),
         };

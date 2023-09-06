@@ -9,8 +9,8 @@ pub enum EventData {
 
 #[derive(Clone)]
 pub struct Event {
-    pub target: crate::function_instance::FunctionId,
-    pub source: crate::function_instance::FunctionId,
+    pub target: crate::function_instance::InstanceId,
+    pub source: crate::function_instance::InstanceId,
     pub stream_id: u64,
     pub data: EventData,
 }

@@ -19,7 +19,7 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
 
     let ingress = http_ingress::ingress_task(
         data_plane.clone(),
-        edgeless_api::function_instance::FunctionId::new(settings.balancer_id.clone()),
+        edgeless_api::function_instance::InstanceId::new(settings.balancer_id.clone()),
         settings.http_ingress_url.clone(),
     )
     .await;
@@ -27,7 +27,7 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
     let egress = Box::new(
         http_egress::EgressResourceProvider::new(
             data_plane.clone(),
-            edgeless_api::function_instance::FunctionId::new(settings.balancer_id.clone()),
+            edgeless_api::function_instance::InstanceId::new(settings.balancer_id.clone()),
         )
         .await,
     );

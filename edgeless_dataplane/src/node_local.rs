@@ -13,9 +13,9 @@ struct NodeLocalLink {
 impl DataPlaneLink for NodeLocalLink {
     async fn handle_send(
         &mut self,
-        target: &edgeless_api::function_instance::FunctionId,
+        target: &edgeless_api::function_instance::InstanceId,
         msg: Message,
-        src: &edgeless_api::function_instance::FunctionId,
+        src: &edgeless_api::function_instance::InstanceId,
         stream_id: u64,
     ) -> LinkProcessingResult {
         if target.node_id == self.node_id {
@@ -94,7 +94,7 @@ impl NodeLocalLinkProvider {
 
     pub async fn new_link(
         &self,
-        target: edgeless_api::function_instance::FunctionId,
+        target: edgeless_api::function_instance::InstanceId,
         sender: futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
     ) -> Box<dyn DataPlaneLink> {
         self.router.lock().await.receivers.insert(target.function_id.clone(), sender);
@@ -112,9 +112,9 @@ mod test {
     #[tokio::test]
     async fn basic_forwarding() {
         let node_id = uuid::Uuid::new_v4();
-        let fid_1 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
-        let fid_2 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
-        let fid_3 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+        let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
+        let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
+        let fid_3 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
 
         let provider = NodeLocalLinkProvider::new();
 

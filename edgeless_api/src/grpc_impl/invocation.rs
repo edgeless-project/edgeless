@@ -8,8 +8,8 @@ const TYPE_CALL_NO_RET: i32 = crate::grpc_impl::api::EventType::CallNoRet as i32
 impl InvocationConverters {
     fn parse_api_event(api_event: &crate::grpc_impl::api::Event) -> anyhow::Result<crate::invocation::Event> {
         Ok(crate::invocation::Event {
-            target: crate::grpc_impl::function_instance::FunctonInstanceConverters::parse_function_id(&api_event.target.as_ref().unwrap())?,
-            source: crate::grpc_impl::function_instance::FunctonInstanceConverters::parse_function_id(&api_event.source.as_ref().unwrap())?,
+            target: crate::grpc_impl::function_instance::FunctonInstanceConverters::parse_instance_id(&api_event.target.as_ref().unwrap())?,
+            source: crate::grpc_impl::function_instance::FunctonInstanceConverters::parse_instance_id(&api_event.source.as_ref().unwrap())?,
             stream_id: api_event.stream_id,
             data: Self::parse_api_event_data(&api_event.msg.as_ref().unwrap())?,
         })
@@ -27,10 +27,10 @@ impl InvocationConverters {
 
     fn encode_crate_event(crate_event: &crate::invocation::Event) -> crate::grpc_impl::api::Event {
         crate::grpc_impl::api::Event {
-            target: Some(crate::grpc_impl::function_instance::FunctonInstanceConverters::serialize_function_id(
+            target: Some(crate::grpc_impl::function_instance::FunctonInstanceConverters::serialize_instance_id(
                 &crate_event.target,
             )),
-            source: Some(crate::grpc_impl::function_instance::FunctonInstanceConverters::serialize_function_id(
+            source: Some(crate::grpc_impl::function_instance::FunctonInstanceConverters::serialize_instance_id(
                 &crate_event.source,
             )),
             stream_id: crate_event.stream_id,

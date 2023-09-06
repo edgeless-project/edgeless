@@ -7,7 +7,7 @@ as well as a higher level-mechanism for sending events that expect a return even
 Future versions of the system may add additional APIs/mechanisms, e.g., data-centric communication or anycast/multicast communication.
 
 Each component has a `DataplaneHandle` that is used for both the events leaving the component (outgoing) and received by the component (incomming).
-The `DataplaneHandle` is registered to the `FunctionId` of a component.
+The `DataplaneHandle` is registered to the `InstanceId` of a component.
 
 A handle for a component can be retrieved from the `DataplaneProvider`, of which there should be a single instance on each node.
 
