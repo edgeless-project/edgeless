@@ -15,9 +15,7 @@ struct FileStateProvider {
 
 impl FileStateProvider {
     fn new() -> Self {
-        if !std::path::Path::new("./function_state/").exists() {
-            std::fs::DirBuilder::new().create("./function_state/").unwrap();
-        }
+        std::fs::DirBuilder::new().recursive(true).create("./function_state/").unwrap();
         Self {
             base_path: std::path::PathBuf::from("./function_state/"),
         }
