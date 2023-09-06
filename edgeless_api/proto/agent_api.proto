@@ -3,136 +3,235 @@ import "google/protobuf/empty.proto";
 package agent_api;
 
 
+// Function instance identifier.
 message InstanceId {
+    // Unique identifier of the node that hosts this instance.
     string node_id = 1;
+    // Unique identifier of the function.
     string function_id = 2;
 }
 
+// Policy to access state.
 enum StatePolicy {
    TRANSIENT = 0;
    NODE_LOCAL = 1;
    GLOBAL = 2;
 }
 
+// State specification.
 message StateSpecification {
+    // Unique identifier of the state.
     string state_id = 1;
+    // Access policy.
     StatePolicy policy = 2;
 }
 
+// Message defining the function class specification.
 message FunctionClassSpecification {
+    // Identifier of the function class.
     string function_class_id  = 1;
+    // Type of the class.
     string function_class_type = 2;
+    // Version of the class.
     string function_class_version = 3;
+    // If present, it carries the function's code.
     optional bytes function_class_inline_code = 4;
-    // A function class is generic. However, to be able to interact with other functions beyond invacation+return value,
-    // we need to invoke callbacks whose targets can be dynamically set for each instance.
+    // Callbacks that are invoked by the functions (in addition to return).
     repeated string output_callback_declarations = 5;
 }
 
+// Message to request the creation a new function instance.
 message SpawnFunctionRequest {
+    // The function instance identifier.
     InstanceId instance_id = 1;
+    // The function class specification.
     FunctionClassSpecification code = 2;
+    // The definitions of output callbacks.
     map<string, InstanceId> output_callback_definitions = 3;
+    // Map between the callback declarations and function instances.
     InstanceId return_continuation = 4;
+    // The set of annotations associated to this function instance.
     map<string, string> annotations = 5;
+    // The state specification.
     StateSpecification state_specification = 6;
 }
 
+// Message to request the update of a function instance.
 message UpdateFunctionLinksRequest {
+    // The function instance identifie.
     InstanceId instance_id = 1;
+    // Map between the callback declarations and function instances.
     map<string, InstanceId> output_callback_definitions = 3;
+    // Unused?
     InstanceId return_continuation = 4;
 }
 
+// Message definining a workflow resource.
 message WorkflowResource {
+    // Name of the resource, local to the workflow specification,
     string alias = 1;
+    // Resource type.
     string resource_class_type = 2;
+    // Map between a possible action and the function aliases to call.
     map<string, string> output_callback_definitions = 3;
+    // Configuration of the resource, which depends on the resource type.
     map<string, string> configurations = 4;
 }
 
+// Message defining a function within a workflow.
 message WorkflowFunction {
+    // Name of this function within the workflow.
     string function_alias = 1;
+    // Specification of the function.
     FunctionClassSpecification function_class = 2;
+    // Map between a possible action and the function aliases to call.
     map<string, string> output_callback_definitions = 3;
+    // Unused?
     string return_continuation = 4;
+    // Annotations associated to this function.
     map<string, string> function_annotations = 5;
 }
 
+// Message defining a request to create a new workflow.
 message SpawnWorkflowRequest {
+    // Identifier of the workflow.
     WorkflowId workflow_id = 1;
+    // Chain of functions to be called. Cannot be empty.
     repeated WorkflowFunction workflow_functions = 2;
+    // List of resources required by the workflow, if any.
     repeated WorkflowResource workflow_resources = 3;
+    // Annotations associated to this workflow.
     map<string, string> workflow_annotations = 4;
 }
 
+// Function instance mapping.
 message WorkflowFunctionMapping {
+    // Name of the function within the workflow.
     string function_alias = 1;
+    // Function instances implementing this function.
     repeated InstanceId instances = 2;
 }
 
+// Status of a workflow instance.
 message WorkflowInstanceStatus {
+    // Workflow identifier.
     WorkflowId workflow_id = 1;
+    // List of function instance mappings.
     repeated WorkflowFunctionMapping functions = 2;
 }
 
+// Identifier of the workflow.
 message WorkflowId {
     string workflow_id = 1;
 }
 
+// List of workflow instances.
 message WorkflowInstanceList {
     repeated WorkflowInstanceStatus workflow_statuses = 1;
 }
 
+// Event types.
 enum EventType {
+    // Function invocation for which a return value is expected.
     CALL = 0;
+    // Function invocation for which no return is expected.
     CAST = 1;
+    // Return value of a function invocation, with data.
     CALL_RET = 2;
+    // Return value of a function invocation, without any data.
     CALL_NO_RET = 3;
+    // Error return type.
     ERR = 4;
 }
 
+// Data associated to an event.
 message EventData {
+    // Event type.
     EventType event_type = 1;
+    // Payload.
     string payload = 2;
 }
 
+// Event.
 message Event {
+    // The function instance that is expected to handle the event (callee).
     InstanceId target = 1;
+    // The function instance that generated the event (caller).
     InstanceId source = 2;
-    uint64 stream_id =3;
+    // Ongoing transaction identifier.
+    uint64 stream_id = 3;
+    // Event data.
     EventData msg = 4;
 }
 
+// Resource provider specification.
 message ResourceProviderSpecification {
+    // Unique identifier of the resource provider.
     string provider_id = 1;
+    // Type of the resource provided.
     string resource_class_type = 2;
+    // List of callbacks that can be invoked.
     repeated string output_callback_declarations = 3;
 }
 
+// Resource instance specification.
 message ResourceInstanceSpecification {
+    // Unique identifier of the resource provider.
     string provider_id = 1;
+    // Resource configuration (depends on the type).
     map<string, string> configuration = 2;
+    // Map between the callbacks and instances that will be called.
     map<string, InstanceId> output_callback_definitions = 3;
 }
 
+// API to manage the lifecycle of function instances (s07).
 service FunctionInstance {
+    // Start a new function instance.
+    // Input: request containing the description of the function to create.
+    // Output: the function instance identifier assigned
     rpc Start (SpawnFunctionRequest) returns (InstanceId);
+    // Stop a running function instance.
+    // Input: the identifier of the function instance to tear down.
+    // Output: none.
     rpc Stop (InstanceId) returns (google.protobuf.Empty );
+    // Updates a running function instance.
+    // Input: the new specification of the function instance.
+    // Output: none.
     rpc Update (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
 }
 
+// API to manage the lifecycle of workflow instances (s04).
 service WorkflowInstance {
+    // Start a new workflow.
+    // Input: request containing the description of the workflow to create.
+    // Output: the status of workflow instance newly created.
     rpc Start (SpawnWorkflowRequest) returns (WorkflowInstanceStatus);
+    // Stop an active workflow.
+    // Input: the identifier of the workflow to tear down.
+    // Output: none.
     rpc Stop (WorkflowId) returns (google.protobuf.Empty);
+    // List the active workflows or shows the status of a given active workflow.
+    // Input: the identifier of the active workflow or a special value indicating all workflows.
+    // Output: the list of status of the active workflow instances.
     rpc List (WorkflowId) returns (WorkflowInstanceList);
 }
 
+// API to handle events (s01).
 service FunctionInvocation {
+    // Handle an event.
+    // Input: event to be handled.
+    // Output: none.
     rpc Handle (Event) returns (google.protobuf.Empty); 
 }
 
+// API to handle the lifecycle of resources (s06).
 service ResourceConfiguration {
+    // Create a new resource.
+    // Input: specification of the resource to be created.
+    // Output: the identifier of the newly created resource.
     rpc Start (ResourceInstanceSpecification) returns (InstanceId);
+    // Terminate an existing resource.
+    // Input: the identifier of the resource to be terminated.
+    // Output: none.
     rpc Stop (InstanceId) returns (google.protobuf.Empty);
 }
