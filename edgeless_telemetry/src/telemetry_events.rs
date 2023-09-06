@@ -103,13 +103,13 @@ impl TelemetryProcessorInner {
         while let Some(val) = self.receiver.recv().await {
             match val {
                 TelemetryProcessorInput::TelemetryEvent(event, event_tags) => {
-                    self.handle_event(event, event_tags).await;
+                    self.handle(event, event_tags).await;
                 }
             }
         }
     }
 
-    async fn handle_event(&mut self, event: TelemetryEvent, event_tags: std::collections::BTreeMap<String, String>) {
+    async fn handle(&mut self, event: TelemetryEvent, event_tags: std::collections::BTreeMap<String, String>) {
         for processor in &mut self.processing_chain {
             let processing_result = processor.handle(&event, &event_tags);
             if processing_result == TelemetryProcessingResult::FINAL {

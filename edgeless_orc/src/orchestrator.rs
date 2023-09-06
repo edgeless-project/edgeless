@@ -61,7 +61,7 @@ impl Orchestrator {
             match req {
                 OrchestratorRequest::SPAWN(spawn_req, reply_channel) => {
                     log::debug!("Orchestrator Spawn {:?}", spawn_req);
-                    let res = match fn_client.start_function_instance(spawn_req).await {
+                    let res = match fn_client.start(spawn_req).await {
                         Ok(f_id) => Ok(f_id),
                         Err(err) => {
                             log::error!("Unhandled: {}", err);
@@ -74,7 +74,7 @@ impl Orchestrator {
                 }
                 OrchestratorRequest::STOP(stop_function_id) => {
                     log::debug!("Orchestrator Stop {:?}", stop_function_id);
-                    match fn_client.stop_function_instance(stop_function_id).await {
+                    match fn_client.stop(stop_function_id).await {
                         Ok(_) => {}
                         Err(err) => {
                             log::error!("Unhandled: {}", err);
@@ -83,7 +83,7 @@ impl Orchestrator {
                 }
                 OrchestratorRequest::UPDATE(update) => {
                     log::debug!("Orchestrator Update {:?}", update);
-                    match fn_client.update_function_instance_links(update).await {
+                    match fn_client.update(update).await {
                         Ok(_) => {}
                         Err(err) => {
                             log::error!("Unhandled: {}", err);
@@ -103,7 +103,7 @@ impl Orchestrator {
 
 #[async_trait::async_trait]
 impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFunctionInstanceClient {
-    async fn start_function_instance(
+    async fn start(
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::function_instance::FunctionId> {
@@ -118,14 +118,14 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFuncti
         }
     }
 
-    async fn stop_function_instance(&mut self, id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
+    async fn stop(&mut self, id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
         match self.sender.send(OrchestratorRequest::STOP(id)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Orchestrator Channel Error")),
         }
     }
 
-    async fn update_function_instance_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+    async fn update(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
         match self.sender.send(OrchestratorRequest::UPDATE(update)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Orchestrator Channel Error")),

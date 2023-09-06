@@ -64,12 +64,12 @@ impl ResourceConfigurationClient {
 
 #[async_trait::async_trait]
 impl crate::resource_configuration::ResourceConfigurationAPI for ResourceConfigurationClient {
-    async fn start_resource_instance(
+    async fn start(
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<crate::function_instance::FunctionId> {
         let encoded = ResourceConfigurationConverters::serialize_crate_instance_specification(&instance_specification);
-        match self.client.start_resource_instance(encoded).await {
+        match self.client.start(encoded).await {
             Ok(res) => {
                 let decoded_id = crate::grpc_impl::function_instance::FunctonInstanceConverters::parse_function_id(&res.into_inner())?;
                 Ok(decoded_id)
@@ -78,9 +78,9 @@ impl crate::resource_configuration::ResourceConfigurationAPI for ResourceConfigu
         }
     }
 
-    async fn stop_resource_instance(&mut self, resource_id: crate::function_instance::FunctionId) -> anyhow::Result<()> {
+    async fn stop(&mut self, resource_id: crate::function_instance::FunctionId) -> anyhow::Result<()> {
         let encoded_id = crate::grpc_impl::function_instance::FunctonInstanceConverters::serialize_function_id(&resource_id);
-        match self.client.stop_resource_instance(encoded_id).await {
+        match self.client.stop(encoded_id).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!("Resource Configuration Request Failed: {}", err)),
         }
@@ -93,7 +93,7 @@ pub struct ResourceConfigurationServerHandler {
 
 #[async_trait::async_trait]
 impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration for ResourceConfigurationServerHandler {
-    async fn start_resource_instance(
+    async fn start(
         &self,
         request: tonic::Request<crate::grpc_impl::api::ResourceInstanceSpecification>,
     ) -> tonic::Result<tonic::Response<crate::grpc_impl::api::FunctionId>> {
@@ -104,7 +104,7 @@ impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
                 return Err(tonic::Status::invalid_argument("Invalid ResourceInstance Specification"));
             }
         };
-        let res = match self.root_api.lock().await.start_resource_instance(parsed_spec).await {
+        let res = match self.root_api.lock().await.start(parsed_spec).await {
             Ok(val) => val,
             Err(_) => {
                 return Err(tonic::Status::internal("Start ResourceInstance Failed"));
@@ -115,7 +115,7 @@ impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
         ))
     }
 
-    async fn stop_resource_instance(&self, request: tonic::Request<crate::grpc_impl::api::FunctionId>) -> tonic::Result<tonic::Response<()>> {
+    async fn stop(&self, request: tonic::Request<crate::grpc_impl::api::FunctionId>) -> tonic::Result<tonic::Response<()>> {
         let inner = request.into_inner();
         let parsed_id = match crate::grpc_impl::function_instance::FunctonInstanceConverters::parse_function_id(&inner) {
             Ok(val) => val,
@@ -123,7 +123,7 @@ impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
                 return Err(tonic::Status::invalid_argument("Invalid ResourceId"));
             }
         };
-        let _res = match self.root_api.lock().await.stop_resource_instance(parsed_id).await {
+        let _res = match self.root_api.lock().await.stop(parsed_id).await {
             Ok(val) => val,
             Err(_) => {
                 return Err(tonic::Status::internal("Stop ResourceInstance Failed"));

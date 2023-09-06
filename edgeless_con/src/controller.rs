@@ -96,7 +96,7 @@ impl Controller {
                         };
 
                         let f_id = fn_client
-                            .start_function_instance(edgeless_api::function_instance::SpawnFunctionRequest {
+                            .start(edgeless_api::function_instance::SpawnFunctionRequest {
                                 function_id: None,
                                 code: fun.function_class_specification,
                                 annotations: fun.function_annotations,
@@ -125,7 +125,7 @@ impl Controller {
                         {
                             let wf_id = handle
                                 .config_api
-                                .start_resource_instance(edgeless_api::resource_configuration::ResourceInstanceSpecification {
+                                .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
                                     provider_id: provider_id.clone(),
                                     output_callback_definitions: resource
                                         .output_callback_definitions
@@ -157,7 +157,7 @@ impl Controller {
                             {
                                 for instance in &mapping.instances {
                                     let res = fn_client
-                                        .update_function_instance_links(edgeless_api::function_instance::UpdateFunctionLinksRequest {
+                                        .update(edgeless_api::function_instance::UpdateFunctionLinksRequest {
                                             function_id: Some(instance.clone()),
                                             output_callback_definitions: config
                                                 .output_callback_definitions
@@ -198,7 +198,7 @@ impl Controller {
                     if let Some(workflow_functions) = active_workflows.remove(&workflow_id.workflow_id.to_string()) {
                         for mapping in workflow_functions {
                             for f_id in mapping.instances {
-                                match fn_client.stop_function_instance(f_id).await {
+                                match fn_client.stop(f_id).await {
                                     Ok(_) => {}
                                     Err(err) => {
                                         log::error!("Unhandled: {}", err);
@@ -263,7 +263,7 @@ pub struct ControllerWorkflowInstanceClient {
 
 #[async_trait::async_trait]
 impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflowInstanceClient {
-    async fn start_workflow_instance(
+    async fn start(
         &mut self,
         request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
     ) -> anyhow::Result<edgeless_api::workflow_instance::WorkflowInstance> {
@@ -279,13 +279,13 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
             Err(_) => Err(anyhow::anyhow!("Controller Channel Error")),
         }
     }
-    async fn stop_workflow_instance(&mut self, id: edgeless_api::workflow_instance::WorkflowId) -> anyhow::Result<()> {
+    async fn stop(&mut self, id: edgeless_api::workflow_instance::WorkflowId) -> anyhow::Result<()> {
         match self.sender.send(ControllerRequest::STOP(id)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Controller Channel Error")),
         }
     }
-    async fn list_workflow_instances(&mut self, id: edgeless_api::workflow_instance::WorkflowId) -> anyhow::Result<Vec<WorkflowInstance>> {
+    async fn list(&mut self, id: edgeless_api::workflow_instance::WorkflowId) -> anyhow::Result<Vec<WorkflowInstance>> {
         let (reply_sender, reply_receiver) =
             tokio::sync::oneshot::channel::<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>();
         match self.sender.send(ControllerRequest::LIST(id.clone(), reply_sender)).await {
