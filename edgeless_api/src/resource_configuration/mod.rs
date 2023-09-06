@@ -12,11 +12,8 @@ pub struct ResourceInstanceSpecification {
 
 #[async_trait::async_trait]
 pub trait ResourceConfigurationAPI: Sync + Send {
-    async fn start_resource_instance(
-        &mut self,
-        instance_specification: ResourceInstanceSpecification,
-    ) -> anyhow::Result<crate::function_instance::FunctionId>;
-    async fn stop_resource_instance(&mut self, resource_id: crate::function_instance::FunctionId) -> anyhow::Result<()>;
+    async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<crate::function_instance::FunctionId>;
+    async fn stop(&mut self, resource_id: crate::function_instance::FunctionId) -> anyhow::Result<()>;
 }
 
 pub struct MultiResouceConfigurationAPI {
@@ -35,13 +32,10 @@ impl MultiResouceConfigurationAPI {
 
 #[async_trait::async_trait]
 impl ResourceConfigurationAPI for MultiResouceConfigurationAPI {
-    async fn start_resource_instance(
-        &mut self,
-        instance_specification: ResourceInstanceSpecification,
-    ) -> anyhow::Result<crate::function_instance::FunctionId> {
+    async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<crate::function_instance::FunctionId> {
         if let Some(resource) = self.resource_providers.get_mut(&instance_specification.provider_id) {
             let provider = instance_specification.provider_id.clone();
-            let id = resource.start_resource_instance(instance_specification).await?;
+            let id = resource.start(instance_specification).await?;
             self.resouce_instances.insert(id.clone(), provider.clone());
             Ok(id)
         } else {
@@ -49,10 +43,10 @@ impl ResourceConfigurationAPI for MultiResouceConfigurationAPI {
         }
     }
 
-    async fn stop_resource_instance(&mut self, resource_id: crate::function_instance::FunctionId) -> anyhow::Result<()> {
+    async fn stop(&mut self, resource_id: crate::function_instance::FunctionId) -> anyhow::Result<()> {
         if let Some(instance_id) = self.resouce_instances.get(&resource_id) {
             if let Some(provider) = self.resource_providers.get_mut(instance_id) {
-                return provider.stop_resource_instance(resource_id).await;
+                return provider.stop(resource_id).await;
             }
         }
         Err(anyhow::anyhow!("Could not delete. (Missing?)"))

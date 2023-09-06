@@ -71,9 +71,9 @@ pub struct SpawnWorkflowRequest {
 
 #[async_trait::async_trait]
 pub trait WorkflowInstanceAPI: WorkflowInstanceAPIClone + Send + Sync {
-    async fn start_workflow_instance(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<WorkflowInstance>;
-    async fn stop_workflow_instance(&mut self, id: WorkflowId) -> anyhow::Result<()>;
-    async fn list_workflow_instances(&mut self, id: WorkflowId) -> anyhow::Result<Vec<WorkflowInstance>>;
+    async fn start(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<WorkflowInstance>;
+    async fn stop(&mut self, id: WorkflowId) -> anyhow::Result<()>;
+    async fn list(&mut self, id: WorkflowId) -> anyhow::Result<Vec<WorkflowInstance>>;
 }
 
 // https://stackoverflow.com/a/30353928

@@ -2,6 +2,7 @@ syntax = "proto3";
 import "google/protobuf/empty.proto";
 package agent_api;
 
+
 message FunctionId {
     string node_id = 1;
     string function_id = 2;
@@ -116,22 +117,22 @@ message ResourceInstanceSpecification {
 }
 
 service FunctionInstance {
-    rpc StartFunctionInstance (SpawnFunctionRequest) returns (FunctionId);
-    rpc StopFunctionInstance (FunctionId) returns (google.protobuf.Empty );
-    rpc UpdateFunctionInstanceLinks (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
+    rpc Start (SpawnFunctionRequest) returns (FunctionId);
+    rpc Stop (FunctionId) returns (google.protobuf.Empty );
+    rpc Update (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
 }
 
 service WorkflowInstance {
-    rpc StartWorkflowInstance (SpawnWorkflowRequest) returns (WorkflowInstanceStatus);
-    rpc StopWorkflowInstance (WorkflowId) returns (google.protobuf.Empty);
-    rpc ListWorkflowInstances (WorkflowId) returns (WorkflowInstanceList);
+    rpc Start (SpawnWorkflowRequest) returns (WorkflowInstanceStatus);
+    rpc Stop (WorkflowId) returns (google.protobuf.Empty);
+    rpc List (WorkflowId) returns (WorkflowInstanceList);
 }
 
 service FunctionInvocation {
-    rpc HandleEvent (Event) returns (google.protobuf.Empty); 
+    rpc Handle (Event) returns (google.protobuf.Empty); 
 }
 
 service ResourceConfiguration {
-    rpc StartResourceInstance (ResourceInstanceSpecification) returns (FunctionId);
-    rpc StopResourceInstance (FunctionId) returns (google.protobuf.Empty);
+    rpc Start (ResourceInstanceSpecification) returns (FunctionId);
+    rpc Stop (FunctionId) returns (google.protobuf.Empty);
 }
