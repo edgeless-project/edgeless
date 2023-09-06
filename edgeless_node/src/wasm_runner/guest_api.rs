@@ -27,13 +27,13 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
         }
     }
 
-    async fn cast(&mut self, target: wit_binding::Fid, msg: String) -> wasmtime::Result<()> {
+    async fn cast(&mut self, target: wit_binding::InstanceId, msg: String) -> wasmtime::Result<()> {
         let parsed_target = parse_wit_function_id(&target)?;
         self.data_plane.send(parsed_target, msg).await;
         Ok(())
     }
 
-    async fn call(&mut self, target: wit_binding::Fid, msg: String) -> wasmtime::Result<wit_binding::CallRet> {
+    async fn call(&mut self, target: wit_binding::InstanceId, msg: String) -> wasmtime::Result<wit_binding::CallRet> {
         let parsed_target = parse_wit_function_id(&target)?;
         let res = self.data_plane.call(parsed_target, msg).await;
         Ok(match res {
@@ -66,14 +66,14 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
         Ok(())
     }
 
-    async fn slf(&mut self) -> wasmtime::Result<wit_binding::Fid> {
-        Ok(wit_binding::Fid {
+    async fn slf(&mut self) -> wasmtime::Result<wit_binding::InstanceId> {
+        Ok(wit_binding::InstanceId {
             node: self.instance_id.node_id.to_string(),
             function: self.instance_id.function_id.to_string(),
         })
     }
 
-    async fn delayed_cast(&mut self, delay: u64, target: wit_binding::Fid, payload: String) -> wasmtime::Result<()> {
+    async fn delayed_cast(&mut self, delay: u64, target: wit_binding::InstanceId, payload: String) -> wasmtime::Result<()> {
         let mut cloned_plane = self.data_plane.clone();
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
@@ -93,9 +93,9 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
     }
 }
 
-fn parse_wit_function_id(fid: &wit_binding::Fid) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
+fn parse_wit_function_id(instance_id: &wit_binding::InstanceId) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
     Ok(edgeless_api::function_instance::InstanceId {
-        node_id: uuid::Uuid::parse_str(&fid.node)?,
-        function_id: uuid::Uuid::parse_str(&fid.function)?,
+        node_id: uuid::Uuid::parse_str(&instance_id.node)?,
+        function_id: uuid::Uuid::parse_str(&instance_id.function)?,
     })
 }

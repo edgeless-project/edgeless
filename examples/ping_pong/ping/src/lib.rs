@@ -12,25 +12,24 @@ struct PingerState {
 static STATE: std::sync::OnceLock<std::sync::Mutex<PingerState>> = std::sync::OnceLock::new();
 
 impl Edgefunction for PingerFun {
-    fn handle_cast(_src: Fid, encoded_message: String) {
+    fn handle_cast(_src: InstanceId, encoded_message: String) {
         log::info!("Pinger: 'Cast' called, MSG: {}", encoded_message);
         if encoded_message == "wakeup" {
-
             let id = STATE.get().unwrap().lock().unwrap().count;
-            
+
             STATE.get().unwrap().lock().unwrap().count += 1;
             sync(&serde_json::to_string(STATE.get().unwrap().lock().unwrap().deref()).unwrap());
-            
+
             let res = call_alias("ponger", &format!("PING-{}", id));
             if let CallRet::Reply(_msg) = res {
                 log::info!("Got Reply");
             }
-            
+
             delayed_cast(1000, &slf(), "wakeup");
         }
     }
 
-    fn handle_call(_src: Fid, encoded_message: String) -> CallRet {
+    fn handle_call(_src: InstanceId, encoded_message: String) -> CallRet {
         log::info!("Pinger: 'Call' called, MSG: {}", encoded_message);
         CallRet::Noreply
     }
@@ -44,7 +43,7 @@ impl Edgefunction for PingerFun {
         } else {
             STATE.set(std::sync::Mutex::new(PingerState { count: 0 })).unwrap();
         }
-        
+
         cast(&slf(), "wakeup");
     }
 

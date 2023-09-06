@@ -125,7 +125,10 @@ impl FunctonInstanceConverters {
 
     pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFunctionRequest) -> crate::grpc_impl::api::SpawnFunctionRequest {
         crate::grpc_impl::api::SpawnFunctionRequest {
-            instance_id: req.instance_id.as_ref().and_then(|fid| Some(Self::serialize_instance_id(fid))),
+            instance_id: req
+                .instance_id
+                .as_ref()
+                .and_then(|instance_id| Some(Self::serialize_instance_id(instance_id))),
             code: Some(Self::serialize_function_class_specification(&req.code)),
             output_callback_definitions: req
                 .output_callback_definitions
@@ -142,7 +145,10 @@ impl FunctonInstanceConverters {
         crate_update: &crate::function_instance::UpdateFunctionLinksRequest,
     ) -> crate::grpc_impl::api::UpdateFunctionLinksRequest {
         crate::grpc_impl::api::UpdateFunctionLinksRequest {
-            instance_id: crate_update.instance_id.as_ref().and_then(|fid| Some(Self::serialize_instance_id(fid))),
+            instance_id: crate_update
+                .instance_id
+                .as_ref()
+                .and_then(|instance_id| Some(Self::serialize_instance_id(instance_id))),
             output_callback_definitions: crate_update
                 .output_callback_definitions
                 .iter()
@@ -237,7 +243,7 @@ impl crate::grpc_impl::api::function_instance_server::FunctionInstance for Funct
         };
         let res = self.root_api.lock().await.start(parsed_request).await;
         match res {
-            Ok(fid) => Ok(tonic::Response::new(FunctonInstanceConverters::serialize_instance_id(&fid))),
+            Ok(instance_id) => Ok(tonic::Response::new(FunctonInstanceConverters::serialize_instance_id(&instance_id))),
             Err(_) => Err(tonic::Status::internal("Server Error")),
         }
     }

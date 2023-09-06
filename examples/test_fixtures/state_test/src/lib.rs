@@ -4,20 +4,19 @@ use log;
 struct StateTest;
 
 impl Edgefunction for StateTest {
-    fn handle_cast(src: Fid, encoded_message: String) {
+    fn handle_cast(src: InstanceId, encoded_message: String) {
         match encoded_message.as_str() {
             "test_cast_output" => {
                 sync("new_state");
-            },
+            }
             _ => {
                 log::info!("Unprocessed Message");
             }
         }
     }
 
-    fn handle_call(src: Fid, encoded_message: String) -> CallRet {
+    fn handle_call(src: InstanceId, encoded_message: String) -> CallRet {
         CallRet::Noreply
-
     }
 
     fn handle_init(payload: String, serialized_state: Option<String>) {
@@ -29,9 +28,7 @@ impl Edgefunction for StateTest {
         }
     }
 
-    fn handle_stop() {
-
-    }
+    fn handle_stop() {}
 }
 
 edgeless_function::export!(StateTest);
