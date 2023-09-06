@@ -75,7 +75,7 @@ impl WorkflowInstanceConverters {
                 .instances
                 .iter()
                 .filter_map(
-                    |fun| match crate::grpc_impl::function_instance::FunctonInstanceConverters::parse_function_id(fun) {
+                    |fun| match crate::grpc_impl::function_instance::FunctonInstanceConverters::parse_instance_id(fun) {
                         Ok(val) => Some(val),
                         Err(_) => None,
                     },
@@ -192,7 +192,7 @@ impl WorkflowInstanceConverters {
             instances: crate_mapping
                 .instances
                 .iter()
-                .map(|instance| crate::grpc_impl::function_instance::FunctonInstanceConverters::serialize_function_id(instance))
+                .map(|instance| crate::grpc_impl::function_instance::FunctonInstanceConverters::serialize_instance_id(instance))
                 .collect(),
         }
     }

@@ -8,7 +8,7 @@ pub mod wit_binding {
 /// State of a function instance that is accessible from the function itself (via bindings).
 /// This struct allows the function to interact with other entities.
 pub struct GuestAPI {
-    pub function_id: edgeless_api::function_instance::FunctionId,
+    pub instance_id: edgeless_api::function_instance::InstanceId,
     pub data_plane: edgeless_dataplane::handle::DataplaneHandle,
     pub callback_table: std::sync::Arc<tokio::sync::Mutex<super::function_instance::FunctionInstanceCallbackTable>>,
     pub state_handle: Box<dyn crate::state_management::StateHandleAPI>,
@@ -68,8 +68,8 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
 
     async fn slf(&mut self) -> wasmtime::Result<wit_binding::Fid> {
         Ok(wit_binding::Fid {
-            node: self.function_id.node_id.to_string(),
-            function: self.function_id.function_id.to_string(),
+            node: self.instance_id.node_id.to_string(),
+            function: self.instance_id.function_id.to_string(),
         })
     }
 
@@ -93,8 +93,8 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
     }
 }
 
-fn parse_wit_function_id(fid: &wit_binding::Fid) -> anyhow::Result<edgeless_api::function_instance::FunctionId> {
-    Ok(edgeless_api::function_instance::FunctionId {
+fn parse_wit_function_id(fid: &wit_binding::Fid) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
+    Ok(edgeless_api::function_instance::InstanceId {
         node_id: uuid::Uuid::parse_str(&fid.node)?,
         function_id: uuid::Uuid::parse_str(&fid.function)?,
     })

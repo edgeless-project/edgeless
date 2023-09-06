@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::function_instance::FunctionId;
+use crate::function_instance::InstanceId;
 
 const WORKFLOW_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
 
@@ -35,7 +35,7 @@ impl WorkflowId {
 #[derive(Debug, Clone)]
 pub struct WorkflowFunctionMapping {
     pub function_alias: String,
-    pub instances: Vec<FunctionId>,
+    pub instances: Vec<InstanceId>,
 }
 
 #[derive(Debug, Clone)]

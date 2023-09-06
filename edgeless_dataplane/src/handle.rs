@@ -4,11 +4,11 @@ use crate::core::*;
 use crate::node_local::*;
 use crate::remote_node::*;
 
-/// The main handle representing an element (identified by a `FunctionId`) across the dataplane.
+/// The main handle representing an element (identified by a `InstanceId`) across the dataplane.
 /// The dataplane might require multiple links which are processed in a chain-like fashion.
 #[derive(Clone)]
 pub struct DataplaneHandle {
-    slf: edgeless_api::function_instance::FunctionId,
+    slf: edgeless_api::function_instance::InstanceId,
     receiver: std::sync::Arc<tokio::sync::Mutex<futures::channel::mpsc::UnboundedReceiver<DataplaneEvent>>>,
     output_chain: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn DataPlaneLink>>>>,
     receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
@@ -17,7 +17,7 @@ pub struct DataplaneHandle {
 
 impl DataplaneHandle {
     async fn new(
-        receiver_id: edgeless_api::function_instance::FunctionId,
+        receiver_id: edgeless_api::function_instance::InstanceId,
         output_chain: Vec<Box<dyn DataPlaneLink>>,
         receiver: futures::channel::mpsc::UnboundedReceiver<DataplaneEvent>,
     ) -> Self {
@@ -103,14 +103,14 @@ impl DataplaneHandle {
     }
 
     /// Send a `cast` event.
-    pub async fn send(&mut self, target: edgeless_api::function_instance::FunctionId, msg: String) {
+    pub async fn send(&mut self, target: edgeless_api::function_instance::InstanceId, msg: String) {
         self.send_inner(target, Message::Cast(msg), 0).await;
     }
 
     // Send a `call` event and wait for the return event.
     // Internally, this sets up a receiver override to handle the message before it would be sent to the `receive_next` function.
-    pub async fn call(&mut self, target: edgeless_api::function_instance::FunctionId, msg: String) -> CallRet {
-        let (send, rec) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::FunctionId, Message)>();
+    pub async fn call(&mut self, target: edgeless_api::function_instance::InstanceId, msg: String) -> CallRet {
+        let (send, rec) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
         let channel_id = self.next_id;
         self.next_id += 1;
         self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, Some(send));
@@ -126,7 +126,7 @@ impl DataplaneHandle {
     }
 
     // Reply to a `call` event using the `channel_id` used to send the request.
-    pub async fn reply(&mut self, target: edgeless_api::function_instance::FunctionId, channel_id: u64, msg: CallRet) {
+    pub async fn reply(&mut self, target: edgeless_api::function_instance::InstanceId, channel_id: u64, msg: CallRet) {
         self.send_inner(
             target,
             match msg {
@@ -139,7 +139,7 @@ impl DataplaneHandle {
         .await;
     }
 
-    async fn send_inner(&mut self, target: edgeless_api::function_instance::FunctionId, msg: Message, channel_id: u64) {
+    async fn send_inner(&mut self, target: edgeless_api::function_instance::InstanceId, msg: Message, channel_id: u64) {
         let mut lck = self.output_chain.lock().await;
         for link in &mut lck.iter_mut() {
             match link.handle_send(&target, msg.clone(), &self.slf, channel_id).await {
@@ -155,7 +155,7 @@ impl DataplaneHandle {
 
 struct TemporaryReceivers {
     temporary_receivers:
-        std::collections::HashMap<u64, Option<futures::channel::oneshot::Sender<(edgeless_api::function_instance::FunctionId, Message)>>>,
+        std::collections::HashMap<u64, Option<futures::channel::oneshot::Sender<(edgeless_api::function_instance::InstanceId, Message)>>>,
 }
 
 #[derive(Clone)]
@@ -187,7 +187,7 @@ impl DataplaneProvider {
         }
     }
 
-    pub async fn get_handle_for(&mut self, target: edgeless_api::function_instance::FunctionId) -> DataplaneHandle {
+    pub async fn get_handle_for(&mut self, target: edgeless_api::function_instance::InstanceId) -> DataplaneHandle {
         let (sender, receiver) = futures::channel::mpsc::unbounded::<DataplaneEvent>();
         let output_chain = vec![
             self.local_provider.lock().await.new_link(target.clone(), sender.clone()).await,
@@ -213,8 +213,8 @@ mod test {
     #[tokio::test]
     async fn local_normal_path() {
         let node_id = uuid::Uuid::new_v4();
-        let fid_1 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
-        let fid_2 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+        let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
+        let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
 
         let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7096".to_string(), vec![]).await;
 
@@ -233,8 +233,8 @@ mod test {
     #[tokio::test]
     async fn local_call_with_return() {
         let node_id = uuid::Uuid::new_v4();
-        let fid_1 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
-        let fid_2 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
+        let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
+        let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
 
         let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7097".to_string(), vec![]).await;
 
@@ -259,8 +259,8 @@ mod test {
     async fn grpc_impl_e2e() {
         let node_id = uuid::Uuid::new_v4();
         let node_id_2 = uuid::Uuid::new_v4();
-        let fid_1 = edgeless_api::function_instance::FunctionId::new(node_id.clone());
-        let fid_2 = edgeless_api::function_instance::FunctionId::new(node_id_2.clone());
+        let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
+        let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id_2.clone());
 
         let provider1_f = tokio::spawn(DataplaneProvider::new(
             node_id.clone(),

@@ -94,7 +94,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
 
 pub async fn ingress_task(
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
-    ingress_id: edgeless_api::function_instance::FunctionId,
+    ingress_id: edgeless_api::function_instance::InstanceId,
     ingress_url: String,
 ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI> {
     let mut provider = dataplane_provider;
@@ -157,13 +157,13 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for IngressR
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::function_instance::FunctionId> {
+    ) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
         let mut lck = self.configuration_state.lock().await;
         if let (Some(host), Some(methods)) = (
             instance_specification.configuration.get("host"),
             instance_specification.configuration.get("methods"),
         ) {
-            let resource_id = edgeless_api::function_instance::FunctionId::new(self.own_node_id.clone());
+            let resource_id = edgeless_api::function_instance::InstanceId::new(self.own_node_id.clone());
             let target = match instance_specification.output_callback_definitions.get("new_request") {
                 Some(val) => val.clone(),
                 None => {
@@ -191,7 +191,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for IngressR
             Err(anyhow::anyhow!("Missing Resource Configuration"))
         }
     }
-    async fn stop(&mut self, resource_id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
+    async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
         let mut lck = self.configuration_state.lock().await;
         lck.interests.retain(|item| item.resource_id != resource_id);
         Ok(())
@@ -199,8 +199,8 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for IngressR
 }
 
 struct HTTPIngressInterest {
-    resource_id: edgeless_api::function_instance::FunctionId,
+    resource_id: edgeless_api::function_instance::InstanceId,
     host: String,
     allow: std::collections::HashSet<edgeless_http::EdgelessHTTPMethod>,
-    target: edgeless_api::function_instance::FunctionId,
+    target: edgeless_api::function_instance::InstanceId,
 }

@@ -4,7 +4,7 @@ use crate::runner_api;
 
 enum AgentRequest {
     SPAWN(edgeless_api::function_instance::SpawnFunctionRequest),
-    STOP(edgeless_api::function_instance::FunctionId),
+    STOP(edgeless_api::function_instance::InstanceId),
     UPDATE(edgeless_api::function_instance::UpdateFunctionLinksRequest),
 }
 
@@ -90,13 +90,13 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
     async fn start(
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
-    ) -> anyhow::Result<edgeless_api::function_instance::FunctionId> {
+    ) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
         let mut request = request;
-        let f_id = match request.function_id.clone() {
+        let f_id = match request.instance_id.clone() {
             Some(id) => id,
             None => {
-                let new_id = edgeless_api::function_instance::FunctionId::new(self.node_id);
-                request.function_id = Some(new_id.clone());
+                let new_id = edgeless_api::function_instance::InstanceId::new(self.node_id);
+                request.instance_id = Some(new_id.clone());
                 new_id
             }
         };
@@ -105,7 +105,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
             Err(_) => Err(anyhow::anyhow!("Agent Channel Error")),
         }
     }
-    async fn stop(&mut self, id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
+    async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
         match self.sender.send(AgentRequest::STOP(id)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Agent Channel Error")),

@@ -1,9 +1,9 @@
 use edgeless_dataplane::core::Message;
 
 pub struct EgressResourceProvider {
-    resource_provider_id: edgeless_api::function_instance::FunctionId,
+    resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
-    egress_instances: std::collections::HashMap<edgeless_api::function_instance::FunctionId, EgressResource>,
+    egress_instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, EgressResource>,
 }
 
 pub struct EgressResource {
@@ -115,12 +115,12 @@ impl EgressResource {
 impl EgressResourceProvider {
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
-        resource_provider_id: edgeless_api::function_instance::FunctionId,
+        resource_provider_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {
             resource_provider_id,
             dataplane_provider,
-            egress_instances: std::collections::HashMap::<edgeless_api::function_instance::FunctionId, EgressResource>::new(),
+            egress_instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, EgressResource>::new(),
         }
     }
 }
@@ -130,8 +130,8 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for EgressRe
     async fn start(
         &mut self,
         _instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::function_instance::FunctionId> {
-        let new_id = edgeless_api::function_instance::FunctionId::new(self.resource_provider_id.node_id);
+    ) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
+        let new_id = edgeless_api::function_instance::InstanceId::new(self.resource_provider_id.node_id);
         let dataplane_handle = self.dataplane_provider.get_handle_for(new_id.clone()).await;
 
         self.egress_instances.insert(new_id.clone(), EgressResource::new(dataplane_handle).await);
@@ -139,7 +139,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for EgressRe
         Ok(new_id)
     }
 
-    async fn stop(&mut self, resource_id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
+    async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
         self.egress_instances.remove(&resource_id);
         Ok(())
     }
