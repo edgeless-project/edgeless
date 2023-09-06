@@ -6,9 +6,9 @@ pub use edgeless_api::invocation::LinkProcessingResult;
 pub trait DataPlaneLink: Send + Sync {
     async fn handle_send(
         &mut self,
-        target: &edgeless_api::function_instance::FunctionId,
+        target: &edgeless_api::function_instance::InstanceId,
         msg: Message,
-        src: &edgeless_api::function_instance::FunctionId,
+        src: &edgeless_api::function_instance::InstanceId,
         channel_id: u64,
     ) -> LinkProcessingResult;
 }
@@ -31,7 +31,7 @@ pub enum Message {
 
 #[derive(Clone, Debug)]
 pub struct DataplaneEvent {
-    pub source_id: edgeless_api::function_instance::FunctionId,
+    pub source_id: edgeless_api::function_instance::InstanceId,
     pub channel_id: u64,
     pub message: Message,
 }

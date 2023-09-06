@@ -77,7 +77,7 @@ impl Controller {
                     let mut f_ids = std::collections::HashMap::<String, edgeless_api::workflow_instance::WorkflowFunctionMapping>::new();
                     let mut to_patch = Vec::<String>::new();
                     for fun in spawn_workflow_request.workflow_functions.clone() {
-                        let outputs: std::collections::HashMap<String, edgeless_api::function_instance::FunctionId> = fun
+                        let outputs: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> = fun
                             .output_callback_definitions
                             .iter()
                             .filter_map(|(output_id, output_alias)| match f_ids.get(output_alias) {
@@ -97,11 +97,11 @@ impl Controller {
 
                         let f_id = fn_client
                             .start(edgeless_api::function_instance::SpawnFunctionRequest {
-                                function_id: None,
+                                instance_id: None,
                                 code: fun.function_class_specification,
                                 annotations: fun.function_annotations,
                                 output_callback_definitions: outputs,
-                                return_continuation: edgeless_api::function_instance::FunctionId::new(uuid::Uuid::new_v4()),
+                                return_continuation: edgeless_api::function_instance::InstanceId::new(uuid::Uuid::new_v4()),
                                 state_specification: edgeless_api::function_instance::StateSpecification {
                                     state_id: state_id,
                                     state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
@@ -158,7 +158,7 @@ impl Controller {
                                 for instance in &mapping.instances {
                                     let res = fn_client
                                         .update(edgeless_api::function_instance::UpdateFunctionLinksRequest {
-                                            function_id: Some(instance.clone()),
+                                            instance_id: Some(instance.clone()),
                                             output_callback_definitions: config
                                                 .output_callback_definitions
                                                 .iter()
@@ -167,7 +167,7 @@ impl Controller {
                                                     None => None,
                                                 })
                                                 .collect(),
-                                            return_continuation: edgeless_api::function_instance::FunctionId::new(uuid::Uuid::new_v4()),
+                                            return_continuation: edgeless_api::function_instance::InstanceId::new(uuid::Uuid::new_v4()),
                                         })
                                         .await;
                                     match res {

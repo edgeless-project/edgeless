@@ -13,7 +13,7 @@ pub struct FunctionInstance {
 
 /// State used within the function-instance task. This manages the WASM VM.
 struct FunctionInstanceInner {
-    function_id: edgeless_api::function_instance::FunctionId,
+    instance_id: edgeless_api::function_instance::InstanceId,
     store: wasmtime::Store<super::guest_api::GuestAPI>,
     binding: super::guest_api::wit_binding::Edgefunction,
     data_plane: edgeless_dataplane::handle::DataplaneHandle,
@@ -24,7 +24,7 @@ struct FunctionInstanceInner {
 /// Struct representing the updatable callbacks/aliases of a function instance.
 /// Shared between instance api and guest api.
 pub struct FunctionInstanceCallbackTable {
-    pub alias_map: std::collections::HashMap<String, edgeless_api::function_instance::FunctionId>,
+    pub alias_map: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId>,
 }
 
 impl FunctionInstance {
@@ -40,10 +40,10 @@ impl FunctionInstance {
         let callback_table = std::sync::Arc::new(tokio::sync::Mutex::new(FunctionInstanceCallbackTable {
             alias_map: spawn_req.output_callback_definitions.clone(),
         }));
-        let function_id = match spawn_req.function_id.clone() {
+        let instance_id = match spawn_req.instance_id.clone() {
             Some(id) => id,
             None => {
-                return Err(anyhow::anyhow!("No FunctionId!"));
+                return Err(anyhow::anyhow!("No InstanceId!"));
             }
         };
 
@@ -53,7 +53,7 @@ impl FunctionInstance {
         let task = tokio::spawn(async move {
             let receiver = stop_receiver;
             if let Ok(mut f) = FunctionInstanceInner::new(
-                function_id.clone(),
+                instance_id.clone(),
                 &spawn_req.code.function_class_inlude_code,
                 cloned_callbacks,
                 data_plane,
@@ -65,7 +65,7 @@ impl FunctionInstance {
             {
                 f.run(receiver).await;
             } else {
-                log::info!("Function Spawn Error {:?}", function_id);
+                log::info!("Function Spawn Error {:?}", instance_id);
             }
         });
 
@@ -92,7 +92,7 @@ impl FunctionInstance {
 
 impl FunctionInstanceInner {
     async fn new(
-        function_id: edgeless_api::function_instance::FunctionId,
+        instance_id: edgeless_api::function_instance::InstanceId,
         binary: &[u8],
         callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
         data_plane: edgeless_dataplane::handle::DataplaneHandle,
@@ -116,7 +116,7 @@ impl FunctionInstanceInner {
         let mut store = wasmtime::Store::new(
             &engine,
             super::guest_api::GuestAPI {
-                function_id: function_id.clone(),
+                instance_id: instance_id.clone(),
                 data_plane: data_plane.clone(),
                 callback_table: callback_table,
                 state_handle: state_handle,
@@ -138,7 +138,7 @@ impl FunctionInstanceInner {
         );
 
         Ok(Self {
-            function_id,
+            instance_id,
             store,
             binding,
             data_plane,
@@ -190,7 +190,7 @@ impl FunctionInstanceInner {
         // Function Exit
         match self
             .runner_api
-            .send(super::runner::WasmRunnerRequest::FunctionExit(self.function_id.clone()))
+            .send(super::runner::WasmRunnerRequest::FunctionExit(self.instance_id.clone()))
             .await
         {
             Ok(_) => {}
@@ -204,7 +204,7 @@ impl FunctionInstanceInner {
         );
     }
 
-    async fn process_cast(&mut self, src: edgeless_api::function_instance::FunctionId, msg: String) -> anyhow::Result<()> {
+    async fn process_cast(&mut self, src: edgeless_api::function_instance::InstanceId, msg: String) -> anyhow::Result<()> {
         let start = tokio::time::Instant::now();
         self.binding
             .call_handle_cast(
@@ -223,7 +223,7 @@ impl FunctionInstanceInner {
         Ok(())
     }
 
-    async fn process_call(&mut self, channel_id: u64, src: edgeless_api::function_instance::FunctionId, msg: String) -> anyhow::Result<()> {
+    async fn process_call(&mut self, channel_id: u64, src: edgeless_api::function_instance::InstanceId, msg: String) -> anyhow::Result<()> {
         let start = tokio::time::Instant::now();
         let res = self
             .binding

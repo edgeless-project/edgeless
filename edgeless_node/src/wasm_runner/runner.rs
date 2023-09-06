@@ -9,9 +9,9 @@ pub struct RunnerClient {
 
 pub enum WasmRunnerRequest {
     Start(edgeless_api::function_instance::SpawnFunctionRequest),
-    Stop(edgeless_api::function_instance::FunctionId),
+    Stop(edgeless_api::function_instance::InstanceId),
     Update(edgeless_api::function_instance::UpdateFunctionLinksRequest),
-    FunctionExit(edgeless_api::function_instance::FunctionId),
+    FunctionExit(edgeless_api::function_instance::InstanceId),
 }
 
 impl Runner {
@@ -34,15 +34,15 @@ impl Runner {
                 while let Some(req) = receiver.next().await {
                     match req {
                         WasmRunnerRequest::Start(spawn_request) => {
-                            let function_id = match spawn_request.function_id.clone() {
+                            let instance_id = match spawn_request.instance_id.clone() {
                                 Some(id) => id,
                                 None => {
                                     continue;
                                 }
                             };
-                            log::info!("Start Function {:?}", spawn_request.function_id);
+                            log::info!("Start Function {:?}", spawn_request.instance_id);
                             let cloned_req = spawn_request.clone();
-                            let data_plane = data_plane_provider.get_handle_for(function_id.clone()).await;
+                            let data_plane = data_plane_provider.get_handle_for(instance_id.clone()).await;
                             let instance = super::function_instance::FunctionInstance::launch(
                                 cloned_req,
                                 data_plane,
@@ -52,23 +52,23 @@ impl Runner {
                                     .await,
                                 telemetry_handle.fork(std::collections::BTreeMap::from([(
                                     "FUNCTION_ID".to_string(),
-                                    function_id.function_id.to_string(),
+                                    instance_id.function_id.to_string(),
                                 )])),
                             )
                             .await;
-                            functions.insert(function_id.function_id.clone(), instance.unwrap());
+                            functions.insert(instance_id.function_id.clone(), instance.unwrap());
                         }
-                        WasmRunnerRequest::Stop(function_id) => {
-                            log::info!("Stop Function {:?}", function_id);
-                            if let Some(instance) = functions.get_mut(&function_id.function_id) {
+                        WasmRunnerRequest::Stop(instance_id) => {
+                            log::info!("Stop Function {:?}", instance_id);
+                            if let Some(instance) = functions.get_mut(&instance_id.function_id) {
                                 instance.stop().await;
                             }
                             // This will also create a FUNCTION_EXIT event.
-                            functions.remove(&function_id.function_id);
+                            functions.remove(&instance_id.function_id);
                         }
                         WasmRunnerRequest::Update(update) => {
-                            log::info!("Update Function {:?}", update.function_id);
-                            if let Some(instance) = functions.get_mut(&update.function_id.as_ref().unwrap().function_id) {
+                            log::info!("Update Function {:?}", update.instance_id);
+                            if let Some(instance) = functions.get_mut(&update.instance_id.as_ref().unwrap().function_id) {
                                 instance.update(update).await;
                             }
                         }
@@ -91,8 +91,8 @@ impl crate::runner_api::RunnerAPI for RunnerClient {
         }
     }
 
-    async fn stop(&mut self, function_id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
-        match self.sender.send(WasmRunnerRequest::Stop(function_id)).await {
+    async fn stop(&mut self, instance_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+        match self.sender.send(WasmRunnerRequest::Stop(instance_id)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
         }

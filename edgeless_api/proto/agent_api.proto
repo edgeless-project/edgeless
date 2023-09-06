@@ -3,7 +3,7 @@ import "google/protobuf/empty.proto";
 package agent_api;
 
 
-message FunctionId {
+message InstanceId {
     string node_id = 1;
     string function_id = 2;
 }
@@ -30,18 +30,18 @@ message FunctionClassSpecification {
 }
 
 message SpawnFunctionRequest {
-    FunctionId function_id = 1;
+    InstanceId instance_id = 1;
     FunctionClassSpecification code = 2;
-    map<string, FunctionId> output_callback_definitions = 3;
-    FunctionId return_continuation = 4;
+    map<string, InstanceId> output_callback_definitions = 3;
+    InstanceId return_continuation = 4;
     map<string, string> annotations = 5;
     StateSpecification state_specification = 6;
 }
 
 message UpdateFunctionLinksRequest {
-    FunctionId function_id = 1;
-    map<string, FunctionId> output_callback_definitions = 3;
-    FunctionId return_continuation = 4;
+    InstanceId instance_id = 1;
+    map<string, InstanceId> output_callback_definitions = 3;
+    InstanceId return_continuation = 4;
 }
 
 message WorkflowResource {
@@ -68,7 +68,7 @@ message SpawnWorkflowRequest {
 
 message WorkflowFunctionMapping {
     string function_alias = 1;
-    repeated FunctionId instances = 2;
+    repeated InstanceId instances = 2;
 }
 
 message WorkflowInstanceStatus {
@@ -98,8 +98,8 @@ message EventData {
 }
 
 message Event {
-    FunctionId target = 1;
-    FunctionId source = 2;
+    InstanceId target = 1;
+    InstanceId source = 2;
     uint64 stream_id =3;
     EventData msg = 4;
 }
@@ -113,12 +113,12 @@ message ResourceProviderSpecification {
 message ResourceInstanceSpecification {
     string provider_id = 1;
     map<string, string> configuration = 2;
-    map<string, FunctionId> output_callback_definitions = 3;
+    map<string, InstanceId> output_callback_definitions = 3;
 }
 
 service FunctionInstance {
-    rpc Start (SpawnFunctionRequest) returns (FunctionId);
-    rpc Stop (FunctionId) returns (google.protobuf.Empty );
+    rpc Start (SpawnFunctionRequest) returns (InstanceId);
+    rpc Stop (InstanceId) returns (google.protobuf.Empty );
     rpc Update (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
 }
 
@@ -133,6 +133,6 @@ service FunctionInvocation {
 }
 
 service ResourceConfiguration {
-    rpc Start (ResourceInstanceSpecification) returns (FunctionId);
-    rpc Stop (FunctionId) returns (google.protobuf.Empty);
+    rpc Start (ResourceInstanceSpecification) returns (InstanceId);
+    rpc Stop (InstanceId) returns (google.protobuf.Empty);
 }

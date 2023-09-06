@@ -3,12 +3,12 @@ pub type NodeId = uuid::Uuid;
 pub type NodeLocalComponentId = uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct FunctionId {
+pub struct InstanceId {
     pub node_id: NodeId,
     pub function_id: NodeLocalComponentId,
 }
 
-impl FunctionId {
+impl InstanceId {
     pub fn new(node_id: uuid::Uuid) -> Self {
         Self {
             node_id: node_id,
@@ -41,25 +41,25 @@ pub struct FunctionClassSpecification {
 
 #[derive(Debug, Clone)]
 pub struct SpawnFunctionRequest {
-    pub function_id: Option<FunctionId>,
+    pub instance_id: Option<InstanceId>,
     pub code: FunctionClassSpecification,
-    pub output_callback_definitions: std::collections::HashMap<String, FunctionId>,
-    pub return_continuation: FunctionId,
+    pub output_callback_definitions: std::collections::HashMap<String, InstanceId>,
+    pub return_continuation: InstanceId,
     pub annotations: std::collections::HashMap<String, String>,
     pub state_specification: StateSpecification,
 }
 
 #[derive(Debug)]
 pub struct UpdateFunctionLinksRequest {
-    pub function_id: Option<FunctionId>,
-    pub output_callback_definitions: std::collections::HashMap<String, FunctionId>,
-    pub return_continuation: FunctionId,
+    pub instance_id: Option<InstanceId>,
+    pub output_callback_definitions: std::collections::HashMap<String, InstanceId>,
+    pub return_continuation: InstanceId,
 }
 
 #[async_trait::async_trait]
 pub trait FunctionInstanceAPI: FunctionInstanceAPIClone + Sync + Send {
-    async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<FunctionId>;
-    async fn stop(&mut self, id: FunctionId) -> anyhow::Result<()>;
+    async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<InstanceId>;
+    async fn stop(&mut self, id: InstanceId) -> anyhow::Result<()>;
     async fn update(&mut self, update: UpdateFunctionLinksRequest) -> anyhow::Result<()>;
 }
 
