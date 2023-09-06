@@ -2,14 +2,14 @@ use edgeless_function::api::*;
 struct PongerFun;
 
 impl Edgefunction for PongerFun {
-    fn handle_cast(src: Fid, encoded_message: String) {
+    fn handle_cast(src: InstanceId, encoded_message: String) {
         log::info!("AsyncPonger: 'Cast' called, MSG: {}", encoded_message);
         cast(&src, "PONG");
-        // OR: 
+        // OR:
         // cast_alias("pinger", "PONG2");
     }
 
-    fn handle_call(_src: Fid, encoded_message: String) -> CallRet {
+    fn handle_call(_src: InstanceId, encoded_message: String) -> CallRet {
         log::info!("AsyncPonger: 'Call' called, MSG: {}", encoded_message);
         CallRet::Noreply
     }

@@ -2,7 +2,7 @@ package edgeless:edgefunction
 
 world edgefunction {
   
-  record fid {
+  record instance-id {
     node: string,
     function: string
   }
@@ -14,16 +14,16 @@ world edgefunction {
   }
 
   import cast-alias: func(alias: string, msg: string)
-  import cast: func(target: fid, msg: string)
-  import call: func(target: fid, msg: string) -> call-ret
+  import cast: func(target: instance-id, msg: string)
+  import call: func(target: instance-id, msg: string) -> call-ret
   import call-alias: func(alias: string, msg: string) -> call-ret
   import telemetry-log: func(lvl: string, target: string, message: string)
-  import slf: func() -> fid
-  import delayed-cast: func(delayms: u64, target: fid, payload: string)
+  import slf: func() -> instance-id
+  import delayed-cast: func(delayms: u64, target: instance-id, payload: string)
   import sync: func(state: string)
 
-  export handle-cast: func(source: fid, msg: string)
-  export handle-call: func(source: fid, msg: string) -> call-ret
+  export handle-cast: func(source: instance-id, msg: string)
+  export handle-call: func(source: instance-id, msg: string) -> call-ret
   export handle-init: func(payload: string, state: option<string>)
   export handle-stop: func()
 }

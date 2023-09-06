@@ -10,7 +10,7 @@ struct PingerState {
 }
 
 impl Edgefunction for PingerFun {
-    fn handle_cast(_src: Fid, encoded_message: String) {
+    fn handle_cast(_src: InstanceId, encoded_message: String) {
         log::info!("AsyncPinger: 'Cast' called, MSG: {}", encoded_message);
         if encoded_message == "wakeup" {
             cast_alias("ponger", "PING");
@@ -20,7 +20,7 @@ impl Edgefunction for PingerFun {
         }
     }
 
-    fn handle_call(_src: Fid, encoded_message: String) -> CallRet {
+    fn handle_call(_src: InstanceId, encoded_message: String) -> CallRet {
         log::info!("AsyncPinger: 'Call' called, MSG: {}", encoded_message);
         CallRet::Noreply
     }
