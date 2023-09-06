@@ -209,7 +209,7 @@ impl FunctionInstanceInner {
         self.binding
             .call_handle_cast(
                 &mut self.store,
-                &super::guest_api::wit_binding::Fid {
+                &super::guest_api::wit_binding::InstanceId {
                     node: src.node_id.to_string(),
                     function: src.function_id.to_string(),
                 },
@@ -229,7 +229,7 @@ impl FunctionInstanceInner {
             .binding
             .call_handle_call(
                 &mut self.store,
-                &super::guest_api::wit_binding::Fid {
+                &super::guest_api::wit_binding::InstanceId {
                     node: src.node_id.to_string(),
                     function: src.function_id.to_string(),
                 },

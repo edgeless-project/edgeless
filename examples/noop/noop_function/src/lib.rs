@@ -4,11 +4,11 @@ use log;
 struct NoopFunction;
 
 impl Edgefunction for NoopFunction {
-    fn handle_cast(src: Fid, encoded_message: String) {
+    fn handle_cast(src: InstanceId, encoded_message: String) {
         log::info!("Noop casted, node {}, function {}, MSG: {}", src.node, src.function, encoded_message);
     }
 
-    fn handle_call(src: Fid, encoded_message: String) -> CallRet {
+    fn handle_call(src: InstanceId, encoded_message: String) -> CallRet {
         log::info!("Noop called, node {}, function {}, MSG: {}", src.node, src.function, encoded_message);
         CallRet::Noreply
     }

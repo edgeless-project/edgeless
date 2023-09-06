@@ -19,13 +19,13 @@ struct ExampleState {
 static STATE: std::sync::OnceLock<std::sync::Mutex<ExampleState>> = std::sync::OnceLock::new();
 
 impl Edgefunction for ExampleFunction {
-    fn handle_cast(src: Fid, encoded_message: String) {
+    fn handle_cast(src: InstanceId, encoded_message: String) {
         log(&format!("Example: 'Cast' called, MSG: {}", encoded_message));
         STATE.get().unwrap().lock().unwrap().count += 1;
         sync(&serde_json::to_string(STATE.get().unwrap().lock().unwrap().deref()).unwrap());
     }
 
-    fn handle_call(src: Fid, encoded_message: String) -> CallRet {
+    fn handle_call(src: InstanceId, encoded_message: String) -> CallRet {
         log(&format!("Example: 'Call' called, MSG: {}", encoded_message));
         CallRet::Noreply
     }
@@ -45,7 +45,7 @@ edgeless_function::export!(ExampleFunction);
 ## Types
 
 ```rust
-struct Fid {
+struct InstanceId {
     node: String,
     function: String
 }
@@ -69,11 +69,11 @@ Return value from calls / value to be returned from `handle_call`.
 
 Send a message to the function registered (in the workflow) under `alias`, **without expecting a return value**.
 
-`async fn cast(&mut self, target: Fid, msg: String);`
+`async fn cast(&mut self, target: InstanceId, msg: String);`
 
 Send a message to the function identified by `target`, **without expecting a return value.**
 
-`async fn call(&mut self, target: Fid, msg: String) -> CallRet;`
+`async fn call(&mut self, target: InstanceId, msg: String) -> CallRet;`
 
 Blockingly / Synchronously send a message to the function identified by `target` **and wait for a return value.**
 
@@ -86,11 +86,11 @@ Blockingly / Synchronously send a message to the function registered (in the wor
 Produce a line of log.
 Currently, this is just printed out; in the future, this might be sent to the monitoring system.
 
-`async fn slf(&mut self) -> Fid;`
+`async fn slf(&mut self) -> InstanceId;`
 
-Retrieve the function's own `Fid` (used for continuation-passing, self-invocation etc.).
+Retrieve the function's own `InstanceId` (used for continuation-passing, self-invocation etc.).
 
-`async fn delayed_cast(&mut self, delay: u64, target: Fid, payload: String);`
+`async fn delayed_cast(&mut self, delay: u64, target: InstanceId, payload: String);`
 
 After `delay` milliseconds, send a message to the function identified by `target` **without expecting a return value**.
 This is useful for self-invocation and creating a periodically running function.
