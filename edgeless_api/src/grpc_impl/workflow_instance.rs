@@ -221,13 +221,10 @@ impl WorkflowInstanceAPIClient {
 
 #[async_trait::async_trait]
 impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient {
-    async fn start_workflow_instance(
-        &mut self,
-        request: crate::workflow_instance::SpawnWorkflowRequest,
-    ) -> anyhow::Result<crate::workflow_instance::WorkflowInstance> {
+    async fn start(&mut self, request: crate::workflow_instance::SpawnWorkflowRequest) -> anyhow::Result<crate::workflow_instance::WorkflowInstance> {
         let ret = self
             .client
-            .start_workflow_instance(tonic::Request::new(
+            .start(tonic::Request::new(
                 crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_spawn_request(&request),
             ))
             .await;
@@ -236,10 +233,10 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             Err(_) => Err(anyhow::anyhow!("Workflow instance server returned error.")),
         }
     }
-    async fn stop_workflow_instance(&mut self, id: crate::workflow_instance::WorkflowId) -> anyhow::Result<()> {
+    async fn stop(&mut self, id: crate::workflow_instance::WorkflowId) -> anyhow::Result<()> {
         let ret = self
             .client
-            .stop_workflow_instance(tonic::Request::new(
+            .stop(tonic::Request::new(
                 crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_id(&id),
             ))
             .await;
@@ -248,13 +245,10 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             Err(_) => Err(anyhow::anyhow!("Workflow instance server returned error.")),
         }
     }
-    async fn list_workflow_instances(
-        &mut self,
-        id: crate::workflow_instance::WorkflowId,
-    ) -> anyhow::Result<Vec<crate::workflow_instance::WorkflowInstance>> {
+    async fn list(&mut self, id: crate::workflow_instance::WorkflowId) -> anyhow::Result<Vec<crate::workflow_instance::WorkflowInstance>> {
         let ret = self
             .client
-            .list_workflow_instances(tonic::Request::new(
+            .list(tonic::Request::new(
                 crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_id(&id),
             ))
             .await;
@@ -271,7 +265,7 @@ pub struct WorkflowInstanceAPIServer {
 
 #[async_trait::async_trait]
 impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for WorkflowInstanceAPIServer {
-    async fn start_workflow_instance(
+    async fn start(
         &self,
         request: tonic::Request<crate::grpc_impl::api::SpawnWorkflowRequest>,
     ) -> Result<tonic::Response<crate::grpc_impl::api::WorkflowInstanceStatus>, tonic::Status> {
@@ -279,7 +273,7 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
             Ok(val) => val,
             Err(_) => return Err(tonic::Status::internal("Server Error")),
         };
-        let ret = self.root_api.lock().await.start_workflow_instance(req).await;
+        let ret = self.root_api.lock().await.start(req).await;
         match ret {
             Ok(workflow) => Ok(tonic::Response::new(
                 crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_instance(&workflow),
@@ -288,22 +282,19 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
         }
     }
 
-    async fn stop_workflow_instance(
-        &self,
-        request_id: tonic::Request<crate::grpc_impl::api::WorkflowId>,
-    ) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn stop(&self, request_id: tonic::Request<crate::grpc_impl::api::WorkflowId>) -> Result<tonic::Response<()>, tonic::Status> {
         let req = match crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_workflow_id(&request_id.into_inner()) {
             Ok(val) => val,
             Err(_) => return Err(tonic::Status::internal("Server Error")),
         };
-        let ret = self.root_api.lock().await.stop_workflow_instance(req).await;
+        let ret = self.root_api.lock().await.stop(req).await;
         match ret {
             Ok(_) => Ok(tonic::Response::new(())),
             Err(_) => Err(tonic::Status::internal("Server Error")),
         }
     }
 
-    async fn list_workflow_instances(
+    async fn list(
         &self,
         request_id: tonic::Request<crate::grpc_impl::api::WorkflowId>,
     ) -> Result<tonic::Response<crate::grpc_impl::api::WorkflowInstanceList>, tonic::Status> {
@@ -311,7 +302,7 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
             Ok(val) => val,
             Err(_) => return Err(tonic::Status::internal("Server Error")),
         };
-        let ret = self.root_api.lock().await.list_workflow_instances(req).await;
+        let ret = self.root_api.lock().await.list(req).await;
         match ret {
             Ok(instances) => Ok(tonic::Response::new(
                 crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_instance_list(&instances),

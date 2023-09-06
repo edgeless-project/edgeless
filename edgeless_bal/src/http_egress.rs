@@ -127,7 +127,7 @@ impl EgressResourceProvider {
 
 #[async_trait::async_trait]
 impl edgeless_api::resource_configuration::ResourceConfigurationAPI for EgressResourceProvider {
-    async fn start_resource_instance(
+    async fn start(
         &mut self,
         _instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::function_instance::FunctionId> {
@@ -139,7 +139,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for EgressRe
         Ok(new_id)
     }
 
-    async fn stop_resource_instance(&mut self, resource_id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
+    async fn stop(&mut self, resource_id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
         self.egress_instances.remove(&resource_id);
         Ok(())
     }

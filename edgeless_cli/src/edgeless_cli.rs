@@ -71,7 +71,7 @@ async fn main() -> anyhow::Result<()> {
                             workflow_id: uuid::Uuid::new_v4(),
                         };
                         let res = con_wf_client
-                            .start_workflow_instance(edgeless_api::workflow_instance::SpawnWorkflowRequest {
+                            .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
                                 workflow_id: my_wf_id.clone(),
                                 workflow_functions: workflow
                                     .functions
@@ -117,16 +117,14 @@ async fn main() -> anyhow::Result<()> {
                     WorkflowCommands::Stop { id } => {
                         let parsed_id = uuid::Uuid::parse_str(&id)?;
                         let res = con_wf_client
-                            .stop_workflow_instance(edgeless_api::workflow_instance::WorkflowId { workflow_id: parsed_id })
+                            .stop(edgeless_api::workflow_instance::WorkflowId { workflow_id: parsed_id })
                             .await;
                         if let Ok(_) = res {
                             println!("Workflow Stopped");
                         }
                     }
                     WorkflowCommands::List {} => {
-                        let res = con_wf_client
-                            .list_workflow_instances(edgeless_api::workflow_instance::WorkflowId::none())
-                            .await;
+                        let res = con_wf_client.list(edgeless_api::workflow_instance::WorkflowId::none()).await;
                         if let Ok(instances) = res {
                             for instance in instances.iter() {
                                 println!("workflow: {}", instance.workflow_id.to_string());

@@ -86,9 +86,9 @@ impl InvocationAPIClient {
 
 #[async_trait::async_trait]
 impl crate::invocation::InvocationAPI for InvocationAPIClient {
-    async fn handle_event(&mut self, event: crate::invocation::Event) -> anyhow::Result<crate::invocation::LinkProcessingResult> {
+    async fn handle(&mut self, event: crate::invocation::Event) -> anyhow::Result<crate::invocation::LinkProcessingResult> {
         let serialized_event = InvocationConverters::encode_crate_event(&event);
-        let res = self.client.handle_event(tonic::Request::new(serialized_event)).await;
+        let res = self.client.handle(tonic::Request::new(serialized_event)).await;
         match res {
             Ok(_) => Ok(crate::invocation::LinkProcessingResult::PROCESSED),
             Err(_) => Err(anyhow::anyhow!("Remote Event Request Failed")),
@@ -102,7 +102,7 @@ pub struct InvocationAPIServerHandler {
 
 #[async_trait::async_trait]
 impl crate::grpc_impl::api::function_invocation_server::FunctionInvocation for InvocationAPIServerHandler {
-    async fn handle_event(&self, request: tonic::Request<crate::grpc_impl::api::Event>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn handle(&self, request: tonic::Request<crate::grpc_impl::api::Event>) -> Result<tonic::Response<()>, tonic::Status> {
         let inner_request = request.into_inner();
         let parsed_request = match InvocationConverters::parse_api_event(&inner_request) {
             Ok(val) => val,
@@ -112,7 +112,7 @@ impl crate::grpc_impl::api::function_invocation_server::FunctionInvocation for I
             }
         };
 
-        let res = self.root_api.lock().await.handle_event(parsed_request).await;
+        let res = self.root_api.lock().await.handle(parsed_request).await;
         match res {
             Ok(_) => Ok(tonic::Response::new(())),
             Err(_) => Err(tonic::Status::internal("Server Error")),

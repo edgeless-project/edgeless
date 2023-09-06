@@ -87,7 +87,7 @@ pub struct AgentClient {
 
 #[async_trait::async_trait]
 impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceClient {
-    async fn start_function_instance(
+    async fn start(
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::function_instance::FunctionId> {
@@ -105,14 +105,14 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
             Err(_) => Err(anyhow::anyhow!("Agent Channel Error")),
         }
     }
-    async fn stop_function_instance(&mut self, id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
+    async fn stop(&mut self, id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
         match self.sender.send(AgentRequest::STOP(id)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Agent Channel Error")),
         }
     }
 
-    async fn update_function_instance_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+    async fn update(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
         match self.sender.send(AgentRequest::UPDATE(update)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Agent Channel Error")),

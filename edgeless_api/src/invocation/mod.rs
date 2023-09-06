@@ -24,5 +24,5 @@ pub enum LinkProcessingResult {
 
 #[async_trait::async_trait]
 pub trait InvocationAPI: Sync + Send {
-    async fn handle_event(&mut self, event: Event) -> anyhow::Result<LinkProcessingResult>;
+    async fn handle(&mut self, event: Event) -> anyhow::Result<LinkProcessingResult>;
 }

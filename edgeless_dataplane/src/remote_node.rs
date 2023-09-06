@@ -21,7 +21,7 @@ impl DataPlaneLink for RemoteLink {
             .remotes
             .lock()
             .await
-            .handle_event(edgeless_api::invocation::Event {
+            .handle(edgeless_api::invocation::Event {
                 target: target.clone(),
                 source: src.clone(),
                 stream_id,
@@ -55,9 +55,9 @@ struct InvocationEventHandler {
 
 #[async_trait::async_trait]
 impl edgeless_api::invocation::InvocationAPI for InvocationEventHandler {
-    async fn handle_event(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
+    async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
         if event.target.node_id == self.node_id {
-            self.locals.lock().await.handle_event(event).await
+            self.locals.lock().await.handle(event).await
         } else {
             Err(anyhow::anyhow!("Wrong Node ID"))
         }
@@ -66,9 +66,9 @@ impl edgeless_api::invocation::InvocationAPI for InvocationEventHandler {
 
 #[async_trait::async_trait]
 impl edgeless_api::invocation::InvocationAPI for RemoteRouter {
-    async fn handle_event(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
+    async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
         if let Some(node_client) = self.receivers.get_mut(&event.target.node_id) {
-            node_client.handle_event(event).await.unwrap();
+            node_client.handle(event).await.unwrap();
             Ok(edgeless_api::invocation::LinkProcessingResult::FINAL)
         } else {
             Ok(edgeless_api::invocation::LinkProcessingResult::PASSED)
@@ -142,7 +142,7 @@ mod test {
         let (sender_1, mut receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
         provider.new_link(fid_target.clone(), sender_1).await;
 
-        api.handle_event(edgeless_api::invocation::Event {
+        api.handle(edgeless_api::invocation::Event {
             target: fid_wrong_component_id.clone(),
             source: fid_source.clone(),
             stream_id: 0,
@@ -154,7 +154,7 @@ mod test {
         assert!(receiver_1.try_next().is_err());
 
         assert!(api
-            .handle_event(edgeless_api::invocation::Event {
+            .handle(edgeless_api::invocation::Event {
                 target: fid_wrong_node_id.clone(),
                 source: fid_source.clone(),
                 stream_id: 0,
@@ -165,7 +165,7 @@ mod test {
 
         assert!(receiver_1.try_next().is_err());
 
-        api.handle_event(edgeless_api::invocation::Event {
+        api.handle(edgeless_api::invocation::Event {
             target: fid_target.clone(),
             source: fid_source.clone(),
             stream_id: 0,
@@ -184,7 +184,7 @@ mod test {
 
     #[async_trait::async_trait]
     impl edgeless_api::invocation::InvocationAPI for MockInvocationAPI {
-        async fn handle_event(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<LinkProcessingResult> {
+        async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<LinkProcessingResult> {
             self.events.send(event.clone()).await.unwrap();
             if event.target.node_id == self.own_node_id {
                 Ok(LinkProcessingResult::FINAL)

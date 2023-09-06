@@ -154,7 +154,7 @@ struct IngressResource {
 
 #[async_trait::async_trait]
 impl edgeless_api::resource_configuration::ResourceConfigurationAPI for IngressResource {
-    async fn start_resource_instance(
+    async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::function_instance::FunctionId> {
@@ -191,7 +191,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for IngressR
             Err(anyhow::anyhow!("Missing Resource Configuration"))
         }
     }
-    async fn stop_resource_instance(&mut self, resource_id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
+    async fn stop(&mut self, resource_id: edgeless_api::function_instance::FunctionId) -> anyhow::Result<()> {
         let mut lck = self.configuration_state.lock().await;
         lck.interests.retain(|item| item.resource_id != resource_id);
         Ok(())

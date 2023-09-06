@@ -23,7 +23,7 @@ impl DataPlaneLink for NodeLocalLink {
                 .router
                 .lock()
                 .await
-                .handle_event(edgeless_api::invocation::Event {
+                .handle(edgeless_api::invocation::Event {
                     target: target.clone(),
                     source: src.clone(),
                     stream_id,
@@ -50,7 +50,7 @@ pub struct NodeLocalRouter {
 // This is used by the remote node that is currently borrowing the `NodeLocalRouter`
 #[async_trait::async_trait]
 impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
-    async fn handle_event(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
+    async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
         if let Some(sender) = self.receivers.get_mut(&event.target.function_id) {
             let msg = match event.data {
                 edgeless_api::invocation::EventData::Call(data) => Message::Call(data),

@@ -58,9 +58,9 @@ pub struct UpdateFunctionLinksRequest {
 
 #[async_trait::async_trait]
 pub trait FunctionInstanceAPI: FunctionInstanceAPIClone + Sync + Send {
-    async fn start_function_instance(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<FunctionId>;
-    async fn stop_function_instance(&mut self, id: FunctionId) -> anyhow::Result<()>;
-    async fn update_function_instance_links(&mut self, update: UpdateFunctionLinksRequest) -> anyhow::Result<()>;
+    async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<FunctionId>;
+    async fn stop(&mut self, id: FunctionId) -> anyhow::Result<()>;
+    async fn update(&mut self, update: UpdateFunctionLinksRequest) -> anyhow::Result<()>;
 }
 
 // https://stackoverflow.com/a/30353928

@@ -187,32 +187,29 @@ impl FunctionInstanceAPIClient {
 
 #[async_trait::async_trait]
 impl crate::function_instance::FunctionInstanceAPI for FunctionInstanceAPIClient {
-    async fn start_function_instance(
-        &mut self,
-        request: crate::function_instance::SpawnFunctionRequest,
-    ) -> anyhow::Result<crate::function_instance::FunctionId> {
+    async fn start(&mut self, request: crate::function_instance::SpawnFunctionRequest) -> anyhow::Result<crate::function_instance::FunctionId> {
         let serialized_request = FunctonInstanceConverters::serialize_spawn_function_request(&request);
 
-        let res = self.client.start_function_instance(tonic::Request::new(serialized_request)).await;
+        let res = self.client.start(tonic::Request::new(serialized_request)).await;
         match res {
             Ok(function_id) => FunctonInstanceConverters::parse_function_id(&function_id.into_inner()),
             Err(_) => Err(anyhow::anyhow!("Start Request Failed")),
         }
     }
 
-    async fn stop_function_instance(&mut self, id: crate::function_instance::FunctionId) -> anyhow::Result<()> {
+    async fn stop(&mut self, id: crate::function_instance::FunctionId) -> anyhow::Result<()> {
         let serialized_id = FunctonInstanceConverters::serialize_function_id(&id);
-        let res = self.client.stop_function_instance(tonic::Request::new(serialized_id)).await;
+        let res = self.client.stop(tonic::Request::new(serialized_id)).await;
         match res {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Stop Request Failed")),
         }
     }
 
-    async fn update_function_instance_links(&mut self, update: crate::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+    async fn update(&mut self, update: crate::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
         let serialized_update = FunctonInstanceConverters::serialize_update_function_links_request(&update);
 
-        let res = self.client.update_function_instance_links(tonic::Request::new(serialized_update)).await;
+        let res = self.client.update(tonic::Request::new(serialized_update)).await;
         match res {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Start Request Failed")),
@@ -226,7 +223,7 @@ pub struct FunctionInstanceAPIServer {
 
 #[async_trait::async_trait]
 impl crate::grpc_impl::api::function_instance_server::FunctionInstance for FunctionInstanceAPIServer {
-    async fn start_function_instance(
+    async fn start(
         &self,
         request: tonic::Request<crate::grpc_impl::api::SpawnFunctionRequest>,
     ) -> Result<tonic::Response<crate::grpc_impl::api::FunctionId>, tonic::Status> {
@@ -238,14 +235,14 @@ impl crate::grpc_impl::api::function_instance_server::FunctionInstance for Funct
                 return Err(tonic::Status::invalid_argument("Bad Request"));
             }
         };
-        let res = self.root_api.lock().await.start_function_instance(parsed_request).await;
+        let res = self.root_api.lock().await.start(parsed_request).await;
         match res {
             Ok(fid) => Ok(tonic::Response::new(FunctonInstanceConverters::serialize_function_id(&fid))),
             Err(_) => Err(tonic::Status::internal("Server Error")),
         }
     }
 
-    async fn stop_function_instance(&self, request: tonic::Request<crate::grpc_impl::api::FunctionId>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn stop(&self, request: tonic::Request<crate::grpc_impl::api::FunctionId>) -> Result<tonic::Response<()>, tonic::Status> {
         let stop_function_id = match FunctonInstanceConverters::parse_function_id(&request.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
@@ -253,17 +250,14 @@ impl crate::grpc_impl::api::function_instance_server::FunctionInstance for Funct
                 return Err(tonic::Status::invalid_argument("Bad Request"));
             }
         };
-        let res = self.root_api.lock().await.stop_function_instance(stop_function_id).await;
+        let res = self.root_api.lock().await.stop(stop_function_id).await;
         match res {
             Ok(_fid) => Ok(tonic::Response::new(())),
             Err(_) => Err(tonic::Status::internal("Server Error")),
         }
     }
 
-    async fn update_function_instance_links(
-        &self,
-        update: tonic::Request<crate::grpc_impl::api::UpdateFunctionLinksRequest>,
-    ) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn update(&self, update: tonic::Request<crate::grpc_impl::api::UpdateFunctionLinksRequest>) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_update = match FunctonInstanceConverters::parse_api_function_link_update(&update.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
@@ -271,7 +265,7 @@ impl crate::grpc_impl::api::function_instance_server::FunctionInstance for Funct
                 return Err(tonic::Status::invalid_argument("Bad Request"));
             }
         };
-        let res = self.root_api.lock().await.update_function_instance_links(parsed_update).await;
+        let res = self.root_api.lock().await.update(parsed_update).await;
         match res {
             Ok(_fid) => Ok(tonic::Response::new(())),
             Err(_) => Err(tonic::Status::internal("Server Error")),
