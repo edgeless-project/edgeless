@@ -1,0 +1,42 @@
+name: Edgeless Commit Checks
+on:
+  push:
+jobs:
+  check:
+    runs-on:
+      - self-hosted
+    container:
+      image: ghcr.io/edgeless-project/ci-image:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.github_token }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Linter
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy --no-deps 
+      - name: Tests
+        run: cargo test
+  build:
+    runs-on:
+      - self-hosted
+    container:
+      image: ghcr.io/edgeless-project/ci-image:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.github_token }}
+    steps:
+      - name: Build x64 Release
+        run: cargo build --release
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v3
+        with:
+          name: binaries
+          path: |
+            target/release/edgeless_inabox
+            target/release/edgeless_cli
+            target/release/edgeless_con_d
+            target/release/edgeless_orc_d
+            target/release/edgeless_bal_d
+            target/release/edgeless_node_d
