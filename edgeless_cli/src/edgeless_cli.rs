@@ -91,7 +91,6 @@ async fn main() -> anyhow::Result<()> {
                                                 output_callback_declarations: wf.class_specification.output_callbacks,
                                             },
                                             output_callback_definitions: wf.output_callback_definitions,
-                                            return_continuation: "UNUSED".to_string(),
                                             function_annotations: wf.annotations,
                                         }
                                     })

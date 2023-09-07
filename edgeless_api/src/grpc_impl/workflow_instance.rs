@@ -19,7 +19,6 @@ impl WorkflowInstanceConverters {
                 },
             )?,
             output_callback_definitions: api_function.output_callback_definitions.clone(),
-            return_continuation: api_function.return_continuation.clone(),
             function_annotations: api_function.function_annotations.clone(),
         })
     }
@@ -133,7 +132,6 @@ impl WorkflowInstanceConverters {
                 ),
             ),
             output_callback_definitions: crate_function.output_callback_definitions.clone(),
-            return_continuation: crate_function.return_continuation.clone(),
         }
     }
 

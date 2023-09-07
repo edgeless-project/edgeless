@@ -44,7 +44,6 @@ pub struct SpawnFunctionRequest {
     pub instance_id: Option<InstanceId>,
     pub code: FunctionClassSpecification,
     pub output_callback_definitions: std::collections::HashMap<String, InstanceId>,
-    pub return_continuation: InstanceId,
     pub annotations: std::collections::HashMap<String, String>,
     pub state_specification: StateSpecification,
 }
@@ -53,7 +52,6 @@ pub struct SpawnFunctionRequest {
 pub struct UpdateFunctionLinksRequest {
     pub instance_id: Option<InstanceId>,
     pub output_callback_definitions: std::collections::HashMap<String, InstanceId>,
-    pub return_continuation: InstanceId,
 }
 
 #[async_trait::async_trait]

@@ -101,7 +101,6 @@ impl Controller {
                                 code: fun.function_class_specification,
                                 annotations: fun.function_annotations,
                                 output_callback_definitions: outputs,
-                                return_continuation: edgeless_api::function_instance::InstanceId::new(uuid::Uuid::new_v4()),
                                 state_specification: edgeless_api::function_instance::StateSpecification {
                                     state_id: state_id,
                                     state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
@@ -167,7 +166,6 @@ impl Controller {
                                                     None => None,
                                                 })
                                                 .collect(),
-                                            return_continuation: edgeless_api::function_instance::InstanceId::new(uuid::Uuid::new_v4()),
                                         })
                                         .await;
                                     match res {
