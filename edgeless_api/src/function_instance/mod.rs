@@ -60,7 +60,7 @@ pub struct UpdateFunctionLinksRequest {
 pub trait FunctionInstanceAPI: FunctionInstanceAPIClone + Sync + Send {
     async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<InstanceId>;
     async fn stop(&mut self, id: InstanceId) -> anyhow::Result<()>;
-    async fn update(&mut self, update: UpdateFunctionLinksRequest) -> anyhow::Result<()>;
+    async fn update_links(&mut self, update: UpdateFunctionLinksRequest) -> anyhow::Result<()>;
 }
 
 // https://stackoverflow.com/a/30353928

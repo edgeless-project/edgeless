@@ -11,7 +11,7 @@ message InstanceId {
     string function_id = 2;
 }
 
-// Policy to access state.
+// Consistency model of state.
 enum StatePolicy {
    TRANSIENT = 0;
    NODE_LOCAL = 1;
@@ -22,7 +22,7 @@ enum StatePolicy {
 message StateSpecification {
     // Unique identifier of the state.
     string state_id = 1;
-    // Access policy.
+    // Consistency model.
     StatePolicy policy = 2;
 }
 
@@ -46,9 +46,9 @@ message SpawnFunctionRequest {
     InstanceId instance_id = 1;
     // The function class specification.
     FunctionClassSpecification code = 2;
-    // The definitions of output callbacks.
-    map<string, InstanceId> output_callback_definitions = 3;
     // Map between the callback declarations and function instances.
+    map<string, InstanceId> output_callback_definitions = 3;
+    // XXX
     InstanceId return_continuation = 4;
     // The set of annotations associated to this function instance.
     map<string, string> annotations = 5;
@@ -58,7 +58,7 @@ message SpawnFunctionRequest {
 
 // Message to request the update of a function instance.
 message UpdateFunctionLinksRequest {
-    // The function instance identifie.
+    // The function instance identifier.
     InstanceId instance_id = 1;
     // Map between the callback declarations and function instances.
     map<string, InstanceId> output_callback_definitions = 3;
@@ -190,14 +190,17 @@ service FunctionInstance {
     // Input: request containing the description of the function to create.
     // Output: the function instance identifier assigned
     rpc Start (SpawnFunctionRequest) returns (InstanceId);
+    
     // Stop a running function instance.
     // Input: the identifier of the function instance to tear down.
     // Output: none.
     rpc Stop (InstanceId) returns (google.protobuf.Empty );
-    // Updates a running function instance.
-    // Input: the new specification of the function instance.
+
+    // Update a running function instance by changing the mapping between the
+    // callback declarations and function instances.
+    // Input: the update mapping.
     // Output: none.
-    rpc Update (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
+    rpc UpdateLinks (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
 }
 
 // API to manage the lifecycle of workflow instances (s04).
@@ -206,9 +209,11 @@ service WorkflowInstance {
     // Input: request containing the description of the workflow to create.
     // Output: the status of workflow instance newly created.
     rpc Start (SpawnWorkflowRequest) returns (WorkflowInstanceStatus);
+
     // Stop an active workflow.
     // Input: the identifier of the workflow to tear down.
     // Output: none.
+
     rpc Stop (WorkflowId) returns (google.protobuf.Empty);
     // List the active workflows or shows the status of a given active workflow.
     // Input: the identifier of the active workflow or a special value indicating all workflows.
@@ -230,6 +235,7 @@ service ResourceConfiguration {
     // Input: specification of the resource to be created.
     // Output: the identifier of the newly created resource.
     rpc Start (ResourceInstanceSpecification) returns (InstanceId);
+
     // Terminate an existing resource.
     // Input: the identifier of the resource to be terminated.
     // Output: none.

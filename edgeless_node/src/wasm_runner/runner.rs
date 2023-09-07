@@ -69,7 +69,7 @@ impl Runner {
                         WasmRunnerRequest::Update(update) => {
                             log::info!("Update Function {:?}", update.instance_id);
                             if let Some(instance) = functions.get_mut(&update.instance_id.as_ref().unwrap().function_id) {
-                                instance.update(update).await;
+                                instance.update_links(update).await;
                             }
                         }
                         WasmRunnerRequest::FunctionExit(id) => {
@@ -98,7 +98,7 @@ impl crate::runner_api::RunnerAPI for RunnerClient {
         }
     }
 
-    async fn update(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+    async fn update_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
         match self.sender.send(WasmRunnerRequest::Update(update)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),

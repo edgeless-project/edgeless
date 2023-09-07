@@ -83,7 +83,7 @@ impl Orchestrator {
                 }
                 OrchestratorRequest::UPDATE(update) => {
                     log::debug!("Orchestrator Update {:?}", update);
-                    match fn_client.update(update).await {
+                    match fn_client.update_links(update).await {
                         Ok(_) => {}
                         Err(err) => {
                             log::error!("Unhandled: {}", err);
@@ -125,7 +125,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFuncti
         }
     }
 
-    async fn update(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+    async fn update_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
         match self.sender.send(OrchestratorRequest::UPDATE(update)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Orchestrator Channel Error")),
