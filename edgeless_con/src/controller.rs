@@ -157,7 +157,7 @@ impl Controller {
                             {
                                 for instance in &mapping.instances {
                                     let res = fn_client
-                                        .update(edgeless_api::function_instance::UpdateFunctionLinksRequest {
+                                        .update_links(edgeless_api::function_instance::UpdateFunctionLinksRequest {
                                             instance_id: Some(instance.clone()),
                                             output_callback_definitions: config
                                                 .output_callback_definitions

@@ -53,7 +53,7 @@ impl Agent {
                 }
                 AgentRequest::UPDATE(update) => {
                     log::debug!("Agent Update {:?}", update);
-                    match runner.update(update).await {
+                    match runner.update_links(update).await {
                         Ok(_) => {}
                         Err(err) => {
                             log::error!("Unhandled Update Error: {}", err);
@@ -112,7 +112,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
         }
     }
 
-    async fn update(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+    async fn update_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
         match self.sender.send(AgentRequest::UPDATE(update)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Agent Channel Error")),
