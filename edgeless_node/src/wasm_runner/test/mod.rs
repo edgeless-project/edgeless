@@ -91,7 +91,6 @@ async fn basic_lifecycle() {
             output_callback_declarations: vec![],
         },
         output_callback_definitions: std::collections::HashMap::new(),
-        return_continuation: instance_id.clone(),
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
             state_id: instance_id.function_id.clone(),
@@ -225,7 +224,6 @@ async fn messaging_test_setup() -> (
             output_callback_declarations: vec!["test_alias".to_string()],
         },
         output_callback_definitions: std::collections::HashMap::from([("test_alias".to_string(), alias_fid.clone())]),
-        return_continuation: instance_id.clone(),
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
             state_id: instance_id.function_id.clone(),
@@ -454,7 +452,6 @@ async fn state_management() {
             output_callback_declarations: Vec::new(),
         },
         output_callback_definitions: std::collections::HashMap::new(),
-        return_continuation: instance_id.clone(),
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
             state_id: instance_id.function_id.clone(),
