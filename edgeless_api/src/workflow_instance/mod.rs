@@ -57,7 +57,6 @@ pub struct WorkflowFunction {
     pub function_alias: String,
     pub function_class_specification: crate::function_instance::FunctionClassSpecification,
     pub output_callback_definitions: std::collections::HashMap<String, String>,
-    pub return_continuation: String,
     pub function_annotations: std::collections::HashMap<String, String>,
 }
 

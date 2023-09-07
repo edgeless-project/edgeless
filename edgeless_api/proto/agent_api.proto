@@ -2,6 +2,9 @@ syntax = "proto3";
 import "google/protobuf/empty.proto";
 package agent_api;
 
+//////////////////////////////////////////////////////////////////////////
+// Messages and data types
+//////////////////////////////////////////////////////////////////////////
 
 // Function instance identifier.
 message InstanceId {
@@ -48,8 +51,6 @@ message SpawnFunctionRequest {
     FunctionClassSpecification code = 2;
     // Map between the callback declarations and function instances.
     map<string, InstanceId> output_callback_definitions = 3;
-    // XXX
-    InstanceId return_continuation = 4;
     // The set of annotations associated to this function instance.
     map<string, string> annotations = 5;
     // The state specification.
@@ -62,8 +63,6 @@ message UpdateFunctionLinksRequest {
     InstanceId instance_id = 1;
     // Map between the callback declarations and function instances.
     map<string, InstanceId> output_callback_definitions = 3;
-    // Unused?
-    InstanceId return_continuation = 4;
 }
 
 // Message definining a workflow resource.
@@ -86,8 +85,6 @@ message WorkflowFunction {
     FunctionClassSpecification function_class = 2;
     // Map between a possible action and the function aliases to call.
     map<string, string> output_callback_definitions = 3;
-    // Unused?
-    string return_continuation = 4;
     // Annotations associated to this function.
     map<string, string> function_annotations = 5;
 }
@@ -183,6 +180,10 @@ message ResourceInstanceSpecification {
     // Map between the callbacks and instances that will be called.
     map<string, InstanceId> output_callback_definitions = 3;
 }
+
+//////////////////////////////////////////////////////////////////////////
+// Services
+//////////////////////////////////////////////////////////////////////////
 
 // API to manage the lifecycle of function instances (s07).
 service FunctionInstance {

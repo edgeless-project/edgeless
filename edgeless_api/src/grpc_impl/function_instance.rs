@@ -46,12 +46,6 @@ impl FunctonInstanceConverters {
                     };
                 })
                 .collect(),
-            return_continuation: Self::parse_instance_id(match &api_request.return_continuation.as_ref() {
-                Some(val) => val,
-                None => {
-                    return Err(anyhow::anyhow!("Request does not contain continuation."));
-                }
-            })?,
             annotations: api_request.annotations.clone(),
             state_specification: Self::parse_api_state_specification(match &api_request.state_specification {
                 Some(val) => val,
@@ -82,12 +76,6 @@ impl FunctonInstanceConverters {
                     };
                 })
                 .collect(),
-            return_continuation: Self::parse_instance_id(match &api_update.return_continuation.as_ref() {
-                Some(val) => val,
-                None => {
-                    return Err(anyhow::anyhow!("Update does not contain continuation."));
-                }
-            })?,
         })
     }
 
@@ -135,7 +123,6 @@ impl FunctonInstanceConverters {
                 .iter()
                 .map(|(key, value)| (key.clone(), Self::serialize_instance_id(&value)))
                 .collect(),
-            return_continuation: Some(Self::serialize_instance_id(&req.return_continuation)),
             annotations: req.annotations.clone(),
             state_specification: Some(Self::serialize_state_specification(&req.state_specification)),
         }
@@ -154,7 +141,6 @@ impl FunctonInstanceConverters {
                 .iter()
                 .map(|(key, value)| (key.clone(), Self::serialize_instance_id(&value)))
                 .collect(),
-            return_continuation: Some(Self::serialize_instance_id(&crate_update.return_continuation)),
         }
     }
 
