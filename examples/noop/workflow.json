@@ -11,7 +11,9 @@
                 "output_callbacks": []
             },
             "output_callback_definitions": {},
-            "annotations": {}
+            "annotations": {
+                "init-payload": "nothing interesting"
+            }
         }
     ],
     "resources": [],
