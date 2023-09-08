@@ -55,6 +55,7 @@ impl FunctionInstance {
             if let Ok(mut f) = FunctionInstanceInner::new(
                 instance_id.clone(),
                 &spawn_req.code.function_class_inlude_code,
+                spawn_req.annotations.get("init-payload").map(|x| x.as_str()),
                 cloned_callbacks,
                 data_plane,
                 runner_api,
@@ -94,6 +95,7 @@ impl FunctionInstanceInner {
     async fn new(
         instance_id: edgeless_api::function_instance::InstanceId,
         binary: &[u8],
+        init_payload: Option<&str>,
         callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
         data_plane: edgeless_dataplane::handle::DataplaneHandle,
         runner_api: futures::channel::mpsc::UnboundedSender<super::runner::WasmRunnerRequest>,
@@ -131,7 +133,9 @@ impl FunctionInstanceInner {
 
         // Function Init (Call to the init handler).
         let start = tokio::time::Instant::now();
-        binding.call_handle_init(&mut store, "test", serialized_state.as_deref()).await?;
+        binding
+            .call_handle_init(&mut store, init_payload.unwrap_or_default(), serialized_state.as_deref())
+            .await?;
         telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInit(start.elapsed()),
             std::collections::BTreeMap::new(),
