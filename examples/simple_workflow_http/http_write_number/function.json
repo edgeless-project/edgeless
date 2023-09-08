@@ -1,0 +1,9 @@
+{
+    "id": "http_write_number",
+    "function_type": "RUST_WASM",
+    "version": "0.1",
+    "build": "Cargo.toml",
+    "output_callbacks": [
+        "external_sink"
+    ]
+}

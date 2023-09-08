@@ -1,0 +1,89 @@
+{
+    "alias": "simple_workflow_http",
+    "functions": [
+        {
+            "alias": "external_trigger",
+            "class_specification": {
+                "id": "http_read_number",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./http_read_number/http_read_number.wasm",
+                "output_callbacks": [
+                    "cb_success"
+                ]
+            },
+            "output_callback_definitions": {
+                "cb_success": "incr"
+            },
+            "annotations": {}
+        },
+        {
+            "alias": "incr",
+            "class_specification": {
+                "id": "incr",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./incr/incr.wasm",
+                "output_callbacks": [
+                    "cb_success"
+                ]
+            },
+            "output_callback_definitions": {
+                "cb_success": "double"
+            },
+            "annotations": {}
+        },
+        {
+            "alias": "double",
+            "class_specification": {
+                "id": "double",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./double/double.wasm",
+                "output_callbacks": [
+                    "cb_success"
+                ]
+            },
+            "output_callback_definitions": {
+                "cb_success": "external_sink"
+            },
+            "annotations": {}
+        },
+        {
+            "alias": "external_sink",
+            "class_specification": {
+                "id": "http_write_number",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./http_write_number/http_write_number.wasm",
+                "output_callbacks": [
+                    "external_sink"
+                ]
+            },
+            "output_callback_definitions": {
+                "external_sink": "http-egress"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "alias": "http-ingress",
+            "resource_class_type": "http-ingress",
+            "output_callback_definitions": {
+                "new_request": "external_trigger"
+            },
+            "configurations": {
+                "host": "demo.edgeless-project.eu",
+                "methods": "POST"
+            }
+        },
+        {
+            "alias": "http-egress",
+            "resource_class_type": "http-egress",
+            "output_callback_definitions": {},
+            "configurations": {}
+        }
+    ],
+    "annotations": {}
+}
