@@ -1,0 +1,38 @@
+### Simple workflow with HTTP external source/sink
+
+The example creates the following chain:
+
+- an HTTP ingress that wait for an external source to POST a message whose body contains an integer
+- a function `incr` that increments by 1 the received integer number in the payload
+- a function `double` that doubles the received integer number in the payload
+- an HTTP egress that sends the received message to an external sink
+
+```bash
+target/debug/edgeless_cli function build examples/simple_workflow_http/http_read_number/function.json
+target/debug/edgeless_cli function build examples/simple_workflow_http/http_write_number/function.json
+target/debug/edgeless_cli function build examples/simple_workflow_http/double/function.json
+target/debug/edgeless_cli function build examples/simple_workflow_http/incr/function.json
+```
+
+
+Then, you can request the controller to start the workflow:
+
+```bash
+ID=$(target/debug/edgeless_cli workflow start examples/simple_workflow_http/workflow.json)
+```
+
+Now `$ID` contains the workflow identifier assigned by the controller.
+
+In a shell open a TCP socket at port 10000 that plays the role of the external sink:
+
+```bash
+nc -l 10000
+```
+
+and in another use curl to emulate an external source:
+
+```bash
+curl -v -H "Host: demo.edgeless-project.eu" http://127.0.0.1:7035/read_number -d 42
+```
+
+In the sink you will receive the number `86=(42+1)*2`.
