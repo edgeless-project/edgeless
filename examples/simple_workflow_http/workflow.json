@@ -63,7 +63,9 @@
             "output_callback_definitions": {
                 "external_sink": "http-egress"
             },
-            "annotations": {}
+            "annotations": {
+                "init-payload": "localhost:10000"
+            }
         }
     ],
     "resources": [
