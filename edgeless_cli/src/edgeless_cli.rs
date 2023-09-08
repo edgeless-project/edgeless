@@ -61,6 +61,12 @@ async fn main() -> anyhow::Result<()> {
         None => println!("Bye"),
         Some(x) => match x {
             Commands::Workflow { workflow_command } => {
+                if std::fs::metadata(&args.config_file).is_err() {
+                    return Err(anyhow::anyhow!(
+                        "configuration file does not exist or cannot be accessed: {}",
+                        &args.config_file
+                    ));
+                }
                 let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file)?)?;
                 let mut con_client = edgeless_api::grpc_impl::controller::ControllerAPIClient::new(&conf.controller_url).await;
                 let mut con_wf_client = con_client.workflow_instance_api();
