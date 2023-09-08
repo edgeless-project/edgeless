@@ -12,7 +12,16 @@ enum WorkflowCommands {
 
 #[derive(Debug, clap::Subcommand)]
 enum FunctionCommands {
-    Build { spec_file: String },
+    Build {
+        spec_file: String,
+    },
+    Invoke {
+        event_type: String,
+        invocation_url: String,
+        node_id: String,
+        function_id: String,
+        payload: String,
+    },
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -205,6 +214,38 @@ async fn main() -> anyhow::Result<()> {
                             .args(["component", "new", &raw_result, "-o", &out_file])
                             .status()?
                     );
+                }
+                FunctionCommands::Invoke {
+                    event_type,
+                    invocation_url,
+                    node_id,
+                    function_id,
+                    payload,
+                } => {
+                    log::info!("invoking function: {} {} {} {}", event_type, node_id, function_id, payload);
+                    let mut client = edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&invocation_url).await;
+                    let event = edgeless_api::invocation::Event {
+                        target: edgeless_api::function_instance::InstanceId {
+                            node_id: uuid::Uuid::parse_str(&node_id)?,
+                            function_id: uuid::Uuid::parse_str(&function_id)?,
+                        },
+                        source: edgeless_api::function_instance::InstanceId {
+                            node_id: uuid::uuid!("00000000-0000-0000-0000-ffff00000000"),
+                            function_id: uuid::uuid!("00000000-0000-0000-0000-ffff00000000"),
+                        },
+                        stream_id: 0,
+                        data: match event_type.as_str() {
+                            "cast" => edgeless_api::invocation::EventData::Cast(payload),
+                            _ => edgeless_api::invocation::EventData::Err,
+                        },
+                    };
+                    if let edgeless_api::invocation::EventData::Err = event.data {
+                        return Err(anyhow::anyhow!("invalid event type: {}", event_type));
+                    }
+                    match edgeless_api::invocation::InvocationAPI::handle(&mut client, event).await {
+                        Ok(_) => println!("event casted"),
+                        Err(err) => return Err(anyhow::anyhow!("error casting the event: {}", err)),
+                    }
                 }
             },
         },
