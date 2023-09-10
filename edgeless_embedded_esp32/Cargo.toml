@@ -1,0 +1,40 @@
+[workspace]
+
+[package]
+name = "edgeless-embedded-esp32"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+edition = "2021"
+resolver = "2"
+rust-version = "1.71"
+
+[profile.dev.package.esp-wifi]
+opt-level = 3
+
+[profile.release]
+opt-level = "s"
+lto = "off"
+
+[profile.dev]
+debug = true
+opt-level = 3
+lto = "off"
+
+[dependencies]
+log = { version = "0.4", default-features = false }
+
+hal = { package = "esp32-hal", version = "0.15", features = ["async", "embassy", "embassy-executor-thread", "embassy-time-timg0"] }
+esp-backtrace = { version = "0.8.0", features = ["esp32", "panic-handler", "exception-handler", "print-uart"] }
+esp-println = { version = "0.6.0", features = ["esp32","log"] }
+esp-alloc = { version = "0.3.0" }
+esp-wifi = { git = "https://github.com/esp-rs/esp-wifi.git", package ="esp-wifi", default-features = false,  features = ["esp32", "utils", "async", "wifi", "embassy-net", "log","wifi-logs", "big-heap"] }
+
+embassy-executor = { version = "0.3.0", features = ["nightly"] }
+embassy-sync = "0.2.0"
+embassy-time = { version = "0.1.3",  features = ["nightly"] }
+embassy-net = { version = "0.1.0", features = ["nightly", "tcp", "udp", "dhcpv4", "medium-ethernet"] }
+static_cell = { version = "1.2.0", features = ["nightly"] }
+embedded-svc = { version = "0.25.1", default-features = false, features = [] }
+
+[build-dependencies]
+embuild = "0.31.2"
