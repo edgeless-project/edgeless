@@ -14,14 +14,11 @@ target/debug/edgeless_cli function build examples/simple_workflow_http/double/fu
 target/debug/edgeless_cli function build examples/simple_workflow_http/incr/function.json
 ```
 
-
 Then, you can request the controller to start the workflow:
 
 ```bash
-ID=$(target/debug/edgeless_cli workflow start examples/simple_workflow_http/workflow.json)
+target/debug/edgeless_cli workflow start examples/simple_workflow_http/workflow.json
 ```
-
-Now `$ID` contains the workflow identifier assigned by the controller.
 
 In a shell open a TCP socket at port 10000 that plays the role of the external sink:
 

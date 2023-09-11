@@ -9,11 +9,11 @@
                 "version": "0.1",
                 "include_code_file": "./http_read_number/http_read_number.wasm",
                 "output_callbacks": [
-                    "cb_success"
+                    "parsed_value"
                 ]
             },
             "output_callback_definitions": {
-                "cb_success": "incr"
+                "parsed_value": "incr"
             },
             "annotations": {}
         },
@@ -25,11 +25,11 @@
                 "version": "0.1",
                 "include_code_file": "./incr/incr.wasm",
                 "output_callbacks": [
-                    "cb_success"
+                    "result"
                 ]
             },
             "output_callback_definitions": {
-                "cb_success": "double"
+                "result": "double"
             },
             "annotations": {}
         },
@@ -41,11 +41,11 @@
                 "version": "0.1",
                 "include_code_file": "./double/double.wasm",
                 "output_callbacks": [
-                    "cb_success"
+                    "result"
                 ]
             },
             "output_callback_definitions": {
-                "cb_success": "external_sink"
+                "result": "external_sink"
             },
             "annotations": {}
         },
