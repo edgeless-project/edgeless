@@ -7,7 +7,7 @@ impl Edgefunction for IncrFun {
         log::info!("incr: called with '{}'", encoded_message);
 
         if let Ok(n) = encoded_message.parse::<i32>() {
-            cast_alias("cb_success", format!("{}", n + 1).as_str());
+            cast_alias("result", format!("{}", n + 1).as_str());
         }
     }
 

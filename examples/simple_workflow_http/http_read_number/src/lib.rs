@@ -14,7 +14,7 @@ impl Edgefunction for HttpReadNumberFun {
             if let Some(body) = req.body {
                 if let Ok(content) = String::from_utf8(body) {
                     if let Ok(_) = content.parse::<i32>() {
-                        cast_alias("cb_success", &content);
+                        cast_alias("parsed_value", &content);
                         (200, None)
                     } else {
                         (400, Some(Vec::<u8>::from("body does not contain an integer")))
