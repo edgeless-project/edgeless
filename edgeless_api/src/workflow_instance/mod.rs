@@ -4,7 +4,7 @@ use crate::function_instance::InstanceId;
 
 const WORKFLOW_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct WorkflowId {
     pub workflow_id: uuid::Uuid,
 }

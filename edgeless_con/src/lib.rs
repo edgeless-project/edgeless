@@ -25,7 +25,7 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
     log::info!("Starting Edgeless Controller at {}", settings.controller_url);
     log::debug!("Settings: {:?}", settings);
 
-    let (mut controller, controller_task) = controller::Controller::new(settings.clone());
+    let (mut controller, controller_task) = controller::Controller::new_from_config(settings.clone()).await;
 
     let server_task =
         edgeless_api::grpc_impl::controller::WorkflowInstanceAPIServer::run(controller.get_api_client(), settings.controller_url.clone());
