@@ -10,43 +10,29 @@ impl Edgefunction for HttpReadNumberFun {
         log::info!("http_read_number: 'Call' called, MSG: {}", encoded_message);
         let req: EdgelessHTTPRequest = edgeless_http::request_from_string(&encoded_message).unwrap();
 
-        let res = if req.path == "/read_number" {
+        let res_params = if req.path == "/read_number" {
             if let Some(body) = req.body {
                 if let Ok(content) = String::from_utf8(body) {
                     if let Ok(_) = content.parse::<i32>() {
                         cast_alias("cb_success", &content);
-                        EdgelessHTTPResponse {
-                            status: 200,
-                            body: None,
-                            headers: std::collections::HashMap::<String, String>::new(),
-                        }
+                        (200, None)
                     } else {
-                        EdgelessHTTPResponse {
-                            status: 400,
-                            body: Some(Vec::<u8>::from("body does not contain an integer")),
-                            headers: std::collections::HashMap::<String, String>::new(),
-                        }
+                        (400, Some(Vec::<u8>::from("body does not contain an integer")))
                     }
                 } else {
-                    EdgelessHTTPResponse {
-                        status: 400,
-                        body: Some(Vec::<u8>::from("body is not a string")),
-                        headers: std::collections::HashMap::<String, String>::new(),
-                    }
+                    (400, Some(Vec::<u8>::from("body is not a string")))
                 }
             } else {
-                EdgelessHTTPResponse {
-                    status: 400,
-                    body: Some(Vec::<u8>::from("empty body")),
-                    headers: std::collections::HashMap::<String, String>::new(),
-                }
+                (400, Some(Vec::<u8>::from("empty body")))
             }
         } else {
-            EdgelessHTTPResponse {
-                status: 404,
-                body: Some(Vec::<u8>::from("invalid path")),
-                headers: std::collections::HashMap::<String, String>::new(),
-            }
+            (404, Some(Vec::<u8>::from("invalid path")))
+        };
+
+        let res = EdgelessHTTPResponse {
+            status: res_params.0,
+            body: res_params.1,
+            headers: std::collections::HashMap::<String, String>::new(),
         };
 
         CallRet::Reply(edgeless_http::response_to_string(&res))
