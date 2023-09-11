@@ -229,19 +229,13 @@ async fn main() -> anyhow::Result<()> {
                             node_id: uuid::Uuid::parse_str(&node_id)?,
                             function_id: uuid::Uuid::parse_str(&function_id)?,
                         },
-                        source: edgeless_api::function_instance::InstanceId {
-                            node_id: uuid::uuid!("00000000-0000-0000-0000-ffff00000000"),
-                            function_id: uuid::uuid!("00000000-0000-0000-0000-ffff00000000"),
-                        },
+                        source: edgeless_api::function_instance::InstanceId::none(),
                         stream_id: 0,
                         data: match event_type.as_str() {
                             "cast" => edgeless_api::invocation::EventData::Cast(payload),
-                            _ => edgeless_api::invocation::EventData::Err,
+                            _ => return Err(anyhow::anyhow!("invalid event type: {}", event_type)),
                         },
                     };
-                    if let edgeless_api::invocation::EventData::Err = event.data {
-                        return Err(anyhow::anyhow!("invalid event type: {}", event_type));
-                    }
                     match edgeless_api::invocation::InvocationAPI::handle(&mut client, event).await {
                         Ok(_) => println!("event casted"),
                         Err(err) => return Err(anyhow::anyhow!("error casting the event: {}", err)),
