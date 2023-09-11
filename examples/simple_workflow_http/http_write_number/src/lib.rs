@@ -2,12 +2,7 @@ use edgeless_function::api::*;
 
 struct HttpWriteNumberFun;
 
-#[derive(Debug)]
-struct Configuration {
-    target_host: String,
-}
-
-static CONFIGURATION: std::sync::OnceLock<std::sync::Mutex<Configuration>> = std::sync::OnceLock::new();
+static CONFIGURATION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 impl Edgefunction for HttpWriteNumberFun {
     fn handle_cast(_src: InstanceId, encoded_message: String) {
@@ -17,7 +12,7 @@ impl Edgefunction for HttpWriteNumberFun {
             &"external_sink",
             &edgeless_http::request_to_string(&edgeless_http::EdgelessHTTPRequest {
                 protocol: edgeless_http::EdgelessHTTPProtocol::HTTP,
-                host: CONFIGURATION.get().unwrap().lock().unwrap().target_host.clone(),
+                host: CONFIGURATION.get().unwrap().clone(),
                 headers: std::collections::HashMap::<String, String>::new(),
                 body: Some(encoded_message.as_bytes().to_vec()),
                 method: edgeless_http::EdgelessHTTPMethod::Post,
@@ -37,11 +32,7 @@ impl Edgefunction for HttpWriteNumberFun {
 
     fn handle_init(payload: String, _serialized_state: Option<String>) {
         log::info!("http_write_number: 'Init' called");
-        CONFIGURATION
-            .set(std::sync::Mutex::new(Configuration {
-                target_host: payload.clone(),
-            }))
-            .unwrap();
+        assert!(CONFIGURATION.set(payload.clone()).is_ok());
     }
 
     fn handle_stop() {
