@@ -2,6 +2,9 @@
 pub type NodeId = uuid::Uuid;
 pub type NodeLocalComponentId = uuid::Uuid;
 
+const NODE_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-fffe00000000");
+const FUNCTION_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-fffd00000000");
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct InstanceId {
     pub node_id: NodeId,
@@ -13,6 +16,12 @@ impl InstanceId {
         Self {
             node_id: node_id,
             function_id: uuid::Uuid::new_v4(),
+        }
+    }
+    pub fn none() -> Self {
+        Self {
+            node_id: NODE_ID_NONE,
+            function_id: FUNCTION_ID_NONE,
         }
     }
 }
