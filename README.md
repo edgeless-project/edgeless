@@ -1,10 +1,12 @@
+![](documentation/edgeless-logo-alpha-200.png)
+
 # Edgeless MVP Implementation
 
-This repository contains a research prototype of the Edgeless platform.
+This repository contains a research prototype of the EDGELESS platform, which is under active development within the project [EDGELESS](https://edgeless-project.eu/).
 
 *There currently are no guarantees on Stability and API-Stability!*
 
-## How to build:
+## How to build
 
 The Implementation relies on Rust and the ProtoBuf compiler.
 
@@ -30,7 +32,7 @@ To build the function examples under `./examples` you will need to add the WASM 
 rustup target add wasm32-unknown-unknown
 ```
 
-## How to run:
+## How to run
 
 It is recommended that you enable at least info-level log directives with:
 
@@ -64,18 +66,18 @@ target/debug/edgeless_inabox
 Congratulations, now a full EDGELESS system in running for you, although it is
 not doing much.
 
-To see examples of simple workflows composed of simple functions, look into the
-`examples/` directory. There you will find a `README` file with a short
-description of each example. Then, each example directory will contain a
-detailed description of the example application.
+### Examples
 
+The `examples/` directory contains several examples representative of the current EDGELESS features.
 
-## How to create new functions/workflows:
+You can find [here](examples/README.md) the full list with a short description of each.
 
-Please refer to
-[documentation/rust_functions.md](documentation/rust_functions.md) and
-[documentation/workflows.md](documentation/workflows.md).
+### How to create new functions/workflows
 
+Please refer to the following specific docs:
+
+- [How to create a new function](documentation/rust_functions.md)
+- [How to complose a new workflow](documentation/workflows.md)
 
 ## Repository Layout
 
@@ -120,10 +122,9 @@ CLI to interact with the e-Controller
     * Binary: `edgeless_cli`
 
 #### edgeless_inabox
-A standalone EDGELESS environment with preconfigured
-  instances of all required services inside a single binary. This is the easiest
-  way to spawn up a development instance of edgeless
 
+A standalone EDGELESS environment with preconfigured instances of all required services inside a single binary.
+This is the easiest way to spawn up a development instance of edgeless
 
 ### Libraries
 In addition to the core components and tools, the repository contains the
@@ -192,3 +193,8 @@ repository.
 
 The Repository is licensed under the MIT License. Please refer to
 [LICENSE-MIT.txt](LICENSE-MIT.txt) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
+
+## Funding
+
+EDGELESS received funding from the [European Health and Digital Executive Agency
+ (HADEA)](https://hadea.ec.europa.eu/) program under Grant Agreement No 101092950.
