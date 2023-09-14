@@ -4,7 +4,7 @@ on:
 jobs:
   check:
     runs-on:
-      - self-hosted
+      - ubuntu-latest
     container:
       image: ghcr.io/edgeless-project/ci-image:latest
       credentials:
@@ -20,13 +20,14 @@ jobs:
         run: cargo test
   build:
     runs-on:
-      - self-hosted
+      - ubuntu-latest
     container:
       image: ghcr.io/edgeless-project/ci-image:latest
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.github_token }}
     steps:
+      - uses: actions/checkout@v3
       - name: Build x64 Release
         run: cargo build --release
       - name: Upload Binaries
