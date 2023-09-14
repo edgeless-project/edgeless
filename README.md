@@ -8,13 +8,13 @@ This repository contains a research prototype of the EDGELESS platform, which is
 
 ## How to build
 
-The Implementation relies on Rust and the ProtoBuf compiler.
+The implementation relies on Rust and the ProtoBuf compiler.
 
-The easiest way to get started is the devcontainer shipped as part of this
+The easiest way to get started is the `devcontainer` shipped as part of this
 repository. See [Extra](#extra) for tips on how to properly set up the dev
 container.
 
-Build Steps:
+**Build Steps**:
 
 Build edgeless core components and tools:
 
@@ -57,13 +57,13 @@ which will create:
 - `cli.toml`
 
 Then you can run the **EDGELESS-in-a-box**, which is a convenience binary that
-runs every necessary components as one, using the generated configuration files:
+runs every necessary component as one, using the generated configuration files:
 
 ```
 target/debug/edgeless_inabox
 ```
 
-Congratulations, now a full EDGELESS system in running for you, although it is
+Congratulations, now a complete EDGELESS system is running for you, although it is
 not doing much.
 
 ### Examples
@@ -77,11 +77,11 @@ You can find [here](examples/README.md) the full list with a short description o
 Please refer to the following specific docs:
 
 - [How to create a new function](documentation/rust_functions.md)
-- [How to complose a new workflow](documentation/workflows.md)
+- [How to compose a new workflow](documentation/workflows.md)
 
 ## Repository Layout
 
-Each of the main services is implemented as its own crate (library + (optional)
+Each of the primary services is implemented as its own crate (library + (optional)
 binary wrapper). Refer to the `README` file of a particular component to find
 out more. To learn more about the conventions of Rust's module system, visit
 [link](https://doc.rust-lang.org/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html).
@@ -137,7 +137,7 @@ following libraries:
     * Tier1 Guests: Rust Functions compiled to WASM
     * Interface to the functions relies on the WASM component model.
 
-* `edgeless_dataplane`: Crate defining the Edgeless dataplane.
+* `edgeless_dataplane`: Crate defining the Edgeless data plane.
     * Provides the primary communication chains
         * Used by communicating entities to send and receive events
     * Provides a local communication provider
@@ -150,16 +150,16 @@ following libraries:
 
 ## Extra
 
-1. It makes sense to clone the repository directly into a devcontainer to avoid
-bind mounts and possibly make builds faster. To do this install VSCode, and
+1. It makes sense to clone the repository directly into a `devcontainer` to avoid
+bind mounts and possibly make builds faster. To do this, install VSCode, and
 select: `DevContainers: Clone Repository in Named Container Volume`. It should
-prompt you to a github page in your browser where you can authentificate. On an
-M1 Max the achieved speedup was around x10 for `cargo build`.
+prompt you to a GitHub page in your browser where you can authenticate. On an
+M1 Max, the achieved speedup was around x10 for `cargo build`.
 
-2. There is a script to configure some plugins for zsh:
+2. There is a script to configure some plugins for `zsh`:
 `scripts/enhance_zsh_dev_container.sh`, which is entirely optional. After
 running it things like autocompletion and shell syntax highlighting are
-available. Fell free to modify it to your liking!
+available. Feel free to modify it to your liking!
 
 3. If your build times are still horrible, try to allocate more CPUs and RAM to
    the Docker dev_container.
@@ -176,7 +176,7 @@ repository.
   formatter.
     *  Suggested workflow: `cargo fix --allow-staged --allow-dirty && cargo fmt
        && git commit`
-* When working on a new feature / issue, create a branch from the github issue
+* When working on a new feature / issue, create a branch from the GitHub issue
   and add your changes there. To merge the changes into the main, create a pull
   request and assign someone as a reviewer. The reviewer should then reject or
   accept the changes / leave some comments. After the changes are accepted by
@@ -184,7 +184,7 @@ repository.
   feature branch.
 * Do not introduce merge commits on the main branch. Merges to the main branch
   must be fast-forwarded. A good practice is also to squash the commits on the
-  feature branch (can be done while merging on github).
+  feature branch (this can be done while merging on GitHub).
 * Add yourself to the list of contributors & adhere to the license.
     * Do not taint this repository with incompatible licenses!
     * Everything not MIT-licensed must be kept external to this repository.
