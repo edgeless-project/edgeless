@@ -1,10 +1,6 @@
 syntax = "proto3";
-import "google/protobuf/empty.proto";
-package agent_api;
 
-//////////////////////////////////////////////////////////////////////////
-// Messages and data types
-//////////////////////////////////////////////////////////////////////////
+package edgeless_api;
 
 // Function instance identifier.
 message InstanceId {
@@ -179,66 +175,4 @@ message ResourceInstanceSpecification {
     map<string, string> configuration = 2;
     // Map between the callbacks and instances that will be called.
     map<string, InstanceId> output_callback_definitions = 3;
-}
-
-//////////////////////////////////////////////////////////////////////////
-// Services
-//////////////////////////////////////////////////////////////////////////
-
-// API to manage the lifecycle of function instances (s07).
-service FunctionInstance {
-    // Start a new function instance.
-    // Input: request containing the description of the function to create.
-    // Output: the function instance identifier assigned
-    rpc Start (SpawnFunctionRequest) returns (InstanceId);
-    
-    // Stop a running function instance.
-    // Input: the identifier of the function instance to tear down.
-    // Output: none.
-    rpc Stop (InstanceId) returns (google.protobuf.Empty );
-
-    // Update a running function instance by changing the mapping between the
-    // callback declarations and function instances.
-    // Input: the update mapping.
-    // Output: none.
-    rpc UpdateLinks (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
-}
-
-// API to manage the lifecycle of workflow instances (s04).
-service WorkflowInstance {
-    // Start a new workflow.
-    // Input: request containing the description of the workflow to create.
-    // Output: the status of workflow instance newly created.
-    rpc Start (SpawnWorkflowRequest) returns (WorkflowInstanceStatus);
-
-    // Stop an active workflow.
-    // Input: the identifier of the workflow to tear down.
-    // Output: none.
-
-    rpc Stop (WorkflowId) returns (google.protobuf.Empty);
-    // List the active workflows or shows the status of a given active workflow.
-    // Input: the identifier of the active workflow or a special value indicating all workflows.
-    // Output: the list of status of the active workflow instances.
-    rpc List (WorkflowId) returns (WorkflowInstanceList);
-}
-
-// API to handle events (s01).
-service FunctionInvocation {
-    // Handle an event.
-    // Input: event to be handled.
-    // Output: none.
-    rpc Handle (Event) returns (google.protobuf.Empty); 
-}
-
-// API to handle the lifecycle of resources (s06).
-service ResourceConfiguration {
-    // Create a new resource.
-    // Input: specification of the resource to be created.
-    // Output: the identifier of the newly created resource.
-    rpc Start (ResourceInstanceSpecification) returns (InstanceId);
-
-    // Terminate an existing resource.
-    // Input: the identifier of the resource to be terminated.
-    // Output: none.
-    rpc Stop (InstanceId) returns (google.protobuf.Empty);
 }

@@ -13,5 +13,5 @@ pub mod invocation;
 pub mod resource_configuration;
 
 pub mod api {
-    tonic::include_proto!("agent_api");
+    tonic::include_proto!("edgeless_api");
 }
