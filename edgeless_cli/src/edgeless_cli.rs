@@ -123,23 +123,30 @@ async fn main() -> anyhow::Result<()> {
                                 workflow_annotations: workflow.annotations.clone(),
                             })
                             .await;
-                        if let Ok(instance) = res {
-                            println!("{}", instance.workflow_id.workflow_id.to_string());
-                            log::info!("{:?}", instance)
+                        match res {
+                            Ok(response) => {
+                                if let Some(instance) = &response.workflow_status {
+                                    println!("{}", instance.workflow_id.workflow_id.to_string());
+                                } else if let Some(error) = &response.response_error {
+                                    println!("{:?}", error);
+                                }
+                                log::info!("{:?}", response)
+                            }
+                            Err(err) => println!("{}", err),
                         }
                     }
                     WorkflowCommands::Stop { id } => {
                         let parsed_id = uuid::Uuid::parse_str(&id)?;
-                        let res = con_wf_client
+                        match con_wf_client
                             .stop(edgeless_api::workflow_instance::WorkflowId { workflow_id: parsed_id })
-                            .await;
-                        if let Ok(_) = res {
-                            println!("Workflow Stopped");
+                            .await
+                        {
+                            Ok(_) => println!("Workflow Stopped"),
+                            Err(err) => println!("{}", err),
                         }
                     }
-                    WorkflowCommands::List {} => {
-                        let res = con_wf_client.list(edgeless_api::workflow_instance::WorkflowId::none()).await;
-                        if let Ok(instances) = res {
+                    WorkflowCommands::List {} => match con_wf_client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
+                        Ok(instances) => {
                             for instance in instances.iter() {
                                 println!("workflow: {}", instance.workflow_id.to_string());
                                 for function in instance.functions.iter() {
@@ -147,7 +154,8 @@ async fn main() -> anyhow::Result<()> {
                                 }
                             }
                         }
-                    }
+                        Err(err) => println!("{}", err),
+                    },
                 }
             }
             Commands::Function { function_command } => match function_command {

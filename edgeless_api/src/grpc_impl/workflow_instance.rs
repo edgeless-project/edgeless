@@ -1,3 +1,5 @@
+use super::common::CommonConverters;
+
 pub struct WorkflowInstanceConverters {}
 
 impl WorkflowInstanceConverters {
@@ -105,6 +107,27 @@ impl WorkflowInstanceConverters {
         })
     }
 
+    pub fn parse_workflow_spawn_response(
+        api_instance: &crate::grpc_impl::api::SpawnWorkflowResponse,
+    ) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowResponse> {
+        Ok(crate::workflow_instance::SpawnWorkflowResponse {
+            response_error: match api_instance.response_error.as_ref() {
+                Some(val) => Some(match CommonConverters::parse_response_error(val) {
+                    Ok(val) => val,
+                    Err(err) => return Err(anyhow::anyhow!(err.to_string())),
+                }),
+                None => None,
+            },
+            workflow_status: match api_instance.workflow_status.as_ref() {
+                Some(val) => Some(match WorkflowInstanceConverters::parse_workflow_instance(val) {
+                    Ok(val) => val,
+                    Err(err) => return Err(anyhow::anyhow!(err.to_string())),
+                }),
+                None => None,
+            },
+        })
+    }
+
     pub fn parse_workflow_instance_list(
         api_instance: &crate::grpc_impl::api::WorkflowInstanceList,
     ) -> anyhow::Result<Vec<crate::workflow_instance::WorkflowInstance>> {
@@ -160,6 +183,21 @@ impl WorkflowInstanceConverters {
                 .map(|res| Self::serialize_workflow_resource(res))
                 .collect(),
             workflow_annotations: crate_request.workflow_annotations.clone(),
+        }
+    }
+
+    pub fn serialize_workflow_spawn_response(
+        crate_request: &crate::workflow_instance::SpawnWorkflowResponse,
+    ) -> crate::grpc_impl::api::SpawnWorkflowResponse {
+        crate::grpc_impl::api::SpawnWorkflowResponse {
+            response_error: match &crate_request.response_error {
+                Some(val) => Some(CommonConverters::serialize_response_error(&val)),
+                None => None,
+            },
+            workflow_status: match &crate_request.workflow_status {
+                Some(val) => Some(Self::serialize_workflow_instance(&val)),
+                None => None,
+            },
         }
     }
 
@@ -219,7 +257,10 @@ impl WorkflowInstanceAPIClient {
 
 #[async_trait::async_trait]
 impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient {
-    async fn start(&mut self, request: crate::workflow_instance::SpawnWorkflowRequest) -> anyhow::Result<crate::workflow_instance::WorkflowInstance> {
+    async fn start(
+        &mut self,
+        request: crate::workflow_instance::SpawnWorkflowRequest,
+    ) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowResponse> {
         let ret = self
             .client
             .start(tonic::Request::new(
@@ -227,8 +268,8 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             ))
             .await;
         match ret {
-            Ok(ret) => return crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_workflow_instance(&ret.into_inner()),
-            Err(_) => Err(anyhow::anyhow!("Workflow instance server returned error.")),
+            Ok(ret) => return crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_workflow_spawn_response(&ret.into_inner()),
+            Err(err) => Err(anyhow::anyhow!("Communication error while starting a workflow: {}", err.to_string())),
         }
     }
     async fn stop(&mut self, id: crate::workflow_instance::WorkflowId) -> anyhow::Result<()> {
@@ -240,7 +281,7 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             .await;
         match ret {
             Ok(_) => return Ok(()),
-            Err(_) => Err(anyhow::anyhow!("Workflow instance server returned error.")),
+            Err(err) => Err(anyhow::anyhow!("Communication error while stopping a workflow: {}", err.to_string())),
         }
     }
     async fn list(&mut self, id: crate::workflow_instance::WorkflowId) -> anyhow::Result<Vec<crate::workflow_instance::WorkflowInstance>> {
@@ -252,7 +293,7 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             .await;
         match ret {
             Ok(ret) => return crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_workflow_instance_list(&ret.into_inner()),
-            Err(_) => Err(anyhow::anyhow!("Workflow instance server returned error.")),
+            Err(err) => Err(anyhow::anyhow!("Communication error while listing workflows: {}", err.to_string())),
         }
     }
 }
@@ -266,17 +307,31 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
     async fn start(
         &self,
         request: tonic::Request<crate::grpc_impl::api::SpawnWorkflowRequest>,
-    ) -> Result<tonic::Response<crate::grpc_impl::api::WorkflowInstanceStatus>, tonic::Status> {
+    ) -> Result<tonic::Response<crate::grpc_impl::api::SpawnWorkflowResponse>, tonic::Status> {
         let req = match crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_workflow_spawn_request(&request.into_inner()) {
             Ok(val) => val,
-            Err(_) => return Err(tonic::Status::internal("Server Error")),
+            Err(err) => {
+                return Ok(tonic::Response::new(crate::grpc_impl::api::SpawnWorkflowResponse {
+                    response_error: Some(crate::grpc_impl::api::ResponseError {
+                        summary: "Invalid request".to_string(),
+                        detail: Some(err.to_string()),
+                    }),
+                    workflow_status: None,
+                }))
+            }
         };
         let ret = self.root_api.lock().await.start(req).await;
         match ret {
-            Ok(workflow) => Ok(tonic::Response::new(
-                crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_instance(&workflow),
+            Ok(response) => Ok(tonic::Response::new(
+                crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_spawn_response(&response),
             )),
-            Err(_) => Err(tonic::Status::internal("Server Error")),
+            Err(err) => Ok(tonic::Response::new(crate::grpc_impl::api::SpawnWorkflowResponse {
+                response_error: Some(crate::grpc_impl::api::ResponseError {
+                    summary: "Requested rejected".to_string(),
+                    detail: Some(err.to_string()),
+                }),
+                workflow_status: None,
+            })),
         }
     }
 

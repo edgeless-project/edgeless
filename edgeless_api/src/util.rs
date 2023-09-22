@@ -2,6 +2,7 @@ pub enum HttpProto {
     HTTP,
     HTTPS,
 }
+
 pub fn parse_http_host(raw: &str) -> anyhow::Result<(HttpProto, String, u16)> {
     let re = regex::Regex::new(r"(http[s]?):\/\/(.*):(\d+)").unwrap();
     let res = re.captures(raw);
