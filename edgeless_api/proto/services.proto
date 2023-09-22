@@ -28,14 +28,14 @@ service FunctionInstance {
 service WorkflowInstance {
     // Start a new workflow.
     // Input: request containing the description of the workflow to create.
-    // Output: the status of workflow instance newly created.
-    rpc Start (SpawnWorkflowRequest) returns (WorkflowInstanceStatus);
+    // Output: the status of workflow instance newly created, if accepted.
+    rpc Start (SpawnWorkflowRequest) returns (SpawnWorkflowResponse);
 
     // Stop an active workflow.
     // Input: the identifier of the workflow to tear down.
     // Output: none.
-
     rpc Stop (WorkflowId) returns (google.protobuf.Empty);
+
     // List the active workflows or shows the status of a given active workflow.
     // Input: the identifier of the active workflow or a special value indicating all workflows.
     // Output: the list of status of the active workflow instances.

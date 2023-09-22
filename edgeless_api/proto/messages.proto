@@ -97,6 +97,16 @@ message SpawnWorkflowRequest {
     map<string, string> workflow_annotations = 4;
 }
 
+// Response to a request to create a new workflow.
+message SpawnWorkflowResponse {
+    // If present it means that the request has been rejected.
+    // In this case, the other fields may not be present or contain meaningful data.
+    optional ResponseError response_error = 1;
+
+    // The status of the newly-created workflow, if the request has been accepted.
+    optional WorkflowInstanceStatus workflow_status = 2;
+}
+
 // Function instance mapping.
 message WorkflowFunctionMapping {
     // Name of the function within the workflow.
@@ -176,3 +186,22 @@ message ResourceInstanceSpecification {
     // Map between the callbacks and instances that will be called.
     map<string, InstanceId> output_callback_definitions = 3;
 }
+
+// Message containing information provided as response to failed request.
+// The fields are inspired from the "problem detail" responses:
+//
+// https://www.rfc-editor.org/rfc/rfc7807.txt
+//
+// Currently all the fields are human-readable, i.e., they are intended to
+// be shown and processed by human operators. Further optional fields might be
+// added in the future that contain binary representations of information
+// intended for machine processing, instead.
+message ResponseError {
+    // A short, human-readable summary of the problem type.
+    // It should not change from occurrence to occurrence of the error.
+    string summary = 1;
+
+    // A human-readable explanation specific to this occurrence of the problem.
+    optional string detail = 2;
+}
+
