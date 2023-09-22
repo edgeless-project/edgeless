@@ -13,7 +13,7 @@ pub struct Controller {
 enum ControllerRequest {
     START(
         edgeless_api::workflow_instance::SpawnWorkflowRequest,
-        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::workflow_instance::WorkflowInstance>>,
+        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>,
     ),
     STOP(edgeless_api::workflow_instance::WorkflowId),
     LIST(
@@ -243,16 +243,19 @@ impl Controller {
                     }
 
                     active_workflows.insert(spawn_workflow_request.workflow_id.clone(), wf.clone());
-                    match reply_sender.send(Ok(edgeless_api::workflow_instance::WorkflowInstance {
-                        workflow_id: spawn_workflow_request.workflow_id,
-                        functions: wf
-                            .function_instances
-                            .iter()
-                            .map(|(alias, instances)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                                function_alias: alias.to_string(),
-                                instances: instances.clone(),
-                            })
-                            .collect(),
+                    match reply_sender.send(Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse {
+                        response_error: None,
+                        workflow_status: Some(edgeless_api::workflow_instance::WorkflowInstance {
+                            workflow_id: spawn_workflow_request.workflow_id,
+                            functions: wf
+                                .function_instances
+                                .iter()
+                                .map(|(alias, instances)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                                    function_alias: alias.to_string(),
+                                    instances: instances.clone(),
+                                })
+                                .collect(),
+                        }),
                     })) {
                         Ok(_) => {}
                         Err(err) => {
@@ -361,9 +364,10 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
     async fn start(
         &mut self,
         request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
-    ) -> anyhow::Result<edgeless_api::workflow_instance::WorkflowInstance> {
+    ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse> {
         let request = request;
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::workflow_instance::WorkflowInstance>>();
+        let (reply_sender, reply_receiver) =
+            tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>();
         match self.sender.send(ControllerRequest::START(request.clone(), reply_sender)).await {
             Ok(_) => {}
             Err(_) => return Err(anyhow::anyhow!("Controller Channel Error")),

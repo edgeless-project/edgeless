@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::function_instance::InstanceId;
+use crate::{common::ResponseError, function_instance::InstanceId};
 
 const WORKFLOW_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
 
@@ -60,7 +60,7 @@ pub struct WorkflowFunction {
     pub function_annotations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SpawnWorkflowRequest {
     pub workflow_id: WorkflowId,
     pub workflow_functions: Vec<WorkflowFunction>,
@@ -68,9 +68,15 @@ pub struct SpawnWorkflowRequest {
     pub workflow_annotations: std::collections::HashMap<String, String>,
 }
 
+#[derive(Clone, Debug)]
+pub struct SpawnWorkflowResponse {
+    pub response_error: Option<ResponseError>,
+    pub workflow_status: Option<WorkflowInstance>,
+}
+
 #[async_trait::async_trait]
 pub trait WorkflowInstanceAPI: WorkflowInstanceAPIClone + Send + Sync {
-    async fn start(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<WorkflowInstance>;
+    async fn start(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<SpawnWorkflowResponse>;
     async fn stop(&mut self, id: WorkflowId) -> anyhow::Result<()>;
     async fn list(&mut self, id: WorkflowId) -> anyhow::Result<Vec<WorkflowInstance>>;
 }
