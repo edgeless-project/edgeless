@@ -139,7 +139,7 @@ async fn single_function_start_stop() {
         workflow_id: uuid::Uuid::new_v4(),
     };
 
-    let returned_id = wf_client
+    let response = wf_client
         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
             workflow_id: wf_id.clone(),
             workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
@@ -160,11 +160,15 @@ async fn single_function_start_stop() {
         .await
         .unwrap();
 
+    assert!(response.response_error.is_none());
+    assert!(response.workflow_status.is_some());
+    let instance = response.workflow_status.unwrap();
+
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    let res = mock_orc_receiver.try_next().unwrap().unwrap();
-    if let MockFunctionInstanceEvent::Start((id, _spawn_req)) = res {
-        assert_eq!(returned_id.functions[0].instances[0], id);
+    let start_res = mock_orc_receiver.try_next().unwrap().unwrap();
+    if let MockFunctionInstanceEvent::Start((id, _spawn_req)) = start_res {
+        assert_eq!(instance.functions[0].instances[0], id);
     } else {
         panic!();
     }
@@ -177,8 +181,9 @@ async fn single_function_start_stop() {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     let stop_res = mock_orc_receiver.try_next().unwrap().unwrap();
+
     if let MockFunctionInstanceEvent::Stop(id) = stop_res {
-        assert_eq!(returned_id.functions[0].instances[0], id);
+        assert_eq!(instance.functions[0].instances[0], id);
     } else {
         panic!();
     }
@@ -198,7 +203,7 @@ async fn resource_to_function_start_stop() {
         workflow_id: uuid::Uuid::new_v4(),
     };
 
-    let returned_id = wf_client
+    let response = wf_client
         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
             workflow_id: wf_id.clone(),
             workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
@@ -226,9 +231,13 @@ async fn resource_to_function_start_stop() {
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
+    assert!(response.response_error.is_none());
+    assert!(response.workflow_status.is_some());
+    let instance = response.workflow_status.unwrap();
+
     let res = mock_orc_receiver.try_next().unwrap().unwrap();
     if let MockFunctionInstanceEvent::Start((id, _spawn_req)) = res {
-        assert_eq!(returned_id.functions[0].instances[0], id);
+        assert_eq!(instance.functions[0].instances[0], id);
     } else {
         panic!();
     }
@@ -237,7 +246,7 @@ async fn resource_to_function_start_stop() {
     if let MockResourceEvent::Start((_id, spawn_req)) = resource_res {
         assert_eq!(
             *spawn_req.output_callback_definitions.get("test_out").unwrap(),
-            returned_id.functions[0].instances[0]
+            instance.functions[0].instances[0]
         );
     } else {
         panic!();
@@ -252,7 +261,7 @@ async fn resource_to_function_start_stop() {
 
     let stop_res = mock_orc_receiver.try_next().unwrap().unwrap();
     if let MockFunctionInstanceEvent::Stop(id) = stop_res {
-        assert_eq!(returned_id.functions[0].instances[0], id);
+        assert_eq!(instance.functions[0].instances[0], id);
     } else {
         panic!();
     }
@@ -278,7 +287,7 @@ async fn function_link_loop_start_stop() {
         workflow_id: uuid::Uuid::new_v4(),
     };
 
-    let returned_wf_state = wf_client
+    let response = wf_client
         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
             workflow_id: wf_id.clone(),
             workflow_functions: vec![
@@ -312,6 +321,10 @@ async fn function_link_loop_start_stop() {
         })
         .await
         .unwrap();
+
+    assert!(response.response_error.is_none());
+    assert!(response.workflow_status.is_some());
+    let returned_wf_state = response.workflow_status.unwrap();
 
     let fids: std::collections::HashSet<_> = returned_wf_state
         .functions
