@@ -59,8 +59,7 @@ message SpawnFunctionResponse {
     // In this case, other fields may not be present or contain meaningful data.
     optional ResponseError response_error = 1;
 
-    // The identifier of the newly-spawned function instance, if the request
-    // has been accepted.
+    // The identifier of the newly-spawned function instance, if accepted.
     optional InstanceId instance_id = 2;
 }
 
@@ -114,8 +113,7 @@ message SpawnWorkflowResponse {
     // In this case, other fields may not be present or contain meaningful data.
     optional ResponseError response_error = 1;
 
-    // The status of the newly-created workflow, if the request has been
-    // accepted.
+    // The status of the newly-created workflow, if request accepted.
     optional WorkflowInstanceStatus workflow_status = 2;
 }
 
@@ -197,6 +195,16 @@ message ResourceInstanceSpecification {
     map<string, string> configuration = 2;
     // Map between the callbacks and instances that will be called.
     map<string, InstanceId> output_callback_definitions = 3;
+}
+
+// Response to a request to create a new resource.
+message SpawnResourceResponse {
+    // If present it means that the request has been rejected.
+    // In this case, other fields may not be present or contain meaningful data.
+    optional ResponseError response_error = 1;
+
+    // The status of the newly-created resource, if request accepted.
+    optional InstanceId instance_id = 2;
 }
 
 // Message containing information provided as response to failed request.
