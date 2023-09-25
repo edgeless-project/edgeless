@@ -74,6 +74,15 @@ pub struct SpawnWorkflowResponse {
     pub workflow_status: Option<WorkflowInstance>,
 }
 
+impl SpawnWorkflowResponse {
+    pub fn good(workflow_status: WorkflowInstance) -> Self {
+        Self {
+            response_error: None,
+            workflow_status: Some(workflow_status),
+        }
+    }
+}
+
 #[async_trait::async_trait]
 pub trait WorkflowInstanceAPI: WorkflowInstanceAPIClone + Send + Sync {
     async fn start(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<SpawnWorkflowResponse>;
