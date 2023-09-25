@@ -53,6 +53,17 @@ message SpawnFunctionRequest {
     StateSpecification state_specification = 6;
 }
 
+// Message to request the creation a new function instance.
+message SpawnFunctionResponse {
+    // If present it means that the request has been rejected.
+    // In this case, other fields may not be present or contain meaningful data.
+    optional ResponseError response_error = 1;
+
+    // The identifier of the newly-spawned function instance, if the request
+    // has been accepted.
+    optional InstanceId instance_id = 2;
+}
+
 // Message to request the update of a function instance.
 message UpdateFunctionLinksRequest {
     // The function instance identifier.
@@ -100,10 +111,11 @@ message SpawnWorkflowRequest {
 // Response to a request to create a new workflow.
 message SpawnWorkflowResponse {
     // If present it means that the request has been rejected.
-    // In this case, the other fields may not be present or contain meaningful data.
+    // In this case, other fields may not be present or contain meaningful data.
     optional ResponseError response_error = 1;
 
-    // The status of the newly-created workflow, if the request has been accepted.
+    // The status of the newly-created workflow, if the request has been
+    // accepted.
     optional WorkflowInstanceStatus workflow_status = 2;
 }
 

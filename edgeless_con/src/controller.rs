@@ -173,7 +173,7 @@ impl Controller {
                                     }
                                 } else {
                                     // Create new instance
-                                    let f_id = fn_client
+                                    let response = fn_client
                                         .start(edgeless_api::function_instance::SpawnFunctionRequest {
                                             instance_id: None,
                                             code: fun.function_class_specification.clone(),
@@ -186,12 +186,24 @@ impl Controller {
                                         })
                                         .await;
 
-                                    if let Ok(id) = f_id {
-                                        wf.function_instances.insert(fun.function_alias.clone(), vec![id]);
-                                        if all_outputs_mapped {
-                                            to_upsert.remove(&fun.function_alias);
+                                    match response {
+                                        Ok(response) => match response.instance_id {
+                                            Some(f_id) => {
+                                                wf.function_instances.insert(fun.function_alias.clone(), vec![f_id]);
+                                                if all_outputs_mapped {
+                                                    to_upsert.remove(&fun.function_alias);
+                                                }
+                                            }
+                                            None => {
+                                                log::error!("function instance creation rejected: {:?}", response.response_error);
+                                            }
+                                        },
+                                        Err(err) => {
+                                            log::error!("failed interaction when creating the function instance: {}", err.to_string());
                                         }
                                     }
+
+                                    // TODO(ccicconetti) handle failed function instance creation
                                 }
                             }
                         }

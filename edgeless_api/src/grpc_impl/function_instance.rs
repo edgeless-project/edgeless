@@ -1,3 +1,5 @@
+use super::common::CommonConverters;
+
 pub struct FunctonInstanceConverters {}
 
 impl FunctonInstanceConverters {
@@ -53,6 +55,27 @@ impl FunctonInstanceConverters {
                     return Err(anyhow::anyhow!("Request does not contain state_spec."));
                 }
             })?,
+        })
+    }
+
+    pub fn parse_spawn_function_response(
+        api_instance: &crate::grpc_impl::api::SpawnFunctionResponse,
+    ) -> anyhow::Result<crate::function_instance::SpawnFunctionResponse> {
+        Ok(crate::function_instance::SpawnFunctionResponse {
+            response_error: match api_instance.response_error.as_ref() {
+                Some(val) => Some(match CommonConverters::parse_response_error(val) {
+                    Ok(val) => val,
+                    Err(err) => return Err(anyhow::anyhow!(err.to_string())),
+                }),
+                None => None,
+            },
+            instance_id: match api_instance.instance_id.as_ref() {
+                Some(val) => Some(match FunctonInstanceConverters::parse_instance_id(val) {
+                    Ok(val) => val,
+                    Err(err) => return Err(anyhow::anyhow!(err.to_string())),
+                }),
+                None => None,
+            },
         })
     }
 
@@ -128,6 +151,19 @@ impl FunctonInstanceConverters {
         }
     }
 
+    pub fn serialize_spawn_function_response(req: &crate::function_instance::SpawnFunctionResponse) -> crate::grpc_impl::api::SpawnFunctionResponse {
+        crate::grpc_impl::api::SpawnFunctionResponse {
+            response_error: match &req.response_error {
+                Some(val) => Some(CommonConverters::serialize_response_error(&val)),
+                None => None,
+            },
+            instance_id: match &req.instance_id {
+                Some(val) => Some(Self::serialize_instance_id(&val)),
+                None => None,
+            },
+        }
+    }
+
     pub fn serialize_update_function_links_request(
         crate_update: &crate::function_instance::UpdateFunctionLinksRequest,
     ) -> crate::grpc_impl::api::UpdateFunctionLinksRequest {
@@ -179,13 +215,19 @@ impl FunctionInstanceAPIClient {
 
 #[async_trait::async_trait]
 impl crate::function_instance::FunctionInstanceAPI for FunctionInstanceAPIClient {
-    async fn start(&mut self, request: crate::function_instance::SpawnFunctionRequest) -> anyhow::Result<crate::function_instance::InstanceId> {
+    async fn start(
+        &mut self,
+        request: crate::function_instance::SpawnFunctionRequest,
+    ) -> anyhow::Result<crate::function_instance::SpawnFunctionResponse> {
         let serialized_request = FunctonInstanceConverters::serialize_spawn_function_request(&request);
 
         let res = self.client.start(tonic::Request::new(serialized_request)).await;
         match res {
-            Ok(instance_id) => FunctonInstanceConverters::parse_instance_id(&instance_id.into_inner()),
-            Err(_) => Err(anyhow::anyhow!("Start Request Failed")),
+            Ok(ret) => FunctonInstanceConverters::parse_spawn_function_response(&ret.into_inner()),
+            Err(err) => Err(anyhow::anyhow!(
+                "Communication error while starting a function instance: {}",
+                err.to_string()
+            )),
         }
     }
 
@@ -194,7 +236,10 @@ impl crate::function_instance::FunctionInstanceAPI for FunctionInstanceAPIClient
         let res = self.client.stop(tonic::Request::new(serialized_id)).await;
         match res {
             Ok(_) => Ok(()),
-            Err(_) => Err(anyhow::anyhow!("Stop Request Failed")),
+            Err(err) => Err(anyhow::anyhow!(
+                "Communication error while stopping a function instance: {}",
+                err.to_string()
+            )),
         }
     }
 
@@ -204,7 +249,10 @@ impl crate::function_instance::FunctionInstanceAPI for FunctionInstanceAPIClient
         let res = self.client.update_links(tonic::Request::new(serialized_update)).await;
         match res {
             Ok(_) => Ok(()),
-            Err(_) => Err(anyhow::anyhow!("Start Request Failed")),
+            Err(err) => Err(anyhow::anyhow!(
+                "Communication error while updating the links of a function instance: {}",
+                err.to_string()
+            )),
         }
     }
 }
@@ -218,19 +266,34 @@ impl crate::grpc_impl::api::function_instance_server::FunctionInstance for Funct
     async fn start(
         &self,
         request: tonic::Request<crate::grpc_impl::api::SpawnFunctionRequest>,
-    ) -> Result<tonic::Response<crate::grpc_impl::api::InstanceId>, tonic::Status> {
+    ) -> Result<tonic::Response<crate::grpc_impl::api::SpawnFunctionResponse>, tonic::Status> {
         let inner_request = request.into_inner();
         let parsed_request = match FunctonInstanceConverters::parse_api_request(&inner_request) {
             Ok(val) => val,
             Err(err) => {
-                log::error!("Parse Request Failed: {}", err);
-                return Err(tonic::Status::invalid_argument("Bad Request"));
+                return Ok(tonic::Response::new(crate::grpc_impl::api::SpawnFunctionResponse {
+                    response_error: Some(crate::grpc_impl::api::ResponseError {
+                        summary: "Invalid request".to_string(),
+                        detail: Some(err.to_string()),
+                    }),
+                    instance_id: None,
+                }))
             }
         };
         let res = self.root_api.lock().await.start(parsed_request).await;
         match res {
-            Ok(instance_id) => Ok(tonic::Response::new(FunctonInstanceConverters::serialize_instance_id(&instance_id))),
-            Err(_) => Err(tonic::Status::internal("Server Error")),
+            Ok(response) => Ok(tonic::Response::new(FunctonInstanceConverters::serialize_spawn_function_response(
+                &response,
+            ))),
+            Err(err) => {
+                return Ok(tonic::Response::new(crate::grpc_impl::api::SpawnFunctionResponse {
+                    response_error: Some(crate::grpc_impl::api::ResponseError {
+                        summary: "Request rejected".to_string(),
+                        detail: Some(err.to_string()),
+                    }),
+                    instance_id: None,
+                }))
+            }
         }
     }
 
