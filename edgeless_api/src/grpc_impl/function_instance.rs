@@ -22,7 +22,7 @@ impl FunctonInstanceConverters {
         })
     }
 
-    pub fn parse_api_request(
+    pub fn parse_spawn_function_request(
         api_request: &crate::grpc_impl::api::SpawnFunctionRequest,
     ) -> anyhow::Result<crate::function_instance::SpawnFunctionRequest> {
         Ok(crate::function_instance::SpawnFunctionRequest {
@@ -49,7 +49,7 @@ impl FunctonInstanceConverters {
                 })
                 .collect(),
             annotations: api_request.annotations.clone(),
-            state_specification: Self::parse_api_state_specification(match &api_request.state_specification {
+            state_specification: Self::parse_state_specification(match &api_request.state_specification {
                 Some(val) => val,
                 None => {
                     return Err(anyhow::anyhow!("Request does not contain state_spec."));
@@ -79,7 +79,7 @@ impl FunctonInstanceConverters {
         })
     }
 
-    pub fn parse_api_function_link_update(
+    pub fn parse_update_function_links_request(
         api_update: &crate::grpc_impl::api::UpdateFunctionLinksRequest,
     ) -> anyhow::Result<crate::function_instance::UpdateFunctionLinksRequest> {
         Ok(crate::function_instance::UpdateFunctionLinksRequest {
@@ -102,7 +102,7 @@ impl FunctonInstanceConverters {
         })
     }
 
-    pub fn parse_api_state_specification(
+    pub fn parse_state_specification(
         api_spec: &crate::grpc_impl::api::StateSpecification,
     ) -> anyhow::Result<crate::function_instance::StateSpecification> {
         Ok(crate::function_instance::StateSpecification {
@@ -268,7 +268,7 @@ impl crate::grpc_impl::api::function_instance_server::FunctionInstance for Funct
         request: tonic::Request<crate::grpc_impl::api::SpawnFunctionRequest>,
     ) -> Result<tonic::Response<crate::grpc_impl::api::SpawnFunctionResponse>, tonic::Status> {
         let inner_request = request.into_inner();
-        let parsed_request = match FunctonInstanceConverters::parse_api_request(&inner_request) {
+        let parsed_request = match FunctonInstanceConverters::parse_spawn_function_request(&inner_request) {
             Ok(val) => val,
             Err(err) => {
                 return Ok(tonic::Response::new(crate::grpc_impl::api::SpawnFunctionResponse {
@@ -316,7 +316,7 @@ impl crate::grpc_impl::api::function_instance_server::FunctionInstance for Funct
         &self,
         update: tonic::Request<crate::grpc_impl::api::UpdateFunctionLinksRequest>,
     ) -> Result<tonic::Response<()>, tonic::Status> {
-        let parsed_update = match FunctonInstanceConverters::parse_api_function_link_update(&update.into_inner()) {
+        let parsed_update = match FunctonInstanceConverters::parse_update_function_links_request(&update.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
                 log::error!("Parse Update Failed: {}", err);
