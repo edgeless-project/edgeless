@@ -65,6 +65,15 @@ pub struct SpawnFunctionResponse {
     pub instance_id: Option<InstanceId>,
 }
 
+impl SpawnFunctionResponse {
+    pub fn good(instance_id: crate::function_instance::InstanceId) -> Self {
+        Self {
+            response_error: None,
+            instance_id: Some(instance_id),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct UpdateFunctionLinksRequest {
     pub instance_id: Option<InstanceId>,
