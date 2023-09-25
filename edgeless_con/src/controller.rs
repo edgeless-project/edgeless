@@ -199,7 +199,7 @@ impl Controller {
                                             }
                                         },
                                         Err(err) => {
-                                            log::error!("failed interaction when creating the function instance: {}", err.to_string());
+                                            log::error!("failed interaction when creating a function instance: {}", err.to_string());
                                         }
                                     }
 
@@ -226,21 +226,32 @@ impl Controller {
                                         .iter_mut()
                                         .find(|(_id, spec)| spec.resource_type == resource.resource_class_type)
                                     {
-                                        let wf_id = handle
+                                        match handle
                                             .config_api
                                             .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
                                                 provider_id: provider_id.clone(),
                                                 output_callback_definitions: output_mapping.clone(),
                                                 configuration: resource.configurations.clone(),
                                             })
-                                            .await;
-
-                                        if let Ok(id) = wf_id {
-                                            wf.resource_instances.insert(resource.alias.clone(), vec![(provider_id.clone(), id)]);
-                                            if output_mapping.len() == resource.output_callback_definitions.len() {
-                                                to_upsert.remove(&resource.alias);
+                                            .await
+                                        {
+                                            Ok(response) => match response.instance_id {
+                                                Some(instance_id) => {
+                                                    wf.resource_instances
+                                                        .insert(resource.alias.clone(), vec![(provider_id.clone(), instance_id)]);
+                                                    if output_mapping.len() == resource.output_callback_definitions.len() {
+                                                        to_upsert.remove(&resource.alias);
+                                                    }
+                                                }
+                                                None => {
+                                                    log::error!("resource creation rejected: {:?}", response.response_error);
+                                                }
+                                            },
+                                            Err(err) => {
+                                                log::error!("failed interaction when creating a resource: {}", err.to_string());
                                             }
                                         }
+                                        // TODO(ccicconetti) handle failed resource creation
                                     }
                                 }
                             }

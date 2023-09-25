@@ -10,9 +10,24 @@ pub struct ResourceInstanceSpecification {
     pub configuration: std::collections::HashMap<String, String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct SpawnResourceResponse {
+    pub response_error: Option<crate::common::ResponseError>,
+    pub instance_id: Option<crate::function_instance::InstanceId>,
+}
+
+impl SpawnResourceResponse {
+    pub fn good(instance_id: crate::function_instance::InstanceId) -> Self {
+        Self {
+            response_error: None,
+            instance_id: Some(instance_id),
+        }
+    }
+}
+
 #[async_trait::async_trait]
 pub trait ResourceConfigurationAPI: Sync + Send {
-    async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<crate::function_instance::InstanceId>;
+    async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<SpawnResourceResponse>;
     async fn stop(&mut self, resource_id: crate::function_instance::InstanceId) -> anyhow::Result<()>;
 }
 
@@ -32,14 +47,24 @@ impl MultiResouceConfigurationAPI {
 
 #[async_trait::async_trait]
 impl ResourceConfigurationAPI for MultiResouceConfigurationAPI {
-    async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<crate::function_instance::InstanceId> {
+    async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<SpawnResourceResponse> {
         if let Some(resource) = self.resource_providers.get_mut(&instance_specification.provider_id) {
             let provider = instance_specification.provider_id.clone();
-            let id = resource.start(instance_specification).await?;
-            self.resource_instances.insert(id.clone(), provider.clone());
-            Ok(id)
+            let res = resource.start(instance_specification).await?;
+            if let Some(id) = res.instance_id {
+                self.resource_instances.insert(id.clone(), provider.clone());
+                Ok(SpawnResourceResponse::good(id))
+            } else {
+                Ok(res)
+            }
         } else {
-            return Err(anyhow::anyhow!("Resource provider does not exist"));
+            Ok(SpawnResourceResponse {
+                response_error: Some(crate::common::ResponseError {
+                    summary: "Error when creating a resource".to_string(),
+                    detail: Some("Provider does not exist".to_string()),
+                }),
+                instance_id: None,
+            })
         }
     }
 
@@ -49,6 +74,6 @@ impl ResourceConfigurationAPI for MultiResouceConfigurationAPI {
                 return provider.stop(resource_id).await;
             }
         }
-        Err(anyhow::anyhow!("Could not delete. (Missing?)"))
+        Err(anyhow::anyhow!("Error when deleting a resource: the resource may not exist"))
     }
 }

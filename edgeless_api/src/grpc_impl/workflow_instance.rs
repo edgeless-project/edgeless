@@ -75,12 +75,10 @@ impl WorkflowInstanceConverters {
             instances: api_mapping
                 .instances
                 .iter()
-                .filter_map(
-                    |fun| match crate::grpc_impl::function_instance::FunctonInstanceConverters::parse_instance_id(fun) {
-                        Ok(val) => Some(val),
-                        Err(_) => None,
-                    },
-                )
+                .filter_map(|fun| match CommonConverters::parse_instance_id(fun) {
+                    Ok(val) => Some(val),
+                    Err(_) => None,
+                })
                 .collect(),
         })
     }
@@ -228,7 +226,7 @@ impl WorkflowInstanceConverters {
             instances: crate_mapping
                 .instances
                 .iter()
-                .map(|instance| crate::grpc_impl::function_instance::FunctonInstanceConverters::serialize_instance_id(instance))
+                .map(|instance| CommonConverters::serialize_instance_id(instance))
                 .collect(),
         }
     }
@@ -338,12 +336,20 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
     async fn stop(&self, request_id: tonic::Request<crate::grpc_impl::api::WorkflowId>) -> Result<tonic::Response<()>, tonic::Status> {
         let req = match crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_workflow_id(&request_id.into_inner()) {
             Ok(val) => val,
-            Err(_) => return Err(tonic::Status::internal("Server Error")),
+            Err(err) => {
+                return Err(tonic::Status::internal(format!(
+                    "Internal error when stopping a workflow: {}",
+                    err.to_string()
+                )))
+            }
         };
         let ret = self.root_api.lock().await.stop(req).await;
         match ret {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(_) => Err(tonic::Status::internal("Server Error")),
+            Err(err) => Err(tonic::Status::internal(format!(
+                "Internal error when stopping a workflow: {}",
+                err.to_string()
+            ))),
         }
     }
 
@@ -353,14 +359,22 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
     ) -> Result<tonic::Response<crate::grpc_impl::api::WorkflowInstanceList>, tonic::Status> {
         let req = match crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_workflow_id(&request_id.into_inner()) {
             Ok(val) => val,
-            Err(_) => return Err(tonic::Status::internal("Server Error")),
+            Err(err) => {
+                return Err(tonic::Status::internal(format!(
+                    "Internal error when listing workflows: {}",
+                    err.to_string()
+                )))
+            }
         };
         let ret = self.root_api.lock().await.list(req).await;
         match ret {
             Ok(instances) => Ok(tonic::Response::new(
                 crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_instance_list(&instances),
             )),
-            Err(_) => Err(tonic::Status::internal("Server Error")),
+            Err(err) => Err(tonic::Status::internal(format!(
+                "Internal error when listing workflows: {}",
+                err.to_string()
+            ))),
         }
     }
 }

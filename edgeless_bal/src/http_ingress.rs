@@ -157,7 +157,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for IngressR
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
+    ) -> anyhow::Result<edgeless_api::resource_configuration::SpawnResourceResponse> {
         let mut lck = self.configuration_state.lock().await;
         if let (Some(host), Some(methods)) = (
             instance_specification.configuration.get("host"),
@@ -186,9 +186,15 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for IngressR
                 allow: allowed_methods,
                 target: target,
             });
-            Ok(resource_id.clone())
+            Ok(edgeless_api::resource_configuration::SpawnResourceResponse::good(resource_id))
         } else {
-            Err(anyhow::anyhow!("Missing Resource Configuration"))
+            Ok(edgeless_api::resource_configuration::SpawnResourceResponse {
+                response_error: Some(edgeless_api::common::ResponseError {
+                    summary: "Error when creating a resource".to_string(),
+                    detail: Some("Missing Resource Configuration".to_string()),
+                }),
+                instance_id: None,
+            })
         }
     }
     async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {

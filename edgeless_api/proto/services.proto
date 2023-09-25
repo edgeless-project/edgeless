@@ -54,8 +54,8 @@ service FunctionInvocation {
 service ResourceConfiguration {
     // Create a new resource.
     // Input: specification of the resource to be created.
-    // Output: the identifier of the newly created resource.
-    rpc Start (ResourceInstanceSpecification) returns (InstanceId);
+    // Output: the identifier of the newly created resource, if accepted.
+    rpc Start (ResourceInstanceSpecification) returns (SpawnResourceResponse);
 
     // Terminate an existing resource.
     // Input: the identifier of the resource to be terminated.
