@@ -266,9 +266,8 @@ impl Controller {
                     }
 
                     active_workflows.insert(spawn_workflow_request.workflow_id.clone(), wf.clone());
-                    match reply_sender.send(Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse {
-                        response_error: None,
-                        workflow_status: Some(edgeless_api::workflow_instance::WorkflowInstance {
+                    match reply_sender.send(Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::good(
+                        edgeless_api::workflow_instance::WorkflowInstance {
                             workflow_id: spawn_workflow_request.workflow_id,
                             functions: wf
                                 .function_instances
@@ -278,8 +277,8 @@ impl Controller {
                                     instances: instances.clone(),
                                 })
                                 .collect(),
-                        }),
-                    })) {
+                        },
+                    ))) {
                         Ok(_) => {}
                         Err(err) => {
                             log::error!("Unhandled: {:?}", err);
