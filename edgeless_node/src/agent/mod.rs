@@ -90,7 +90,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
     async fn start(
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
-    ) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
+    ) -> anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse> {
         let mut request = request;
         let f_id = match request.instance_id.clone() {
             Some(id) => id,
@@ -101,21 +101,33 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
             }
         };
         match self.sender.send(AgentRequest::SPAWN(request)).await {
-            Ok(_) => Ok(f_id),
-            Err(_) => Err(anyhow::anyhow!("Agent Channel Error")),
+            Ok(_) => Ok(edgeless_api::function_instance::SpawnFunctionResponse {
+                response_error: None,
+                instance_id: Some(f_id),
+            }),
+            Err(err) => Err(anyhow::anyhow!(
+                "Agent channel error when creating a function instance: {}",
+                err.to_string()
+            )),
         }
     }
     async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
         match self.sender.send(AgentRequest::STOP(id)).await {
             Ok(_) => Ok(()),
-            Err(_) => Err(anyhow::anyhow!("Agent Channel Error")),
+            Err(err) => Err(anyhow::anyhow!(
+                "Agent channel error when stopping a function instance: {}",
+                err.to_string()
+            )),
         }
     }
 
     async fn update_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
         match self.sender.send(AgentRequest::UPDATE(update)).await {
             Ok(_) => Ok(()),
-            Err(_) => Err(anyhow::anyhow!("Agent Channel Error")),
+            Err(err) => Err(anyhow::anyhow!(
+                "Agent channel error when updating the links of a function instance: {}",
+                err.to_string()
+            )),
         }
     }
 }

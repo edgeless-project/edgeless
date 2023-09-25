@@ -1,3 +1,5 @@
+use crate::common::ResponseError;
+
 // TODO(raphaelhetzel) These should be actual types in the future to allow for type-safety.
 pub type NodeId = uuid::Uuid;
 pub type NodeLocalComponentId = uuid::Uuid;
@@ -57,6 +59,12 @@ pub struct SpawnFunctionRequest {
     pub state_specification: StateSpecification,
 }
 
+#[derive(Debug, Clone)]
+pub struct SpawnFunctionResponse {
+    pub response_error: Option<ResponseError>,
+    pub instance_id: Option<InstanceId>,
+}
+
 #[derive(Debug)]
 pub struct UpdateFunctionLinksRequest {
     pub instance_id: Option<InstanceId>,
@@ -65,7 +73,7 @@ pub struct UpdateFunctionLinksRequest {
 
 #[async_trait::async_trait]
 pub trait FunctionInstanceAPI: FunctionInstanceAPIClone + Sync + Send {
-    async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<InstanceId>;
+    async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<SpawnFunctionResponse>;
     async fn stop(&mut self, id: InstanceId) -> anyhow::Result<()>;
     async fn update_links(&mut self, update: UpdateFunctionLinksRequest) -> anyhow::Result<()>;
 }

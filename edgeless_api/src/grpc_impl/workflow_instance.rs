@@ -327,7 +327,7 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
             )),
             Err(err) => Ok(tonic::Response::new(crate::grpc_impl::api::SpawnWorkflowResponse {
                 response_error: Some(crate::grpc_impl::api::ResponseError {
-                    summary: "Requested rejected".to_string(),
+                    summary: "Request rejected".to_string(),
                     detail: Some(err.to_string()),
                 }),
                 workflow_status: None,
