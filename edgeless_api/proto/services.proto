@@ -9,8 +9,8 @@ package edgeless_api;
 service FunctionInstance {
     // Start a new function instance.
     // Input: request containing the description of the function to create.
-    // Output: the function instance identifier assigned
-    rpc Start (SpawnFunctionRequest) returns (InstanceId);
+    // Output: the function instance identifier assigned, if accepted.
+    rpc Start (SpawnFunctionRequest) returns (SpawnFunctionResponse);
     
     // Stop a running function instance.
     // Input: the identifier of the function instance to tear down.

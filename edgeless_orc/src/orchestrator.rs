@@ -7,7 +7,7 @@ pub struct Orchestrator {
 enum OrchestratorRequest {
     SPAWN(
         edgeless_api::function_instance::SpawnFunctionRequest,
-        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::function_instance::InstanceId>>,
+        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse>>,
     ),
     STOP(edgeless_api::function_instance::InstanceId),
     UPDATE(edgeless_api::function_instance::UpdateFunctionLinksRequest),
@@ -62,7 +62,7 @@ impl Orchestrator {
                 OrchestratorRequest::SPAWN(spawn_req, reply_channel) => {
                     log::debug!("Orchestrator Spawn {:?}", spawn_req);
                     let res = match fn_client.start(spawn_req).await {
-                        Ok(f_id) => Ok(f_id),
+                        Ok(res) => Ok(res),
                         Err(err) => {
                             log::error!("Unhandled: {}", err);
                             Err(anyhow::anyhow!("Orchestrator->Node Spawn Request failed"))
@@ -106,29 +106,42 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFuncti
     async fn start(
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
-    ) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
+    ) -> anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse> {
         let request = request;
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::function_instance::InstanceId>>();
-        if let Err(_) = self.sender.send(OrchestratorRequest::SPAWN(request, reply_sender)).await {
-            return Err(anyhow::anyhow!("Orchestrator Channel Error"));
+        let (reply_sender, reply_receiver) =
+            tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse>>();
+        if let Err(err) = self.sender.send(OrchestratorRequest::SPAWN(request, reply_sender)).await {
+            return Err(anyhow::anyhow!(
+                "Orchestrator channel error when creating a function instance: {}",
+                err.to_string()
+            ));
         }
         match reply_receiver.await {
             Ok(f_id) => f_id,
-            Err(_) => Err(anyhow::anyhow!("Orchestrator Channel Error")),
+            Err(err) => Err(anyhow::anyhow!(
+                "Orchestrator channel error when creating a function instance: {}",
+                err.to_string()
+            )),
         }
     }
 
     async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
         match self.sender.send(OrchestratorRequest::STOP(id)).await {
             Ok(_) => Ok(()),
-            Err(_) => Err(anyhow::anyhow!("Orchestrator Channel Error")),
+            Err(err) => Err(anyhow::anyhow!(
+                "Orchestrator channel error when stopping a function instance: {}",
+                err.to_string()
+            )),
         }
     }
 
     async fn update_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
         match self.sender.send(OrchestratorRequest::UPDATE(update)).await {
             Ok(_) => Ok(()),
-            Err(_) => Err(anyhow::anyhow!("Orchestrator Channel Error")),
+            Err(err) => Err(anyhow::anyhow!(
+                "Orchestrator channel error when updating the links of a function instance: {}",
+                err.to_string()
+            )),
         }
     }
 }
