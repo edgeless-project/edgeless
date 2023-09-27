@@ -2,7 +2,9 @@
 
 type nid = int (* Nodes *)
 type wid = int (* Workflows *)
-type fid = int (* Functions*)
+type fid = int (* Instantiated functions*)
+type rid = string (* Repository identified *)
+type alias = string (* Naming things *)
 
 (** Forwarding tables.
 
@@ -12,7 +14,8 @@ function instances on other nodes with some priority for load balancing.
 *)
 
 type prio = int (* Entry priority, for load balancing *)
-type fwde = (wid * fid) * ((nid * fid) * prio) list
+type target = nid * fid (* Target for a function output *)
+type fwde = (wid * fid) * (target * prio) list
 (* Forwarding table entries, the list of postential destination function
    instances with associated priorities corresponding to a function i
    nstance on this node *)
@@ -40,32 +43,46 @@ target based on the node's architecture.
 type runtime = Wasm | Container | X86_64 (* What this node can host *)
 
 (** Functions.
-    
-A function is an identified entity within a function repository.
+
+A function is a named entity within a function repository targeting a
+particular runtime.
 *)
 
 module Function : sig
   type t
 end = struct
+  type t = { repository : rid; alias : alias; runtime : runtime }
+end
+
+
+(** Function invocations.
+
+A function invocation is a named stage in a Workflow that may invoke one
+or more output callbacks.
+
+*)
+module Invocation : sig
+  type t
+end = struct
   type t = {
-    fid : fid;
-    runtime : runtime;
-    repository : string;
+    alias : alias;
+    func : Function.t;
+    outputs : Function.t list;
   }
 end
 
 
 (** Workflows.
     
-A workflow is an identified sequence of function calls.
+A workflow is a named list of function invocations, representing a DAG.
 *)
 
 module Workflow : sig
   type t
 end = struct
   type t = {
-    wid : wid;
-    chain : Function.t list;
+    alias: string;
+    functions: Invocation.t list;
   }
 end
 
@@ -80,7 +97,6 @@ module Node : sig
   type t
 end = struct
   type t = {
-    nid : nid;
     resources : cpu * memory * resource list;
     runtime : runtime;
     fwdt : fwdt;
@@ -123,6 +139,6 @@ module Controller : sig
 end = struct
   type t = Orchestrator.t list
 
-  let start econ workflow = (econ, -1)
+  let start econ workflow : t * wid = (econ, -1)
   let stop econ workflow_id = econ
 end
