@@ -8,15 +8,14 @@ type alias = string (* Naming things *)
 
 (** Forwarding tables.
 
-A forwarding table is a list of forwarding table entries assoicated with
-a function Instance, each of which maps a specific output to one or more
+A forwarding table is a list of forwarding table entries, each of which
+maps a specific function instance in a specific workflow to one or more
 function instances on other nodes with some priority for load balancing.
 *)
 
 type prio = int (* Entry priority, for load balancing *)
-type output = string (* Output channel for a function *)
 type target = nid * fid (* Target for a function output *)
-type fwde = output * (target * prio) list
+type fwde = (wid * fid) * (target * prio) list
 (* Forwarding table entries, the list of postential destination function
    instances with associated priorities corresponding to a function i
    nstance on this node *)
@@ -55,28 +54,23 @@ end = struct
   type t = { repository : rid; alias : alias; runtime : runtime }
 end
 
-(** Function instance.
-
-A function instance is a running function hosted on a node, with a
-forwarding table attached.
-*)
-
-module Instance : sig
-  type t
-end = struct
-  type t = { fid : fid; func : Function.t; fwdt : fwdt }
-end
 
 (** Function invocations.
 
 A function invocation is a named stage in a Workflow that may invoke one
-or more outputs.
+or more output callbacks.
+
 *)
 module Invocation : sig
   type t
 end = struct
-  type t = { alias : alias; func : Function.t; outputs : output list }
+  type t = {
+    alias : alias;
+    func : Function.t;
+    outputs : Function.t list;
+  }
 end
+
 
 (** Workflows.
     
@@ -86,7 +80,10 @@ A workflow is a named list of function invocations, representing a DAG.
 module Workflow : sig
   type t
 end = struct
-  type t = { alias : string; functions : Invocation.t list }
+  type t = {
+    alias: string;
+    functions: Invocation.t list;
+  }
 end
 
 (** Nodes.
@@ -100,10 +97,9 @@ module Node : sig
   type t
 end = struct
   type t = {
-    nid : nid;
     resources : cpu * memory * resource list;
     runtime : runtime;
-    instances : Instance.t list;
+    fwdt : fwdt;
   }
 end
 
