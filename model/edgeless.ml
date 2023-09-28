@@ -78,7 +78,7 @@ or more outputs.
 module Invocation : sig
   type t
 end = struct
-  type t = { alias : alias; func : Function.t }
+  type t = { alias : alias; func : Function.t; outputs : output list }
 end
 
 (** Workflows.
@@ -90,7 +90,7 @@ function, chain, DAG, or general graph.
 module Workflow : sig
   type t
 end = struct
-  type t = { w_name : w_name; functions : Invocation.t list; output_mapping : output * alias list }
+  type t = { alias : string; functions : Invocation.t list }
 end
 
 (** Nodes.
