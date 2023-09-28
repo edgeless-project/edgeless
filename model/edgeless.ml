@@ -4,11 +4,14 @@ type nid = int (* Nodes *)
 type wid = int (* Workflows *)
 type fid = int (* Instantiated functions*)
 type rid = string (* Repository identified *)
-type alias = string (* Naming things *)
+type alias = string (* Function alias within a workflow *)
+type f_name = string (* Function name *)
+type w_name = string (* Workflow name *)
+type version = string (* Version number/name *)
 
 (** Forwarding tables.
 
-A forwarding table is a list of forwarding table entries assoicated with
+A forwarding table is a list of forwarding table entries associated with
 a function Instance, each of which maps a specific output to one or more
 function instances on other nodes with some priority for load balancing.
 *)
@@ -52,7 +55,7 @@ particular runtime.
 module Function : sig
   type t
 end = struct
-  type t = { repository : rid; alias : alias; runtime : runtime }
+  type t = { repository : rid; version : version; f_name : f_name; runtime : runtime; outputs : output list }
 end
 
 (** Function instance.
@@ -75,18 +78,19 @@ or more outputs.
 module Invocation : sig
   type t
 end = struct
-  type t = { alias : alias; func : Function.t; outputs : output list }
+  type t = { alias : alias; func : Function.t }
 end
 
 (** Workflows.
     
-A workflow is a named list of function invocations, representing a DAG.
+A workflow is a named list of function invocations, representing a single
+function, chain, DAG, or general graph.
 *)
 
 module Workflow : sig
   type t
 end = struct
-  type t = { alias : string; functions : Invocation.t list }
+  type t = { w_name : w_name; functions : Invocation.t list; output_mapping : output * alias list }
 end
 
 (** Nodes.
@@ -95,6 +99,8 @@ Nodes are identified entities that use resources and a runtime to host
 functions, using a forwarding table to determine where to send the
 output of a function according to the workflow to which the fnuction
 belongs.
+
+A node contains the list of instances currently running.
 *)
 module Node : sig
   type t
@@ -118,6 +124,7 @@ module Orchestrator : sig
 
   val start : t -> wid * Function.t -> t * (nid * fid) list
   val stop : t -> nid * fid -> t
+  val stop : t -> wid -> t
   val update : t -> (nid * fwdt) list -> t
 end = struct
   type t = Ingress of fwdt * Node.t list
@@ -129,9 +136,9 @@ end
 
 (** Controllers.
 
-A controller -- e-con -- is an administrative domain contaiing a list of
+A controller -- e-con -- is an administrative domain containing a list of
 orchestrators. Controllers process workflows, making requests of
-orchestrators for the fnuctions required by a workflow to be
+orchestrators for the functions required by a workflow to be
 instantiated.
 *)
 
@@ -140,9 +147,11 @@ module Controller : sig
 
   val start : t -> Workflow.t -> t * wid
   val stop : t -> wid -> t
+  val list : t -> t * (wid * Orchestrator.t list)
 end = struct
-  type t = Orchestrator.t list
+  type t = { Orchestrator.t list ; wid * Orchestrator.t list }
 
   let start econ workflow : t * wid = (econ, -1)
   let stop econ workflow_id = econ
+  let list econ = econ * []
 end
