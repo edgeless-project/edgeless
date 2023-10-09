@@ -1,9 +1,7 @@
 // Based on https://github.com/esp-rs/esp-wifi/blob/main/examples-esp32/examples/embassy_dhcp.rs
 use embedded_svc::wifi::Wifi;
 
-use hal::{
-    prelude::*,
-};
+use hal::prelude::*;
 
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
@@ -18,43 +16,38 @@ macro_rules! singleton {
     }};
 }
 
-#[embassy_executor::task]
 pub async fn init(
     spawner: embassy_executor::Spawner,
     timer: esp_wifi::EspWifiTimer,
     rng: hal::Rng,
     radio_clock_control: hal::system::RadioClockControl,
     clocks: hal::clock::Clocks<'static>,
-    radio: hal::peripherals::RADIO
-) {
-
-    let init = esp_wifi::initialize(
-        esp_wifi::EspWifiInitFor::Wifi,
-        timer,
-        rng.clone(),
-        radio_clock_control,
-        &clocks,
-    )
-    .unwrap();
-
+    radio: hal::peripherals::RADIO,
+) -> &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static>> {
+    let init = esp_wifi::initialize(esp_wifi::EspWifiInitFor::Wifi, timer, rng.clone(), radio_clock_control, &clocks).unwrap();
 
     let (wifi, _) = radio.split();
 
-    let (wifi_interface, controller) =
-        esp_wifi::wifi::new_with_mode(&init, wifi, esp_wifi::wifi::WifiMode::Sta).unwrap();
+    let (wifi_interface, controller) = esp_wifi::wifi::new_with_mode(&init, wifi, esp_wifi::wifi::WifiMode::Sta).unwrap();
 
     let net_config = embassy_net::Config::dhcpv4(Default::default());
-    
-    let stack = &*singleton!(embassy_net::Stack::new(
+
+    let stack = static_cell::make_static!(embassy_net::Stack::new(
         wifi_interface,
         net_config,
         singleton!(embassy_net::StackResources::<3>::new()),
         1234
     ));
 
-    spawner.spawn(connection(controller)).ok();
-    spawner.spawn(net_task(&stack)).ok();
+    spawner.spawn(connection(controller)).unwrap();
+    spawner.spawn(net_task(stack)).unwrap();
+    spawner.spawn(network_watchdog(stack)).unwrap();
 
+    stack
+}
+
+#[embassy_executor::task]
+async fn network_watchdog(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static>>) {
     loop {
         if stack.is_link_up() {
             break;
@@ -77,7 +70,6 @@ async fn connection(mut controller: esp_wifi::wifi::WifiController<'static>) {
     loop {
         match esp_wifi::wifi::get_wifi_state() {
             esp_wifi::wifi::WifiState::StaConnected => {
-                // wait until we're no longer connected
                 controller.wait_for_event(esp_wifi::wifi::WifiEvent::StaDisconnected).await;
                 embassy_time::Timer::after(embassy_time::Duration::from_millis(5000)).await
             }
@@ -93,7 +85,6 @@ async fn connection(mut controller: esp_wifi::wifi::WifiController<'static>) {
             controller.set_configuration(&client_config).unwrap();
             log::info!("Starting wifi. SSID: {}", SSID);
             controller.start().await.unwrap();
-            log::info!("Wifi started!");
         }
 
         log::info!("Attempt to connect.");
@@ -106,7 +97,6 @@ async fn connection(mut controller: esp_wifi::wifi::WifiController<'static>) {
         }
     }
 }
-
 
 #[embassy_executor::task]
 async fn net_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static>>) {
