@@ -170,10 +170,19 @@ impl DataplaneProvider {
             RemoteLinkProvider::new(node_id, std::collections::HashMap::new()).await,
         ));
 
+        let (_, _, port) = edgeless_api::util::parse_http_host(&invocation_url.clone()).unwrap();
+
         let clone_provider = remote_provider.clone();
         let _server = tokio::spawn(edgeless_api::grpc_impl::invocation::InvocationAPIServer::run(
             clone_provider.lock().await.incomming_api().await,
             invocation_url,
+        ));
+
+        log::info!("coap port {}", port);
+
+        let _coap_server = tokio::spawn(edgeless_api::coap_impl::CoapInvocationServer::run(
+            clone_provider.lock().await.incomming_api().await,
+            std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
         ));
 
         for peer in peers {
@@ -190,7 +199,7 @@ impl DataplaneProvider {
     pub async fn get_handle_for(&mut self, target: edgeless_api::function_instance::InstanceId) -> DataplaneHandle {
         let (sender, receiver) = futures::channel::mpsc::unbounded::<DataplaneEvent>();
         let output_chain = vec![
-            self.local_provider.lock().await.new_link(target.clone(), sender.clone()).await,
+            // self.local_provider.lock().await.new_link(target.clone(), sender.clone()).await,
             self.remote_provider.lock().await.new_link(target.clone(), sender.clone()).await,
         ];
         DataplaneHandle::new(target, output_chain, receiver).await
@@ -199,10 +208,19 @@ impl DataplaneProvider {
     async fn connect_peer(
         target: &EdgelessDataplanePeerSettings,
     ) -> (edgeless_api::function_instance::NodeId, Box<dyn edgeless_api::invocation::InvocationAPI>) {
-        (
-            target.id.clone(),
-            Box::new(edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&target.invocation_url).await),
-        )
+        let (proto, url, port) = edgeless_api::util::parse_http_host(&target.invocation_url).unwrap();
+
+        if proto == edgeless_api::util::Proto::COAP {
+            (
+                target.id.clone(),
+                Box::new(edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port)).await),
+            )
+        } else {
+            (
+                target.id.clone(),
+                Box::new(edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&target.invocation_url).await),
+            )
+        }
     }
 }
 

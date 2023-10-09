@@ -20,21 +20,47 @@ debug = true
 opt-level = 3
 lto = "off"
 
+[patch.crates-io]
+esp32-hal = { path = "../vendor/esp-hal/esp32-hal" }
+
 [dependencies]
 log = { version = "0.4", default-features = false }
 
-hal = { package = "esp32-hal", version = "0.15", features = ["async", "embassy", "embassy-executor-thread", "embassy-time-timg0"] }
+hal = { package = "esp32-hal", version="0.15", features = ["async", "embassy", "embassy-executor-thread", "embassy-time-timg0", "eh1"] }
 esp-backtrace = { version = "0.8.0", features = ["esp32", "panic-handler", "exception-handler", "print-uart"] }
-esp-println = { version = "0.6.0", features = ["esp32","log"] }
+esp-println = { version = "0.6.0", default-features=false, features = ["esp32", "uart", "log", "critical-section"] }
 esp-alloc = { version = "0.3.0" }
-esp-wifi = { git = "https://github.com/esp-rs/esp-wifi.git", package ="esp-wifi", default-features = false,  features = ["esp32", "utils", "async", "wifi", "embassy-net", "log","wifi-logs", "big-heap"] }
+esp-wifi = { git = "https://github.com/esp-rs/esp-wifi.git", package ="esp-wifi", default-features = false,  features = ["esp32", "utils", "async", "wifi", "embassy-net"] }
 
 embassy-executor = { version = "0.3.0", features = ["nightly"] }
-embassy-sync = "0.2.0"
+embassy-sync = { version = "0.3" }
 embassy-time = { version = "0.1.3",  features = ["nightly"] }
 embassy-net = { version = "0.1.0", features = ["nightly", "tcp", "udp", "dhcpv4", "medium-ethernet"] }
+embassy-futures = { version =  "0.1" }
 static_cell = { version = "1.2.0", features = ["nightly"] }
 embedded-svc = { version = "0.25.1", default-features = false, features = [] }
+
+once_cell = {version = "1.18", default-features = false, features = ["critical-section"]}
+getrandom = { version = "0.2", features = ["custom"] }
+uuid = {version= "1.3", default-features = false, features = ["v4"] }
+
+edgeless_api_core = {path = "../edgeless_api_core" }
+# edgeless_dataplane = {path = "../edgeless_dataplane" }
+heapless = "0.7"
+
+coap-lite = { version = "0.11", default-features = false }
+minicbor =  {version = "0.19", default-features = false, features = ["derive"]}
+# futures = { version = "0.3", default-features = false }
+
+
+smoltcp = { version = "0.10.0", default-features = false, features = [
+  "socket",
+  "async",
+] }
+
+epd-waveshare = { path = "../vendor/epd-waveshare", features = ["graphics", "epd2in13_v3"], default-features = false}
+embedded-graphics = { version = "0.8"}
+sensor-scd30 = {path="../vendor/rust-sensor-scd30", default-features=false}
 
 [build-dependencies]
 embuild = "0.31.2"
