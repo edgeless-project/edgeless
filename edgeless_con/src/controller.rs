@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{net::SocketAddrV4, str::FromStr};
 
 use edgeless_api::workflow_instance::WorkflowInstance;
 use futures::{Future, SinkExt, StreamExt};
@@ -61,14 +61,23 @@ impl Controller {
         }
 
         for resource in &controller_settings.resources {
+            let (proto, url, port) = edgeless_api::util::parse_http_host(&resource.resource_configuration_url).unwrap();
+            let config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send> = match proto {
+                edgeless_api::util::Proto::COAP => {
+                    log::info!("coap called");
+                    Box::new(edgeless_api::coap_impl::CoapClient::new(SocketAddrV4::new(url.parse().unwrap(), port)).await)
+                }
+                _ => Box::new(
+                    edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationClient::new(&resource.resource_configuration_url).await,
+                ),
+            };
+
             resources.insert(
                 resource.resource_provider_id.clone(),
                 ResourceHandle {
                     resource_type: resource.resource_class_type.clone(),
                     _output_callback_declarations: resource.output_callback_declarations.clone(),
-                    config_api: Box::new(
-                        edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationClient::new(&resource.resource_configuration_url).await,
-                    ),
+                    config_api: config_api,
                 },
             );
         }
