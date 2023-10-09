@@ -1,0 +1,38 @@
+{
+    "alias": "esp32_resources",
+    "functions": [
+        {
+            "alias": "test_fun",
+            "class_specification": {
+                "id": "esp_test_fun",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./esp_test_fun/esp_test_fun.wasm",
+                "output_callbacks": [
+                    "check_display"
+                ]
+            },
+            "output_callback_definitions": {
+                "check_display": "test_display"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "alias": "test_sensor",
+            "resource_class_type": "scd30-sensor",
+            "output_callback_definitions": {
+                "data_out": "test_fun"
+            },
+            "configurations": {}
+        },
+        {
+            "alias": "test_display",
+            "resource_class_type": "epaper-display",
+            "output_callback_definitions": {},
+            "configurations": {}
+        }
+    ],
+    "annotations": {}
+}
