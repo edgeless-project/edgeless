@@ -40,9 +40,10 @@ orchestrators = [
     { domain_id = "domain-1", orchestrator_url="http://127.0.0.1:7011" }
 ]
 resources = [
-    { resource_provider_id = "file-log-1",  resource_class_type = "file-log", output_callback_declarations = [], resource_configuration_url = "http://127.0.0.1:7033" },
-    { resource_provider_id = "http-ingress-1",  resource_class_type = "http-ingress", output_callback_declarations = ["new_request"], resource_configuration_url = "http://127.0.0.1:7033" },
-    { resource_provider_id = "http-egress-1",  resource_class_type = "http-egress", output_callback_declarations = [], resource_configuration_url = "http://127.0.0.1:7033" }
+    { resource_provider_id = "file-log-1",     resource_class_type = "file-log",     output_callback_declarations = [],              resource_configuration_url = "http://127.0.0.1:7033" },
+    { resource_provider_id = "http-ingress-1", resource_class_type = "http-ingress", output_callback_declarations = ["new_request"], resource_configuration_url = "http://127.0.0.1:7033" },
+    { resource_provider_id = "http-egress-1",  resource_class_type = "http-egress",  output_callback_declarations = [],              resource_configuration_url = "http://127.0.0.1:7033" },
+    { resource_provider_id = "redis-1",        resource_class_type = "redis",        output_callback_declarations = [],              resource_configuration_url = "http://127.0.0.1:7033" }
 ]
 "##,
     )
