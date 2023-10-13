@@ -23,6 +23,15 @@ impl SpawnResourceResponse {
             instance_id: Some(instance_id),
         }
     }
+    pub fn bad(summary: &str, detail: &str) -> Self {
+        Self {
+            response_error: Some(crate::common::ResponseError {
+                summary: summary.to_string(),
+                detail: Some(detail.to_string()),
+            }),
+            instance_id: None,
+        }
+    }
 }
 
 #[async_trait::async_trait]
