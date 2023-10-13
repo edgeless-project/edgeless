@@ -1,6 +1,6 @@
 #!/bin/bash
 
-logs="build.log edgeless_bal.log edgeless_con.log edgeless_orc.log edgeless_node.log"
+logs="build.log build_functions.log edgeless_bal.log edgeless_con.log edgeless_orc.log edgeless_node.log my-local-file.log"
 confs="balancer.toml controller.toml orchestrator.toml node.toml cli.toml"
 
 echo "checking for existing files"
@@ -29,6 +29,20 @@ if [ $? -ne 0 ] ; then
     exit 1
 fi
 
+echo "building the functions, if needed"
+rm -f build_functions.log 2> /dev/null
+for func in $(find examples/ -type f -name function.json) ; do
+    echo -n "checking function in $(dirname $func): "
+
+    wasm_name="$(dirname $func)/$(grep "\"id\"" $func | cut -f 4 -d '"').wasm"
+    if [ -r $wasm_name ] ; then
+        echo "using pre-built byte code"
+    else
+        echo "building byte code (please be patient)"
+        target/debug/edgeless_cli function build $func >> build_functions.log 2>&1
+    fi
+done
+
 echo "creating configuration files"
 target/debug/edgeless_bal_d -t balancer.toml
 target/debug/edgeless_con_d -t controller.toml
@@ -49,30 +63,24 @@ pids+=($!)
 
 sleep 0.5
 
-echo "building the functions, if needed"
-if [ ! -r examples/ping_pong/ping/pinger.wasm ] ; then
-    target/debug/edgeless_cli function build examples/ping_pong/ping/function.json >& pinger.log
-fi
-if [ ! -r examples/ping_pong/pong/ponger.wasm ] ; then
-    target/debug/edgeless_cli function build examples/ping_pong/pong/function.json >& ponger.log
-fi
-
-if [[ ! -r examples/ping_pong/ping/pinger.wasm || ! -r examples/ping_pong/pong/ponger.wasm ]] ; then
-    echo "could not build the functions, check logs"
-else
-    uid=$(target/debug/edgeless_cli workflow start examples/ping_pong/workflow.json)
-    echo "workflow UID = $uid"
-    echo "sleeping for 2 seconds"
+echo "workflows"
+for workflow in $(find examples/ -type f -name workflow.json) ; do
+    echo -n "starting workflow $(dirname $workflow): "
+    uid=$(target/debug/edgeless_cli workflow start $workflow)
+    if [ $? -eq 0 ] ; then
+        echo "started with ID $uid"
+    else
+        echo "error"
+    fi
     sleep 2
-    echo "terminating the workflow"
-    target/debug/edgeless_cli workflow stop $uid
-    if [ $? -ne 0 ] ; then
-        echo "something when wrong when terminating the workflow"
+    echo -n "stopping workflow $(dirname $workflow): "
+    target/debug/edgeless_cli workflow stop $uid >& /dev/null
+    if [ $? -eq 0 ] ; then
+        echo "done"
+    else
+        echo "error"
     fi
-    if [ "$(grep 'Got Reply' edgeless_node.log)" == "" ] ; then
-        echo "the workflow execution failed"
-    fi
-fi
+done
 
 echo "cleaning up"
 for pid in "${pids[@]}" ; do
