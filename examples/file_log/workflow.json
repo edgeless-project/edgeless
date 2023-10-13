@@ -1,0 +1,32 @@
+{
+    "alias": "my-workflow",
+    "functions": [
+        {
+            "alias": "my-message-generator",
+            "class_specification": {
+                "id": "message_generator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./message_generator/message_generator.wasm",
+                "output_callbacks": []
+            },
+            "output_callback_definitions": {
+                "output": "my-log"
+            },
+            "annotations": {
+                "init-payload": "hello world"
+            }
+        }
+    ],
+    "resources": [
+        {
+            "alias": "my-log",
+            "resource_class_type": "file-log",
+            "output_callback_definitions": {},
+            "configurations": {
+                "filename": "my-local-file.log"
+            }
+        }
+    ],
+    "annotations": {}
+}
