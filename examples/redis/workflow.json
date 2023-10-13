@@ -1,0 +1,33 @@
+{
+    "alias": "my-redis-workflow",
+    "functions": [
+        {
+            "alias": "my-message-generator",
+            "class_specification": {
+                "id": "counter",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./counter/counter.wasm",
+                "output_callbacks": []
+            },
+            "output_callback_definitions": {
+                "output": "my-redis"
+            },
+            "annotations": {
+                "init-payload": "42"
+            }
+        }
+    ],
+    "resources": [
+        {
+            "alias": "my-redis",
+            "resource_class_type": "redis",
+            "output_callback_definitions": {},
+            "configurations": {
+                "url": "redis://127.0.0.1:6379/",
+                "key": "example-redis"
+            }
+        }
+    ],
+    "annotations": {}
+}

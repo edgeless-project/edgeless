@@ -1,6 +1,7 @@
 pub mod file_log;
 pub mod http_egress;
 pub mod http_ingress;
+pub mod redis;
 
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct EdgelessBalSettings {
@@ -41,11 +42,20 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
         .await,
     );
 
+    let redis = Box::new(
+        redis::RedisResourceProvider::new(
+            data_plane.clone(),
+            edgeless_api::function_instance::InstanceId::new(settings.balancer_id.clone()),
+        )
+        .await,
+    );
+
     let multi_resouce_api = Box::new(edgeless_api::resource_configuration::MultiResouceConfigurationAPI::new(
         std::collections::HashMap::<String, Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI>>::from([
             ("http-ingress-1".to_string(), ingress),
             ("http-egress-1".to_string(), egress),
             ("file-log-1".to_string(), file_log),
+            ("redis-1".to_string(), redis),
         ]),
     ));
 

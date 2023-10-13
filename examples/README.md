@@ -9,4 +9,5 @@ Edgeless MVP platform.
 - `noop`: minimal workflow with a single function that does nothing, which can be used as a template to create more interesting stuff, see [tutorial](noop/README.md)
 - `ping_pong`: shows how functions can be combined in a chain and how to access a shared state, see [tutorial](ping_pong/README.md)
 - `ping_pong_cast`: same as above, but uses CAST instead of CALL events
+- `redis`: shows how to use a resource that updates values on a Redis server
 - `simple_workflow_http`: shows function chaining with external HTTP source/sink
