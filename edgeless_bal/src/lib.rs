@@ -1,3 +1,4 @@
+pub mod file_log;
 pub mod http_egress;
 pub mod http_ingress;
 
@@ -32,10 +33,19 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
         .await,
     );
 
+    let file_log = Box::new(
+        file_log::FileLogResourceProvider::new(
+            data_plane.clone(),
+            edgeless_api::function_instance::InstanceId::new(settings.balancer_id.clone()),
+        )
+        .await,
+    );
+
     let multi_resouce_api = Box::new(edgeless_api::resource_configuration::MultiResouceConfigurationAPI::new(
         std::collections::HashMap::<String, Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI>>::from([
             ("http-ingress-1".to_string(), ingress),
             ("http-egress-1".to_string(), egress),
+            ("file-log-1".to_string(), file_log),
         ]),
     ));
 
