@@ -1,4 +1,4 @@
-# Rust Function API
+# EDGELESS Rust function API
 
 ## Function Framework
 

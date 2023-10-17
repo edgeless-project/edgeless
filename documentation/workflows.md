@@ -1,4 +1,4 @@
-# Workflow Definitions
+# EDGELESS workflows
 
 From a workflow-developer perspective, workflows can be defined using a
 `workflow.json` file. Internally, the `edgeless_cli` uses the
