@@ -11,3 +11,11 @@ Edgeless MVP platform.
 - `ping_pong_cast`: same as above, but uses CAST instead of CALL events
 - `redis`: shows how to use a resource that updates values on a Redis server
 - `simple_workflow_http`: shows function chaining with external HTTP source/sink
+
+Before running the examples you must build the system, see [building instructions](../BUILDING.md).
+
+You may run all the examples with a single command by using the following script:
+
+```shell
+scripts/run_all_examples.sh
+```
