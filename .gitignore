@@ -7,3 +7,4 @@ function_state/
 /orchestrator.toml
 /cli.toml
 .direnv
+settings.json
