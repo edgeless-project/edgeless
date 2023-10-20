@@ -2,12 +2,12 @@ mod orchestrator;
 
 use futures::join;
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessOrcNodeConfig {
     pub node_id: uuid::Uuid,
     pub agent_url: String,
 }
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessOrcSettings {
     pub domain_id: String,
     pub orchestrator_url: String,

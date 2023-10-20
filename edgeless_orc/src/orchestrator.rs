@@ -5,7 +5,10 @@ pub struct Orchestrator {
 }
 
 enum OrchestratorRequest {
+    // TODO: why does SpawnFunctionRequest already container instance_id?
+    // shouldn't this be decided by the orchestrator?
     SPAWN(
+        // contains: instance_id (node + function id), code, output_callbacks?
         edgeless_api::function_instance::SpawnFunctionRequest,
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse>>,
     ),
@@ -13,17 +16,20 @@ enum OrchestratorRequest {
     UPDATE(edgeless_api::function_instance::UpdateFunctionLinksRequest),
 }
 
+// TODO: what is the role of OrchestratorClient?
 pub struct OrchestratorClient {
     function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceAPI>,
 }
 
 impl edgeless_api::orc::OrchestratorAPI for OrchestratorClient {
+    // TODO: what is the role of this?
     fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI> {
         self.function_instance_client.clone()
     }
 }
 
 #[derive(Clone)]
+// TODO: what is the role of this component?
 pub struct OrchestratorFunctionInstanceClient {
     sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
 }
@@ -42,13 +48,17 @@ impl Orchestrator {
 
     async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
         let mut clients = std::collections::HashMap::<uuid::Uuid, Box<dyn edgeless_api::agent::AgentAPI + Send>>::new();
+        // Goes through the list of all worker nodes in this orchestration
+        // domain and creates AgentAPIClient objects for them
         for node in &orchestrator_settings.nodes {
             clients.insert(
                 node.node_id,
                 Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&node.agent_url).await),
             );
         }
+        // Receiver TODO: explain what it does
         let mut receiver = receiver;
+
         let mut client = match clients.into_values().next() {
             Some(c) => c,
             None => {
@@ -57,9 +67,15 @@ impl Orchestrator {
             }
         };
         let mut fn_client = client.function_instance_api();
+
         while let Some(req) = receiver.next().await {
             match req {
                 OrchestratorRequest::SPAWN(spawn_req, reply_channel) => {
+                    // TODO: here we should perform the selection of the client to which we
+                    // will send the spawn request
+
+                    // TODO: my code will go here
+
                     log::debug!("Orchestrator Spawn {:?}", spawn_req);
                     let res = match fn_client.start(spawn_req).await {
                         Ok(res) => Ok(res),
@@ -73,6 +89,8 @@ impl Orchestrator {
                     }
                 }
                 OrchestratorRequest::STOP(stop_function_id) => {
+                    // TODO: orchestrator maintains a list map where
+                    // function_ids are mapped to the worker node
                     log::debug!("Orchestrator Stop {:?}", stop_function_id);
                     match fn_client.stop(stop_function_id).await {
                         Ok(_) => {}
@@ -82,6 +100,8 @@ impl Orchestrator {
                     };
                 }
                 OrchestratorRequest::UPDATE(update) => {
+                    // TODO: orchestrator maintains a list map where
+                    // function_ids are mapped to the client id
                     log::debug!("Orchestrator Update {:?}", update);
                     match fn_client.update_links(update).await {
                         Ok(_) => {}
@@ -102,6 +122,7 @@ impl Orchestrator {
 }
 
 #[async_trait::async_trait]
+// It sends events on the sender?
 impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFunctionInstanceClient {
     async fn start(
         &mut self,

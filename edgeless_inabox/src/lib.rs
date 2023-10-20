@@ -1,19 +1,29 @@
+#[derive(Debug)]
+pub struct InABoxConfig {
+    pub node_conf_files: Vec<String>,
+    pub orc_conf_file: String,
+    pub bal_conf_file: String,
+    pub con_conf_file: String,
+}
+
 pub fn edgeless_inabox_main(
     async_runtime: &tokio::runtime::Runtime,
     async_tasks: &mut Vec<tokio::task::JoinHandle<()>>,
-    node_conf_file: &str,
-    orc_conf_file: &str,
-    bal_conf_file: &str,
-    con_conf_file: &str,
+    in_a_box_config: InABoxConfig,
 ) -> anyhow::Result<()> {
-    let node_conf: edgeless_node::EdgelessNodeSettings = toml::from_str(&std::fs::read_to_string(node_conf_file)?)?;
-    let orc_conf: edgeless_orc::EdgelessOrcSettings = toml::from_str(&std::fs::read_to_string(orc_conf_file)?)?;
-    let bal_conf: edgeless_bal::EdgelessBalSettings = toml::from_str(&std::fs::read_to_string(bal_conf_file)?)?;
-    let con_conf: edgeless_con::EdgelessConSettings = toml::from_str(&std::fs::read_to_string(con_conf_file)?)?;
+    let mut node_confs: Vec<edgeless_node::EdgelessNodeSettings> = Vec::new();
+    for node_conf_file in in_a_box_config.node_conf_files {
+        node_confs.push(toml::from_str(&std::fs::read_to_string(node_conf_file)?)?);
+    }
+    let orc_conf: edgeless_orc::EdgelessOrcSettings = toml::from_str(&std::fs::read_to_string(in_a_box_config.orc_conf_file)?)?;
+    let bal_conf: edgeless_bal::EdgelessBalSettings = toml::from_str(&std::fs::read_to_string(in_a_box_config.bal_conf_file)?)?;
+    let con_conf: edgeless_con::EdgelessConSettings = toml::from_str(&std::fs::read_to_string(in_a_box_config.con_conf_file)?)?;
 
-    log::info!("Edgeless In A Box");
+    log::info!("Starting Edgeless In A Box");
 
-    async_tasks.push(async_runtime.spawn(edgeless_node::edgeless_node_main(node_conf.clone())));
+    for node_conf in node_confs {
+        async_tasks.push(async_runtime.spawn(edgeless_node::edgeless_node_main(node_conf.clone())));
+    }
     async_tasks.push(async_runtime.spawn(edgeless_bal::edgeless_bal_main(bal_conf.clone())));
     async_tasks.push(async_runtime.spawn(edgeless_orc::edgeless_orc_main(orc_conf.clone())));
     async_tasks.push(async_runtime.spawn(edgeless_con::edgeless_con_main(con_conf.clone())));
@@ -55,10 +65,12 @@ mod tests {
         edgeless_inabox_main(
             &async_runtime,
             &mut async_tasks,
-            node_conf.as_str(),
-            orc_conf.as_str(),
-            bal_conf.as_str(),
-            con_conf.as_str(),
+            InABoxConfig {
+                node_conf_files: vec![node_conf],
+                orc_conf_file: orc_conf,
+                bal_conf_file: bal_conf,
+                con_conf_file: con_conf,
+            },
         )?;
 
         std::thread::sleep(std::time::Duration::from_millis(500));
