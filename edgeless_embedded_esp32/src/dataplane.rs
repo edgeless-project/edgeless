@@ -1,7 +1,7 @@
-use edgeless_api_core::invocation::InvocationAPI;
+use crate::invocation::InvocationAPI;
 
 pub struct EmbeddedDataplaneHandle {
-    pub reg: crate::agent::ResourceRegistry,
+    pub reg: crate::agent::EmbeddedAgent,
 }
 
 impl EmbeddedDataplaneHandle {

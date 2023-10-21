@@ -39,9 +39,45 @@ pub struct SCD30Sensor {
     pub inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, SCD30SensorInner>>,
 }
 
-impl SCD30Sensor {}
+impl SCD30Sensor {
+    async fn parse_configuration<'a>(
+        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+    ) -> Result<SCD30SensorConfiguration, ()> {
+        let mut out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
 
-impl<'a> crate::resource::Resource<'a, SCD30SensorConfiguration> for SCD30Sensor {
+        if data.provider_id != "scd30-sensor-1" {
+            return Err(());
+        }
+
+        for output_callback in data.output_callback_definitions {
+            if let Some((key, val)) = output_callback {
+                if key == "data_out" {
+                    out_id = Some(val);
+                    break;
+                }
+            }
+        }
+
+        let out_id = match out_id {
+            Some(val) => val,
+            None => return Err(()),
+        };
+
+        Ok(SCD30SensorConfiguration { data_out_id: out_id })
+    }
+
+    pub async fn new(sensor: &'static mut dyn Sensor) -> &'static mut dyn crate::resource::ResourceDyn {
+        let sensor_state = static_cell::make_static!(core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(SCD30SensorInner {
+            instance_id: None,
+            data_out_id: None,
+            delay: 5,
+            sensor: sensor
+        })));
+        static_cell::make_static!(SCD30Sensor { inner: sensor_state })
+    }
+}
+
+impl crate::resource::Resource for SCD30Sensor {
     fn provider_id(&self) -> &'static str {
         return "scd30-sensor-1";
     }
@@ -51,6 +87,10 @@ impl<'a> crate::resource::Resource<'a, SCD30SensorConfiguration> for SCD30Sensor
         let lck = tmp.lock().await;
 
         return lck.instance_id == Some(instance_id.clone());
+    }
+
+    async fn launch(&mut self, spawner: embassy_executor::Spawner, dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {
+        spawner.spawn(scd30_sensor_task(self.inner.clone(), dataplane_handle));
     }
 }
 
@@ -99,7 +139,7 @@ pub async fn scd30_sensor_task(
     }
 }
 
-impl edgeless_api_core::invocation::InvocationAPI for SCD30Sensor {
+impl crate::invocation::InvocationAPI for SCD30Sensor {
     async fn handle(
         &mut self,
         _event: edgeless_api_core::invocation::Event<&[u8]>,
@@ -109,34 +149,13 @@ impl edgeless_api_core::invocation::InvocationAPI for SCD30Sensor {
     }
 }
 
-impl<'a> edgeless_api_core::resource_configuration::ResourceConfigurationAPI<'a, SCD30SensorConfiguration> for SCD30Sensor {
-    async fn parse_configuration(
-        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<SCD30SensorConfiguration, ()> {
-        let mut out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
+impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
+    async fn start<'a>(
+        &mut self,
+        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
+        let instance_specification = SCD30Sensor::parse_configuration(instance_specification).await?;
 
-        if data.provider_id != "scd30-sensor-1" {
-            return Err(());
-        }
-
-        for output_callback in data.output_callback_definitions {
-            if let Some((key, val)) = output_callback {
-                if key == "data_out" {
-                    out_id = Some(val);
-                    break;
-                }
-            }
-        }
-
-        let out_id = match out_id {
-            Some(val) => val,
-            None => return Err(()),
-        };
-
-        Ok(SCD30SensorConfiguration { data_out_id: out_id })
-    }
-
-    async fn start(&mut self, instance_specification: SCD30SensorConfiguration) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;
 

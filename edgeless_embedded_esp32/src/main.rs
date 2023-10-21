@@ -11,9 +11,11 @@ pub mod agent;
 pub mod coap;
 pub mod dataplane;
 pub mod epaper_display;
+pub mod invocation;
 pub mod mock_display;
 pub mod mock_sensor;
 pub mod resource;
+pub mod resource_configuration;
 pub mod scd30_sensor;
 pub mod wifi;
 
@@ -155,59 +157,18 @@ async fn edgeless(
 
     let stack = wifi::init(spawner.clone(), timer, rng, radio_clock_control, clocks, radio).await;
 
-    let channel = static_cell::make_static!(embassy_sync::channel::Channel::<
-        embassy_sync::blocking_mutex::raw::NoopRawMutex,
-        edgeless_api_core::invocation::Event<heapless::String<1500>>,
-        2,
-    >::new());
-    let sender = channel.sender();
-    let receiver = channel.receiver();
-    let node_id = NODE_ID.clone();
+    let mock_sensor = mock_sensor::MockSensor::new().await;
+    let scd30_sensor = scd30_sensor::SCD30Sensor::new(scd30).await;
+    let mock_display = mock_display::MockDisplay::new().await;
+    let epaper_display = epaper_display::EPaperDisplay::new(display).await;
 
-    let mock_sensor_state = static_cell::make_static!(core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(mock_sensor::MockSensorInner {
-        instance_id: None,
-        data_out_id: None,
-        delay: 30
-    })));
+    let resources = static_cell::make_static!([mock_display, epaper_display, mock_sensor, scd30_sensor]);
 
-    let sensor_state = static_cell::make_static!(core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(
-        scd30_sensor::SCD30SensorInner {
-            instance_id: None,
-            data_out_id: None,
-            delay: 5,
-            sensor: scd30
-        }
-    )));
+    let resource_registry = agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), resources).await;
 
-    let resource_registry = static_cell::make_static!(agent::ResourceRegistry {
-        own_node_id: node_id.clone(),
-        upstream_sender: sender,
-        inner: static_cell::make_static!(core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(agent::ResourceRegistryInner {
-            mock_display: (mock_display::MockDisplay {
-                instance_id: None,
-                active: false
-            }),
-            display: (epaper_display::EPaperDisplay {
-                header: None,
-                instance_id: None,
-                display: display
-            }),
-            mock_sensor: (mock_sensor::MockSensor { inner: mock_sensor_state }),
-            sensor: (scd30_sensor::SCD30Sensor { inner: sensor_state })
-        })))
-    });
-
-    spawner.spawn(coap::coap_task(stack, receiver, resource_registry.clone()));
-
-    let dataplane_handle = dataplane::EmbeddedDataplaneHandle {
-        reg: resource_registry.clone(),
-    };
-
-    spawner.spawn(mock_sensor::mock_sensor_task(mock_sensor_state, dataplane_handle));
-
-    let dataplane_handle = dataplane::EmbeddedDataplaneHandle {
-        reg: resource_registry.clone(),
-    };
-
-    spawner.spawn(scd30_sensor::scd30_sensor_task(sensor_state, dataplane_handle));
+    spawner.spawn(coap::coap_task(
+        stack,
+        resource_registry.upstream_receiver().unwrap(),
+        resource_registry.clone(),
+    ));
 }
