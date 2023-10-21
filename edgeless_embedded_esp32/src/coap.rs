@@ -1,5 +1,5 @@
-use edgeless_api_core::invocation::InvocationAPI;
-use edgeless_api_core::resource_configuration::ResourceConfigurationAPI;
+use crate::invocation::InvocationAPI;
+use crate::resource_configuration::ResourceConfigurationAPI;
 
 #[embassy_executor::task]
 pub async fn coap_task(
@@ -10,7 +10,7 @@ pub async fn coap_task(
         edgeless_api_core::invocation::Event<heapless::String<1500>>,
         2,
     >,
-    agent: crate::agent::ResourceRegistry,
+    agent: crate::agent::EmbeddedAgent,
 ) {
     let mut agent = agent;
 

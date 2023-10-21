@@ -1,27 +1,76 @@
-use crate::resource::Resource;
-
-pub struct ResourceRegistryInner {
-    pub mock_display: crate::mock_display::MockDisplay,
-    pub display: crate::epaper_display::EPaperDisplay,
-    pub mock_sensor: crate::mock_sensor::MockSensor,
-    pub sensor: crate::scd30_sensor::SCD30Sensor,
-}
-
 #[derive(Clone)]
-pub struct ResourceRegistry {
-    pub own_node_id: edgeless_api_core::instance_id::NodeId,
-    pub upstream_sender: embassy_sync::channel::Sender<
+pub struct EmbeddedAgent {
+    own_node_id: edgeless_api_core::instance_id::NodeId,
+    upstream_sender: embassy_sync::channel::Sender<
         'static,
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
         edgeless_api_core::invocation::Event<heapless::String<1500>>,
         2,
     >,
-    pub inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, ResourceRegistryInner>>,
+    upstream_receiver: Option<
+        embassy_sync::channel::Receiver<
+            'static,
+            embassy_sync::blocking_mutex::raw::NoopRawMutex,
+            edgeless_api_core::invocation::Event<heapless::String<1500>>,
+            2,
+        >,
+    >,
+    inner: &'static core::cell::RefCell<
+        embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, &'static mut [&'static mut dyn crate::resource::ResourceDyn]>,
+    >,
 }
 
-impl ResourceRegistry {}
+impl EmbeddedAgent {
+    pub async fn new(
+        spawner: embassy_executor::Spawner,
+        node_id: edgeless_api_core::instance_id::NodeId,
+        resources: &'static mut [&'static mut dyn crate::resource::ResourceDyn],
+    ) -> &'static mut EmbeddedAgent {
+        let channel = static_cell::make_static!(embassy_sync::channel::Channel::<
+            embassy_sync::blocking_mutex::raw::NoopRawMutex,
+            edgeless_api_core::invocation::Event<heapless::String<1500>>,
+            2,
+        >::new());
+        let sender = channel.sender();
+        let receiver = channel.receiver();
 
-impl edgeless_api_core::invocation::InvocationAPI for ResourceRegistry {
+        let slf = static_cell::make_static!(EmbeddedAgent {
+            own_node_id: node_id.clone(),
+            upstream_sender: sender,
+            upstream_receiver: Some(receiver),
+            inner: static_cell::make_static!(core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(&mut resources[..])))
+        });
+
+        {
+            let inner = slf.inner.borrow_mut();
+            let mut lck = inner.lock().await;
+            for r in lck.iter_mut() {
+                r.launch(spawner, slf.dataplane_handle());
+            }
+        }
+
+        slf
+    }
+
+    pub fn dataplane_handle(&mut self) -> crate::dataplane::EmbeddedDataplaneHandle {
+        crate::dataplane::EmbeddedDataplaneHandle { reg: self.clone() }
+    }
+
+    pub fn upstream_receiver(
+        &mut self,
+    ) -> Option<
+        embassy_sync::channel::Receiver<
+            'static,
+            embassy_sync::blocking_mutex::raw::NoopRawMutex,
+            edgeless_api_core::invocation::Event<heapless::String<1500>>,
+            2,
+        >,
+    > {
+        self.upstream_receiver.take()
+    }
+}
+
+impl crate::invocation::InvocationAPI for EmbeddedAgent {
     async fn handle(
         &mut self,
         event: edgeless_api_core::invocation::Event<&[u8]>,
@@ -51,80 +100,39 @@ impl edgeless_api_core::invocation::InvocationAPI for ResourceRegistry {
         } else {
             let inner = self.inner.borrow_mut();
             let mut lck = inner.lock().await;
-            if lck.mock_display.has_instance(&event.target).await {
-                return lck.mock_display.handle(event).await;
-            }
-            if lck.display.has_instance(&event.target).await {
-                return lck.display.handle(event).await;
-            }
-            if lck.mock_sensor.has_instance(&event.target).await {
-                return lck.mock_sensor.handle(event).await;
-            }
-            if lck.sensor.has_instance(&event.target).await {
-                return lck.sensor.handle(event).await;
+
+            for r in lck.iter_mut() {
+                if r.has_instance(&event.target).await {
+                    return r.handle(event).await;
+                }
             }
             Ok(edgeless_api_core::invocation::LinkProcessingResult::PASSED)
         }
     }
 }
 
-impl<'a>
-    edgeless_api_core::resource_configuration::ResourceConfigurationAPI<
-        'a,
-        edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    > for ResourceRegistry
-{
-    async fn parse_configuration(
-        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>, ()> {
-        Ok(data)
-    }
-
+impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
     async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), ()> {
         let inner = self.inner.borrow_mut();
         let mut lck = inner.lock().await;
-        if lck.mock_display.has_instance(&resource_id).await {
-            lck.mock_display.stop(resource_id);
-            return Ok(());
-        }
-        if lck.display.has_instance(&resource_id).await {
-            lck.display.stop(resource_id);
-            return Ok(());
-        }
-        if (lck.mock_sensor.has_instance(&resource_id)).await {
-            lck.mock_sensor.stop(resource_id);
-            return Ok(());
-        }
-        if (lck.sensor.has_instance(&resource_id)).await {
-            lck.sensor.stop(resource_id);
-            return Ok(());
+        for r in lck.iter_mut() {
+            if r.has_instance(&resource_id).await {
+                return r.stop(resource_id).await;
+            }
         }
         Err(())
     }
 
-    async fn start(
+    async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
-        if let Ok(display_config) = crate::mock_display::MockDisplay::parse_configuration(instance_specification.clone()).await {
-            let inner = self.inner.borrow_mut();
-            let mut lck = inner.lock().await;
-            return lck.mock_display.start(display_config).await;
-        }
-        if let Ok(display_config) = crate::epaper_display::EPaperDisplay::parse_configuration(instance_specification.clone()).await {
-            let inner = self.inner.borrow_mut();
-            let mut lck = inner.lock().await;
-            return lck.display.start(display_config).await;
-        }
-        if let Ok(sensor_config) = crate::mock_sensor::MockSensor::parse_configuration(instance_specification.clone()).await {
-            let inner = self.inner.borrow_mut();
-            let mut lck = inner.lock().await;
-            return lck.mock_sensor.start(sensor_config).await;
-        }
-        if let Ok(sensor_config) = crate::scd30_sensor::SCD30Sensor::parse_configuration(instance_specification).await {
-            let inner = self.inner.borrow_mut();
-            let mut lck = inner.lock().await;
-            return lck.sensor.start(sensor_config).await;
+        let inner = self.inner.borrow_mut();
+        let mut lck = inner.lock().await;
+        for r in lck.iter_mut() {
+            if r.provider_id() == instance_specification.provider_id {
+                return r.start(instance_specification).await;
+            }
         }
         Err(())
     }
