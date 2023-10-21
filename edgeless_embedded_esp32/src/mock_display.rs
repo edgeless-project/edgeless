@@ -5,7 +5,26 @@ pub struct MockDisplay {
     pub active: bool,
 }
 
-impl<'a> crate::resource::Resource<'a, MockDisplayInstanceConfiguration> for MockDisplay {
+impl MockDisplay {
+    async fn parse_configuration<'a>(
+        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+    ) -> Result<MockDisplayInstanceConfiguration, ()> {
+        if data.provider_id == "mock-display-1" {
+            Ok(MockDisplayInstanceConfiguration {})
+        } else {
+            Err(())
+        }
+    }
+
+    pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
+        static_cell::make_static!(MockDisplay {
+            instance_id: None,
+            active: false
+        })
+    }
+}
+
+impl crate::resource::Resource for MockDisplay {
     fn provider_id(&self) -> &'static str {
         return "mock-display-1";
     }
@@ -16,9 +35,11 @@ impl<'a> crate::resource::Resource<'a, MockDisplayInstanceConfiguration> for Moc
         }
         false
     }
+
+    async fn launch(&mut self, _spawner: embassy_executor::Spawner, _dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {}
 }
 
-impl edgeless_api_core::invocation::InvocationAPI for MockDisplay {
+impl crate::invocation::InvocationAPI for MockDisplay {
     async fn handle(
         &mut self,
         event: edgeless_api_core::invocation::Event<&[u8]>,
@@ -33,17 +54,7 @@ impl edgeless_api_core::invocation::InvocationAPI for MockDisplay {
     }
 }
 
-impl<'a> edgeless_api_core::resource_configuration::ResourceConfigurationAPI<'a, MockDisplayInstanceConfiguration> for MockDisplay {
-    async fn parse_configuration(
-        data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<MockDisplayInstanceConfiguration, ()> {
-        if data.provider_id == "mock-display-1" {
-            Ok(MockDisplayInstanceConfiguration {})
-        } else {
-            Err(())
-        }
-    }
-
+impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
     async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), ()> {
         log::info!("Display Stop");
 
@@ -55,8 +66,13 @@ impl<'a> edgeless_api_core::resource_configuration::ResourceConfigurationAPI<'a,
         }
     }
 
-    async fn start(&mut self, _instance_specification: MockDisplayInstanceConfiguration) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
+    async fn start<'a>(
+        &mut self,
+        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
         log::info!("Display Start");
+
+        let _instance_specification = Self::parse_configuration(instance_specification).await?;
 
         if self.instance_id.is_some() {
             return Err(());

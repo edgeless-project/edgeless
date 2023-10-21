@@ -103,12 +103,6 @@ impl<C> minicbor::CborLen<C> for EncodedResourceInstanceSpecification<'_> {
     }
 }
 
-pub trait ResourceConfigurationAPI<'a, ResourceInstanceSpecification> {
-    async fn parse_configuration(data: EncodedResourceInstanceSpecification<'a>) -> Result<ResourceInstanceSpecification, ()>;
-    async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> Result<crate::instance_id::InstanceId, ()>;
-    async fn stop(&mut self, resource_id: crate::instance_id::InstanceId) -> Result<(), ()>;
-}
-
 #[cfg(test)]
 mod test {
     #[test]
