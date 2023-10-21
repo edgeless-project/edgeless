@@ -8,7 +8,7 @@ struct InitState {
     max_value: f32,
 }
 
-static INIT_STATE: std::sync::OnceLock<std::sync::Mutex<InitState>> = std::sync::OnceLock::new();
+static INIT_STATE: std::sync::OnceLock<InitState> = std::sync::OnceLock::new();
 
 impl Edgefunction for FilterInRangeFunction {
     fn handle_cast(src: InstanceId, encoded_message: String) {
@@ -21,7 +21,7 @@ impl Edgefunction for FilterInRangeFunction {
 
         match encoded_message.parse::<f32>() {
             Ok(val) => {
-                let state = INIT_STATE.get().unwrap().lock().unwrap();
+                let state = INIT_STATE.get().unwrap();
                 if val >= state.min_value && val <= state.max_value {
                     cast_alias(&"output", &encoded_message);
                 } else {
@@ -43,19 +43,16 @@ impl Edgefunction for FilterInRangeFunction {
         edgeless_function::init_logger();
 
         let tokens: Vec<&str> = payload.split(',').collect();
-        let mut min_value_init = 0.0;
-        let mut max_value_init = 0.0;
+        let mut min_value = 0.0;
+        let mut max_value = 0.0;
         if tokens.len() == 2 {
-            if let (Ok(min_value), Ok(max_value)) = (tokens[0].parse::<f32>(), tokens[1].parse::<f32>()) {
-                min_value_init = min_value;
-                max_value_init = max_value;
+            if let (Ok(lhs), Ok(rhs)) = (tokens[0].parse::<f32>(), tokens[1].parse::<f32>()) {
+                min_value = lhs;
+                max_value = rhs;
             }
         }
-        log::info!("Filter_in_range initialized with [{},{}]", min_value_init, max_value_init);
-        let _ = INIT_STATE.set(std::sync::Mutex::new(InitState {
-            min_value: min_value_init,
-            max_value: max_value_init,
-        }));
+        log::info!("Filter_in_range initialized with [{},{}]", min_value, max_value);
+        let _ = INIT_STATE.set(InitState { min_value, max_value });
     }
 
     fn handle_stop() {
