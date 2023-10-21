@@ -1,5 +1,7 @@
 #![no_std]
-#![feature(async_fn_in_trait)]
+
+// #[cfg(feature = "embedded")]
+// #![feature(async_fn_in_trait)]
 
 extern crate alloc;
 

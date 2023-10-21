@@ -13,54 +13,8 @@ pub struct MockSensor {
     pub inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
 }
 
-impl MockSensor {}
-
-impl<'a> crate::resource::Resource<'a, MockSensorConfiguration> for MockSensor {
-    fn provider_id(&self) -> &'static str {
-        return "mock-sensor-1";
-    }
-
-    async fn has_instance(&self, instance_id: &edgeless_api_core::instance_id::InstanceId) -> bool {
-        let tmp = self.inner.borrow_mut();
-        let lck = tmp.lock().await;
-
-        return lck.instance_id == Some(instance_id.clone());
-    }
-}
-
-#[embassy_executor::task]
-pub async fn mock_sensor_task(
-    state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
-    dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
-) {
-    let mut dataplane_handle = dataplane_handle;
-
-    loop {
-        let (instance_id, data_out_id, delay) = {
-            let tmp = state.borrow_mut();
-            let lck = tmp.lock().await;
-            (lck.instance_id, lck.data_out_id, lck.delay)
-        };
-        if let (Some(instance_id), Some(data_out_id)) = (instance_id, data_out_id) {
-            log::info!("Sensor send!");
-            dataplane_handle.send(instance_id, data_out_id, "10").await;
-        }
-        embassy_time::Timer::after(embassy_time::Duration::from_secs(delay as u64)).await;
-    }
-}
-
-impl edgeless_api_core::invocation::InvocationAPI for MockSensor {
-    async fn handle(
-        &mut self,
-        _event: edgeless_api_core::invocation::Event<&[u8]>,
-    ) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
-        log::warn!("Sensor received unexpected Event.");
-        Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)
-    }
-}
-
-impl<'a> edgeless_api_core::resource_configuration::ResourceConfigurationAPI<'a, MockSensorConfiguration> for MockSensor {
-    async fn parse_configuration(
+impl MockSensor {
+    async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<MockSensorConfiguration, ()> {
         let mut out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
@@ -101,7 +55,71 @@ impl<'a> edgeless_api_core::resource_configuration::ResourceConfigurationAPI<'a,
         })
     }
 
-    async fn start(&mut self, instance_specification: MockSensorConfiguration) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
+    pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
+        let mock_sensor_state = static_cell::make_static!(core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(MockSensorInner {
+            instance_id: None,
+            data_out_id: None,
+            delay: 30
+        })));
+        static_cell::make_static!(MockSensor { inner: mock_sensor_state })
+    }
+}
+
+impl crate::resource::Resource for MockSensor {
+    fn provider_id(&self) -> &'static str {
+        return "mock-sensor-1";
+    }
+
+    async fn has_instance(&self, instance_id: &edgeless_api_core::instance_id::InstanceId) -> bool {
+        let tmp = self.inner.borrow_mut();
+        let lck = tmp.lock().await;
+
+        return lck.instance_id == Some(instance_id.clone());
+    }
+
+    async fn launch(&mut self, spawner: embassy_executor::Spawner, dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {
+        spawner.spawn(mock_sensor_task(self.inner.clone(), dataplane_handle));
+    }
+}
+
+#[embassy_executor::task]
+pub async fn mock_sensor_task(
+    state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
+    dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
+) {
+    let mut dataplane_handle = dataplane_handle;
+
+    loop {
+        let (instance_id, data_out_id, delay) = {
+            let tmp = state.borrow_mut();
+            let lck = tmp.lock().await;
+            (lck.instance_id, lck.data_out_id, lck.delay)
+        };
+        if let (Some(instance_id), Some(data_out_id)) = (instance_id, data_out_id) {
+            log::info!("Sensor send!");
+            dataplane_handle.send(instance_id, data_out_id, "10").await;
+        }
+        embassy_time::Timer::after(embassy_time::Duration::from_secs(delay as u64)).await;
+    }
+}
+
+impl crate::invocation::InvocationAPI for MockSensor {
+    async fn handle(
+        &mut self,
+        _event: edgeless_api_core::invocation::Event<&[u8]>,
+    ) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
+        log::warn!("Sensor received unexpected Event.");
+        Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)
+    }
+}
+
+impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
+    async fn start<'a>(
+        &mut self,
+        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
+        let instance_specification = Self::parse_configuration(instance_specification).await?;
+
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;
 

@@ -1,3 +1,18 @@
+#[async_trait::async_trait]
+pub trait InvocationAPI {
+    async fn handle(&mut self, event: edgeless_api_core::invocation::Event<&[u8]>)
+        -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()>;
+}
+
+#[async_trait::async_trait]
+pub trait ResourceConfigurationAPI {
+    async fn start(
+        &mut self,
+        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification,
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, ()>;
+    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), ()>;
+}
+
 pub struct CoapInvocationServer {
     sock: tokio::net::UdpSocket,
     root_api: Box<dyn crate::invocation::InvocationAPI>,

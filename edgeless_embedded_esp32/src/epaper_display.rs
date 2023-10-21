@@ -56,36 +56,8 @@ pub struct EPaperDisplay {
     pub display: &'static mut dyn EPaper,
 }
 
-impl<'a> crate::resource::Resource<'a, EPaperDisplayInstanceConfiguration> for EPaperDisplay {
-    fn provider_id(&self) -> &'static str {
-        return "epaper-display-1";
-    }
-
-    async fn has_instance(&self, id: &edgeless_api_core::instance_id::InstanceId) -> bool {
-        if self.instance_id == Some(*id) {
-            return true;
-        }
-        false
-    }
-}
-
-impl edgeless_api_core::invocation::InvocationAPI for EPaperDisplay {
-    async fn handle(
-        &mut self,
-        event: edgeless_api_core::invocation::Event<&[u8]>,
-    ) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
-        if let edgeless_api_core::invocation::EventData::Cast(message) = event.data {
-            if let Ok(message) = core::str::from_utf8(message) {
-                self.display.set_text(message);
-            }
-        }
-
-        Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)
-    }
-}
-
-impl<'a> edgeless_api_core::resource_configuration::ResourceConfigurationAPI<'a, EPaperDisplayInstanceConfiguration> for EPaperDisplay {
-    async fn parse_configuration(
+impl EPaperDisplay {
+    async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<EPaperDisplayInstanceConfiguration, ()> {
         if data.provider_id == "epaper-display-1" {
@@ -112,7 +84,49 @@ impl<'a> edgeless_api_core::resource_configuration::ResourceConfigurationAPI<'a,
             Err(())
         }
     }
+}
 
+impl crate::resource::Resource for EPaperDisplay {
+    fn provider_id(&self) -> &'static str {
+        return "epaper-display-1";
+    }
+
+    async fn has_instance(&self, id: &edgeless_api_core::instance_id::InstanceId) -> bool {
+        if self.instance_id == Some(*id) {
+            return true;
+        }
+        false
+    }
+
+    async fn launch(&mut self, _spawner: embassy_executor::Spawner, _dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {}
+}
+
+impl EPaperDisplay {
+    pub async fn new(display: &'static mut dyn EPaper) -> &'static mut dyn crate::resource::ResourceDyn {
+        static_cell::make_static!(EPaperDisplay {
+            header: None,
+            instance_id: None,
+            display: display
+        })
+    }
+}
+
+impl crate::invocation::InvocationAPI for EPaperDisplay {
+    async fn handle(
+        &mut self,
+        event: edgeless_api_core::invocation::Event<&[u8]>,
+    ) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
+        if let edgeless_api_core::invocation::EventData::Cast(message) = event.data {
+            if let Ok(message) = core::str::from_utf8(message) {
+                self.display.set_text(message);
+            }
+        }
+
+        Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)
+    }
+}
+
+impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
     async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), ()> {
         log::info!("Display Stop");
 
@@ -125,8 +139,13 @@ impl<'a> edgeless_api_core::resource_configuration::ResourceConfigurationAPI<'a,
         }
     }
 
-    async fn start(&mut self, instance_specification: EPaperDisplayInstanceConfiguration) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
+    async fn start<'a>(
+        &mut self,
+        instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
         log::info!("Display Start");
+
+        let instance_specification = Self::parse_configuration(instance_specification).await?;
 
         if self.instance_id.is_some() {
             return Err(());

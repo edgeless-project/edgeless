@@ -30,7 +30,3 @@ pub enum LinkProcessingResult {
     PROCESSED,
     PASSED,
 }
-
-pub trait InvocationAPI {
-    async fn handle(&mut self, event: Event<&[u8]>) -> Result<LinkProcessingResult, ()>;
-}
