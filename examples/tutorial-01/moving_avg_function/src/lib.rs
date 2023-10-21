@@ -12,7 +12,7 @@ struct State {
     values: VecDeque<f32>,
 }
 
-static INIT_STATE: std::sync::OnceLock<std::sync::Mutex<InitState>> = std::sync::OnceLock::new();
+static INIT_STATE: std::sync::OnceLock<InitState> = std::sync::OnceLock::new();
 static STATE: std::sync::OnceLock<std::sync::Mutex<State>> = std::sync::OnceLock::new();
 
 impl Edgefunction for MovingAvgFunction {
@@ -24,7 +24,7 @@ impl Edgefunction for MovingAvgFunction {
             &encoded_message
         );
 
-        let init_state = INIT_STATE.get().unwrap().lock().unwrap();
+        let init_state = INIT_STATE.get().unwrap();
 
         match encoded_message.parse::<f32>() {
             Ok(val) => {
@@ -49,14 +49,14 @@ impl Edgefunction for MovingAvgFunction {
     fn handle_init(payload: String, _serialized_state: Option<String>) {
         edgeless_function::init_logger();
 
-        let num_values_init = match payload.parse::<usize>() {
+        let num_values = match payload.parse::<usize>() {
             Ok(val) => val,
             Err(_) => 0,
         };
-        let _ = INIT_STATE.set(std::sync::Mutex::new(InitState { num_values: num_values_init }));
+        let _ = INIT_STATE.set(InitState { num_values });
         let _ = STATE.set(std::sync::Mutex::new(State { values: VecDeque::new() }));
 
-        log::info!("moving_avg initialized with size = {}", num_values_init);
+        log::info!("moving_avg initialized with size = {}", num_values);
     }
 
     fn handle_stop() {
