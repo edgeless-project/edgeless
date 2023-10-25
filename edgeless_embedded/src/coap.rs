@@ -3,7 +3,8 @@ use crate::resource_configuration::ResourceConfigurationAPI;
 
 #[embassy_executor::task]
 pub async fn coap_task(
-    stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static>>,
+    mut sock: embassy_net::udp::UdpSocket<'static>,
+    // stack: &'static embassy_net::Stack<>,
     out_reader: embassy_sync::channel::Receiver<
         'static,
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
@@ -14,14 +15,9 @@ pub async fn coap_task(
 ) {
     let mut agent = agent;
 
-    let mut rx_buf = [0 as u8; 5000];
-    let mut rx_meta = [embassy_net::udp::PacketMetadata::EMPTY; 10];
-    let mut tx_buf = [0 as u8; 5000];
-    let mut tx_meta = [embassy_net::udp::PacketMetadata::EMPTY; 10];
     let mut app_buf = [0 as u8; 5000];
     let mut app_buf_tx = [0 as u8; 5000];
 
-    let mut sock = embassy_net::udp::UdpSocket::new(stack, &mut rx_meta, &mut rx_buf, &mut tx_meta, &mut tx_buf);
 
     let mut last_tokens = heapless::LinearMap::<smoltcp::wire::IpEndpoint, (u8, Option<edgeless_api_core::instance_id::InstanceId>), 4>::new();
 
