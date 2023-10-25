@@ -10,11 +10,11 @@ pub trait EPaper {
 }
 
 pub struct LillyGoEPaper<
-    SPI: hal::prelude::eh1::_embedded_hal_1_spi_SpiDevice,
-    BUSY: hal::prelude::eh1::_embedded_hal_1_digital_InputPin,
-    DC: hal::prelude::eh1::_embedded_hal_1_digital_OutputPin,
-    RST: hal::prelude::eh1::_embedded_hal_1_digital_OutputPin,
-    DELAY: hal::prelude::eh1::_embedded_hal_1_delay_DelayUs,
+    SPI: embedded_hal::spi::SpiDevice,
+    BUSY: embedded_hal::digital::InputPin,
+    DC: embedded_hal::digital::OutputPin,
+    RST: embedded_hal::digital::OutputPin,
+    DELAY: embedded_hal::delay::DelayUs,
 > {
     pub spi_dev: SPI,
     pub delay: DELAY,
@@ -23,11 +23,11 @@ pub struct LillyGoEPaper<
 }
 
 impl<
-        SPI: hal::prelude::eh1::_embedded_hal_1_spi_SpiDevice,
-        BUSY: hal::prelude::eh1::_embedded_hal_1_digital_InputPin,
-        DC: hal::prelude::eh1::_embedded_hal_1_digital_OutputPin,
-        RST: hal::prelude::eh1::_embedded_hal_1_digital_OutputPin,
-        DELAY: hal::prelude::eh1::_embedded_hal_1_delay_DelayUs,
+        SPI: embedded_hal::spi::SpiDevice,
+        BUSY: embedded_hal::digital::InputPin,
+        DC: embedded_hal::digital::OutputPin,
+        RST: embedded_hal::digital::OutputPin,
+        DELAY: embedded_hal::delay::DelayUs,
     > EPaper for LillyGoEPaper<SPI, BUSY, DC, RST, DELAY>
 {
     fn set_text(&mut self, new_text: &str) {
