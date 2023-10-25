@@ -1,0 +1,42 @@
+[package]
+name = "edgeless_embedded"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+edition = "2021"
+resolver = "2"
+
+[lib]
+name = "edgeless_embedded"
+path = "src/lib.rs"
+
+[dependencies]
+embedded-hal = "1.0.0-rc.1"
+
+log = { version = "0.4", default-features = false }
+
+
+embassy-executor = { version = "0.3.0", features = ["nightly"] }
+embassy-sync = { version = "0.3" }
+embassy-time = { version = "0.1",  features = ["nightly"] }
+embassy-net = { version = "0.1", features = ["nightly", "tcp", "udp", "dhcpv4", "medium-ethernet"] }
+embassy-futures = { version =  "0.1" }
+
+
+static_cell = { version = "1.2.0", features = ["nightly"] }
+heapless = "0.7"
+
+uuid = {version= "1.3", default-features = false, features = ["v4"] }
+
+edgeless_api_core = {path = "../edgeless_api_core" }
+
+coap-lite = { version = "0.11", default-features = false }
+minicbor =  {version = "0.19", default-features = false, features = ["derive"]}
+
+smoltcp = { version = "0.10.0", default-features = false, features = [
+  "socket",
+  "async",
+] }
+
+epd-waveshare = { path = "../vendor/epd-waveshare", features = ["graphics", "epd2in13_v3"], default-features = false}
+embedded-graphics = { version = "0.8"}
+sensor-scd30 = {path="../vendor/rust-sensor-scd30", default-features=false}

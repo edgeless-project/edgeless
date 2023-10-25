@@ -1,3 +1,8 @@
+pub mod epaper_display;
+pub mod mock_display;
+pub mod mock_sensor;
+pub mod scd30_sensor;
+
 pub trait Resource: crate::invocation::InvocationAPI + crate::resource_configuration::ResourceConfigurationAPI {
     fn provider_id(&self) -> &'static str;
     // fn resource_class(&self) -> &'static str;

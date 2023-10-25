@@ -5,11 +5,11 @@ pub trait Sensor {
     fn read(&mut self) -> Result<sensor_scd30::Measurement, ()>;
 }
 
-pub struct SCD30SensorWrapper<Conn: Base<Err, Delay>, Delay: hal::prelude::eh1::_embedded_hal_blocking_delay_DelayMs<u32>, Err: core::fmt::Debug> {
+pub struct SCD30SensorWrapper<Conn: Base<Err, Delay>, Delay: embedded_hal::delay::DelayUs, Err: core::fmt::Debug> {
     pub sensor: sensor_scd30::Scd30<Conn, Delay, Err>,
 }
 
-impl<Conn: Base<Err, Delay>, Delay: hal::prelude::eh1::_embedded_hal_blocking_delay_DelayMs<u32>, Err: core::fmt::Debug> Sensor
+impl<Conn: Base<Err, Delay>, Delay: embedded_hal::delay::DelayUs, Err: core::fmt::Debug> Sensor
     for SCD30SensorWrapper<Conn, Delay, Err>
 {
     fn init(&mut self, _delay_s: u8) {
