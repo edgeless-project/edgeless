@@ -6,6 +6,7 @@
 extern crate alloc;
 
 pub mod coap_mapping;
+pub mod common;
 pub mod instance_id;
 pub mod invocation;
 pub mod resource_configuration;

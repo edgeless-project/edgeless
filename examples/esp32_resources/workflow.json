@@ -29,7 +29,7 @@
         },
         {
             "alias": "test_display",
-            "resource_class_type": "epaper-display",
+            "resource_class_type": "text-display",
             "output_callback_definitions": {},
             "configurations": {}
         }
