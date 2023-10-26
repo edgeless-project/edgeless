@@ -8,11 +8,14 @@ pub struct MockDisplay {
 impl MockDisplay {
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<MockDisplayInstanceConfiguration, ()> {
+    ) -> Result<MockDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
         if data.provider_id == "mock-display-1" {
             Ok(MockDisplayInstanceConfiguration {})
         } else {
-            Err(())
+            return Err(edgeless_api_core::common::ErrorResponse {
+                summary: "Wrong Resource ProviderId",
+                detail: None,
+            });
         }
     }
 
@@ -55,31 +58,39 @@ impl crate::invocation::InvocationAPI for MockDisplay {
 }
 
 impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
-    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), ()> {
+    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         log::info!("Display Stop");
 
         if Some(resource_id) == self.instance_id {
             self.instance_id = None;
             Ok(())
         } else {
-            Err(())
+            Err(edgeless_api_core::common::ErrorResponse {
+                summary: "Wrong Resource InstanceId",
+                detail: None,
+            })
         }
     }
 
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
         log::info!("Display Start");
 
         let _instance_specification = Self::parse_configuration(instance_specification).await?;
 
         if self.instance_id.is_some() {
-            return Err(());
+            return Err(edgeless_api_core::common::ErrorResponse {
+                summary: "Resource Busy",
+                detail: None,
+            });
         }
 
-        self.instance_id = Some(edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone()));
+        let id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone());
 
-        Ok(self.instance_id.unwrap())
+        self.instance_id = Some(id);
+
+        Ok(id)
     }
 }

@@ -45,7 +45,7 @@ impl EmbeddedAgent {
             let inner = slf.inner.borrow_mut();
             let mut lck = inner.lock().await;
             for r in lck.iter_mut() {
-                r.launch(spawner, slf.dataplane_handle());
+                r.launch(spawner, slf.dataplane_handle()).await;
             }
         }
 
@@ -112,7 +112,7 @@ impl crate::invocation::InvocationAPI for EmbeddedAgent {
 }
 
 impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
-    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), ()> {
+    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         let inner = self.inner.borrow_mut();
         let mut lck = inner.lock().await;
         for r in lck.iter_mut() {
@@ -120,13 +120,16 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
                 return r.stop(resource_id).await;
             }
         }
-        Err(())
+        Err(edgeless_api_core::common::ErrorResponse {
+            summary: "ResourceProvider Not Found",
+            detail: None,
+        })
     }
 
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
         let inner = self.inner.borrow_mut();
         let mut lck = inner.lock().await;
         for r in lck.iter_mut() {
@@ -134,6 +137,9 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
                 return r.start(instance_specification).await;
             }
         }
-        Err(())
+        Err(edgeless_api_core::common::ErrorResponse {
+            summary: "ResourceProvider Not Found",
+            detail: None,
+        })
     }
 }

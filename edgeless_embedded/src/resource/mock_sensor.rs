@@ -16,11 +16,14 @@ pub struct MockSensor {
 impl MockSensor {
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<MockSensorConfiguration, ()> {
+    ) -> Result<MockSensorConfiguration, edgeless_api_core::common::ErrorResponse> {
         let mut out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
 
-        if data.provider_id != "mock-sensor-1" {
-            return Err(());
+        if data.provider_id != "mock-scd30-sensor-1" {
+            return Err(edgeless_api_core::common::ErrorResponse {
+                summary: "Wrong Resource ProviderId",
+                detail: None,
+            });
         }
 
         for output_callback in data.output_callback_definitions {
@@ -34,7 +37,12 @@ impl MockSensor {
 
         let out_id = match out_id {
             Some(val) => val,
-            None => return Err(()),
+            None => {
+                return Err(edgeless_api_core::common::ErrorResponse {
+                    summary: "Output Configuration Missing",
+                    detail: None,
+                })
+            }
         };
 
         let mut delay: u8 = 10;
@@ -67,7 +75,7 @@ impl MockSensor {
 
 impl crate::resource::Resource for MockSensor {
     fn provider_id(&self) -> &'static str {
-        return "mock-sensor-1";
+        return "mock-scd30-sensor-1";
     }
 
     async fn has_instance(&self, instance_id: &edgeless_api_core::instance_id::InstanceId) -> bool {
@@ -78,7 +86,7 @@ impl crate::resource::Resource for MockSensor {
     }
 
     async fn launch(&mut self, spawner: embassy_executor::Spawner, dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {
-        spawner.spawn(mock_sensor_task(self.inner.clone(), dataplane_handle));
+        spawner.spawn(mock_sensor_task(self.inner, dataplane_handle)).unwrap();
     }
 }
 
@@ -97,7 +105,7 @@ pub async fn mock_sensor_task(
         };
         if let (Some(instance_id), Some(data_out_id)) = (instance_id, data_out_id) {
             log::info!("Sensor send!");
-            dataplane_handle.send(instance_id, data_out_id, "10").await;
+            dataplane_handle.send(instance_id, data_out_id, "800.12345;50.12345;20.12345").await;
         }
         embassy_time::Timer::after(embassy_time::Duration::from_secs(delay as u64)).await;
     }
@@ -117,14 +125,18 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
+        log::info!("Mock Sensor Start");
         let instance_specification = Self::parse_configuration(instance_specification).await?;
 
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;
 
         if let Some(_) = lck.instance_id {
-            return Err(());
+            return Err(edgeless_api_core::common::ErrorResponse {
+                summary: "Resource Busy",
+                detail: None,
+            });
         }
 
         let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone());
@@ -135,7 +147,8 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
         Ok(instance_id)
     }
 
-    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), ()> {
+    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+        log::info!("Mock Sensor Stop");
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;
 
@@ -144,6 +157,11 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
                 lck.instance_id = None;
                 lck.data_out_id = None;
             }
+        } else {
+            return Err(edgeless_api_core::common::ErrorResponse {
+                summary: "Wrong Resource InstanceId",
+                detail: None,
+            });
         }
 
         Ok(())

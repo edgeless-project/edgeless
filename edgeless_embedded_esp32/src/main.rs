@@ -9,9 +9,18 @@ extern crate alloc;
 
 pub mod wifi;
 
-use epd_waveshare::prelude::WaveshareDisplay;
+#[cfg(feature = "epaper_2_13")]
+pub mod epaper_display_impl;
+#[cfg(feature = "scd30")]
+pub mod scd30_sensor_impl;
+
 use esp_backtrace as _;
 use hal::prelude::*;
+
+#[cfg(feature = "epaper_2_13")]
+use edgeless_embedded::resource::epaper_display::EPaper;
+#[cfg(feature = "epaper_2_13")]
+use epd_waveshare::prelude::*;
 
 #[global_allocator]
 static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
@@ -44,6 +53,7 @@ fn esp_getrandom(dest: &mut [u8]) -> Result<(), getrandom::Error> {
     }
 }
 
+#[allow(non_upper_case_globals)]
 getrandom::register_custom_getrandom!(esp_getrandom);
 
 #[entry]
@@ -55,7 +65,8 @@ fn main() -> ! {
     init_heap();
 
     let peripherals = hal::peripherals::Peripherals::take();
-    let _io = hal::IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    #[allow(unused_variables)]
+    let io = hal::IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let system = peripherals.SYSTEM.split();
 
     let clocks = hal::clock::ClockControl::max(system.clock_control).freeze();
@@ -68,7 +79,7 @@ fn main() -> ! {
     hal::embassy::init(&clocks, timer_group0.timer0);
 
     #[cfg(feature = "epaper_2_13")]
-    let display : Option<&'static mut dyn epaper_display::EPaper> = {
+    let display: Option<&'static mut dyn edgeless_embedded::resource::epaper_display::EPaper> = {
         let spi = static_cell::make_static!(hal::spi::SpiBusController::from_spi(hal::spi::Spi::new_no_cs_no_miso(
             peripherals.SPI2,
             io.pins.gpio18,
@@ -88,7 +99,7 @@ fn main() -> ! {
 
         let display = epd_waveshare::epd2in13_lillygo::Display2in13::default();
 
-        let display_wrapper = static_cell::make_static!(epaper_display::LillyGoEPaper {
+        let display_wrapper = static_cell::make_static!(epaper_display_impl::LillyGoEPaper {
             spi_dev: spi_dev,
             epd: epd,
             display: display,
@@ -99,23 +110,22 @@ fn main() -> ! {
 
         Some(display_wrapper)
     };
-    #[cfg(not(feature = "epaper_2_13"))] 
-    let display : Option<&'static mut dyn edgeless_embedded::resource::epaper_display::EPaper> = None;
-    
+    #[cfg(not(feature = "epaper_2_13"))]
+    let display: Option<&'static mut dyn edgeless_embedded::resource::epaper_display::EPaper> = None;
 
     #[cfg(feature = "scd30")]
-    let scd30 : Option<&'static mut dyn scd30_sensor::Sensor> = {
+    let scd30: Option<&'static mut dyn edgeless_embedded::resource::scd30_sensor::Sensor> = {
         let i2c = hal::i2c::I2C::new(peripherals.I2C0, io.pins.gpio33, io.pins.gpio32, 50u32.kHz(), &clocks);
 
         let mut i2c_delay = hal::delay::Delay::new(&clocks);
         i2c_delay.delay_ms(2000u32);
-    
+
         let scd = sensor_scd30::Scd30::new(i2c, i2c_delay).unwrap();
-    
-        Some(static_cell::make_static!(scd30_sensor::SCD30SensorWrapper { sensor: scd }))
+
+        Some(static_cell::make_static!(scd30_sensor_impl::SCD30SensorWrapper { sensor: scd }))
     };
     #[cfg(not(feature = "scd30"))]
-    let scd30 : Option<&'static mut dyn edgeless_embedded::resource::scd30_sensor::Sensor> = None; 
+    let scd30: Option<&'static mut dyn edgeless_embedded::resource::scd30_sensor::Sensor> = None;
 
     let executor = static_cell::make_static!(hal::embassy::executor::Executor::new());
 
@@ -132,6 +142,7 @@ fn main() -> ! {
         ));
     });
 
+    #[allow(unreachable_code)]
     loop {}
 }
 
@@ -152,9 +163,9 @@ async fn edgeless(
     let rx_meta = static_cell::make_static!([embassy_net::udp::PacketMetadata::EMPTY; 10]);
     let tx_buf = static_cell::make_static!([0 as u8; 5000]);
     let tx_meta = static_cell::make_static!([embassy_net::udp::PacketMetadata::EMPTY; 10]);
-    
+
     let stack = wifi::init(spawner.clone(), timer, rng, radio_clock_control, clocks, radio).await;
-    let sock = embassy_net::udp::UdpSocket::new(stack, rx_meta, rx_buf, tx_meta,  tx_buf);
+    let sock = embassy_net::udp::UdpSocket::new(stack, rx_meta, rx_buf, tx_meta, tx_buf);
 
     let sensor_scd30 = if let Some(scd30) = scd30 {
         edgeless_embedded::resource::scd30_sensor::SCD30Sensor::new(scd30).await
