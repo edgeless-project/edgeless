@@ -9,3 +9,4 @@ function_state/
 .direnv
 settings.json
 vendor/
+secrets/

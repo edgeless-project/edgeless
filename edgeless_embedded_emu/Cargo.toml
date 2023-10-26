@@ -1,0 +1,33 @@
+[workspace]
+
+[package]
+name = "edgeless-embedded-emu"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+edition = "2021"
+resolver = "2"
+
+[dependencies]
+log = { version = "0.4", default-features = false }
+env_logger = "0.10"
+embassy-executor = { version = "0.3.0", features = ["nightly", "arch-std", "executor-thread", "integrated-timers", "log"] }
+embassy-sync = { version = "0.3", features = ["log"] }
+embassy-time = { version = "0.1",  features = ["std", "nightly", "log"] }
+embassy-net = { git="https://github.com/embassy-rs/embassy.git", tag="embassy-net-v0.2.0", features = ["tcp", "udp", "dhcpv4", "medium-ethernet", "medium-ip", "log"] }
+embassy-futures = { version =  "0.1" }
+embassy-net-tuntap = { git="https://github.com/embassy-rs/embassy.git", tag="embassy-net-v0.2.0", package = "embassy-net-tuntap"}
+
+static_cell = { version = "1.2.0", features = ["nightly"] }
+heapless = "0.7"
+
+uuid = {version= "1.3", default-features = false, features = ["v4"] }
+
+edgeless_embedded = {path = "../edgeless_embedded" }
+edgeless_api_core = {path = "../edgeless_api_core" }
+
+embedded-io-async = { version = "0.6.0" }
+
+smoltcp = { version = "0.10.0", default-features = false, features = [
+  "socket",
+  "async",
+] }

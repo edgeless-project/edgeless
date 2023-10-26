@@ -1,53 +1,9 @@
-use embedded_graphics::prelude::*;
-use epd_waveshare::prelude::*;
-
 pub struct EPaperDisplayInstanceConfiguration {
     header_text: Option<[u8; 128]>,
 }
 
 pub trait EPaper {
     fn set_text(&mut self, new_text: &str);
-}
-
-pub struct LillyGoEPaper<
-    SPI: embedded_hal::spi::SpiDevice,
-    BUSY: embedded_hal::digital::InputPin,
-    DC: embedded_hal::digital::OutputPin,
-    RST: embedded_hal::digital::OutputPin,
-    DELAY: embedded_hal::delay::DelayUs,
-> {
-    pub spi_dev: SPI,
-    pub delay: DELAY,
-    pub epd: epd_waveshare::epd2in13_lillygo::Epd2in13<SPI, BUSY, DC, RST, DELAY>,
-    pub display: epd_waveshare::epd2in13_lillygo::Display2in13,
-}
-
-impl<
-        SPI: embedded_hal::spi::SpiDevice,
-        BUSY: embedded_hal::digital::InputPin,
-        DC: embedded_hal::digital::OutputPin,
-        RST: embedded_hal::digital::OutputPin,
-        DELAY: embedded_hal::delay::DelayUs,
-    > EPaper for LillyGoEPaper<SPI, BUSY, DC, RST, DELAY>
-{
-    fn set_text(&mut self, new_text: &str) {
-        self.display.clear(Color::White).unwrap();
-
-        let style = embedded_graphics::mono_font::MonoTextStyleBuilder::new()
-            .font(&embedded_graphics::mono_font::ascii::FONT_10X20)
-            .text_color(Color::Black)
-            .background_color(Color::White)
-            .build();
-
-        let text_style = embedded_graphics::text::TextStyleBuilder::new()
-            .baseline(embedded_graphics::text::Baseline::Top)
-            .build();
-
-        let _ = embedded_graphics::text::Text::with_text_style(new_text, Point::new(0, 5), style, text_style).draw(&mut self.display);
-        self.epd
-            .update_and_display_frame(&mut self.spi_dev, &self.display.buffer(), &mut self.delay)
-            .unwrap();
-    }
 }
 
 pub struct EPaperDisplay {
@@ -59,7 +15,7 @@ pub struct EPaperDisplay {
 impl EPaperDisplay {
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<EPaperDisplayInstanceConfiguration, ()> {
+    ) -> Result<EPaperDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
         if data.provider_id == "epaper-display-1" {
             let mut config: Option<[u8; 128]> = None;
             for configuration_item in data.configuration {
@@ -81,7 +37,10 @@ impl EPaperDisplay {
 
             Ok(EPaperDisplayInstanceConfiguration { header_text: config })
         } else {
-            Err(())
+            return Err(edgeless_api_core::common::ErrorResponse {
+                summary: "Wrong Resource ProviderId",
+                detail: None,
+            });
         }
     }
 }
@@ -127,28 +86,34 @@ impl crate::invocation::InvocationAPI for EPaperDisplay {
 }
 
 impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
-    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), ()> {
-        log::info!("Display Stop");
+    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+        log::info!("EPaper Display Stop");
 
         if Some(resource_id) == self.instance_id {
             self.instance_id = None;
             self.display.set_text("Display\nStopped");
             Ok(())
         } else {
-            Err(())
+            Err(edgeless_api_core::common::ErrorResponse {
+                summary: "Wrong Resource InstanceId",
+                detail: None,
+            })
         }
     }
 
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
-        log::info!("Display Start");
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
+        log::info!("Epaper Display Start");
 
         let instance_specification = Self::parse_configuration(instance_specification).await?;
 
         if self.instance_id.is_some() {
-            return Err(());
+            return Err(edgeless_api_core::common::ErrorResponse {
+                summary: "Resource Busy",
+                detail: None,
+            });
         }
 
         self.instance_id = Some(edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone()));

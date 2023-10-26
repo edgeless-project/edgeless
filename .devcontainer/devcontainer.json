@@ -5,9 +5,11 @@
   },
   "runArgs": [
     "--cap-add=SYS_PTRACE",
+    "--cap-add=NET_ADMIN",
     "--security-opt",
     "seccomp=unconfined",
-    "--name=edgeless_devcontainer"
+    "--name=edgeless_devcontainer",
+    "--device=/dev/net/tun",
   ],
   "customizations": {
     "vscode": {

@@ -199,7 +199,7 @@ impl DataplaneProvider {
     pub async fn get_handle_for(&mut self, target: edgeless_api::function_instance::InstanceId) -> DataplaneHandle {
         let (sender, receiver) = futures::channel::mpsc::unbounded::<DataplaneEvent>();
         let output_chain = vec![
-            // self.local_provider.lock().await.new_link(target.clone(), sender.clone()).await,
+            self.local_provider.lock().await.new_link(target.clone(), sender.clone()).await,
             self.remote_provider.lock().await.new_link(target.clone(), sender.clone()).await,
         ];
         DataplaneHandle::new(target, output_chain, receiver).await

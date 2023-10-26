@@ -11,26 +11,27 @@ struct SCD30Measurement {
 
 impl Edgefunction for TestFun {
     fn handle_cast(_src: InstanceId, encoded_message: String) {
-        log::info!("HTTP_Processor: 'Cast' called, MSG: {}", encoded_message);
+        log::info!("Resource Processor: 'Cast' called, MSG: {}", encoded_message);
         let values : Vec<_> = encoded_message.split(";").collect();
         if values.len() == 3 {
-            let item = format!("CO2:\n{:.0}", values[0]);
+            let co2 : f32 = values[0].parse().unwrap();
+            let item = format!("CO2:\n{:.0}", co2);
             cast_alias("check_display", &item);
         }
     }
 
     fn handle_call(_src: InstanceId, encoded_message: String) -> CallRet {
-        log::info!("HTTP_Processor: 'Call' called, MSG: {}", encoded_message);
+        log::info!("Resource Processor: 'Call' called, MSG: {}", encoded_message);
         CallRet::Noreply
     }
 
     fn handle_init(_payload: String, serialized_state: Option<String>) {
         edgeless_function::init_logger();
-        log::info!("HTTP_Processor: 'Init' called");
+        log::info!("Resource Processor: 'Init' called");
     }
 
     fn handle_stop() {
-        log::info!("HTTP_Processor: 'Stop' called");
+        log::info!("Resource Processor: 'Stop' called");
     }
 }
 
