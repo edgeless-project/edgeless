@@ -1,27 +1,12 @@
-use sensor_scd30::base::Base;
+pub struct Measurement {
+    pub co2: f32,
+    pub rh: f32,
+    pub temp: f32,
+}
 
 pub trait Sensor {
     fn init(&mut self, delay_s: u8);
-    fn read(&mut self) -> Result<sensor_scd30::Measurement, ()>;
-}
-
-pub struct SCD30SensorWrapper<Conn: Base<Err, Delay>, Delay: embedded_hal::delay::DelayUs, Err: core::fmt::Debug> {
-    pub sensor: sensor_scd30::Scd30<Conn, Delay, Err>,
-}
-
-impl<Conn: Base<Err, Delay>, Delay: embedded_hal::delay::DelayUs, Err: core::fmt::Debug> Sensor
-    for SCD30SensorWrapper<Conn, Delay, Err>
-{
-    fn init(&mut self, _delay_s: u8) {
-        self.sensor.set_measurement_interval(5).unwrap();
-        self.sensor.start_continuous(0).unwrap();
-    }
-    fn read(&mut self) -> Result<sensor_scd30::Measurement, ()> {
-        match self.sensor.read_data() {
-            Ok(val) => Ok(val),
-            Err(_) => Err(()),
-        }
-    }
+    fn read(&mut self) -> Result<Measurement, ()>;
 }
 
 pub struct SCD30SensorInner {
@@ -42,11 +27,14 @@ pub struct SCD30Sensor {
 impl SCD30Sensor {
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<SCD30SensorConfiguration, ()> {
+    ) -> Result<SCD30SensorConfiguration, edgeless_api_core::common::ErrorResponse> {
         let mut out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
 
         if data.provider_id != "scd30-sensor-1" {
-            return Err(());
+            return Err(edgeless_api_core::common::ErrorResponse {
+                summary: "Wrong Resource ProviderId",
+                detail: None,
+            });
         }
 
         for output_callback in data.output_callback_definitions {
@@ -60,7 +48,12 @@ impl SCD30Sensor {
 
         let out_id = match out_id {
             Some(val) => val,
-            None => return Err(()),
+            None => {
+                return Err(edgeless_api_core::common::ErrorResponse {
+                    summary: "Output Configuration Missing",
+                    detail: None,
+                })
+            }
         };
 
         Ok(SCD30SensorConfiguration { data_out_id: out_id })
@@ -90,7 +83,7 @@ impl crate::resource::Resource for SCD30Sensor {
     }
 
     async fn launch(&mut self, spawner: embassy_executor::Spawner, dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {
-        spawner.spawn(scd30_sensor_task(self.inner.clone(), dataplane_handle));
+        spawner.spawn(scd30_sensor_task(self.inner, dataplane_handle)).unwrap();
     }
 }
 
@@ -153,14 +146,17 @@ impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<edgeless_api_core::instance_id::InstanceId, ()> {
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
         let instance_specification = SCD30Sensor::parse_configuration(instance_specification).await?;
 
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;
 
         if let Some(_) = lck.instance_id {
-            return Err(());
+            return Err(edgeless_api_core::common::ErrorResponse {
+                summary: "Resource Busy",
+                detail: None,
+            });
         }
 
         let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone());
@@ -170,7 +166,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
         Ok(instance_id)
     }
 
-    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), ()> {
+    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;
 
@@ -179,6 +175,11 @@ impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
                 lck.instance_id = None;
                 lck.data_out_id = None;
             }
+        } else {
+            return Err(edgeless_api_core::common::ErrorResponse {
+                summary: "Wrong Resource InstanceId",
+                detail: None,
+            });
         }
 
         Ok(())

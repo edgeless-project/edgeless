@@ -18,7 +18,7 @@ log = { version = "0.4", default-features = false }
 embassy-executor = { version = "0.3.0", features = ["nightly"] }
 embassy-sync = { version = "0.3" }
 embassy-time = { version = "0.1",  features = ["nightly"] }
-embassy-net = { version = "0.1", features = ["nightly", "tcp", "udp", "dhcpv4", "medium-ethernet"] }
+embassy-net = { git="https://github.com/embassy-rs/embassy.git", tag="embassy-net-v0.2.0", features = ["tcp", "udp", "dhcpv4", "medium-ethernet"] }
 embassy-futures = { version =  "0.1" }
 
 
@@ -37,6 +37,6 @@ smoltcp = { version = "0.10.0", default-features = false, features = [
   "async",
 ] }
 
-epd-waveshare = { path = "../vendor/epd-waveshare", features = ["graphics", "epd2in13_v3"], default-features = false}
-embedded-graphics = { version = "0.8"}
-sensor-scd30 = {path="../vendor/rust-sensor-scd30", default-features=false}
+# epd-waveshare = { path = "../vendor/epd-waveshare", features = ["graphics", "epd2in13_v3"], default-features = false}
+# embedded-graphics = { version = "0.8"}
+# sensor-scd30 = {path="../vendor/rust-sensor-scd30", default-features=false}

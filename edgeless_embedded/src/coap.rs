@@ -4,7 +4,6 @@ use crate::resource_configuration::ResourceConfigurationAPI;
 #[embassy_executor::task]
 pub async fn coap_task(
     mut sock: embassy_net::udp::UdpSocket<'static>,
-    // stack: &'static embassy_net::Stack<>,
     out_reader: embassy_sync::channel::Receiver<
         'static,
         embassy_sync::blocking_mutex::raw::NoopRawMutex,
@@ -18,7 +17,6 @@ pub async fn coap_task(
     let mut app_buf = [0 as u8; 5000];
     let mut app_buf_tx = [0 as u8; 5000];
 
-
     let mut last_tokens = heapless::LinearMap::<smoltcp::wire::IpEndpoint, (u8, Option<edgeless_api_core::instance_id::InstanceId>), 4>::new();
 
     let mut token = 0 as u8;
@@ -30,15 +28,29 @@ pub async fn coap_task(
 
         match res {
             embassy_futures::select::Either::First(res) => {
-                let (data_len, sender) = res.unwrap();
-                let (message, token) = edgeless_api_core::coap_mapping::CoapDecoder::decode(&app_buf[..data_len]).unwrap();
+                let (data_len, sender) = match res {
+                    Ok(ret) => ret,
+                    Err(err) => {
+                        log::error!("UDP/COAP Receive Error: {:?}", err);
+                        continue;
+                    }
+                };
+                let (message, token) = match edgeless_api_core::coap_mapping::CoapDecoder::decode(&app_buf[..data_len]) {
+                    Ok(ret) => ret,
+                    Err(err) => {
+                        log::error!("UDP/COAP Receive Error: {:?}", err);
+                        continue;
+                    }
+                };
                 match message {
                     edgeless_api_core::coap_mapping::CoapMessage::Invocation(invocation) => {
                         let key_entry = last_tokens.get_mut(&sender);
                         match key_entry {
                             None => {
                                 agent.handle(invocation).await.unwrap();
-                                last_tokens.insert(sender.clone(), (token, None));
+                                if let Err(_) = last_tokens.insert(sender.clone(), (token, None)) {
+                                    log::info!("Could not store token, duplicate delivery is possible!");
+                                }
                             }
                             Some((entry, _message)) => {
                                 if &*entry < &token || token == 0 {
@@ -53,7 +65,9 @@ pub async fn coap_task(
                         let id = match key_entry {
                             None => {
                                 let id = agent.start(start_spec.clone()).await.unwrap();
-                                last_tokens.insert(sender.clone(), (token, Some(id.clone())));
+                                if let Err(_) = last_tokens.insert(sender.clone(), (token, Some(id.clone()))) {
+                                    log::info!("Could not store token, duplicate delivery is possible!");
+                                }
                                 Some(id)
                             }
                             Some((entry, message)) => {
@@ -78,7 +92,9 @@ pub async fn coap_task(
                             let (encoded_id, _tail) = edgeless_api_core::coap_mapping::COAPEncoder::encode_instance_id(id, &mut buffer[..]);
                             let ((data, sender), _tail) =
                                 edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, encoded_id, token, &mut app_buf_tx[..]);
-                            sock.send_to(data, sender).await;
+                            if let Err(err) = sock.send_to(data, sender).await {
+                                log::error!("UDP/COAP Send Error: {:?}", err);
+                            }
                         }
                     }
                     edgeless_api_core::coap_mapping::CoapMessage::ResourceStop(stop_instance_id) => {
@@ -86,7 +102,9 @@ pub async fn coap_task(
                         match key_entry {
                             None => {
                                 agent.stop(stop_instance_id).await.unwrap();
-                                last_tokens.insert(sender.clone(), (token, None));
+                                if let Err(_) = last_tokens.insert(sender.clone(), (token, None)) {
+                                    log::info!("Could not store token, duplicate delivery is possible!");
+                                }
                             }
                             Some((entry, _message)) => {
                                 if &*entry < &token || token == 0 {
@@ -98,7 +116,9 @@ pub async fn coap_task(
 
                         let ((data, sender), _tail) =
                             edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &[], token, &mut app_buf_tx[..]);
-                        sock.send_to(data, sender).await;
+                        if let Err(err) = sock.send_to(data, sender).await {
+                            log::error!("UDP/COAP Send Error: {:?}", err);
+                        }
                     }
                     _ => {}
                 }
@@ -127,7 +147,9 @@ pub async fn coap_task(
                             u8::MAX => 0,
                             _ => token + 1,
                         };
-                        sock.send_to(&data, *endpoint).await.unwrap();
+                        if let Err(err) = sock.send_to(&data, *endpoint).await {
+                            log::error!("UDP/COAP Send Error: {:?}", err);
+                        }
                         break;
                     }
                 }
