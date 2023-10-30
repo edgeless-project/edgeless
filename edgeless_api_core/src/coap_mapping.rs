@@ -1,5 +1,5 @@
 use alloc::vec;
-use coap_lite::{MessageClass, MessageType};
+use coap_lite::{MessageClass, MessageType, ResponseType};
 
 pub struct COAPEncoder {}
 
@@ -88,11 +88,15 @@ impl COAPEncoder {
         data: &[u8],
         token: u8,
         out_buf: &'a mut [u8],
+        ok: bool,
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
         let mut packet = coap_lite::Packet::new();
         packet.header.set_version(1);
         packet.header.set_type(MessageType::Acknowledgement);
-        packet.header.code = MessageClass::Response(coap_lite::ResponseType::Content);
+        packet.header.code = match ok {
+            true => MessageClass::Response(coap_lite::ResponseType::Content),
+            false => MessageClass::Response(coap_lite::ResponseType::BadRequest),
+        };
         packet.set_token(vec![token]);
         packet.payload = alloc::vec::Vec::from(data);
         let out = packet.to_bytes().unwrap();
@@ -101,10 +105,16 @@ impl COAPEncoder {
         ((data, endpoint), tail)
     }
 
-    pub fn encode_instance_id<'a>(instance_id: crate::instance_id::InstanceId, out_buf: &'a mut [u8]) -> (&'a [u8], &'a [u8]) {
+    pub fn encode_instance_id<'a>(instance_id: crate::instance_id::InstanceId, out_buf: &'a mut [u8]) -> (&'a mut [u8], &'a mut [u8]) {
         let len = minicbor::len(instance_id);
         let (data, tail) = out_buf.split_at_mut(len);
         minicbor::encode(instance_id, &mut data[..]).unwrap();
+        (data, tail)
+    }
+
+    pub fn encode_error_response<'a>(error: crate::common::ErrorResponse, out_buf: &'a mut [u8]) -> (&'a mut [u8], &'a mut [u8]) {
+        let (data, tail) = out_buf.split_at_mut(minicbor::len(error.summary));
+        minicbor::encode(error.summary, &mut data[..]).unwrap();
         (data, tail)
     }
 }
@@ -113,7 +123,7 @@ pub enum CoapMessage<'a> {
     Invocation(crate::invocation::Event<&'a [u8]>),
     ResourceStart(crate::resource_configuration::EncodedResourceInstanceSpecification<'a>),
     ResourceStop(crate::instance_id::InstanceId),
-    Response(&'a [u8]),
+    Response(&'a [u8], bool),
 }
 
 pub struct CoapDecoder {}
@@ -181,10 +191,26 @@ impl CoapDecoder {
         let body_len = response.message.payload.len();
         let body_ref = &data[(data.len() - body_len)..];
 
-        Ok((CoapMessage::Response(body_ref), response.message.get_token()[0]))
+        let return_status_ok = match response.message.header.code {
+            MessageClass::Response(response_type) => match response_type {
+                ResponseType::Content => true,
+                _ => false,
+            },
+            _ => true,
+        };
+
+        Ok((CoapMessage::Response(body_ref, return_status_ok), response.message.get_token()[0]))
     }
 
     pub fn decode_instance_id(data: &[u8]) -> Result<crate::instance_id::InstanceId, ()> {
+        let parsed = minicbor::decode::<crate::instance_id::InstanceId>(data);
+        match parsed {
+            Ok(id) => Ok(id),
+            Err(_) => Err(()),
+        }
+    }
+
+    pub fn decode_error_response(data: &[u8]) -> Result<crate::instance_id::InstanceId, ()> {
         let parsed = minicbor::decode::<crate::instance_id::InstanceId>(data);
         match parsed {
             Ok(id) => Ok(id),
