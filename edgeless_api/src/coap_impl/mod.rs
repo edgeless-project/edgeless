@@ -31,7 +31,7 @@ impl CoapClient {
         CoapClient {
             sock: sock,
             endpoint: peer,
-            next_token: 1,
+            next_token: 0,
         }
     }
 }
@@ -111,14 +111,29 @@ impl crate::resource_configuration::ResourceConfigurationAPI for CoapClient {
             }
             let (res, response_token) = edgeless_api_core::coap_mapping::CoapDecoder::decode(&buffer[..size]).unwrap();
             match res {
-                edgeless_api_core::coap_mapping::CoapMessage::Response(response_data) => {
+                edgeless_api_core::coap_mapping::CoapMessage::Response(response_data, ok) => {
                     if response_token == token {
-                        let response = crate::resource_configuration::SpawnResourceResponse {
-                            response_error: None,
-                            instance_id: Some(edgeless_api_core::coap_mapping::CoapDecoder::decode_instance_id(response_data).unwrap()),
-                        };
+                        match ok {
+                            true => {
+                                let response = crate::resource_configuration::SpawnResourceResponse {
+                                    response_error: None,
+                                    instance_id: Some(edgeless_api_core::coap_mapping::CoapDecoder::decode_instance_id(response_data).unwrap()),
+                                };
+                                return Ok(response);
+                            }
+                            false => {
+                                let summary: String = minicbor::decode::<&str>(response_data).unwrap().to_string();
 
-                        return Ok(response);
+                                let response = crate::resource_configuration::SpawnResourceResponse {
+                                    response_error: Some(crate::common::ResponseError {
+                                        summary: summary,
+                                        detail: None,
+                                    }),
+                                    instance_id: None,
+                                };
+                                return Ok(response);
+                            }
+                        }
                     }
                 }
                 _ => {}
@@ -142,9 +157,14 @@ impl crate::resource_configuration::ResourceConfigurationAPI for CoapClient {
             }
             let (res, response_token) = edgeless_api_core::coap_mapping::CoapDecoder::decode(&buffer[..size]).unwrap();
             match res {
-                edgeless_api_core::coap_mapping::CoapMessage::Response(_response_data) => {
+                edgeless_api_core::coap_mapping::CoapMessage::Response(response_data, ok) => {
                     if response_token == token {
-                        return Ok(());
+                        match ok {
+                            true => {
+                                return Ok(());
+                            }
+                            false => return Err(anyhow::anyhow!(core::str::from_utf8(response_data).unwrap().to_string())),
+                        }
                     }
                 }
                 _ => {}
