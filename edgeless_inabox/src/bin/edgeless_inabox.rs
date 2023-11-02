@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, path::Path};
+use std::{collections::HashMap, path::Path};
 
 use anyhow::anyhow;
 use clap::Parser;
@@ -80,7 +80,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     let mut node_invocation_urls: HashMap<Uuid, String> = HashMap::new();
     let mut node_orc_agent_urls: HashMap<Uuid, String> = HashMap::new();
 
-    for _ in (0..number_of_nodes) {
+    for _ in 0..number_of_nodes {
         let node_id = Uuid::new_v4();
         node_invocation_urls.insert(node_id, next_url());
         node_orc_agent_urls.insert(node_id, next_url());
@@ -143,6 +143,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 agent_url: value.clone(),
             })
             .collect(),
+        orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
     };
 
     // Controller
@@ -190,7 +191,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         if !is_empty {
             return Err("/config directory is not empty - remove old configuration files first".to_string());
         }
-    } else if let Err(err) = fs::create_dir(&path) {
+    } else if let Err(_err) = fs::create_dir(&path) {
         return Err("Failed with creating a directory config/".to_string());
     }
 

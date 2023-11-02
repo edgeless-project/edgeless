@@ -11,6 +11,7 @@ pub struct Controller {
 }
 
 enum ControllerRequest {
+    // TODO: why is the response also packed in here
     START(
         edgeless_api::workflow_instance::SpawnWorkflowRequest,
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>,
@@ -36,6 +37,7 @@ struct ActiveWorkflow {
 }
 
 impl ActiveWorkflow {
+    // TODO:
     fn instances(&self, alias: &str) -> Vec<edgeless_api::function_instance::InstanceId> {
         let mut all_instances = Vec::new();
         if let Some(function_instances) = self.function_instances.get(alias) {
@@ -53,6 +55,7 @@ impl Controller {
         let mut orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>::new();
         let mut resources = std::collections::HashMap::<String, ResourceHandle>::new();
 
+        // Connect to all orchestrators in the orchestration domain
         for orc in &controller_settings.orchestrators {
             orc_clients.insert(
                 orc.domain_id.to_string(),
@@ -60,6 +63,7 @@ impl Controller {
             );
         }
 
+        // Prepare all resources defined for this controller
         for resource in &controller_settings.resources {
             resources.insert(
                 resource.resource_provider_id.clone(),
@@ -97,31 +101,38 @@ impl Controller {
         let mut resources = resources;
 
         let mut receiver = receiver;
-        let mut client = match orchestrators.into_values().next() {
+
+        // For now the controller selects only one orchestrator to communicate with
+        let mut selected_orchestrator = match orchestrators.into_values().next() {
             Some(c) => c,
             None => {
                 return;
             }
         };
 
-        let mut fn_client = client.function_instance_api();
+        // Gets the FunctionInsatnceAPI object of the selected orchestrator,
+        // which can then be used to start / stop / update functions on nodes in its
+        // orchestration domain.
+        let mut fn_client = selected_orchestrator.function_instance_api();
         let mut active_workflows = std::collections::HashMap::<edgeless_api::workflow_instance::WorkflowId, ActiveWorkflow>::new();
 
+        // Main loop that reacts to messages on the receiver channel
         while let Some(req) = receiver.next().await {
             match req {
                 ControllerRequest::START(spawn_workflow_request, reply_sender) => {
-                    let mut wf = ActiveWorkflow {
+                    let mut current_workflow = ActiveWorkflow {
                         _desired_state: spawn_workflow_request.clone(),
                         function_instances: std::collections::HashMap::new(),
                         resource_instances: std::collections::HashMap::new(),
                     };
 
                     let mut to_upsert = std::collections::HashSet::<String>::new();
-                    to_upsert.extend(spawn_workflow_request.workflow_functions.iter().map(|f| f.function_alias.to_string()));
-                    to_upsert.extend(spawn_workflow_request.workflow_resources.iter().map(|w| w.alias.to_string()));
+                    to_upsert.extend(spawn_workflow_request.workflow_functions.iter().map(|wf| wf.function_alias.to_string()));
+                    to_upsert.extend(spawn_workflow_request.workflow_resources.iter().map(|wr| wr.alias.to_string()));
 
                     let mut iteration_count = 100;
 
+                    // TODO: how does this algorithm work?
                     loop {
                         if iteration_count == 0 || to_upsert.len() == 0 {
                             break;
@@ -134,7 +145,8 @@ impl Controller {
                                     .output_callback_definitions
                                     .iter()
                                     .filter_map(|(output_id, output_alias)| {
-                                        let instances = wf.instances(&output_alias);
+                                        // TODO: what does this do?
+                                        let instances = current_workflow.instances(&output_alias);
                                         if instances.len() > 0 {
                                             Some((output_id.to_string(), instances[0].clone()))
                                         } else {
@@ -151,8 +163,8 @@ impl Controller {
                                     _ => uuid::Uuid::new_v4(),
                                 };
 
-                                // Update spawned instance
-                                if let Some(existing_instances) = wf.function_instances.get(&fun.function_alias) {
+                                // Update an existing spawned instance of a function
+                                if let Some(existing_instances) = current_workflow.function_instances.get(&fun.function_alias) {
                                     for instance in existing_instances {
                                         let res = fn_client
                                             .update_links(edgeless_api::function_instance::UpdateFunctionLinksRequest {
@@ -172,10 +184,11 @@ impl Controller {
                                         }
                                     }
                                 } else {
-                                    // Create new instance
+                                    // An instance of this function does not
+                                    // exist yet, create a new one
                                     let response = fn_client
                                         .start(edgeless_api::function_instance::SpawnFunctionRequest {
-                                            instance_id: None,
+                                            instance_id: None, // at this stage we don't specify an instance_id yet - it will be decided later in the invocation chain
                                             code: fun.function_class_specification.clone(),
                                             annotations: fun.function_annotations.clone(),
                                             output_callback_definitions: outputs.clone(),
@@ -189,7 +202,7 @@ impl Controller {
                                     match response {
                                         Ok(response) => match response.instance_id {
                                             Some(f_id) => {
-                                                wf.function_instances.insert(fun.function_alias.clone(), vec![f_id]);
+                                                current_workflow.function_instances.insert(fun.function_alias.clone(), vec![f_id]);
                                                 if all_outputs_mapped {
                                                     to_upsert.remove(&fun.function_alias);
                                                 }
@@ -213,11 +226,13 @@ impl Controller {
                                 let output_mapping: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> = resource
                                     .output_callback_definitions
                                     .iter()
-                                    .map(|(callback, alias)| (callback.to_string(), wf.function_instances.get(alias).unwrap()[0].clone()))
+                                    .map(|(callback, alias)| {
+                                        (callback.to_string(), current_workflow.function_instances.get(alias).unwrap()[0].clone())
+                                    })
                                     .collect();
 
                                 // Update resource instance
-                                if let Some(_instances) = wf.resource_instances.get(&resource.alias) {
+                                if let Some(_instances) = current_workflow.resource_instances.get(&resource.alias) {
                                     // resources currently don't have an update function.
                                     todo!();
                                 } else {
@@ -237,7 +252,8 @@ impl Controller {
                                         {
                                             Ok(response) => match response.instance_id {
                                                 Some(instance_id) => {
-                                                    wf.resource_instances
+                                                    current_workflow
+                                                        .resource_instances
                                                         .insert(resource.alias.clone(), vec![(provider_id.clone(), instance_id)]);
                                                     if output_mapping.len() == resource.output_callback_definitions.len() {
                                                         to_upsert.remove(&resource.alias);
@@ -265,11 +281,11 @@ impl Controller {
                         continue;
                     }
 
-                    active_workflows.insert(spawn_workflow_request.workflow_id.clone(), wf.clone());
+                    active_workflows.insert(spawn_workflow_request.workflow_id.clone(), current_workflow.clone());
                     match reply_sender.send(Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::good(
                         edgeless_api::workflow_instance::WorkflowInstance {
                             workflow_id: spawn_workflow_request.workflow_id,
-                            functions: wf
+                            functions: current_workflow
                                 .function_instances
                                 .iter()
                                 .map(|(alias, instances)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
@@ -287,6 +303,8 @@ impl Controller {
                 }
                 ControllerRequest::STOP(workflow_id) => {
                     if let Some(workflow_to_remove) = active_workflows.remove(&workflow_id) {
+                        // Send stop to all function instances associated with
+                        // this workflow. For now only one orchestrator is supported.
                         for (_alias, instances) in workflow_to_remove.function_instances {
                             for f_id in instances {
                                 match fn_client.stop(f_id).await {
@@ -297,6 +315,7 @@ impl Controller {
                                 }
                             }
                         }
+                        // Stop all of the resources using the ResourceConfigurationAPI
                         for (_alias, instances) in workflow_to_remove.resource_instances {
                             for (provider, instance_id) in instances {
                                 match resources.get_mut(&provider) {

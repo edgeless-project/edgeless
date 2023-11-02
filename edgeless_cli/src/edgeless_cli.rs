@@ -168,7 +168,7 @@ async fn main() -> anyhow::Result<()> {
                     let build_dir = std::env::temp_dir().join(format!("edgeless-{}-{}", function_spec.id, uuid::Uuid::new_v4()));
 
                     let config = &cargo::util::config::Config::default()?;
-                    let mut ws = cargo::core::Workspace::new(&cargo_manifest, config.clone())?;
+                    let mut ws = cargo::core::Workspace::new(&cargo_manifest, config)?;
                     ws.set_target_dir(cargo::util::Filesystem::new(build_dir.clone()));
 
                     let pack = ws.current()?;
