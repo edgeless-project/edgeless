@@ -1,32 +1,4 @@
-use crate::common::ResponseError;
-
-// TODO(raphaelhetzel) These should be actual types in the future to allow for type-safety.
-pub type NodeId = uuid::Uuid;
-pub type NodeLocalComponentId = uuid::Uuid;
-
-const NODE_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-fffe00000000");
-const FUNCTION_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-fffd00000000");
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct InstanceId {
-    pub node_id: NodeId,
-    pub function_id: NodeLocalComponentId,
-}
-
-impl InstanceId {
-    pub fn new(node_id: uuid::Uuid) -> Self {
-        Self {
-            node_id: node_id,
-            function_id: uuid::Uuid::new_v4(),
-        }
-    }
-    pub fn none() -> Self {
-        Self {
-            node_id: NODE_ID_NONE,
-            function_id: FUNCTION_ID_NONE,
-        }
-    }
-}
+pub use edgeless_api_core::instance_id::*;
 
 #[derive(Debug, Clone)]
 pub enum StatePolicy {
@@ -61,7 +33,7 @@ pub struct SpawnFunctionRequest {
 
 #[derive(Debug, Clone)]
 pub struct SpawnFunctionResponse {
-    pub response_error: Option<ResponseError>,
+    pub response_error: Option<crate::common::ResponseError>,
     pub instance_id: Option<InstanceId>,
 }
 

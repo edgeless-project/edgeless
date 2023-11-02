@@ -8,4 +8,6 @@ function_state/
 /cli.toml
 .direnv
 config/
-
+settings.json
+vendor/
+secrets/

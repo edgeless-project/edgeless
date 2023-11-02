@@ -1,6 +1,6 @@
 #!/bin/bash
 
-logs="build.log build_functions.log edgeless_bal.log edgeless_con.log edgeless_orc.log edgeless_node.log my-local-file.log"
+logs="build.log build_functions.log edgeless_bal.log edgeless_con.log edgeless_orc.log edgeless_node.log my-local-file.log reading-errors.log"
 confs="balancer.toml controller.toml orchestrator.toml node.toml cli.toml"
 
 echo "checking for existing files"
