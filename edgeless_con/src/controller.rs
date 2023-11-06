@@ -11,9 +11,10 @@ pub struct Controller {
 }
 
 enum ControllerRequest {
-    // TODO: why is the response also packed in here
     START(
         edgeless_api::workflow_instance::SpawnWorkflowRequest,
+        // oneshot channel that basically represents the return address for the
+        // SpawnWorkflowRequest
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>,
     ),
     STOP(edgeless_api::workflow_instance::WorkflowId),
@@ -37,7 +38,6 @@ struct ActiveWorkflow {
 }
 
 impl ActiveWorkflow {
-    // TODO:
     fn instances(&self, alias: &str) -> Vec<edgeless_api::function_instance::InstanceId> {
         let mut all_instances = Vec::new();
         if let Some(function_instances) = self.function_instances.get(alias) {
@@ -111,7 +111,8 @@ impl Controller {
 
         let mut receiver = receiver;
 
-        // For now the controller selects only one orchestrator to communicate with
+        // For now the controller selects only one orchestrator to communicate
+        // with
         let mut selected_orchestrator = match orchestrators.into_values().next() {
             Some(c) => c,
             None => {
@@ -120,8 +121,8 @@ impl Controller {
         };
 
         // Gets the FunctionInsatnceAPI object of the selected orchestrator,
-        // which can then be used to start / stop / update functions on nodes in its
-        // orchestration domain.
+        // which can then be used to start / stop / update functions on nodes in
+        // its orchestration domain.
         let mut fn_client = selected_orchestrator.function_instance_api();
         let mut active_workflows = std::collections::HashMap::<edgeless_api::workflow_instance::WorkflowId, ActiveWorkflow>::new();
 
@@ -141,7 +142,17 @@ impl Controller {
 
                     let mut iteration_count = 100;
 
-                    // TODO: how does this algorithm work?
+                    //  This algorithm iterates over all functions/resources
+                    //  until either all output connections are linked or the
+                    //  iteration count (100) is reached. This is required, as
+                    //  we can only get the instance id by spawning the function
+                    //  and because there might be dependency loops. By doing
+                    //  this in multiple iterations (and updating the sets) we
+                    //  can create workflows that also contain loops from the
+                    //  alias system (and we don't need to find the order in a
+                    //  loop-free graph). In case there is a loop, the iteration
+                    //  count of 100 will be reached and the workflow creation
+                    //  would fail.
                     loop {
                         if iteration_count == 0 || to_upsert.len() == 0 {
                             break;
@@ -154,7 +165,6 @@ impl Controller {
                                     .output_callback_definitions
                                     .iter()
                                     .filter_map(|(output_id, output_alias)| {
-                                        // TODO: what does this do?
                                         let instances = current_workflow.instances(&output_alias);
                                         if instances.len() > 0 {
                                             Some((output_id.to_string(), instances[0].clone()))
@@ -172,7 +182,8 @@ impl Controller {
                                     _ => uuid::Uuid::new_v4(),
                                 };
 
-                                // Update an existing spawned instance of a function
+                                // Update an existing spawned instance of a
+                                // function
                                 if let Some(existing_instances) = current_workflow.function_instances.get(&fun.function_alias) {
                                     for instance in existing_instances {
                                         let res = fn_client
@@ -197,7 +208,10 @@ impl Controller {
                                     // exist yet, create a new one
                                     let response = fn_client
                                         .start(edgeless_api::function_instance::SpawnFunctionRequest {
-                                            instance_id: None, // at this stage we don't specify an instance_id yet - it will be decided later in the invocation chain
+                                            // at this stage we don't specify an
+                                            // instance_id yet - it will be
+                                            // assigned by the node running the function
+                                            instance_id: None,
                                             code: fun.function_class_specification.clone(),
                                             annotations: fun.function_annotations.clone(),
                                             output_callback_definitions: outputs.clone(),
@@ -225,7 +239,8 @@ impl Controller {
                                         }
                                     }
 
-                                    // TODO(ccicconetti) handle failed function instance creation
+                                    // TODO(ccicconetti) handle failed function
+                                    // instance creation
                                 }
                             }
                         }
@@ -242,7 +257,8 @@ impl Controller {
 
                                 // Update resource instance
                                 if let Some(_instances) = current_workflow.resource_instances.get(&resource.alias) {
-                                    // resources currently don't have an update function.
+                                    // resources currently don't have an update
+                                    // function.
                                     todo!();
                                 } else {
                                     // Create new resource instance
@@ -276,15 +292,16 @@ impl Controller {
                                                 log::error!("failed interaction when creating a resource: {}", err.to_string());
                                             }
                                         }
-                                        // TODO(ccicconetti) handle failed resource creation
+                                        // TODO(ccicconetti) handle failed
+                                        // resource creation
                                     }
                                 }
                             }
                         }
                     }
 
-                    // Everything should be mapped now.
-                    // Fails if there is invalid mappings or large dependency loops.
+                    // Everything should be mapped now. Fails if there is
+                    // invalid mappings or large dependency loops.
                     if to_upsert.len() > 0 {
                         reply_sender.send(Err(anyhow::anyhow!("Failed to resolve alias-links."))).unwrap();
                         continue;
@@ -313,7 +330,8 @@ impl Controller {
                 ControllerRequest::STOP(workflow_id) => {
                     if let Some(workflow_to_remove) = active_workflows.remove(&workflow_id) {
                         // Send stop to all function instances associated with
-                        // this workflow. For now only one orchestrator is supported.
+                        // this workflow. For now only one orchestrator is
+                        // supported.
                         for (_alias, instances) in workflow_to_remove.function_instances {
                             for f_id in instances {
                                 match fn_client.stop(f_id).await {
@@ -324,7 +342,8 @@ impl Controller {
                                 }
                             }
                         }
-                        // Stop all of the resources using the ResourceConfigurationAPI
+                        // Stop all of the resources using the
+                        // ResourceConfigurationAPI
                         for (_alias, instances) in workflow_to_remove.resource_instances {
                             for (provider, instance_id) in instances {
                                 match resources.get_mut(&provider) {

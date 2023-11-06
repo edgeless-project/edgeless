@@ -41,6 +41,7 @@ pub fn edgeless_orc_default_conf() -> String {
     String::from(
         r##"domain_id = "domain-1"
 orchestrator_url = "http://127.0.0.1:7011"
+orchestration_strategy = "Random"
 nodes = [
         {node_id = "fda6ce79-46df-4f96-a0d2-456f720f606c", agent_url = "http://127.0.0.1:7001" }
 ]
