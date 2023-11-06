@@ -1,5 +1,6 @@
 use warp::Filter;
 
+/// Prometheus collects metrics from targets by scraping metrics HTTP targets. This struct defines that.
 pub struct PrometheusEventTarget {
     registry: std::sync::Arc<tokio::sync::Mutex<prometheus_client::registry::Registry>>,
     function_count: prometheus_client::metrics::family::Family<RuntimeLabels, prometheus_client::metrics::gauge::Gauge>,
@@ -12,6 +13,7 @@ struct RuntimeLabels {
     function_type: String,
 }
 
+// TODO: add additional labels like function_class, function_name
 #[derive(Clone, Debug, Hash, PartialEq, Eq, prometheus_client::encoding::EncodeLabelSet)]
 struct FunctionLabels {
     node_id: String,

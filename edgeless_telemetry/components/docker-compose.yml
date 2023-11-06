@@ -1,0 +1,18 @@
+version: "3"
+
+services:
+  prometheus:
+    build:
+      context: ./prometheus
+      dockerfile: Dockerfile
+    ports:
+      - 9090:9090
+      - 7003:7003 # TODO: pass this as env variable? this is the metrics port on an edgeless node
+  grafana:
+    build:
+      context: ./grafana
+      dockerfile: Dockerfile
+    ports:
+      - 3000:3000
+    depends_on:
+      - prometheus

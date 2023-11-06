@@ -31,7 +31,7 @@ pub fn telemetry_to_api(lvl: TelemetryLogLevel) -> String {
 pub enum TelemetryEvent {
     FunctionInstantiate(std::time::Duration),
     FunctionInit(std::time::Duration),
-    FunctionLogEntry(TelemetryLogLevel, String, String),
+    FunctionLogEntry(TelemetryLogLevel, String, String), // (_, target, msg)
     FunctionInvocationCompleted(std::time::Duration),
     FunctionStop(std::time::Duration),
     FunctionExit,
@@ -125,6 +125,7 @@ pub struct TelemetryProcessor {
 
 impl TelemetryProcessor {
     pub async fn new(metrics_url: String) -> Self {
+        // TODO: this should not be hardcoded in the future
         let mut listen_port: u16 = 7003;
         if let Ok((_, _, port)) = edgeless_api::util::parse_http_host(&metrics_url) {
             listen_port = port;
