@@ -1,3 +1,5 @@
+use std::net::SocketAddr;
+
 use warp::Filter;
 
 /// Prometheus collects metrics from targets by scraping metrics HTTP targets. This struct defines that.
@@ -36,7 +38,7 @@ struct ExecutionLabels {
 }
 
 impl PrometheusEventTarget {
-    pub async fn new(listen_port: u16) -> Self {
+    pub async fn new(endpoint: &str) -> Self {
         let registry = std::sync::Arc::new(tokio::sync::Mutex::new(<prometheus_client::registry::Registry>::default()));
 
         let function_count = prometheus_client::metrics::family::Family::<RuntimeLabels, prometheus_client::metrics::gauge::Gauge>::default();
@@ -53,6 +55,7 @@ impl PrometheusEventTarget {
         registry.lock().await.register("execution_times", "", execution_times.clone());
 
         let reg_clone = registry.clone();
+        let socket_addr: std::net::SocketAddr = endpoint.parse().expect(&format!("invalid endpoint: {}", &endpoint));
         tokio::spawn(async move {
             let metric_handler = warp::path("metrics").then(move || {
                 let cloned = reg_clone.clone();
@@ -65,7 +68,7 @@ impl PrometheusEventTarget {
                 }
             });
 
-            warp::serve(metric_handler).run(([127, 0, 0, 1], listen_port)).await;
+            warp::serve(metric_handler).run(socket_addr).await;
         });
 
         Self {

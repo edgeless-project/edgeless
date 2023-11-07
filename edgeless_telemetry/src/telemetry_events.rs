@@ -124,29 +124,28 @@ pub struct TelemetryProcessor {
 }
 
 impl TelemetryProcessor {
-    pub async fn new(metrics_url: String) -> Self {
-        // TODO: this should not be hardcoded in the future
-        let mut listen_port: u16 = 7003;
-        if let Ok((_, _, port)) = edgeless_api::util::parse_http_host(&metrics_url) {
-            listen_port = port;
+    pub async fn new(metrics_url: String) -> anyhow::Result<Self> {
+        match edgeless_api::util::parse_http_host(&metrics_url) {
+            Ok((_, ip, port)) => {
+                let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<TelemetryProcessorInput>();
+
+                let inner = TelemetryProcessorInner {
+                    processing_chain: vec![
+                        Box::new(crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
+                        Box::new(EventLogger {}),
+                    ],
+                    receiver: receiver,
+                };
+
+                tokio::spawn(async move {
+                    let mut inner = inner;
+                    inner.run().await;
+                });
+
+                Ok(Self { sender })
+            }
+            Err(err) => Err(err),
         }
-
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<TelemetryProcessorInput>();
-
-        let inner = TelemetryProcessorInner {
-            processing_chain: vec![
-                Box::new(crate::prometheus_target::PrometheusEventTarget::new(listen_port).await),
-                Box::new(EventLogger {}),
-            ],
-            receiver: receiver,
-        };
-
-        tokio::spawn(async move {
-            let mut inner = inner;
-            inner.run().await;
-        });
-
-        Self { sender }
     }
 
     pub fn get_handle(&self, handle_tags: std::collections::BTreeMap<String, String>) -> TelemetryHandle {
