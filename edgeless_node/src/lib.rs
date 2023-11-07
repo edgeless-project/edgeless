@@ -20,7 +20,9 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let state_manager = Box::new(state_management::StateManager::new().await);
     let data_plane =
         edgeless_dataplane::handle::DataplaneProvider::new(settings.node_id.clone(), settings.invocation_url.clone(), settings.peers.clone()).await;
-    let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.metrics_url.clone()).await;
+    let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.metrics_url.clone())
+        .await
+        .expect(&format!("could not build the telemetry provider at URL {}", &settings.metrics_url));
     let (rust_runner_client, rust_runner_task) = wasm_runner::runner::Runner::new(
         data_plane.clone(),
         state_manager.clone(),
