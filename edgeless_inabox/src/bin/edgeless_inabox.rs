@@ -27,29 +27,31 @@ struct Args {
 fn main() -> anyhow::Result<()> {
     env_logger::init();
     let args = Args::parse();
-    let config: InABoxConfig;
 
-    if args.templates || args.num_of_nodes == 1 {
+    if args.templates && args.num_of_nodes == 1 {
         log::info!("Generating default templates for one node");
         edgeless_api::util::create_template("node.toml", edgeless_node::edgeless_node_default_conf().as_str())?;
         edgeless_api::util::create_template("orchestrator.toml", edgeless_orc::edgeless_orc_default_conf().as_str())?;
         edgeless_api::util::create_template("balancer.toml", edgeless_bal::edgeless_bal_default_conf().as_str())?;
         edgeless_api::util::create_template("controller.toml", edgeless_con::edgeless_con_default_conf().as_str())?;
-        config = InABoxConfig {
+        return Ok(());
+    }
+
+    let config = match args.num_of_nodes {
+        1 => InABoxConfig {
             node_conf_files: vec!["node.toml".to_string()],
             orc_conf_file: "orchestrator.toml".to_string(),
             bal_conf_file: "balancer.toml".to_string(),
             con_conf_file: "controller.toml".to_string(),
-        };
-        return Ok(());
-    } else if args.num_of_nodes > 0 {
-        config = match generate_configs(args.num_of_nodes) {
+        },
+        _ if args.num_of_nodes >= 2 => match generate_configs(args.num_of_nodes) {
             Ok(config) => config,
             Err(error) => return Err(anyhow!(error)),
+        },
+        _ => {
+            return Err(anyhow!("Invalid number of worker nodes specified: {}", args.num_of_nodes));
         }
-    } else {
-        return Err(anyhow!("Invalid number of worker nodes specified"));
-    }
+    };
 
     let async_runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(8).enable_all().build()?;
     let mut async_tasks = vec![];
@@ -183,16 +185,19 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         ],
     };
 
-    // Save the config files to the configs/ directory if its empty, to give
+    // Save the config files to a hard-coded directory if its empty, to give
     // users reference on how the cluster is configured
     let path = "config/";
     if fs::metadata(&path).is_ok() {
         let is_empty = fs::read_dir(&path).map(|entries| entries.count() == 0).unwrap_or(true);
         if !is_empty {
-            return Err("/config directory is not empty - remove old configuration files first".to_string());
+            return Err(format!(
+                "Configuration directory '{}' not empty: remove old configuration files first",
+                &path
+            ));
         }
     } else if let Err(_err) = fs::create_dir(&path) {
-        return Err("Failed with creating a directory config/".to_string());
+        return Err(format!("Failed with creating directory: {}", &path));
     }
 
     // now we are sure that there exists a directory which is empty (this is
@@ -208,14 +213,14 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
             toml::to_string(&node_conf).expect("Wrong"),
         )
         .ok();
-        node_files.push(format!("config/node{}.toml", count));
+        node_files.push(format!("{}/node{}.toml", &path, count));
         count += 1;
     }
 
     Ok(InABoxConfig {
         node_conf_files: node_files,
-        orc_conf_file: "config/orchestrator.toml".to_string(),
-        bal_conf_file: "config/balancer.toml".to_string(),
-        con_conf_file: "config/controller.toml".to_string(),
+        orc_conf_file: format!("{}/orchestrator.toml", &path),
+        bal_conf_file: format!("{}/balancer.toml", &path),
+        con_conf_file: format!("{}/controller.toml", &path),
     })
 }
