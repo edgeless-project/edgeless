@@ -1,12 +1,12 @@
 mod controller;
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessConOrcConfig {
     pub domain_id: String,
     pub orchestrator_url: String,
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessConResourceConfig {
     pub resource_provider_id: String,
     pub resource_class_type: String,
@@ -14,7 +14,7 @@ pub struct EdgelessConResourceConfig {
     pub resource_configuration_url: String,
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessConSettings {
     pub controller_url: String,
     pub orchestrators: Vec<EdgelessConOrcConfig>,

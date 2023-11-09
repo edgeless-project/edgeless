@@ -46,7 +46,7 @@ impl SpawnFunctionResponse {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UpdateFunctionLinksRequest {
     pub instance_id: Option<InstanceId>,
     pub output_callback_definitions: std::collections::HashMap<String, InstanceId>,
