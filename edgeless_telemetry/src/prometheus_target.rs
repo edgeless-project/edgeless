@@ -1,10 +1,8 @@
-use std::net::SocketAddr;
-
 use warp::Filter;
 
 /// Prometheus collects metrics from targets by scraping metrics HTTP targets. This struct defines that.
 pub struct PrometheusEventTarget {
-    registry: std::sync::Arc<tokio::sync::Mutex<prometheus_client::registry::Registry>>,
+    _registry: std::sync::Arc<tokio::sync::Mutex<prometheus_client::registry::Registry>>,
     function_count: prometheus_client::metrics::family::Family<RuntimeLabels, prometheus_client::metrics::gauge::Gauge>,
     execution_times: prometheus_client::metrics::family::Family<ExecutionLabels, prometheus_client::metrics::histogram::Histogram>,
 }
@@ -72,7 +70,7 @@ impl PrometheusEventTarget {
         });
 
         Self {
-            registry,
+            _registry: registry,
             function_count,
             execution_times,
         }
