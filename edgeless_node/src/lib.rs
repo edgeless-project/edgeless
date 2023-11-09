@@ -5,7 +5,7 @@ pub mod runner_api;
 pub mod state_management;
 pub mod wasm_runner;
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
     pub node_id: uuid::Uuid,
     pub agent_url: String,

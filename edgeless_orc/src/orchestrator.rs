@@ -1,4 +1,5 @@
 use futures::{Future, SinkExt, StreamExt};
+use std::collections::HashMap;
 
 pub struct Orchestrator {
     sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
@@ -41,7 +42,11 @@ impl Orchestrator {
     }
 
     async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
-        let mut clients = std::collections::HashMap::<uuid::Uuid, Box<dyn edgeless_api::agent::AgentAPI + Send>>::new();
+        log::info!("Main_task started!");
+        let mut clients = HashMap::<uuid::Uuid, Box<dyn edgeless_api::agent::AgentAPI + Send>>::new();
+        // Goes through the list of all worker nodes in this orchestration
+        // domain and creates AgentAPIClient objects for them that will be used
+        // to control them
         for node in &orchestrator_settings.nodes {
             clients.insert(
                 node.node_id,
@@ -49,20 +54,46 @@ impl Orchestrator {
             );
         }
         let mut receiver = receiver;
-        let mut client = match clients.into_values().next() {
-            Some(c) => c,
-            None => {
-                log::error!("Orchestrator without nodes. Exiting.");
-                return;
-            }
-        };
-        let mut fn_client = client.function_instance_api();
+
+        // Initializes the OrchestrationLogic
+        let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(
+            Some(orchestrator_settings.orchestration_strategy),
+            clients.keys().cloned().collect(),
+        );
+
+        // Main loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
             match req {
                 OrchestratorRequest::SPAWN(spawn_req, reply_channel) => {
-                    log::debug!("Orchestrator Spawn {:?}", spawn_req);
+                    // Orchestration step: select the node to spawn this
+                    // function instance by using the orchestration logic.
+                    // Orchestration strategy can also be changed during
+                    // runtime.
+                    let selected_node_id = match orchestration_logic.next() {
+                        Some(u) => u,
+                        None => {
+                            log::error!("Could not select the next node. Either no nodes are specified or an error occured. Exiting.");
+                            return;
+                        }
+                    };
+
+                    let mut fn_client = match clients.get_mut(&selected_node_id) {
+                        Some(c) => c,
+                        None => {
+                            log::error!("Invalid node selected by the orchestration logic. Exiting.");
+                            return;
+                        }
+                    }
+                    .function_instance_api();
+                    log::debug!("Orchestrator Spawn {:?} at worker node with node_id {:?}", spawn_req, selected_node_id);
+
+                    // Finally try to spawn the function instance on the
+                    // selected client
                     let res = match fn_client.start(spawn_req).await {
-                        Ok(res) => Ok(res),
+                        Ok(res) => {
+                            log::info!("Spawned at: {:?}", res.instance_id);
+                            Ok(res)
+                        }
                         Err(err) => {
                             log::error!("Unhandled: {}", err);
                             Err(anyhow::anyhow!("Orchestrator->Node Spawn Request failed"))
@@ -74,6 +105,14 @@ impl Orchestrator {
                 }
                 OrchestratorRequest::STOP(stop_function_id) => {
                     log::debug!("Orchestrator Stop {:?}", stop_function_id);
+                    let mut fn_client = match clients.get_mut(&stop_function_id.node_id) {
+                        Some(c) => c,
+                        None => {
+                            log::error!("This orchestrator does not manage the node where this function instance {:?} is located! Please note that support for multiple orchestrators is not implemented yet!", stop_function_id);
+                            return;
+                        }
+                    }.function_instance_api();
+
                     match fn_client.stop(stop_function_id).await {
                         Ok(_) => {}
                         Err(err) => {
@@ -83,12 +122,24 @@ impl Orchestrator {
                 }
                 OrchestratorRequest::UPDATE(update) => {
                     log::debug!("Orchestrator Update {:?}", update);
-                    match fn_client.update_links(update).await {
-                        Ok(_) => {}
-                        Err(err) => {
-                            log::error!("Unhandled: {}", err);
-                        }
-                    };
+                    if let Some(instance_id) = update.clone().instance_id {
+                        let mut fn_client = match clients.get_mut(&instance_id.node_id) {
+                            Some(c) => c,
+                            None => {
+                                log::error!("This orchestrator does not manage the node where this function instance {:?} is located! Please note that support for multiple orchestrators is not implemented yet!", instance_id);
+                                return;
+                            }
+                        }.function_instance_api();
+
+                        match fn_client.update_links(update).await {
+                            Ok(_) => {}
+                            Err(err) => {
+                                log::error!("Unhandled: {}", err);
+                            }
+                        };
+                    } else {
+                        log::error!("A request to an orchestrator to update links must contain a valid InstanceId!");
+                    }
                 }
             }
         }
@@ -108,6 +159,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFuncti
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse> {
         let request = request;
+        println!("{:?}", request.instance_id);
         let (reply_sender, reply_receiver) =
             tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse>>();
         if let Err(err) = self.sender.send(OrchestratorRequest::SPAWN(request, reply_sender)).await {

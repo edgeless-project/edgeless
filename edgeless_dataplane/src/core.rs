@@ -36,7 +36,7 @@ pub struct DataplaneEvent {
     pub message: Message,
 }
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessDataplanePeerSettings {
     pub id: uuid::Uuid,
     pub invocation_url: String,

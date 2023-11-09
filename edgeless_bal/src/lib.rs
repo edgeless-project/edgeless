@@ -3,7 +3,7 @@ pub mod http_egress;
 pub mod http_ingress;
 pub mod redis;
 
-#[derive(Debug, Clone, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessBalSettings {
     pub balancer_id: uuid::Uuid,
     pub invocation_url: String,

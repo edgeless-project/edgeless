@@ -1098,6 +1098,7 @@ dependencies = [
  "env_logger",
  "futures",
  "log",
+ "rand",
  "serde",
  "tokio",
  "toml 0.7.6",
