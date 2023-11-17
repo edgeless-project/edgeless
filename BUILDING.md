@@ -84,3 +84,48 @@ To build the function examples under `./examples` you will need to add the WASM 
 ```shell
 rustup target add wasm32-unknown-unknown
 ```
+
+## Jetson Nano/Ubuntu 18.04
+
+[Optional] You can install an Ubuntu 22.04 VM (5 cores, 8 GB RAM, 32 GB disk) very easily with [multipass](https://multipass.run/):
+
+```bash
+multipass launch -n edgeless-jetson -c 5 -m 8G -d 32G 18.04
+multipass shell edgeless-jetson
+```
+
+Install Rust (follow the interactive instructions):
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Install the dependencies and target architectures:
+
+```bash
+source "$HOME/.cargo/env"
+sudo apt update && sudo apt install gcc libssl-dev pkg-config unzip gcc-aarch64-linux-gnu -y
+rustup target add wasm32-unknown-unknown
+rustup target add aarch64-unknown-linux-gnu
+cargo install wasm-tools
+```
+
+Install the protobuf binaries:
+
+```bash
+wget https://github.com/protocolbuffers/protobuf/releases/download/v25.1/protoc-25.1-linux-x86_64.zip
+cd /usr/local
+unzip -t $OLDPWD/protoc-25.1-linux-x86_64.zip
+rm -f readme.txt
+cd -
+```
+
+At this point you may have to logout/login to let your shell know of the new executable, just try `protoc` to see if it works.
+
+Finally, you can just clone the repo and build the system:
+
+```bash
+git clone https://github.com/edgeless-project/edgeless.git
+cd edgeless
+cargo build --target aarch64-unknown-linux-gnu
+```
