@@ -32,18 +32,9 @@ pub struct SpawnFunctionRequest {
 }
 
 #[derive(Debug, Clone)]
-pub struct SpawnFunctionResponse {
-    pub response_error: Option<crate::common::ResponseError>,
-    pub instance_id: Option<InstanceId>,
-}
-
-impl SpawnFunctionResponse {
-    pub fn good(instance_id: crate::function_instance::InstanceId) -> Self {
-        Self {
-            response_error: None,
-            instance_id: Some(instance_id),
-        }
-    }
+pub enum SpawnFunctionResponse {
+    ResponseError(crate::common::ResponseError),
+    InstanceId(InstanceId),
 }
 
 #[derive(Debug, Clone)]
