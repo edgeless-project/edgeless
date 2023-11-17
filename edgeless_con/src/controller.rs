@@ -223,15 +223,15 @@ impl Controller {
                                         .await;
 
                                     match response {
-                                        Ok(response) => match response.instance_id {
-                                            Some(f_id) => {
-                                                current_workflow.function_instances.insert(fun.function_alias.clone(), vec![f_id]);
+                                        Ok(response) => match response {
+                                            edgeless_api::function_instance::SpawnFunctionResponse::ResponseError(error) => {
+                                                log::error!("function instance creation rejected: {}", error);
+                                            }
+                                            edgeless_api::function_instance::SpawnFunctionResponse::InstanceId(id) => {
+                                                current_workflow.function_instances.insert(fun.function_alias.clone(), vec![id]);
                                                 if all_outputs_mapped {
                                                     to_upsert.remove(&fun.function_alias);
                                                 }
-                                            }
-                                            None => {
-                                                log::error!("function instance creation rejected: {:?}", response.response_error);
                                             }
                                         },
                                         Err(err) => {

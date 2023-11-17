@@ -101,7 +101,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
             }
         };
         match self.sender.send(AgentRequest::SPAWN(request)).await {
-            Ok(_) => Ok(edgeless_api::function_instance::SpawnFunctionResponse::good(f_id)),
+            Ok(_) => Ok(edgeless_api::function_instance::SpawnFunctionResponse::InstanceId(f_id)),
             Err(err) => Err(anyhow::anyhow!(
                 "Agent channel error when creating a function instance: {}",
                 err.to_string()

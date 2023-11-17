@@ -54,22 +54,21 @@ impl FunctonInstanceConverters {
     pub fn parse_spawn_function_response(
         api_instance: &crate::grpc_impl::api::SpawnFunctionResponse,
     ) -> anyhow::Result<crate::function_instance::SpawnFunctionResponse> {
-        Ok(crate::function_instance::SpawnFunctionResponse {
-            response_error: match api_instance.response_error.as_ref() {
-                Some(val) => Some(match CommonConverters::parse_response_error(val) {
-                    Ok(val) => val,
-                    Err(err) => return Err(anyhow::anyhow!(err.to_string())),
-                }),
-                None => None,
+        match api_instance.instance_id.as_ref() {
+            Some(val) => match CommonConverters::parse_instance_id(val) {
+                Ok(val) => Ok(crate::function_instance::SpawnFunctionResponse::InstanceId(val)),
+                Err(err) => Err(anyhow::anyhow!(err.to_string())),
             },
-            instance_id: match api_instance.instance_id.as_ref() {
-                Some(val) => Some(match CommonConverters::parse_instance_id(val) {
-                    Ok(val) => val,
+            None => match api_instance.response_error.as_ref() {
+                Some(val) => match CommonConverters::parse_response_error(val) {
+                    Ok(val) => Ok(crate::function_instance::SpawnFunctionResponse::ResponseError(val)),
                     Err(err) => return Err(anyhow::anyhow!(err.to_string())),
-                }),
-                None => None,
+                },
+                None => Err(anyhow::anyhow!(
+                    "Ill-formed SpawnFunctionResponse message: both ResponseError and InstanceId are empty"
+                )),
             },
-        })
+        }
     }
 
     pub fn parse_update_function_links_request(
@@ -138,14 +137,14 @@ impl FunctonInstanceConverters {
     }
 
     pub fn serialize_spawn_function_response(req: &crate::function_instance::SpawnFunctionResponse) -> crate::grpc_impl::api::SpawnFunctionResponse {
-        crate::grpc_impl::api::SpawnFunctionResponse {
-            response_error: match &req.response_error {
-                Some(val) => Some(CommonConverters::serialize_response_error(&val)),
-                None => None,
+        match req {
+            crate::function_instance::SpawnFunctionResponse::ResponseError(err) => crate::grpc_impl::api::SpawnFunctionResponse {
+                response_error: Some(CommonConverters::serialize_response_error(&err)),
+                instance_id: None,
             },
-            instance_id: match &req.instance_id {
-                Some(val) => Some(CommonConverters::serialize_instance_id(&val)),
-                None => None,
+            crate::function_instance::SpawnFunctionResponse::InstanceId(id) => crate::grpc_impl::api::SpawnFunctionResponse {
+                response_error: None,
+                instance_id: Some(CommonConverters::serialize_instance_id(&id)),
             },
         }
     }

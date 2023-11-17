@@ -1,3 +1,4 @@
+use edgeless_api::function_instance::SpawnFunctionResponse;
 use futures::{Future, SinkExt, StreamExt};
 use std::collections::HashMap;
 
@@ -90,10 +91,13 @@ impl Orchestrator {
                     // Finally try to spawn the function instance on the
                     // selected client
                     let res = match fn_client.start(spawn_req).await {
-                        Ok(res) => {
-                            log::info!("Spawned at: {:?}", res.instance_id);
-                            Ok(res)
-                        }
+                        Ok(res) => match res {
+                            SpawnFunctionResponse::ResponseError(err) => Err(anyhow::anyhow!("Orchestrator->Node Spawn Request failed: {}", &err)),
+                            SpawnFunctionResponse::InstanceId(id) => {
+                                log::info!("Spawned at: {:?}", &id);
+                                Ok(res)
+                            }
+                        },
                         Err(err) => {
                             log::error!("Unhandled: {}", err);
                             Err(anyhow::anyhow!("Orchestrator->Node Spawn Request failed"))
