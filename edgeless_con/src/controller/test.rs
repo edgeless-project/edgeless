@@ -43,10 +43,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for MockFunctionInstan
             .send(MockFunctionInstanceEvent::Start((new_id.clone(), spawn_request)))
             .await
             .unwrap();
-        Ok(edgeless_api::function_instance::SpawnFunctionResponse {
-            response_error: None,
-            instance_id: Some(new_id),
-        })
+        Ok(edgeless_api::function_instance::SpawnFunctionResponse::InstanceId(new_id))
     }
     async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
         self.sender.send(MockFunctionInstanceEvent::Stop(id)).await.unwrap();
