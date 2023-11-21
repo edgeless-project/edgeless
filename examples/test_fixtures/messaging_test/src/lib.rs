@@ -12,8 +12,8 @@ impl Edgefunction for MessagingTest {
             "test_call_raw_output" => {
                 let _res = call_raw(&src, "call_raw_output");
             }
-            "test_delayed_cast_raw_output" => {
-                let _res = delayed_cast_raw(100, &src, "delayed_cast_raw_output");
+            "test_delayed_cast_output" => {
+                delayed_cast(100, "test", "delayed_cast_output");
             }
             "test_cast_output" => {
                 cast("test", "cast_output");

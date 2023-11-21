@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use edgeless_function::api::*;
 
 struct PingerFun;
@@ -14,7 +12,7 @@ impl Edgefunction for PingerFun {
         log::info!("AsyncPinger: 'Cast' called, MSG: {}", encoded_message);
         if encoded_message == "wakeup" {
             cast("ponger", "PING");
-            delayed_cast_raw(1000, &slf(), "wakeup");
+            delayed_cast(1000, "self", "wakeup");
         } else {
             log::info!("Got Response");
         }
@@ -28,7 +26,7 @@ impl Edgefunction for PingerFun {
     fn handle_init(_payload: String, serialized_state: Option<String>) {
         edgeless_function::init_logger();
         log::info!("AsyncPinger: 'Init' called");
-        cast_raw(&slf(), "wakeup");
+        cast("self", "wakeup");
     }
 
     fn handle_stop() {

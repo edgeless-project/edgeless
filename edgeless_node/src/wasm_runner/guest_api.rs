@@ -17,20 +17,23 @@ pub struct GuestAPI {
 
 #[async_trait::async_trait]
 impl wit_binding::EdgefunctionImports for GuestAPI {
-    async fn cast(&mut self, alias: String, msg: String) -> wasmtime::Result<()> {
-        if let Some(target) = self.callback_table.lock().await.alias_map.get(&alias) {
-            self.data_plane.send(target.clone(), msg).await;
-            Ok(())
-        } else {
-            log::warn!("Unknown alias.");
-            Ok(())
-        }
-    }
-
     async fn cast_raw(&mut self, target: wit_binding::InstanceId, msg: String) -> wasmtime::Result<()> {
         let parsed_target = parse_wit_function_id(&target)?;
         self.data_plane.send(parsed_target, msg).await;
         Ok(())
+    }
+
+    async fn cast(&mut self, alias: String, msg: String) -> wasmtime::Result<()> {
+        if alias == "self" {
+            self.data_plane.send(self.instance_id.clone(), msg).await;
+            Ok(())
+        } else if let Some(target) = self.callback_table.lock().await.alias_map.get(&alias) {
+            self.data_plane.send(target.clone(), msg).await;
+            Ok(())
+        } else {
+            log::warn!("Unknown alias: {}", &alias);
+            Ok(())
+        }
     }
 
     async fn call_raw(&mut self, target: wit_binding::InstanceId, msg: String) -> wasmtime::Result<wit_binding::CallRet> {
@@ -44,17 +47,23 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
     }
 
     async fn call(&mut self, alias: String, msg: String) -> wasmtime::Result<wit_binding::CallRet> {
-        if let Some(target) = self.callback_table.lock().await.alias_map.get(&alias) {
-            let res = self.data_plane.call(target.clone(), msg).await;
-            Ok(match res {
-                CallRet::Reply(msg) => wit_binding::CallRet::Reply(msg),
-                CallRet::NoReply => wit_binding::CallRet::Noreply,
-                CallRet::Err => wit_binding::CallRet::Err,
-            })
-        } else {
-            log::warn!("Unknown alias.");
-            Ok(wit_binding::CallRet::Err)
+        let target = match alias.as_str() {
+            "self" => self.instance_id,
+            _ => *match self.callback_table.lock().await.alias_map.get(&alias) {
+                Some(val) => val,
+                None => {
+                    log::warn!("Unknown alias: {}", &alias);
+                    return Ok(wit_binding::CallRet::Err);
+                }
+            },
         }
+        .clone();
+
+        Ok(match self.data_plane.call(target, msg).await {
+            CallRet::Reply(msg) => wit_binding::CallRet::Reply(msg),
+            CallRet::NoReply => wit_binding::CallRet::Noreply,
+            CallRet::Err => wit_binding::CallRet::Err,
+        })
     }
 
     async fn telemetry_log(&mut self, lvl: String, target: String, msg: String) -> wasmtime::Result<()> {
@@ -73,15 +82,23 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
         })
     }
 
-    async fn delayed_cast_raw(&mut self, delay: u64, target: wit_binding::InstanceId, payload: String) -> wasmtime::Result<()> {
+    async fn delayed_cast(&mut self, delay: u64, alias: String, payload: String) -> wasmtime::Result<()> {
+        let target = match alias.as_str() {
+            "self" => self.instance_id,
+            _ => *match self.callback_table.lock().await.alias_map.get(&alias) {
+                Some(val) => val,
+                None => {
+                    log::warn!("Unknown alias: {}", &alias);
+                    return Ok(());
+                }
+            },
+        }
+        .clone();
+
         let mut cloned_plane = self.data_plane.clone();
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
-            if let Ok(parsed_target) = parse_wit_function_id(&target) {
-                cloned_plane.send(parsed_target, payload).await;
-            } else {
-                log::error!("Unhandled failure in delayed message.")
-            }
+            cloned_plane.send(target, payload).await;
         });
         Ok(())
     }
