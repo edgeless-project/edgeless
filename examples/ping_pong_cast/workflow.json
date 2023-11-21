@@ -7,7 +7,7 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "include_code_file": "./pong/async_ponger.wasm",
-                "output_callbacks": [
+                "outputs": [
                     "ping"
                 ]
             },
@@ -23,7 +23,7 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "include_code_file": "./ping/async_pinger.wasm",
-                "output_callbacks": [
+                "outputs": [
                     "ponger"
                 ]
             },

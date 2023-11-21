@@ -26,7 +26,7 @@ enum ControllerRequest {
 
 struct ResourceHandle {
     resource_type: String,
-    _output_callback_declarations: Vec<String>,
+    _outputs: Vec<String>,
     config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send>,
 }
 
@@ -80,7 +80,7 @@ impl Controller {
                 resource.resource_provider_id.clone(),
                 ResourceHandle {
                     resource_type: resource.class_type.clone(),
-                    _output_callback_declarations: resource.output_callback_declarations.clone(),
+                    _outputs: resource.outputs.clone(),
                     config_api: config_api,
                 },
             );

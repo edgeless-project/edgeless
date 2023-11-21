@@ -10,7 +10,7 @@ pub struct EdgelessConOrcConfig {
 pub struct EdgelessConResourceConfig {
     pub resource_provider_id: String,
     pub class_type: String,
-    pub output_callback_declarations: Vec<String>,
+    pub outputs: Vec<String>,
     pub resource_configuration_url: String,
 }
 
@@ -40,10 +40,10 @@ orchestrators = [
     { domain_id = "domain-1", orchestrator_url="http://127.0.0.1:7011" }
 ]
 resources = [
-    { resource_provider_id = "file-log-1",     class_type = "file-log",     output_callback_declarations = [],              resource_configuration_url = "http://127.0.0.1:7033" },
-    { resource_provider_id = "http-ingress-1", class_type = "http-ingress", output_callback_declarations = ["new_request"], resource_configuration_url = "http://127.0.0.1:7033" },
-    { resource_provider_id = "http-egress-1",  class_type = "http-egress",  output_callback_declarations = [],              resource_configuration_url = "http://127.0.0.1:7033" },
-    { resource_provider_id = "redis-1",        class_type = "redis",        output_callback_declarations = [],              resource_configuration_url = "http://127.0.0.1:7033" }
+    { resource_provider_id = "file-log-1",     class_type = "file-log",     outputs = [],              resource_configuration_url = "http://127.0.0.1:7033" },
+    { resource_provider_id = "http-ingress-1", class_type = "http-ingress", outputs = ["new_request"], resource_configuration_url = "http://127.0.0.1:7033" },
+    { resource_provider_id = "http-egress-1",  class_type = "http-egress",  outputs = [],              resource_configuration_url = "http://127.0.0.1:7033" },
+    { resource_provider_id = "redis-1",        class_type = "redis",        outputs = [],              resource_configuration_url = "http://127.0.0.1:7033" }
 ]
 "##,
     )

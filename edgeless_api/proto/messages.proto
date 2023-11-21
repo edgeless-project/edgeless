@@ -36,7 +36,7 @@ message FunctionClassSpecification {
     // If present, it carries the function's code.
     optional bytes function_class_inline_code = 4;
     // Callbacks that are invoked by the functions (in addition to return).
-    repeated string output_callback_declarations = 5;
+    repeated string outputs = 5;
 }
 
 // Message to request the creation a new function instance.
@@ -45,7 +45,7 @@ message SpawnFunctionRequest {
     InstanceId instance_id = 1;
     // The function class specification.
     FunctionClassSpecification code = 2;
-    // Map between the callback declarations and function instances.
+    // Mapping of the outputs to concrete function/resource instances.
     map<string, InstanceId> output_callback_definitions = 3;
     // The set of annotations associated to this function instance.
     map<string, string> annotations = 5;
@@ -67,7 +67,7 @@ message SpawnFunctionResponse {
 message UpdateFunctionLinksRequest {
     // The function instance identifier.
     InstanceId instance_id = 1;
-    // Map between the callback declarations and function instances.
+    // Mapping of the outputs to concrete function/resource instances.
     map<string, InstanceId> output_callback_definitions = 3;
 }
 
@@ -184,7 +184,7 @@ message ResourceProviderSpecification {
     // Type of the resource provided.
     string class_type = 2;
     // List of callbacks that can be invoked.
-    repeated string output_callback_declarations = 3;
+    repeated string outputs = 3;
 }
 
 // Resource instance specification.
@@ -193,7 +193,7 @@ message ResourceInstanceSpecification {
     string provider_id = 1;
     // Resource configuration (depends on the type).
     map<string, string> configuration = 2;
-    // Map between the callbacks and instances that will be called.
+    // Mapping of the outputs to concrete function/resource instances.
     map<string, InstanceId> output_callback_definitions = 3;
 }
 

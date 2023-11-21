@@ -7,7 +7,7 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "include_code_file": "./http_read_number/http_read_number.wasm",
-                "output_callbacks": [
+                "outputs": [
                     "parsed_value"
                 ]
             },
@@ -23,7 +23,7 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "include_code_file": "./incr/incr.wasm",
-                "output_callbacks": [
+                "outputs": [
                     "result"
                 ]
             },
@@ -39,7 +39,7 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "include_code_file": "./double/double.wasm",
-                "output_callbacks": [
+                "outputs": [
                     "result"
                 ]
             },
@@ -55,7 +55,7 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "include_code_file": "./http_write_number/http_write_number.wasm",
-                "output_callbacks": [
+                "outputs": [
                     "external_sink"
                 ]
             },

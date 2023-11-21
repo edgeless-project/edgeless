@@ -11,7 +11,7 @@ impl FunctonInstanceConverters {
             function_class_type: api_spec.function_class_type.clone(),
             function_class_version: api_spec.function_class_version.clone(),
             function_class_inlude_code: api_spec.function_class_inline_code().to_vec(),
-            output_callback_declarations: api_spec.output_callback_declarations.clone(),
+            outputs: api_spec.outputs.clone(),
         })
     }
 
@@ -115,7 +115,7 @@ impl FunctonInstanceConverters {
             function_class_type: spec.function_class_type.clone(),
             function_class_version: spec.function_class_version.clone(),
             function_class_inline_code: Some(spec.function_class_inlude_code.clone()),
-            output_callback_declarations: spec.output_callback_declarations.clone(),
+            outputs: spec.outputs.clone(),
         }
     }
 
