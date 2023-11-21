@@ -11,7 +11,7 @@
                     "check_display"
                 ]
             },
-            "output_callback_definitions": {
+            "output_mapping": {
                 "check_display": "test_display"
             },
             "annotations": {}
@@ -21,7 +21,7 @@
         {
             "name": "test_sensor",
             "class_type": "scd30-sensor",
-            "output_callback_definitions": {
+            "output_mapping": {
                 "data_out": "test_fun"
             },
             "configurations": {}
@@ -29,7 +29,7 @@
         {
             "name": "test_display",
             "class_type": "text-display",
-            "output_callback_definitions": {},
+            "output_mapping": {},
             "configurations": {}
         }
     ],

@@ -164,7 +164,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for IngressR
             instance_specification.configuration.get("methods"),
         ) {
             let resource_id = edgeless_api::function_instance::InstanceId::new(self.own_node_id.clone());
-            let target = match instance_specification.output_callback_definitions.get("new_request") {
+            let target = match instance_specification.output_mapping.get("new_request") {
                 Some(val) => val.clone(),
                 None => {
                     return Err(anyhow::anyhow!("Missing Target"));

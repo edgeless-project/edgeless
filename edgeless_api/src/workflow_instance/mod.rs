@@ -48,7 +48,7 @@ pub struct WorkflowInstance {
 pub struct WorkflowResource {
     pub name: String,
     pub class_type: String,
-    pub output_callback_definitions: std::collections::HashMap<String, String>,
+    pub output_mapping: std::collections::HashMap<String, String>,
     pub configurations: std::collections::HashMap<String, String>,
 }
 
@@ -56,7 +56,7 @@ pub struct WorkflowResource {
 pub struct WorkflowFunction {
     pub name: String,
     pub function_class_specification: crate::function_instance::FunctionClassSpecification,
-    pub output_callback_definitions: std::collections::HashMap<String, String>,
+    pub output_mapping: std::collections::HashMap<String, String>,
     pub annotations: std::collections::HashMap<String, String>,
 }
 

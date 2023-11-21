@@ -20,7 +20,7 @@ impl WorkflowInstanceConverters {
                     None => return Err(anyhow::anyhow!("Missing Workflow FunctionClass")),
                 },
             )?,
-            output_callback_definitions: api_function.output_callback_definitions.clone(),
+            output_mapping: api_function.output_mapping.clone(),
             annotations: api_function.annotations.clone(),
         })
     }
@@ -31,7 +31,7 @@ impl WorkflowInstanceConverters {
         Ok(crate::workflow_instance::WorkflowResource {
             name: api_workflow.name.clone(),
             class_type: api_workflow.class_type.clone(),
-            output_callback_definitions: api_workflow.output_callback_definitions.clone(),
+            output_mapping: api_workflow.output_mapping.clone(),
             configurations: api_workflow.configurations.clone(),
         })
     }
@@ -151,7 +151,7 @@ impl WorkflowInstanceConverters {
                     &crate_function.function_class_specification,
                 ),
             ),
-            output_callback_definitions: crate_function.output_callback_definitions.clone(),
+            output_mapping: crate_function.output_mapping.clone(),
         }
     }
 
@@ -159,7 +159,7 @@ impl WorkflowInstanceConverters {
         crate::grpc_impl::api::WorkflowResource {
             name: crate_resource.name.clone(),
             class_type: crate_resource.class_type.clone(),
-            output_callback_definitions: crate_resource.output_callback_definitions.clone(),
+            output_mapping: crate_resource.output_mapping.clone(),
             configurations: crate_resource.configurations.clone(),
         }
     }

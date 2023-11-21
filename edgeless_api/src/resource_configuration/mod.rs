@@ -6,7 +6,7 @@
 
 pub struct ResourceInstanceSpecification {
     pub provider_id: String,
-    pub output_callback_definitions: std::collections::HashMap<String, crate::function_instance::InstanceId>,
+    pub output_mapping: std::collections::HashMap<String, crate::function_instance::InstanceId>,
     pub configuration: std::collections::HashMap<String, String>,
 }
 

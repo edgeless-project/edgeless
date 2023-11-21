@@ -9,7 +9,7 @@
                 "include_code_file": "./processing_function/http_processor.wasm",
                 "outputs": []
             },
-            "output_callback_definitions": {},
+            "output_mapping": {},
             "annotations": {}
         }
     ],
@@ -17,7 +17,7 @@
         {
             "name": "http-ingress-1-1",
             "class_type": "http-ingress",
-            "output_callback_definitions": {
+            "output_mapping": {
                 "new_request": "http_processor"
             },
             "configurations": {

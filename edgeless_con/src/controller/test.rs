@@ -153,7 +153,7 @@ async fn single_function_start_stop() {
                     function_class_inlude_code: vec![],
                     outputs: vec![],
                 },
-                output_callback_definitions: std::collections::HashMap::new(),
+                output_mapping: std::collections::HashMap::new(),
                 annotations: std::collections::HashMap::new(),
             }],
             workflow_resources: vec![],
@@ -218,13 +218,13 @@ async fn resource_to_function_start_stop() {
                     function_class_inlude_code: vec![],
                     outputs: vec![],
                 },
-                output_callback_definitions: std::collections::HashMap::new(),
+                output_mapping: std::collections::HashMap::new(),
                 annotations: std::collections::HashMap::new(),
             }],
             workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
                 name: "r1".to_string(),
                 class_type: "test-res".to_string(),
-                output_callback_definitions: std::collections::HashMap::from([("test_out".to_string(), "f1".to_string())]),
+                output_mapping: std::collections::HashMap::from([("test_out".to_string(), "f1".to_string())]),
                 configurations: std::collections::HashMap::new(),
             }],
             annotations: std::collections::HashMap::new(),
@@ -248,10 +248,7 @@ async fn resource_to_function_start_stop() {
 
     let resource_res = mock_res_receiver.try_next().unwrap().unwrap();
     if let MockResourceEvent::Start((_id, spawn_req)) = resource_res {
-        assert_eq!(
-            *spawn_req.output_callback_definitions.get("test_out").unwrap(),
-            instance.functions[0].instances[0]
-        );
+        assert_eq!(*spawn_req.output_mapping.get("test_out").unwrap(), instance.functions[0].instances[0]);
     } else {
         panic!();
     }
@@ -304,7 +301,7 @@ async fn function_link_loop_start_stop() {
                         function_class_inlude_code: vec![],
                         outputs: vec!["output-1".to_string()],
                     },
-                    output_callback_definitions: std::collections::HashMap::from([("output-1".to_string(), "f2".to_string())]),
+                    output_mapping: std::collections::HashMap::from([("output-1".to_string(), "f2".to_string())]),
                     annotations: std::collections::HashMap::new(),
                 },
                 edgeless_api::workflow_instance::WorkflowFunction {
@@ -316,7 +313,7 @@ async fn function_link_loop_start_stop() {
                         function_class_inlude_code: vec![],
                         outputs: vec!["output-2".to_string()],
                     },
-                    output_callback_definitions: std::collections::HashMap::from([("output-2".to_string(), "f1".to_string())]),
+                    output_mapping: std::collections::HashMap::from([("output-2".to_string(), "f1".to_string())]),
                     annotations: std::collections::HashMap::new(),
                 },
             ],
@@ -339,7 +336,7 @@ async fn function_link_loop_start_stop() {
     let res = mock_orc_receiver.try_next().unwrap().unwrap();
     if let MockFunctionInstanceEvent::Start((id, spawn_req)) = res {
         assert!(fids.contains(&id));
-        assert_eq!(spawn_req.output_callback_definitions.len(), 0);
+        assert_eq!(spawn_req.output_mapping.len(), 0);
         to_patch = Some(id);
     } else {
         panic!();
@@ -347,14 +344,14 @@ async fn function_link_loop_start_stop() {
     let res2 = mock_orc_receiver.try_next().unwrap().unwrap();
     if let MockFunctionInstanceEvent::Start((id, spawn_req)) = res2 {
         assert!(fids.contains(&id));
-        assert_eq!(spawn_req.output_callback_definitions.len(), 1);
+        assert_eq!(spawn_req.output_mapping.len(), 1);
     } else {
         panic!();
     }
     let res3 = mock_orc_receiver.try_next().unwrap().unwrap();
     if let MockFunctionInstanceEvent::Update(update_req) = res3 {
         assert_eq!(update_req.instance_id.unwrap(), to_patch.unwrap());
-        assert_eq!(update_req.output_callback_definitions.len(), 1);
+        assert_eq!(update_req.output_mapping.len(), 1);
     } else {
         panic!();
     }

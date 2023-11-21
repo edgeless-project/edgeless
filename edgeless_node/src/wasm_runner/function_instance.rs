@@ -38,7 +38,7 @@ impl FunctionInstance {
         let mut telemetry_handle = telemetry_handle;
 
         let callback_table = std::sync::Arc::new(tokio::sync::Mutex::new(FunctionInstanceCallbackTable {
-            mapping: spawn_req.output_callback_definitions.clone(),
+            mapping: spawn_req.output_mapping.clone(),
         }));
         let instance_id = match spawn_req.instance_id.clone() {
             Some(id) => id,
@@ -87,7 +87,7 @@ impl FunctionInstance {
     }
 
     pub async fn update_links(&mut self, update_req: edgeless_api::function_instance::UpdateFunctionLinksRequest) {
-        self.callback_table.lock().await.mapping = update_req.output_callback_definitions;
+        self.callback_table.lock().await.mapping = update_req.output_mapping;
     }
 }
 
