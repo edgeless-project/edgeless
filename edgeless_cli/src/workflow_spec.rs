@@ -26,7 +26,6 @@ pub struct WorkflowSpecResourceInstance {
 
 #[derive(Debug, serde::Deserialize)]
 pub struct WorkflowSpec {
-    pub alias: String,
     pub functions: Vec<WorflowSpecFunction>,
     pub resources: Vec<WorkflowSpecResourceInstance>,
     pub annotations: std::collections::HashMap<String, String>,

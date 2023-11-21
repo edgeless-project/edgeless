@@ -1,5 +1,4 @@
 {
-    "alias": "noop_workflow",
     "functions": [
         {
             "alias": "noop",

@@ -1,5 +1,4 @@
 {
-    "alias": "http_egress",
     "functions": [
         {
             "alias": "http_requestor",

@@ -1,5 +1,4 @@
 {
-    "alias": "ping_pong",
     "functions": [
         {
             "alias": "ponger",

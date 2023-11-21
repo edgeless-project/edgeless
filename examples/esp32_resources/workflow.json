@@ -1,5 +1,4 @@
 {
-    "alias": "esp32_resources",
     "functions": [
         {
             "alias": "test_fun",
