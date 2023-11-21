@@ -108,22 +108,21 @@ impl WorkflowInstanceConverters {
     pub fn parse_workflow_spawn_response(
         api_instance: &crate::grpc_impl::api::SpawnWorkflowResponse,
     ) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowResponse> {
-        Ok(crate::workflow_instance::SpawnWorkflowResponse {
-            response_error: match api_instance.response_error.as_ref() {
-                Some(val) => Some(match CommonConverters::parse_response_error(val) {
-                    Ok(val) => val,
-                    Err(err) => return Err(anyhow::anyhow!(err.to_string())),
-                }),
-                None => None,
+        match api_instance.workflow_status.as_ref() {
+            Some(val) => match WorkflowInstanceConverters::parse_workflow_instance(val) {
+                Ok(val) => Ok(crate::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val)),
+                Err(err) => Err(anyhow::anyhow!(err.to_string())),
             },
-            workflow_status: match api_instance.workflow_status.as_ref() {
-                Some(val) => Some(match WorkflowInstanceConverters::parse_workflow_instance(val) {
-                    Ok(val) => val,
-                    Err(err) => return Err(anyhow::anyhow!(err.to_string())),
-                }),
-                None => None,
+            None => match api_instance.response_error.as_ref() {
+                Some(val) => match CommonConverters::parse_response_error(val) {
+                    Ok(val) => Ok(crate::workflow_instance::SpawnWorkflowResponse::ResponseError(val)),
+                    Err(err) => Err(anyhow::anyhow!(err.to_string())),
+                },
+                None => Err(anyhow::anyhow!(
+                    "Ill-formed SpawnWorkflowResponse message: both ResponseError and WorkflowInstance are empty"
+                )),
             },
-        })
+        }
     }
 
     pub fn parse_workflow_instance_list(
@@ -187,14 +186,14 @@ impl WorkflowInstanceConverters {
     pub fn serialize_workflow_spawn_response(
         crate_request: &crate::workflow_instance::SpawnWorkflowResponse,
     ) -> crate::grpc_impl::api::SpawnWorkflowResponse {
-        crate::grpc_impl::api::SpawnWorkflowResponse {
-            response_error: match &crate_request.response_error {
-                Some(val) => Some(CommonConverters::serialize_response_error(&val)),
-                None => None,
+        match crate_request {
+            crate::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => crate::grpc_impl::api::SpawnWorkflowResponse {
+                response_error: Some(CommonConverters::serialize_response_error(&err)),
+                workflow_status: None,
             },
-            workflow_status: match &crate_request.workflow_status {
-                Some(val) => Some(Self::serialize_workflow_instance(&val)),
-                None => None,
+            crate::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(instance) => crate::grpc_impl::api::SpawnWorkflowResponse {
+                response_error: None,
+                workflow_status: Some(Self::serialize_workflow_instance(&instance)),
             },
         }
     }

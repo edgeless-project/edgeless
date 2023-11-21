@@ -1,3 +1,5 @@
+use edgeless_api::workflow_instance::SpawnWorkflowResponse;
+
 use super::*;
 
 enum MockFunctionInstanceEvent {
@@ -160,9 +162,10 @@ async fn single_function_start_stop() {
         .await
         .unwrap();
 
-    assert!(response.response_error.is_none());
-    assert!(response.workflow_status.is_some());
-    let instance = response.workflow_status.unwrap();
+    let instance = match &response {
+        SpawnWorkflowResponse::ResponseError(err) => panic!("{}", err),
+        SpawnWorkflowResponse::WorkflowInstance(val) => val,
+    };
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
@@ -231,9 +234,10 @@ async fn resource_to_function_start_stop() {
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    assert!(response.response_error.is_none());
-    assert!(response.workflow_status.is_some());
-    let instance = response.workflow_status.unwrap();
+    let instance = match &response {
+        SpawnWorkflowResponse::ResponseError(err) => panic!("{}", err),
+        SpawnWorkflowResponse::WorkflowInstance(val) => val,
+    };
 
     let res = mock_orc_receiver.try_next().unwrap().unwrap();
     if let MockFunctionInstanceEvent::Start((id, _spawn_req)) = res {
@@ -322,15 +326,12 @@ async fn function_link_loop_start_stop() {
         .await
         .unwrap();
 
-    assert!(response.response_error.is_none());
-    assert!(response.workflow_status.is_some());
-    let returned_wf_state = response.workflow_status.unwrap();
+    let instance = match &response {
+        SpawnWorkflowResponse::ResponseError(err) => panic!("{}", err),
+        SpawnWorkflowResponse::WorkflowInstance(val) => val,
+    };
 
-    let fids: std::collections::HashSet<_> = returned_wf_state
-        .functions
-        .iter()
-        .flat_map(|instances| instances.instances.clone())
-        .collect();
+    let fids: std::collections::HashSet<_> = instance.functions.iter().flat_map(|instances| instances.instances.clone()).collect();
     let to_patch: Option<edgeless_api::function_instance::InstanceId>;
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;

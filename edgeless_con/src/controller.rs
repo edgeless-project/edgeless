@@ -308,7 +308,7 @@ impl Controller {
                     }
 
                     active_workflows.insert(spawn_workflow_request.workflow_id.clone(), current_workflow.clone());
-                    match reply_sender.send(Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::good(
+                    match reply_sender.send(Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(
                         edgeless_api::workflow_instance::WorkflowInstance {
                             workflow_id: spawn_workflow_request.workflow_id,
                             functions: current_workflow

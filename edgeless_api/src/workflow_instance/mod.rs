@@ -69,18 +69,9 @@ pub struct SpawnWorkflowRequest {
 }
 
 #[derive(Clone, Debug)]
-pub struct SpawnWorkflowResponse {
-    pub response_error: Option<ResponseError>,
-    pub workflow_status: Option<WorkflowInstance>,
-}
-
-impl SpawnWorkflowResponse {
-    pub fn good(workflow_status: WorkflowInstance) -> Self {
-        Self {
-            response_error: None,
-            workflow_status: Some(workflow_status),
-        }
-    }
+pub enum SpawnWorkflowResponse {
+    ResponseError(ResponseError),
+    WorkflowInstance(WorkflowInstance),
 }
 
 #[async_trait::async_trait]
