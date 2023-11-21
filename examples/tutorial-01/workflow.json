@@ -1,5 +1,4 @@
 {
-    "alias": "tutorial-01",
     "functions": [
         {
             "alias": "sensor_simulator",

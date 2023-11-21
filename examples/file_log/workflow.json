@@ -1,5 +1,4 @@
 {
-    "alias": "my-workflow",
     "functions": [
         {
             "alias": "my-message-generator",
