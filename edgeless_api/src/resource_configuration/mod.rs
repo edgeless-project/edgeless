@@ -1,7 +1,7 @@
 // struct ResourceProviderSpecification {
 //     resource_provider_id: String,
 //     class_type: String,
-//     output_callback_declarations: Vec<String>,
+//     outputs: Vec<String>,
 // }
 
 pub struct ResourceInstanceSpecification {

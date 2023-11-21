@@ -7,7 +7,7 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "include_code_file": "./noop_function/noop.wasm",
-                "output_callbacks": []
+                "outputs": []
             },
             "output_callback_definitions": {},
             "annotations": {

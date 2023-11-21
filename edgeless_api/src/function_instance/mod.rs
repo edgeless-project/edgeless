@@ -19,7 +19,7 @@ pub struct FunctionClassSpecification {
     pub function_class_type: String,
     pub function_class_version: String,
     pub function_class_inlude_code: Vec<u8>,
-    pub output_callback_declarations: Vec<String>,
+    pub outputs: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

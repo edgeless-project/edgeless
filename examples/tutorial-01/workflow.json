@@ -7,7 +7,7 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "include_code_file": "./sensor_simulator_function/sensor_simulator.wasm",
-                "output_callbacks": [
+                "outputs": [
                     "output"
                 ]
             },
@@ -23,7 +23,7 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "include_code_file": "./filter_in_range_function/filter_in_range.wasm",
-                "output_callbacks": [
+                "outputs": [
                     "output",
                     "error"
                 ]
@@ -43,7 +43,7 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "include_code_file": "./moving_avg_function/moving_avg.wasm",
-                "output_callbacks": [
+                "outputs": [
                     "output",
                     "error"
                 ]
