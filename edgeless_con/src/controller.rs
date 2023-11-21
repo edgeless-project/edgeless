@@ -162,7 +162,7 @@ impl Controller {
                         for fun in &spawn_workflow_request.workflow_functions {
                             if to_upsert.contains(&fun.name) {
                                 let outputs: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> = fun
-                                    .output_callback_definitions
+                                    .output_mapping
                                     .iter()
                                     .filter_map(|(output_id, output_name)| {
                                         let instances = current_workflow.instances(&output_name);
@@ -174,7 +174,7 @@ impl Controller {
                                     })
                                     .collect();
 
-                                let all_outputs_mapped = outputs.len() == fun.output_callback_definitions.len();
+                                let all_outputs_mapped = outputs.len() == fun.output_mapping.len();
 
                                 let state_id = match fun.name.as_str() {
                                     "pinger" => uuid::Uuid::from_str("86699b23-6c24-4ca2-a2a0-b843b7c5e193").unwrap(),
@@ -189,7 +189,7 @@ impl Controller {
                                         let res = fn_client
                                             .update_links(edgeless_api::function_instance::UpdateFunctionLinksRequest {
                                                 instance_id: Some(instance.clone()),
-                                                output_callback_definitions: outputs.clone(),
+                                                output_mapping: outputs.clone(),
                                             })
                                             .await;
                                         match res {
@@ -214,7 +214,7 @@ impl Controller {
                                             instance_id: None,
                                             code: fun.function_class_specification.clone(),
                                             annotations: fun.annotations.clone(),
-                                            output_callback_definitions: outputs.clone(),
+                                            output_mapping: outputs.clone(),
                                             state_specification: edgeless_api::function_instance::StateSpecification {
                                                 state_id: state_id,
                                                 state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
@@ -248,7 +248,7 @@ impl Controller {
                         for resource in &spawn_workflow_request.workflow_resources {
                             if to_upsert.contains(&resource.name) {
                                 let output_mapping: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> = resource
-                                    .output_callback_definitions
+                                    .output_mapping
                                     .iter()
                                     .map(|(callback, name)| (callback.to_string(), current_workflow.function_instances.get(name).unwrap()[0].clone()))
                                     .collect();
@@ -267,7 +267,7 @@ impl Controller {
                                             .config_api
                                             .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
                                                 provider_id: provider_id.clone(),
-                                                output_callback_definitions: output_mapping.clone(),
+                                                output_mapping: output_mapping.clone(),
                                                 configuration: resource.configurations.clone(),
                                             })
                                             .await
@@ -277,7 +277,7 @@ impl Controller {
                                                     current_workflow
                                                         .resource_instances
                                                         .insert(resource.name.clone(), vec![(provider_id.clone(), instance_id)]);
-                                                    if output_mapping.len() == resource.output_callback_definitions.len() {
+                                                    if output_mapping.len() == resource.output_mapping.len() {
                                                         to_upsert.remove(&resource.name);
                                                     }
                                                 }

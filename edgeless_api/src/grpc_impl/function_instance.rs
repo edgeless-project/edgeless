@@ -29,8 +29,8 @@ impl FunctonInstanceConverters {
                     return Err(anyhow::anyhow!("Request does not contain actor class."));
                 }
             })?,
-            output_callback_definitions: api_request
-                .output_callback_definitions
+            output_mapping: api_request
+                .output_mapping
                 .iter()
                 .filter_map(|(key, value)| {
                     return {
@@ -79,8 +79,8 @@ impl FunctonInstanceConverters {
                 Some(id) => Some(CommonConverters::parse_instance_id(id)?),
                 None => None,
             },
-            output_callback_definitions: api_update
-                .output_callback_definitions
+            output_mapping: api_update
+                .output_mapping
                 .iter()
                 .filter_map(|(key, value)| {
                     return {
@@ -126,8 +126,8 @@ impl FunctonInstanceConverters {
                 .as_ref()
                 .and_then(|instance_id| Some(CommonConverters::serialize_instance_id(instance_id))),
             code: Some(Self::serialize_function_class_specification(&req.code)),
-            output_callback_definitions: req
-                .output_callback_definitions
+            output_mapping: req
+                .output_mapping
                 .iter()
                 .map(|(key, value)| (key.clone(), CommonConverters::serialize_instance_id(&value)))
                 .collect(),
@@ -157,8 +157,8 @@ impl FunctonInstanceConverters {
                 .instance_id
                 .as_ref()
                 .and_then(|instance_id| Some(CommonConverters::serialize_instance_id(instance_id))),
-            output_callback_definitions: crate_update
-                .output_callback_definitions
+            output_mapping: crate_update
+                .output_mapping
                 .iter()
                 .map(|(key, value)| (key.clone(), CommonConverters::serialize_instance_id(&value)))
                 .collect(),

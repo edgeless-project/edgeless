@@ -9,8 +9,8 @@ impl ResourceConfigurationConverters {
         Ok(crate::resource_configuration::ResourceInstanceSpecification {
             provider_id: api_spec.provider_id.clone(),
             configuration: api_spec.configuration.clone(),
-            output_callback_definitions: api_spec
-                .output_callback_definitions
+            output_mapping: api_spec
+                .output_mapping
                 .iter()
                 .flat_map(|(name, id)| {
                     let id = CommonConverters::parse_instance_id(id);
@@ -49,8 +49,8 @@ impl ResourceConfigurationConverters {
         crate::grpc_impl::api::ResourceInstanceSpecification {
             provider_id: crate_spec.provider_id.clone(),
             configuration: crate_spec.configuration.clone(),
-            output_callback_definitions: crate_spec
-                .output_callback_definitions
+            output_mapping: crate_spec
+                .output_mapping
                 .iter()
                 .map(|(name, id)| (name.to_string(), CommonConverters::serialize_instance_id(id)))
                 .collect(),

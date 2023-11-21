@@ -26,7 +26,7 @@ impl MockSensor {
             });
         }
 
-        for output_callback in data.output_callback_definitions {
+        for output_callback in data.output_mapping {
             if let Some((key, val)) = output_callback {
                 if key == "data_out" {
                     out_id = Some(val);

@@ -11,7 +11,7 @@
                     "parsed_value"
                 ]
             },
-            "output_callback_definitions": {
+            "output_mapping": {
                 "parsed_value": "incr"
             },
             "annotations": {}
@@ -27,7 +27,7 @@
                     "result"
                 ]
             },
-            "output_callback_definitions": {
+            "output_mapping": {
                 "result": "double"
             },
             "annotations": {}
@@ -43,7 +43,7 @@
                     "result"
                 ]
             },
-            "output_callback_definitions": {
+            "output_mapping": {
                 "result": "external_sink"
             },
             "annotations": {}
@@ -59,7 +59,7 @@
                     "external_sink"
                 ]
             },
-            "output_callback_definitions": {
+            "output_mapping": {
                 "external_sink": "http-egress"
             },
             "annotations": {
@@ -71,7 +71,7 @@
         {
             "name": "http-ingress",
             "class_type": "http-ingress",
-            "output_callback_definitions": {
+            "output_mapping": {
                 "new_request": "external_trigger"
             },
             "configurations": {
@@ -82,7 +82,7 @@
         {
             "name": "http-egress",
             "class_type": "http-egress",
-            "output_callback_definitions": {},
+            "output_mapping": {},
             "configurations": {}
         }
     ],

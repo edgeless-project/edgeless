@@ -12,7 +12,7 @@ pub struct WorkflowSpecFunctionClass {
 pub struct WorflowSpecFunction {
     pub name: String,
     pub class_specification: WorkflowSpecFunctionClass,
-    pub output_callback_definitions: std::collections::HashMap<String, String>,
+    pub output_mapping: std::collections::HashMap<String, String>,
     pub annotations: std::collections::HashMap<String, String>,
 }
 
@@ -20,7 +20,7 @@ pub struct WorflowSpecFunction {
 pub struct WorkflowSpecResourceInstance {
     pub name: String,
     pub class_type: String,
-    pub output_callback_definitions: std::collections::HashMap<String, String>,
+    pub output_mapping: std::collections::HashMap<String, String>,
     pub configurations: std::collections::HashMap<String, String>,
 }
 

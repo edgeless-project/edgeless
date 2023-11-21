@@ -11,7 +11,7 @@
                     "output"
                 ]
             },
-            "output_callback_definitions": {
+            "output_mapping": {
                 "output": "filter_in_range"
             },
             "annotations": {}
@@ -28,7 +28,7 @@
                     "error"
                 ]
             },
-            "output_callback_definitions": {
+            "output_mapping": {
                 "output": "moving_avg",
                 "error": "file-log"
             },
@@ -48,7 +48,7 @@
                     "error"
                 ]
             },
-            "output_callback_definitions": {
+            "output_mapping": {
                 "output": "redis",
                 "error": "file-log"
             },
@@ -61,7 +61,7 @@
         {
             "name": "file-log",
             "class_type": "file-log",
-            "output_callback_definitions": {},
+            "output_mapping": {},
             "configurations": {
                 "filename": "reading-errors.log"
             }
@@ -69,7 +69,7 @@
         {
             "name": "redis",
             "class_type": "redis",
-            "output_callback_definitions": {},
+            "output_mapping": {},
             "configurations": {
                 "url": "redis://127.0.0.1:6379/",
                 "key": "tutorial-01"

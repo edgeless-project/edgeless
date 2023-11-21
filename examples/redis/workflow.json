@@ -9,7 +9,7 @@
                 "include_code_file": "./counter/counter.wasm",
                 "outputs": []
             },
-            "output_callback_definitions": {
+            "output_mapping": {
                 "output": "my-redis"
             },
             "annotations": {
@@ -21,7 +21,7 @@
         {
             "name": "my-redis",
             "class_type": "redis",
-            "output_callback_definitions": {},
+            "output_mapping": {},
             "configurations": {
                 "url": "redis://127.0.0.1:6379/",
                 "key": "example-redis"

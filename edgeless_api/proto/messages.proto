@@ -46,7 +46,7 @@ message SpawnFunctionRequest {
     // The function class specification.
     FunctionClassSpecification code = 2;
     // Mapping of the outputs to concrete function/resource instances.
-    map<string, InstanceId> output_callback_definitions = 3;
+    map<string, InstanceId> output_mapping = 3;
     // The set of annotations associated to this function instance.
     map<string, string> annotations = 5;
     // The state specification.
@@ -68,7 +68,7 @@ message UpdateFunctionLinksRequest {
     // The function instance identifier.
     InstanceId instance_id = 1;
     // Mapping of the outputs to concrete function/resource instances.
-    map<string, InstanceId> output_callback_definitions = 3;
+    map<string, InstanceId> output_mapping = 3;
 }
 
 // Message definining a workflow resource.
@@ -78,7 +78,7 @@ message WorkflowResource {
     // Resource type.
     string class_type = 2;
     // Mapping of the outputs to other functions/resources in the workflow.
-    map<string, string> output_callback_definitions = 3;
+    map<string, string> output_mapping = 3;
     // Configuration of the resource, which depends on the resource type.
     map<string, string> configurations = 4;
 }
@@ -90,7 +90,7 @@ message WorkflowFunction {
     // Specification of the function.
     FunctionClassSpecification class_spec = 2;
     // Mapping of the outputs to other functions/resources in the workflow.
-    map<string, string> output_callback_definitions = 3;
+    map<string, string> output_mapping = 3;
     // Annotations associated to this function.
     map<string, string> annotations = 5;
 }
@@ -194,7 +194,7 @@ message ResourceInstanceSpecification {
     // Resource configuration (depends on the type).
     map<string, string> configuration = 2;
     // Mapping of the outputs to concrete function/resource instances.
-    map<string, InstanceId> output_callback_definitions = 3;
+    map<string, InstanceId> output_mapping = 3;
 }
 
 // Response to a request to create a new resource.

@@ -11,7 +11,7 @@
                     "http_e"
                 ]
             },
-            "output_callback_definitions": {
+            "output_mapping": {
                 "http_e": "http-egress-1-1"
             },
             "annotations": {}
@@ -21,7 +21,7 @@
         {
             "name": "http-egress-1-1",
             "class_type": "http-egress",
-            "output_callback_definitions": {},
+            "output_mapping": {},
             "configurations": {}
         }
     ],
