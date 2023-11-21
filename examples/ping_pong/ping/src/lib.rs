@@ -20,12 +20,12 @@ impl Edgefunction for PingerFun {
             STATE.get().unwrap().lock().unwrap().count += 1;
             sync(&serde_json::to_string(STATE.get().unwrap().lock().unwrap().deref()).unwrap());
 
-            let res = call_alias("ponger", &format!("PING-{}", id));
+            let res = call("ponger", &format!("PING-{}", id));
             if let CallRet::Reply(_msg) = res {
                 log::info!("Got Reply");
             }
 
-            delayed_cast(1000, &slf(), "wakeup");
+            delayed_cast_raw(1000, &slf(), "wakeup");
         }
     }
 
@@ -44,7 +44,7 @@ impl Edgefunction for PingerFun {
             STATE.set(std::sync::Mutex::new(PingerState { count: 0 })).unwrap();
         }
 
-        cast(&slf(), "wakeup");
+        cast_raw(&slf(), "wakeup");
     }
 
     fn handle_stop() {

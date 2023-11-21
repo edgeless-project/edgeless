@@ -23,15 +23,15 @@ impl Edgefunction for FilterInRangeFunction {
             Ok(val) => {
                 let state = INIT_STATE.get().unwrap();
                 if val >= state.min_value && val <= state.max_value {
-                    cast_alias(&"output", &encoded_message);
+                    cast(&"output", &encoded_message);
                 } else {
-                    cast_alias(
+                    cast(
                         &"error",
                         format!("value '{}' out of range [{},{}]", val, state.min_value, state.max_value).as_str(),
                     );
                 }
             }
-            Err(err) => cast_alias(&"error", format!("invalid event payload '{}': {}", &encoded_message, err).as_str()),
+            Err(err) => cast(&"error", format!("invalid event payload '{}': {}", &encoded_message, err).as_str()),
         }
     }
 

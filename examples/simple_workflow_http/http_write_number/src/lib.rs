@@ -8,7 +8,7 @@ impl Edgefunction for HttpWriteNumberFun {
     fn handle_cast(_src: InstanceId, encoded_message: String) {
         log::info!("http_write_number: 'Cast' called, MSG: {}", encoded_message);
 
-        let res = call_alias(
+        let res = call(
             &"external_sink",
             &edgeless_http::request_to_string(&edgeless_http::EdgelessHTTPRequest {
                 protocol: edgeless_http::EdgelessHTTPProtocol::HTTP,
