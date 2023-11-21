@@ -186,15 +186,14 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for IngressR
                 allow: allowed_methods,
                 target: target,
             });
-            Ok(edgeless_api::resource_configuration::SpawnResourceResponse::good(resource_id))
+            Ok(edgeless_api::resource_configuration::SpawnResourceResponse::InstanceId(resource_id))
         } else {
-            Ok(edgeless_api::resource_configuration::SpawnResourceResponse {
-                response_error: Some(edgeless_api::common::ResponseError {
+            Ok(edgeless_api::resource_configuration::SpawnResourceResponse::ResponseError(
+                edgeless_api::common::ResponseError {
                     summary: "Error when creating a resource".to_string(),
                     detail: Some("Missing Resource Configuration".to_string()),
-                }),
-                instance_id: None,
-            })
+                },
+            ))
         }
     }
     async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {

@@ -26,22 +26,21 @@ impl ResourceConfigurationConverters {
     pub fn parse_spawn_resource_response(
         api_instance: &crate::grpc_impl::api::SpawnResourceResponse,
     ) -> anyhow::Result<crate::resource_configuration::SpawnResourceResponse> {
-        Ok(crate::resource_configuration::SpawnResourceResponse {
-            response_error: match api_instance.response_error.as_ref() {
-                Some(val) => Some(match CommonConverters::parse_response_error(val) {
-                    Ok(val) => val,
-                    Err(err) => return Err(anyhow::anyhow!(err.to_string())),
-                }),
-                None => None,
+        match api_instance.instance_id.as_ref() {
+            Some(val) => match CommonConverters::parse_instance_id(val) {
+                Ok(val) => Ok(crate::resource_configuration::SpawnResourceResponse::InstanceId(val)),
+                Err(err) => Err(anyhow::anyhow!(err.to_string())),
             },
-            instance_id: match api_instance.instance_id.as_ref() {
-                Some(val) => Some(match CommonConverters::parse_instance_id(val) {
-                    Ok(val) => val,
-                    Err(err) => return Err(anyhow::anyhow!(err.to_string())),
-                }),
-                None => None,
+            None => match api_instance.response_error.as_ref() {
+                Some(val) => match CommonConverters::parse_response_error(val) {
+                    Ok(val) => Ok(crate::resource_configuration::SpawnResourceResponse::ResponseError(val)),
+                    Err(err) => Err(anyhow::anyhow!(err.to_string())),
+                },
+                None => Err(anyhow::anyhow!(
+                    "Ill-formed SpawnResourceResponse message: both ResponseError and InstanceId are empty"
+                )),
             },
-        })
+        }
     }
 
     pub fn serialize_resource_instance_specification(
@@ -61,14 +60,14 @@ impl ResourceConfigurationConverters {
     pub fn serialize_spawn_resource_response(
         req: &crate::resource_configuration::SpawnResourceResponse,
     ) -> crate::grpc_impl::api::SpawnResourceResponse {
-        crate::grpc_impl::api::SpawnResourceResponse {
-            response_error: match &req.response_error {
-                Some(val) => Some(CommonConverters::serialize_response_error(&val)),
-                None => None,
+        match req {
+            crate::resource_configuration::SpawnResourceResponse::ResponseError(err) => crate::grpc_impl::api::SpawnResourceResponse {
+                response_error: Some(CommonConverters::serialize_response_error(&err)),
+                instance_id: None,
             },
-            instance_id: match &req.instance_id {
-                Some(val) => Some(CommonConverters::serialize_instance_id(&val)),
-                None => None,
+            crate::resource_configuration::SpawnResourceResponse::InstanceId(id) => crate::grpc_impl::api::SpawnResourceResponse {
+                response_error: None,
+                instance_id: Some(CommonConverters::serialize_instance_id(&id)),
             },
         }
     }

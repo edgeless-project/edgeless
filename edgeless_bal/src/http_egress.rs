@@ -136,7 +136,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for EgressRe
 
         self.egress_instances.insert(new_id.clone(), EgressResource::new(dataplane_handle).await);
 
-        Ok(edgeless_api::resource_configuration::SpawnResourceResponse::good(new_id))
+        Ok(edgeless_api::resource_configuration::SpawnResourceResponse::InstanceId(new_id))
     }
 
     async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {

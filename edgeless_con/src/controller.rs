@@ -275,8 +275,8 @@ impl Controller {
                                             })
                                             .await
                                         {
-                                            Ok(response) => match response.instance_id {
-                                                Some(instance_id) => {
+                                            Ok(response) => match response {
+                                                edgeless_api::resource_configuration::SpawnResourceResponse::InstanceId(instance_id) => {
                                                     current_workflow
                                                         .resource_instances
                                                         .insert(resource.alias.clone(), vec![(provider_id.clone(), instance_id)]);
@@ -284,8 +284,8 @@ impl Controller {
                                                         to_upsert.remove(&resource.alias);
                                                     }
                                                 }
-                                                None => {
-                                                    log::error!("resource creation rejected: {:?}", response.response_error);
+                                                edgeless_api::resource_configuration::SpawnResourceResponse::ResponseError(err) => {
+                                                    log::error!("resource creation rejected: {:?}", &err);
                                                 }
                                             },
                                             Err(err) => {
