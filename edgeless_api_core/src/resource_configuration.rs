@@ -1,7 +1,7 @@
 #[derive(Clone, PartialEq, Eq)]
 pub struct EncodedResourceInstanceSpecification<'a> {
     pub provider_id: &'a str,
-    pub output_callback_definitions: [Option<(&'a str, crate::instance_id::InstanceId)>; 16],
+    pub output_mapping: [Option<(&'a str, crate::instance_id::InstanceId)>; 16],
     pub configuration: [Option<(&'a str, &'a str)>; 16],
 }
 
@@ -10,13 +10,13 @@ impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
         let mut e = e.str(self.provider_id)?;
         {
             let mut true_callbacks_size: u64 = 0;
-            for i in self.output_callback_definitions {
+            for i in self.output_mapping {
                 if i.is_some() {
                     true_callbacks_size = true_callbacks_size + 1;
                 }
             }
             e = e.array(true_callbacks_size)?;
-            for data in self.output_callback_definitions {
+            for data in self.output_mapping {
                 if let Some((key, val)) = data {
                     e = e.encode((key, val))?;
                 }
@@ -65,7 +65,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
 
         Ok(EncodedResourceInstanceSpecification {
             provider_id: id,
-            output_callback_definitions: outputs,
+            output_mapping: outputs,
             configuration: configuration,
         })
     }
@@ -80,7 +80,7 @@ impl<C> minicbor::CborLen<C> for EncodedResourceInstanceSpecification<'_> {
         let mut configuration: [(&str, &str); 16] = [("" as &str, "" as &str); 16];
         let mut configuration_i: usize = 0;
 
-        for item in self.output_callback_definitions {
+        for item in self.output_mapping {
             if let Some((key, val)) = item {
                 outputs[outputs_i] = (key, val);
                 outputs_i = outputs_i + 1;
@@ -115,7 +115,7 @@ mod test {
 
         let id = super::EncodedResourceInstanceSpecification {
             provider_id: "prov-1",
-            output_callback_definitions: outputs,
+            output_mapping: outputs,
             configuration: configuration,
         };
 

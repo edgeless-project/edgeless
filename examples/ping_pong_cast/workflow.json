@@ -11,7 +11,7 @@
                     "ping"
                 ]
             },
-            "output_callback_definitions": {
+            "output_mapping": {
                 "ping": "pinger"
             },
             "annotations": {}
@@ -27,7 +27,7 @@
                     "ponger"
                 ]
             },
-            "output_callback_definitions": {
+            "output_mapping": {
                 "ponger": "ponger"
             },
             "annotations": {}

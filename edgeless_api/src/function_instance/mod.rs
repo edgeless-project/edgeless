@@ -26,7 +26,7 @@ pub struct FunctionClassSpecification {
 pub struct SpawnFunctionRequest {
     pub instance_id: Option<InstanceId>,
     pub code: FunctionClassSpecification,
-    pub output_callback_definitions: std::collections::HashMap<String, InstanceId>,
+    pub output_mapping: std::collections::HashMap<String, InstanceId>,
     pub annotations: std::collections::HashMap<String, String>,
     pub state_specification: StateSpecification,
 }
@@ -40,7 +40,7 @@ pub enum SpawnFunctionResponse {
 #[derive(Debug, Clone)]
 pub struct UpdateFunctionLinksRequest {
     pub instance_id: Option<InstanceId>,
-    pub output_callback_definitions: std::collections::HashMap<String, InstanceId>,
+    pub output_mapping: std::collections::HashMap<String, InstanceId>,
 }
 
 #[async_trait::async_trait]

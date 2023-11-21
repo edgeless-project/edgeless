@@ -9,7 +9,7 @@
                 "include_code_file": "./noop_function/noop.wasm",
                 "outputs": []
             },
-            "output_callback_definitions": {},
+            "output_mapping": {},
             "annotations": {
                 "init-payload": "nothing interesting"
             }

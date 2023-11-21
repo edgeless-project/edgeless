@@ -75,7 +75,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for CoapClient {
         let mut configuration: [Option<(&str, &str)>; 16] = [None; 16];
         let mut configuration_i: usize = 0;
 
-        for (key, val) in &instance_specification.output_callback_definitions {
+        for (key, val) in &instance_specification.output_mapping {
             outputs[outputs_i] = Some((key, val.clone()));
             outputs_i = outputs_i + 1;
         }
@@ -87,7 +87,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for CoapClient {
 
         let encoded_resource_spec = edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification {
             provider_id: &instance_specification.provider_id,
-            output_callback_definitions: outputs,
+            output_mapping: outputs,
             configuration: configuration,
         };
 

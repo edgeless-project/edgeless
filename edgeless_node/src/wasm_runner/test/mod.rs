@@ -90,7 +90,7 @@ async fn basic_lifecycle() {
             function_class_inlude_code: include_bytes!("fixtures/messaging_test.wasm").to_vec(),
             outputs: vec![],
         },
-        output_callback_definitions: std::collections::HashMap::new(),
+        output_mapping: std::collections::HashMap::new(),
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
             state_id: instance_id.function_id.clone(),
@@ -223,7 +223,7 @@ async fn messaging_test_setup() -> (
             function_class_inlude_code: include_bytes!("fixtures/messaging_test.wasm").to_vec(),
             outputs: vec!["test".to_string()],
         },
-        output_callback_definitions: std::collections::HashMap::from([("test".to_string(), next_fid.clone())]),
+        output_mapping: std::collections::HashMap::from([("test".to_string(), next_fid.clone())]),
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
             state_id: instance_id.function_id.clone(),
@@ -449,7 +449,7 @@ async fn state_management() {
             function_class_inlude_code: include_bytes!("fixtures/state_test.wasm").to_vec(),
             outputs: Vec::new(),
         },
-        output_callback_definitions: std::collections::HashMap::new(),
+        output_mapping: std::collections::HashMap::new(),
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
             state_id: instance_id.function_id.clone(),

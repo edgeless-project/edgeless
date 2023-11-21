@@ -108,7 +108,7 @@ async fn main() -> anyhow::Result<()> {
                                                 function_class_inlude_code: std::fs::read(p).unwrap(),
                                                 outputs: func_spec.class_specification.outputs,
                                             },
-                                            output_callback_definitions: func_spec.output_callback_definitions,
+                                            output_mapping: func_spec.output_mapping,
                                             annotations: func_spec.annotations,
                                         }
                                     })
@@ -119,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
                                     .map(|res_spec| edgeless_api::workflow_instance::WorkflowResource {
                                         name: res_spec.name,
                                         class_type: res_spec.class_type,
-                                        output_callback_definitions: res_spec.output_callback_definitions,
+                                        output_mapping: res_spec.output_mapping,
                                         configurations: res_spec.configurations,
                                     })
                                     .collect(),
