@@ -7,7 +7,7 @@ impl Edgefunction for RequestorFun {
     fn handle_cast(_src: InstanceId, encoded_message: String) {
         log::info!("HTTP_Requestor: 'Cast' called, MSG: {}", encoded_message);
 
-        let res = call_alias(
+        let res = call(
             &"http_e",
             &edgeless_http::request_to_string(&edgeless_http::EdgelessHTTPRequest {
                 protocol: edgeless_http::EdgelessHTTPProtocol::HTTPS,
@@ -35,7 +35,7 @@ impl Edgefunction for RequestorFun {
 
     fn handle_init(_payload: String, serialized_state: Option<String>) {
         log::info!("HTTP_Requestor: 'Init' called");
-        delayed_cast(5000, &slf(), "wakeup");
+        delayed_cast_raw(5000, &slf(), "wakeup");
     }
 
     fn handle_stop() {

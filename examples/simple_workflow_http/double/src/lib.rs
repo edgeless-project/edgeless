@@ -7,7 +7,7 @@ impl Edgefunction for DoubleFun {
         log::info!("double: called with '{}'", encoded_message);
 
         if let Ok(n) = encoded_message.parse::<i32>() {
-            cast_alias("result", format!("{}", 2 * n).as_str());
+            cast("result", format!("{}", 2 * n).as_str());
         }
     }
 
