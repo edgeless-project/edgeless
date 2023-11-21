@@ -1,5 +1,4 @@
 {
-    "alias": "my-redis-workflow",
     "functions": [
         {
             "alias": "my-message-generator",

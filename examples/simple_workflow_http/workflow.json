@@ -1,5 +1,4 @@
 {
-    "alias": "simple_workflow_http",
     "functions": [
         {
             "alias": "external_trigger",

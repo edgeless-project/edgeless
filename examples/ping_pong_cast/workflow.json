@@ -1,5 +1,4 @@
 {
-    "alias": "ping_pong_cast",
     "functions": [
         {
             "alias": "ponger",
