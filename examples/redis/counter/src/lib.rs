@@ -7,7 +7,7 @@ impl Edgefunction for Counter {
         let prev_count = message.parse::<i32>().unwrap();
         let cur_count = format!("{}", prev_count + 1);
         cast("output", cur_count.as_str());
-        delayed_cast_raw(1000, &slf(), &cur_count);
+        delayed_cast(1000, "self", &cur_count);
     }
 
     fn handle_call(_src: InstanceId, _message: String) -> CallRet {
@@ -20,7 +20,7 @@ impl Edgefunction for Counter {
             Ok(_) => init_message,
             Err(_) => "0".to_string(),
         };
-        cast_raw(&slf(), &message);
+        cast("self", &message);
     }
 
     fn handle_stop() {

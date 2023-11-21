@@ -25,7 +25,7 @@ impl Edgefunction for PingerFun {
                 log::info!("Got Reply");
             }
 
-            delayed_cast_raw(1000, &slf(), "wakeup");
+            delayed_cast(1000, "self", "wakeup");
         }
     }
 
@@ -44,7 +44,7 @@ impl Edgefunction for PingerFun {
             STATE.set(std::sync::Mutex::new(PingerState { count: 0 })).unwrap();
         }
 
-        cast_raw(&slf(), "wakeup");
+        cast("self", "wakeup");
     }
 
     fn handle_stop() {

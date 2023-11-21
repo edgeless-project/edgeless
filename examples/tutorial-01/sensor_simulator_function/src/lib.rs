@@ -116,7 +116,7 @@ impl Edgefunction for SensorSimulatorFunction {
             index += 1;
             log::info!("sensor_simulator {}:{}, new value generated: {}", src.node, src.function, value);
             cast(&"output", format!("{}", value).as_str());
-            delayed_cast_raw(100, &slf(), format!("{}", index).as_str());
+            delayed_cast(100, "self", format!("{}", index).as_str());
         }
     }
 
@@ -126,7 +126,7 @@ impl Edgefunction for SensorSimulatorFunction {
 
     fn handle_init(_payload: String, _serialized_state: Option<String>) {
         edgeless_function::init_logger();
-        cast_raw(&slf(), &"0");
+        cast("self", &"0");
     }
 
     fn handle_stop() {

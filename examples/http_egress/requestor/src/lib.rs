@@ -35,7 +35,7 @@ impl Edgefunction for RequestorFun {
 
     fn handle_init(_payload: String, serialized_state: Option<String>) {
         log::info!("HTTP_Requestor: 'Init' called");
-        delayed_cast_raw(5000, &slf(), "wakeup");
+        delayed_cast(5000, "self", "wakeup");
     }
 
     fn handle_stop() {

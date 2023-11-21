@@ -314,21 +314,19 @@ async fn messaging_call_raw_output() {
 
 // test output: delayed_cast
 #[tokio::test]
-async fn messaging_delayed_cast_raw_output() {
-    let (instance_id, mut test_peer_handle, _test_peer_fid, _alias_handle, _alias_fid, telemetry_mock_receiver) = messaging_test_setup().await;
+async fn messaging_delayed_cast_output() {
+    let (instance_id, mut test_peer_handle, _test_peer_fid, mut alias_handle, _alias_fid, telemetry_mock_receiver) = messaging_test_setup().await;
 
-    test_peer_handle
-        .send(instance_id.clone(), "test_delayed_cast_raw_output".to_string())
-        .await;
+    test_peer_handle.send(instance_id.clone(), "test_delayed_cast_output".to_string()).await;
     let start = tokio::time::Instant::now();
 
-    let test_message = test_peer_handle.receive_next().await;
+    let test_message = alias_handle.receive_next().await;
     assert!(start.elapsed() >= Duration::from_millis(100));
 
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(
         test_message.message,
-        edgeless_dataplane::core::Message::Cast("delayed_cast_raw_output".to_string())
+        edgeless_dataplane::core::Message::Cast("delayed_cast_output".to_string())
     );
 
     tokio::time::sleep(Duration::from_millis(50)).await;

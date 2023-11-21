@@ -19,7 +19,7 @@ world edgefunction {
   import call: func(alias: string, msg: string) -> call-ret
   import telemetry-log: func(lvl: string, target: string, message: string)
   import slf: func() -> instance-id
-  import delayed-cast-raw: func(delayms: u64, target: instance-id, payload: string)
+  import delayed-cast: func(delayms: u64, alias: string, payload: string)
   import sync: func(state: string)
 
   export handle-cast: func(source: instance-id, msg: string)
