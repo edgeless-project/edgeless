@@ -62,7 +62,7 @@ impl FunctonInstanceConverters {
             None => match api_instance.response_error.as_ref() {
                 Some(val) => match CommonConverters::parse_response_error(val) {
                     Ok(val) => Ok(crate::function_instance::SpawnFunctionResponse::ResponseError(val)),
-                    Err(err) => return Err(anyhow::anyhow!(err.to_string())),
+                    Err(err) => Err(anyhow::anyhow!(err.to_string())),
                 },
                 None => Err(anyhow::anyhow!(
                     "Ill-formed SpawnFunctionResponse message: both ResponseError and InstanceId are empty"
