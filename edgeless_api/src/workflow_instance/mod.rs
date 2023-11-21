@@ -46,7 +46,7 @@ pub struct WorkflowInstance {
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct WorkflowResource {
-    pub alias: String,
+    pub name: String,
     pub class_type: String,
     pub output_callback_definitions: std::collections::HashMap<String, String>,
     pub configurations: std::collections::HashMap<String, String>,

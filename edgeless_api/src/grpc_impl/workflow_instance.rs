@@ -29,7 +29,7 @@ impl WorkflowInstanceConverters {
         api_workflow: &crate::grpc_impl::api::WorkflowResource,
     ) -> anyhow::Result<crate::workflow_instance::WorkflowResource> {
         Ok(crate::workflow_instance::WorkflowResource {
-            alias: api_workflow.alias.clone(),
+            name: api_workflow.name.clone(),
             class_type: api_workflow.class_type.clone(),
             output_callback_definitions: api_workflow.output_callback_definitions.clone(),
             configurations: api_workflow.configurations.clone(),
@@ -157,7 +157,7 @@ impl WorkflowInstanceConverters {
 
     pub fn serialize_workflow_resource(crate_resource: &crate::workflow_instance::WorkflowResource) -> crate::grpc_impl::api::WorkflowResource {
         crate::grpc_impl::api::WorkflowResource {
-            alias: crate_resource.alias.clone(),
+            name: crate_resource.name.clone(),
             class_type: crate_resource.class_type.clone(),
             output_callback_definitions: crate_resource.output_callback_definitions.clone(),
             configurations: crate_resource.configurations.clone(),

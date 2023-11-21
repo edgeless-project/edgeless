@@ -4,7 +4,7 @@ use futures::{FutureExt, SinkExt};
 /// Handle/Wrapper around a single instance of a WASM function.
 /// This manages the task executing the function.
 /// This is the management interface used to interact with a function instace.
-/// The `callback_table` is used to set up the alias-callbacks and is shared with the guest API.
+/// The `callback_table` is used to set up the name callbacks and is shared with the guest API.
 pub struct FunctionInstance {
     task_handle: Option<tokio::task::JoinHandle<()>>,
     callback_table: std::sync::Arc<tokio::sync::Mutex<FunctionInstanceCallbackTable>>,
@@ -21,10 +21,10 @@ struct FunctionInstanceInner {
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
 }
 
-/// Struct representing the updatable callbacks/aliases of a function instance.
+/// Struct representing the updatable callbacks/names of a function instance.
 /// Shared between instance api and guest api.
 pub struct FunctionInstanceCallbackTable {
-    pub alias_map: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId>,
+    pub mapping: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId>,
 }
 
 impl FunctionInstance {
@@ -38,7 +38,7 @@ impl FunctionInstance {
         let mut telemetry_handle = telemetry_handle;
 
         let callback_table = std::sync::Arc::new(tokio::sync::Mutex::new(FunctionInstanceCallbackTable {
-            alias_map: spawn_req.output_callback_definitions.clone(),
+            mapping: spawn_req.output_callback_definitions.clone(),
         }));
         let instance_id = match spawn_req.instance_id.clone() {
             Some(id) => id,
@@ -87,7 +87,7 @@ impl FunctionInstance {
     }
 
     pub async fn update_links(&mut self, update_req: edgeless_api::function_instance::UpdateFunctionLinksRequest) {
-        self.callback_table.lock().await.alias_map = update_req.output_callback_definitions;
+        self.callback_table.lock().await.mapping = update_req.output_callback_definitions;
     }
 }
 

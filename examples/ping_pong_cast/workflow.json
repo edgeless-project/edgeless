@@ -1,7 +1,7 @@
 {
     "functions": [
         {
-            "alias": "ponger",
+            "name": "ponger",
             "class_specification": {
                 "id": "async_ponger",
                 "function_type": "RUST_WASM",
@@ -14,12 +14,10 @@
             "output_callback_definitions": {
                 "ping": "pinger"
             },
-            "annotations": {
-
-            }
+            "annotations": {}
         },
         {
-            "alias": "pinger",
+            "name": "pinger",
             "class_specification": {
                 "id": "async_pinger",
                 "function_type": "RUST_WASM",
@@ -32,12 +30,9 @@
             "output_callback_definitions": {
                 "ponger": "ponger"
             },
-            "annotations": {
-
-            }
+            "annotations": {}
         }
     ],
-    "resources": [
-    ],
+    "resources": [],
     "annotations": {}
 }

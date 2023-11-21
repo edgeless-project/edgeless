@@ -1,7 +1,7 @@
 {
     "functions": [
         {
-            "alias": "my-message-generator",
+            "name": "my-message-generator",
             "class_specification": {
                 "id": "message_generator",
                 "function_type": "RUST_WASM",
@@ -19,7 +19,7 @@
     ],
     "resources": [
         {
-            "alias": "my-log",
+            "name": "my-log",
             "class_type": "file-log",
             "output_callback_definitions": {},
             "configurations": {
