@@ -66,7 +66,7 @@ sleep 0.5
 echo "workflows"
 for workflow in $(find examples/ -type f -name workflow.json) ; do
     echo -n "starting workflow $(dirname $workflow): "
-    uid=$(target/debug/edgeless_cli workflow start $workflow)
+    uid=$(target/debug/edgeless_cli workflow start $workflow | grep '-')
     if [ $? -eq 0 ] ; then
         echo "started with ID $uid"
     else
