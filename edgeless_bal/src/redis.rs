@@ -92,19 +92,24 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for RedisRes
             match RedisResource::new(dataplane_handle, url, key).await {
                 Ok(resource) => {
                     self.instances.insert(new_id.clone(), resource);
-                    return Ok(edgeless_api::resource_configuration::SpawnResourceResponse::good(new_id));
+                    return Ok(edgeless_api::resource_configuration::SpawnResourceResponse::InstanceId(new_id));
                 }
                 Err(err) => {
-                    return Ok(edgeless_api::resource_configuration::SpawnResourceResponse::bad(
-                        &"Invalid resource configuration",
-                        &err.to_string(),
+                    return Ok(edgeless_api::resource_configuration::SpawnResourceResponse::ResponseError(
+                        edgeless_api::common::ResponseError {
+                            summary: "Invalid resource configuration".to_string(),
+                            detail: Some(err.to_string()),
+                        },
                     ));
                 }
             }
         }
-        Ok(edgeless_api::resource_configuration::SpawnResourceResponse::bad(
-            &"Invalid resource configuration",
-            &"One of the fields 'url' or 'key' is missing",
+
+        Ok(edgeless_api::resource_configuration::SpawnResourceResponse::ResponseError(
+            edgeless_api::common::ResponseError {
+                summary: "Invalid resource configuration".to_string(),
+                detail: Some("One of the fields 'url' or 'key' is missing".to_string()),
+            },
         ))
     }
 
