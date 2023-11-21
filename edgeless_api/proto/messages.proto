@@ -76,7 +76,7 @@ message WorkflowResource {
     // Name of the resource, local to the workflow specification,
     string alias = 1;
     // Resource type.
-    string resource_class_type = 2;
+    string class_type = 2;
     // Map between a possible action and the function aliases to call.
     map<string, string> output_callback_definitions = 3;
     // Configuration of the resource, which depends on the resource type.
@@ -86,13 +86,13 @@ message WorkflowResource {
 // Message defining a function within a workflow.
 message WorkflowFunction {
     // Name of this function within the workflow.
-    string function_alias = 1;
+    string name = 1;
     // Specification of the function.
-    FunctionClassSpecification function_class = 2;
+    FunctionClassSpecification class_spec = 2;
     // Map between a possible action and the function aliases to call.
     map<string, string> output_callback_definitions = 3;
     // Annotations associated to this function.
-    map<string, string> function_annotations = 5;
+    map<string, string> annotations = 5;
 }
 
 // Message defining a request to create a new workflow.
@@ -104,7 +104,7 @@ message SpawnWorkflowRequest {
     // List of resources required by the workflow, if any.
     repeated WorkflowResource workflow_resources = 3;
     // Annotations associated to this workflow.
-    map<string, string> workflow_annotations = 4;
+    map<string, string> annotations = 4;
 }
 
 // Response to a request to create a new workflow.
@@ -120,7 +120,7 @@ message SpawnWorkflowResponse {
 // Function instance mapping.
 message WorkflowFunctionMapping {
     // Name of the function within the workflow.
-    string function_alias = 1;
+    string name = 1;
     // Function instances implementing this function.
     repeated InstanceId instances = 2;
 }
@@ -182,7 +182,7 @@ message ResourceProviderSpecification {
     // Unique identifier of the resource provider.
     string provider_id = 1;
     // Type of the resource provided.
-    string resource_class_type = 2;
+    string class_type = 2;
     // List of callbacks that can be invoked.
     repeated string output_callback_declarations = 3;
 }

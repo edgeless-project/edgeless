@@ -100,7 +100,7 @@ async fn main() -> anyhow::Result<()> {
                                             .unwrap()
                                             .join(wf.class_specification.include_code_file.unwrap());
                                         edgeless_api::workflow_instance::WorkflowFunction {
-                                            function_alias: wf.alias,
+                                            name: wf.alias,
                                             function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
                                                 function_class_id: wf.class_specification.id,
                                                 function_class_type: wf.class_specification.function_type,
@@ -109,7 +109,7 @@ async fn main() -> anyhow::Result<()> {
                                                 output_callback_declarations: wf.class_specification.output_callbacks,
                                             },
                                             output_callback_definitions: wf.output_callback_definitions,
-                                            function_annotations: wf.annotations,
+                                            annotations: wf.annotations,
                                         }
                                     })
                                     .collect(),
@@ -118,12 +118,12 @@ async fn main() -> anyhow::Result<()> {
                                     .into_iter()
                                     .map(|wr| edgeless_api::workflow_instance::WorkflowResource {
                                         alias: wr.alias,
-                                        resource_class_type: wr.resource_class_type,
+                                        class_type: wr.class_type,
                                         output_callback_definitions: wr.output_callback_definitions,
                                         configurations: wr.configurations,
                                     })
                                     .collect(),
-                                workflow_annotations: workflow.annotations.clone(),
+                                annotations: workflow.annotations.clone(),
                             })
                             .await;
                         match res {

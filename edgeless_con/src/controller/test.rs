@@ -145,7 +145,7 @@ async fn single_function_start_stop() {
         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
             workflow_id: wf_id.clone(),
             workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
-                function_alias: "f1".to_string(),
+                name: "f1".to_string(),
                 function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
                     function_class_id: "fc1".to_string(),
                     function_class_type: "RUST_WASM".to_string(),
@@ -154,10 +154,10 @@ async fn single_function_start_stop() {
                     output_callback_declarations: vec![],
                 },
                 output_callback_definitions: std::collections::HashMap::new(),
-                function_annotations: std::collections::HashMap::new(),
+                annotations: std::collections::HashMap::new(),
             }],
             workflow_resources: vec![],
-            workflow_annotations: std::collections::HashMap::new(),
+            annotations: std::collections::HashMap::new(),
         })
         .await
         .unwrap();
@@ -210,7 +210,7 @@ async fn resource_to_function_start_stop() {
         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
             workflow_id: wf_id.clone(),
             workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
-                function_alias: "f1".to_string(),
+                name: "f1".to_string(),
                 function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
                     function_class_id: "fc1".to_string(),
                     function_class_type: "RUST_WASM".to_string(),
@@ -219,15 +219,15 @@ async fn resource_to_function_start_stop() {
                     output_callback_declarations: vec![],
                 },
                 output_callback_definitions: std::collections::HashMap::new(),
-                function_annotations: std::collections::HashMap::new(),
+                annotations: std::collections::HashMap::new(),
             }],
             workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
                 alias: "r1".to_string(),
-                resource_class_type: "test-res".to_string(),
+                class_type: "test-res".to_string(),
                 output_callback_definitions: std::collections::HashMap::from([("test_out".to_string(), "f1".to_string())]),
                 configurations: std::collections::HashMap::new(),
             }],
-            workflow_annotations: std::collections::HashMap::new(),
+            annotations: std::collections::HashMap::new(),
         })
         .await
         .unwrap();
@@ -296,7 +296,7 @@ async fn function_link_loop_start_stop() {
             workflow_id: wf_id.clone(),
             workflow_functions: vec![
                 edgeless_api::workflow_instance::WorkflowFunction {
-                    function_alias: "f1".to_string(),
+                    name: "f1".to_string(),
                     function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
                         function_class_id: "fc1".to_string(),
                         function_class_type: "RUST_WASM".to_string(),
@@ -305,10 +305,10 @@ async fn function_link_loop_start_stop() {
                         output_callback_declarations: vec!["output-1".to_string()],
                     },
                     output_callback_definitions: std::collections::HashMap::from([("output-1".to_string(), "f2".to_string())]),
-                    function_annotations: std::collections::HashMap::new(),
+                    annotations: std::collections::HashMap::new(),
                 },
                 edgeless_api::workflow_instance::WorkflowFunction {
-                    function_alias: "f2".to_string(),
+                    name: "f2".to_string(),
                     function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
                         function_class_id: "fc2".to_string(),
                         function_class_type: "RUST_WASM".to_string(),
@@ -317,11 +317,11 @@ async fn function_link_loop_start_stop() {
                         output_callback_declarations: vec!["output-2".to_string()],
                     },
                     output_callback_definitions: std::collections::HashMap::from([("output-2".to_string(), "f1".to_string())]),
-                    function_annotations: std::collections::HashMap::new(),
+                    annotations: std::collections::HashMap::new(),
                 },
             ],
             workflow_resources: vec![],
-            workflow_annotations: std::collections::HashMap::new(),
+            annotations: std::collections::HashMap::new(),
         })
         .await
         .unwrap();
