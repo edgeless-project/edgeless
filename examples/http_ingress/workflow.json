@@ -16,7 +16,7 @@
     "resources": [
         {
             "alias": "http-ingress-1-1",
-            "resource_class_type": "http-ingress",
+            "class_type": "http-ingress",
             "output_callback_definitions": {
                 "new_request": "http_processor"
             },

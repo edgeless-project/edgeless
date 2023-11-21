@@ -13,15 +13,15 @@ impl WorkflowInstanceConverters {
         api_function: &crate::grpc_impl::api::WorkflowFunction,
     ) -> anyhow::Result<crate::workflow_instance::WorkflowFunction> {
         Ok(crate::workflow_instance::WorkflowFunction {
-            function_alias: api_function.function_alias.clone(),
+            name: api_function.name.clone(),
             function_class_specification: crate::grpc_impl::function_instance::FunctonInstanceConverters::parse_function_class_specification(
-                match &api_function.function_class.as_ref() {
+                match &api_function.class_spec.as_ref() {
                     Some(val) => val,
                     None => return Err(anyhow::anyhow!("Missing Workflow FunctionClass")),
                 },
             )?,
             output_callback_definitions: api_function.output_callback_definitions.clone(),
-            function_annotations: api_function.function_annotations.clone(),
+            annotations: api_function.annotations.clone(),
         })
     }
 
@@ -30,7 +30,7 @@ impl WorkflowInstanceConverters {
     ) -> anyhow::Result<crate::workflow_instance::WorkflowResource> {
         Ok(crate::workflow_instance::WorkflowResource {
             alias: api_workflow.alias.clone(),
-            resource_class_type: api_workflow.resource_class_type.clone(),
+            class_type: api_workflow.class_type.clone(),
             output_callback_definitions: api_workflow.output_callback_definitions.clone(),
             configurations: api_workflow.configurations.clone(),
         })
@@ -63,7 +63,7 @@ impl WorkflowInstanceConverters {
                     Err(_) => None,
                 })
                 .collect(),
-            workflow_annotations: api_request.workflow_annotations.clone(),
+            annotations: api_request.annotations.clone(),
         })
     }
 
@@ -71,7 +71,7 @@ impl WorkflowInstanceConverters {
         api_mapping: &crate::grpc_impl::api::WorkflowFunctionMapping,
     ) -> anyhow::Result<crate::workflow_instance::WorkflowFunctionMapping> {
         Ok(crate::workflow_instance::WorkflowFunctionMapping {
-            function_alias: api_mapping.function_alias.to_string(),
+            name: api_mapping.name.to_string(),
             instances: api_mapping
                 .instances
                 .iter()
@@ -144,9 +144,9 @@ impl WorkflowInstanceConverters {
 
     pub fn serialize_workflow_function(crate_function: &crate::workflow_instance::WorkflowFunction) -> crate::grpc_impl::api::WorkflowFunction {
         crate::grpc_impl::api::WorkflowFunction {
-            function_alias: crate_function.function_alias.clone(),
-            function_annotations: crate_function.function_annotations.clone(),
-            function_class: Some(
+            name: crate_function.name.clone(),
+            annotations: crate_function.annotations.clone(),
+            class_spec: Some(
                 crate::grpc_impl::function_instance::FunctonInstanceConverters::serialize_function_class_specification(
                     &crate_function.function_class_specification,
                 ),
@@ -158,7 +158,7 @@ impl WorkflowInstanceConverters {
     pub fn serialize_workflow_resource(crate_resource: &crate::workflow_instance::WorkflowResource) -> crate::grpc_impl::api::WorkflowResource {
         crate::grpc_impl::api::WorkflowResource {
             alias: crate_resource.alias.clone(),
-            resource_class_type: crate_resource.resource_class_type.clone(),
+            class_type: crate_resource.class_type.clone(),
             output_callback_definitions: crate_resource.output_callback_definitions.clone(),
             configurations: crate_resource.configurations.clone(),
         }
@@ -179,7 +179,7 @@ impl WorkflowInstanceConverters {
                 .iter()
                 .map(|res| Self::serialize_workflow_resource(res))
                 .collect(),
-            workflow_annotations: crate_request.workflow_annotations.clone(),
+            annotations: crate_request.annotations.clone(),
         }
     }
 
@@ -221,7 +221,7 @@ impl WorkflowInstanceConverters {
         crate_mapping: &crate::workflow_instance::WorkflowFunctionMapping,
     ) -> crate::grpc_impl::api::WorkflowFunctionMapping {
         crate::grpc_impl::api::WorkflowFunctionMapping {
-            function_alias: crate_mapping.function_alias.to_string(),
+            name: crate_mapping.name.to_string(),
             instances: crate_mapping
                 .instances
                 .iter()

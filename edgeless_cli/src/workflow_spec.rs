@@ -19,7 +19,7 @@ pub struct WorflowSpecFunction {
 #[derive(Debug, serde::Deserialize)]
 pub struct WorkflowSpecResourceInstance {
     pub alias: String,
-    pub resource_class_type: String,
+    pub class_type: String,
     pub output_callback_definitions: std::collections::HashMap<String, String>,
     pub configurations: std::collections::HashMap<String, String>,
 }
