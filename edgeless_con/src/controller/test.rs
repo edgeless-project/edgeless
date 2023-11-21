@@ -84,7 +84,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for MockReso
             .send(MockResourceEvent::Start((new_id.clone(), instance_specification)))
             .await
             .unwrap();
-        Ok(edgeless_api::resource_configuration::SpawnResourceResponse::good(new_id))
+        Ok(edgeless_api::resource_configuration::SpawnResourceResponse::InstanceId(new_id))
     }
     async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
         self.sender.send(MockResourceEvent::Stop(resource_id)).await.unwrap();

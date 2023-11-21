@@ -11,28 +11,9 @@ pub struct ResourceInstanceSpecification {
 }
 
 #[derive(Debug, Clone)]
-pub struct SpawnResourceResponse {
-    // XXX#78
-    pub response_error: Option<crate::common::ResponseError>,
-    pub instance_id: Option<crate::function_instance::InstanceId>,
-}
-
-impl SpawnResourceResponse {
-    pub fn good(instance_id: crate::function_instance::InstanceId) -> Self {
-        Self {
-            response_error: None,
-            instance_id: Some(instance_id),
-        }
-    }
-    pub fn bad(summary: &str, detail: &str) -> Self {
-        Self {
-            response_error: Some(crate::common::ResponseError {
-                summary: summary.to_string(),
-                detail: Some(detail.to_string()),
-            }),
-            instance_id: None,
-        }
-    }
+pub enum SpawnResourceResponse {
+    ResponseError(crate::common::ResponseError),
+    InstanceId(crate::function_instance::InstanceId),
 }
 
 #[async_trait::async_trait]
@@ -61,20 +42,17 @@ impl ResourceConfigurationAPI for MultiResouceConfigurationAPI {
         if let Some(resource) = self.resource_providers.get_mut(&instance_specification.provider_id) {
             let provider = instance_specification.provider_id.clone();
             let res = resource.start(instance_specification).await?;
-            if let Some(id) = res.instance_id {
+            if let SpawnResourceResponse::InstanceId(id) = res {
                 self.resource_instances.insert(id.clone(), provider.clone());
-                Ok(SpawnResourceResponse::good(id))
+                Ok(SpawnResourceResponse::InstanceId(id))
             } else {
                 Ok(res)
             }
         } else {
-            Ok(SpawnResourceResponse {
-                response_error: Some(crate::common::ResponseError {
-                    summary: "Error when creating a resource".to_string(),
-                    detail: Some("Provider does not exist".to_string()),
-                }),
-                instance_id: None,
-            })
+            Ok(SpawnResourceResponse::ResponseError(crate::common::ResponseError {
+                summary: "Error when creating a resource".to_string(),
+                detail: Some("Provider does not exist".to_string()),
+            }))
         }
     }
 
