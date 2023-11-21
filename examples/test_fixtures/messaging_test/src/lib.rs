@@ -6,20 +6,20 @@ struct MessagingTest;
 impl Edgefunction for MessagingTest {
     fn handle_cast(src: InstanceId, encoded_message: String) {
         match encoded_message.as_str() {
+            "test_cast_raw_output" => {
+                cast_raw(&src, "cast_raw_output");
+            }
+            "test_call_raw_output" => {
+                let _res = call_raw(&src, "call_raw_output");
+            }
+            "test_delayed_cast_raw_output" => {
+                let _res = delayed_cast_raw(100, &src, "delayed_cast_raw_output");
+            }
             "test_cast_output" => {
-                cast(&src, "cast_output");
+                cast("test", "cast_output");
             }
             "test_call_output" => {
-                let _res = call(&src, "call_output");
-            }
-            "test_delayed_cast_output" => {
-                let _res = delayed_cast(100, &src, "delayed_cast_output");
-            }
-            "test_cast_alias_output" => {
-                cast_alias("test_alias", "cast_alias_output");
-            }
-            "test_call_alias_output" => {
-                let _res = call_alias("test_alias", "call_alias_output");
+                let _res = call("test", "call_output");
             }
             _ => {
                 log::info!("Unprocessed Message");
@@ -27,7 +27,7 @@ impl Edgefunction for MessagingTest {
         }
     }
 
-    fn handle_call(src: InstanceId, encoded_message: String) -> CallRet {
+    fn handle_call(_src: InstanceId, encoded_message: String) -> CallRet {
         match encoded_message.as_str() {
             "test_err" => CallRet::Err,
             "test_ret" => CallRet::Reply("test_reply".to_string()),
@@ -35,7 +35,7 @@ impl Edgefunction for MessagingTest {
         }
     }
 
-    fn handle_init(payload: String, _serialized_state: Option<String>) {
+    fn handle_init(_payload: String, _serialized_state: Option<String>) {
         edgeless_function::init_logger();
         log::info!("Messaging Test Init");
     }

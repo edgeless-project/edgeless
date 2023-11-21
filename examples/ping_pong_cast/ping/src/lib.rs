@@ -13,8 +13,8 @@ impl Edgefunction for PingerFun {
     fn handle_cast(_src: InstanceId, encoded_message: String) {
         log::info!("AsyncPinger: 'Cast' called, MSG: {}", encoded_message);
         if encoded_message == "wakeup" {
-            cast_alias("ponger", "PING");
-            delayed_cast(1000, &slf(), "wakeup");
+            cast("ponger", "PING");
+            delayed_cast_raw(1000, &slf(), "wakeup");
         } else {
             log::info!("Got Response");
         }
@@ -28,7 +28,7 @@ impl Edgefunction for PingerFun {
     fn handle_init(_payload: String, serialized_state: Option<String>) {
         edgeless_function::init_logger();
         log::info!("AsyncPinger: 'Init' called");
-        cast(&slf(), "wakeup");
+        cast_raw(&slf(), "wakeup");
     }
 
     fn handle_stop() {

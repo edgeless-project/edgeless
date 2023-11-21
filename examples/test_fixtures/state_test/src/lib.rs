@@ -4,9 +4,9 @@ use log;
 struct StateTest;
 
 impl Edgefunction for StateTest {
-    fn handle_cast(src: InstanceId, encoded_message: String) {
+    fn handle_cast(_src: InstanceId, encoded_message: String) {
         match encoded_message.as_str() {
-            "test_cast_output" => {
+            "test_cast_raw_output" => {
                 sync("new_state");
             }
             _ => {
@@ -15,11 +15,11 @@ impl Edgefunction for StateTest {
         }
     }
 
-    fn handle_call(src: InstanceId, encoded_message: String) -> CallRet {
+    fn handle_call(_src: InstanceId, _encoded_message: String) -> CallRet {
         CallRet::Noreply
     }
 
-    fn handle_init(payload: String, serialized_state: Option<String>) {
+    fn handle_init(_payload: String, serialized_state: Option<String>) {
         edgeless_function::init_logger();
         if let Some(state) = serialized_state {
             log::info!("{}", state);

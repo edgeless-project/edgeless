@@ -35,10 +35,10 @@ impl Edgefunction for MovingAvgFunction {
                 state.values.push_front(val);
                 if state.values.len() == init_state.num_values {
                     let average: f32 = state.values.iter().sum();
-                    cast_alias(&"output", format!("{}", average / state.values.len() as f32).as_str());
+                    cast(&"output", format!("{}", average / state.values.len() as f32).as_str());
                 }
             }
-            Err(err) => cast_alias(&"error", format!("invalid event payload '{}': {}", &encoded_message, err).as_str()),
+            Err(err) => cast(&"error", format!("invalid event payload '{}': {}", &encoded_message, err).as_str()),
         }
     }
 

@@ -17,7 +17,7 @@ pub struct GuestAPI {
 
 #[async_trait::async_trait]
 impl wit_binding::EdgefunctionImports for GuestAPI {
-    async fn cast_alias(&mut self, alias: String, msg: String) -> wasmtime::Result<()> {
+    async fn cast(&mut self, alias: String, msg: String) -> wasmtime::Result<()> {
         if let Some(target) = self.callback_table.lock().await.alias_map.get(&alias) {
             self.data_plane.send(target.clone(), msg).await;
             Ok(())
@@ -27,13 +27,13 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
         }
     }
 
-    async fn cast(&mut self, target: wit_binding::InstanceId, msg: String) -> wasmtime::Result<()> {
+    async fn cast_raw(&mut self, target: wit_binding::InstanceId, msg: String) -> wasmtime::Result<()> {
         let parsed_target = parse_wit_function_id(&target)?;
         self.data_plane.send(parsed_target, msg).await;
         Ok(())
     }
 
-    async fn call(&mut self, target: wit_binding::InstanceId, msg: String) -> wasmtime::Result<wit_binding::CallRet> {
+    async fn call_raw(&mut self, target: wit_binding::InstanceId, msg: String) -> wasmtime::Result<wit_binding::CallRet> {
         let parsed_target = parse_wit_function_id(&target)?;
         let res = self.data_plane.call(parsed_target, msg).await;
         Ok(match res {
@@ -43,7 +43,7 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
         })
     }
 
-    async fn call_alias(&mut self, alias: String, msg: String) -> wasmtime::Result<wit_binding::CallRet> {
+    async fn call(&mut self, alias: String, msg: String) -> wasmtime::Result<wit_binding::CallRet> {
         if let Some(target) = self.callback_table.lock().await.alias_map.get(&alias) {
             let res = self.data_plane.call(target.clone(), msg).await;
             Ok(match res {
@@ -73,7 +73,7 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
         })
     }
 
-    async fn delayed_cast(&mut self, delay: u64, target: wit_binding::InstanceId, payload: String) -> wasmtime::Result<()> {
+    async fn delayed_cast_raw(&mut self, delay: u64, target: wit_binding::InstanceId, payload: String) -> wasmtime::Result<()> {
         let mut cloned_plane = self.data_plane.clone();
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;

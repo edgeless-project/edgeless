@@ -4,19 +4,22 @@ struct TestFun;
 
 #[derive(minicbor::Decode, minicbor::CborLen)]
 struct SCD30Measurement {
-    #[n(0)] co2: f32,
-    #[n(1)] rh: f32,
-    #[n(2)] temp: f32
+    #[n(0)]
+    co2: f32,
+    #[n(1)]
+    rh: f32,
+    #[n(2)]
+    temp: f32,
 }
 
 impl Edgefunction for TestFun {
     fn handle_cast(_src: InstanceId, encoded_message: String) {
         log::info!("Resource Processor: 'Cast' called, MSG: {}", encoded_message);
-        let values : Vec<_> = encoded_message.split(";").collect();
+        let values: Vec<_> = encoded_message.split(";").collect();
         if values.len() == 3 {
-            let co2 : f32 = values[0].parse().unwrap();
+            let co2: f32 = values[0].parse().unwrap();
             let item = format!("CO2:\n{:.0}", co2);
-            cast_alias("check_display", &item);
+            cast("check_display", &item);
         }
     }
 
