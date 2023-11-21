@@ -79,7 +79,7 @@ impl Controller {
             resources.insert(
                 resource.resource_provider_id.clone(),
                 ResourceHandle {
-                    resource_type: resource.resource_class_type.clone(),
+                    resource_type: resource.class_type.clone(),
                     _output_callback_declarations: resource.output_callback_declarations.clone(),
                     config_api: config_api,
                 },
@@ -137,7 +137,7 @@ impl Controller {
                     };
 
                     let mut to_upsert = std::collections::HashSet::<String>::new();
-                    to_upsert.extend(spawn_workflow_request.workflow_functions.iter().map(|wf| wf.function_alias.to_string()));
+                    to_upsert.extend(spawn_workflow_request.workflow_functions.iter().map(|wf| wf.name.to_string()));
                     to_upsert.extend(spawn_workflow_request.workflow_resources.iter().map(|wr| wr.alias.to_string()));
 
                     let mut iteration_count = 100;
@@ -160,7 +160,7 @@ impl Controller {
                         iteration_count = iteration_count - 1;
 
                         for fun in &spawn_workflow_request.workflow_functions {
-                            if to_upsert.contains(&fun.function_alias) {
+                            if to_upsert.contains(&fun.name) {
                                 let outputs: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> = fun
                                     .output_callback_definitions
                                     .iter()
@@ -176,7 +176,7 @@ impl Controller {
 
                                 let all_outputs_mapped = outputs.len() == fun.output_callback_definitions.len();
 
-                                let state_id = match fun.function_alias.as_str() {
+                                let state_id = match fun.name.as_str() {
                                     "pinger" => uuid::Uuid::from_str("86699b23-6c24-4ca2-a2a0-b843b7c5e193").unwrap(),
                                     "ponger" => uuid::Uuid::from_str("7dd076cc-2606-40ae-b46b-97628e0094be").unwrap(),
                                     _ => uuid::Uuid::new_v4(),
@@ -184,7 +184,7 @@ impl Controller {
 
                                 // Update an existing spawned instance of a
                                 // function
-                                if let Some(existing_instances) = current_workflow.function_instances.get(&fun.function_alias) {
+                                if let Some(existing_instances) = current_workflow.function_instances.get(&fun.name) {
                                     for instance in existing_instances {
                                         let res = fn_client
                                             .update_links(edgeless_api::function_instance::UpdateFunctionLinksRequest {
@@ -195,7 +195,7 @@ impl Controller {
                                         match res {
                                             Ok(_) => {
                                                 if all_outputs_mapped {
-                                                    to_upsert.remove(&fun.function_alias);
+                                                    to_upsert.remove(&fun.name);
                                                 }
                                             }
                                             Err(err) => {
@@ -213,7 +213,7 @@ impl Controller {
                                             // assigned by the node running the function
                                             instance_id: None,
                                             code: fun.function_class_specification.clone(),
-                                            annotations: fun.function_annotations.clone(),
+                                            annotations: fun.annotations.clone(),
                                             output_callback_definitions: outputs.clone(),
                                             state_specification: edgeless_api::function_instance::StateSpecification {
                                                 state_id: state_id,
@@ -228,9 +228,9 @@ impl Controller {
                                                 log::error!("function instance creation rejected: {}", error);
                                             }
                                             edgeless_api::function_instance::SpawnFunctionResponse::InstanceId(id) => {
-                                                current_workflow.function_instances.insert(fun.function_alias.clone(), vec![id]);
+                                                current_workflow.function_instances.insert(fun.name.clone(), vec![id]);
                                                 if all_outputs_mapped {
-                                                    to_upsert.remove(&fun.function_alias);
+                                                    to_upsert.remove(&fun.name);
                                                 }
                                             }
                                         },
@@ -262,9 +262,8 @@ impl Controller {
                                     todo!();
                                 } else {
                                     // Create new resource instance
-                                    if let Some((provider_id, handle)) = resources
-                                        .iter_mut()
-                                        .find(|(_id, spec)| spec.resource_type == resource.resource_class_type)
+                                    if let Some((provider_id, handle)) =
+                                        resources.iter_mut().find(|(_id, spec)| spec.resource_type == resource.class_type)
                                     {
                                         match handle
                                             .config_api
@@ -315,7 +314,7 @@ impl Controller {
                                 .function_instances
                                 .iter()
                                 .map(|(alias, instances)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                                    function_alias: alias.to_string(),
+                                    name: alias.to_string(),
                                     instances: instances.clone(),
                                 })
                                 .collect(),
@@ -373,7 +372,7 @@ impl Controller {
                                     .function_instances
                                     .iter()
                                     .map(|(alias, instances)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                                        function_alias: alias.to_string(),
+                                        name: alias.to_string(),
                                         instances: instances.clone(),
                                     })
                                     .collect(),
@@ -388,7 +387,7 @@ impl Controller {
                                     .function_instances
                                     .iter()
                                     .map(|(alias, instances)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                                        function_alias: alias.to_string(),
+                                        name: alias.to_string(),
                                         instances: instances.clone(),
                                     })
                                     .collect(),

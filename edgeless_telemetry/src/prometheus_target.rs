@@ -13,7 +13,7 @@ struct RuntimeLabels {
     function_type: String,
 }
 
-// TODO: add additional labels like function_class, function_name
+// TODO: add additional labels like class_spec, function_name
 #[derive(Clone, Debug, Hash, PartialEq, Eq, prometheus_client::encoding::EncodeLabelSet)]
 struct FunctionLabels {
     node_id: String,

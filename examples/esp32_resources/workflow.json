@@ -20,7 +20,7 @@
     "resources": [
         {
             "alias": "test_sensor",
-            "resource_class_type": "scd30-sensor",
+            "class_type": "scd30-sensor",
             "output_callback_definitions": {
                 "data_out": "test_fun"
             },
@@ -28,7 +28,7 @@
         },
         {
             "alias": "test_display",
-            "resource_class_type": "text-display",
+            "class_type": "text-display",
             "output_callback_definitions": {},
             "configurations": {}
         }

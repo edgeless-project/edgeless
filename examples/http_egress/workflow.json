@@ -20,7 +20,7 @@
     "resources": [
         {
             "alias": "http-egress-1-1",
-            "resource_class_type": "http-egress",
+            "class_type": "http-egress",
             "output_callback_definitions": {},
             "configurations": {}
         }

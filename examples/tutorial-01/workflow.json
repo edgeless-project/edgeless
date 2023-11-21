@@ -60,7 +60,7 @@
     "resources": [
         {
             "alias": "file-log",
-            "resource_class_type": "file-log",
+            "class_type": "file-log",
             "output_callback_definitions": {},
             "configurations": {
                 "filename": "reading-errors.log"
@@ -68,7 +68,7 @@
         },
         {
             "alias": "redis",
-            "resource_class_type": "redis",
+            "class_type": "redis",
             "output_callback_definitions": {},
             "configurations": {
                 "url": "redis://127.0.0.1:6379/",

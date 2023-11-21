@@ -34,7 +34,7 @@ impl WorkflowId {
 
 #[derive(Debug, Clone)]
 pub struct WorkflowFunctionMapping {
-    pub function_alias: String,
+    pub name: String,
     pub instances: Vec<InstanceId>,
 }
 
@@ -47,17 +47,17 @@ pub struct WorkflowInstance {
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct WorkflowResource {
     pub alias: String,
-    pub resource_class_type: String,
+    pub class_type: String,
     pub output_callback_definitions: std::collections::HashMap<String, String>,
     pub configurations: std::collections::HashMap<String, String>,
 }
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct WorkflowFunction {
-    pub function_alias: String,
+    pub name: String,
     pub function_class_specification: crate::function_instance::FunctionClassSpecification,
     pub output_callback_definitions: std::collections::HashMap<String, String>,
-    pub function_annotations: std::collections::HashMap<String, String>,
+    pub annotations: std::collections::HashMap<String, String>,
 }
 
 #[derive(Clone, Debug)]
@@ -65,7 +65,7 @@ pub struct SpawnWorkflowRequest {
     pub workflow_id: WorkflowId,
     pub workflow_functions: Vec<WorkflowFunction>,
     pub workflow_resources: Vec<WorkflowResource>,
-    pub workflow_annotations: std::collections::HashMap<String, String>,
+    pub annotations: std::collections::HashMap<String, String>,
 }
 
 #[derive(Clone, Debug)]

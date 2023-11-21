@@ -70,7 +70,7 @@
     "resources": [
         {
             "alias": "http-ingress",
-            "resource_class_type": "http-ingress",
+            "class_type": "http-ingress",
             "output_callback_definitions": {
                 "new_request": "external_trigger"
             },
@@ -81,7 +81,7 @@
         },
         {
             "alias": "http-egress",
-            "resource_class_type": "http-egress",
+            "class_type": "http-egress",
             "output_callback_definitions": {},
             "configurations": {}
         }

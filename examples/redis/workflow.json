@@ -20,7 +20,7 @@
     "resources": [
         {
             "alias": "my-redis",
-            "resource_class_type": "redis",
+            "class_type": "redis",
             "output_callback_definitions": {},
             "configurations": {
                 "url": "redis://127.0.0.1:6379/",
