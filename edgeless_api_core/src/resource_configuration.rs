@@ -44,15 +44,15 @@ impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
 impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let id = d.str()?;
-        let mut output_callbacks: [Option<(&'b str, crate::instance_id::InstanceId)>; 16] = [None; 16];
-        let mut output_callbacks_i: usize = 0;
+        let mut outputs: [Option<(&'b str, crate::instance_id::InstanceId)>; 16] = [None; 16];
+        let mut outputs_i: usize = 0;
         let mut configuration: [Option<(&'b str, &'b str)>; 16] = [None; 16];
         let mut configuration_i: usize = 0;
 
         for item in d.array_iter::<(&str, crate::instance_id::InstanceId)>().unwrap() {
             if let Ok(item) = item {
-                output_callbacks[output_callbacks_i] = Some(item);
-                output_callbacks_i = output_callbacks_i + 1;
+                outputs[outputs_i] = Some(item);
+                outputs_i = outputs_i + 1;
             }
         }
 
@@ -65,7 +65,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
 
         Ok(EncodedResourceInstanceSpecification {
             provider_id: id,
-            output_callback_definitions: output_callbacks,
+            output_callback_definitions: outputs,
             configuration: configuration,
         })
     }
@@ -75,16 +75,15 @@ impl<C> minicbor::CborLen<C> for EncodedResourceInstanceSpecification<'_> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         let mut len: usize = self.provider_id.cbor_len(ctx);
 
-        let mut output_callbacks: [(&str, crate::instance_id::InstanceId); 16] =
-            [("" as &str, crate::instance_id::InstanceId::new(uuid::Uuid::new_v4())); 16];
-        let mut output_callbacks_i: usize = 0;
+        let mut outputs: [(&str, crate::instance_id::InstanceId); 16] = [("" as &str, crate::instance_id::InstanceId::new(uuid::Uuid::new_v4())); 16];
+        let mut outputs_i: usize = 0;
         let mut configuration: [(&str, &str); 16] = [("" as &str, "" as &str); 16];
         let mut configuration_i: usize = 0;
 
         for item in self.output_callback_definitions {
             if let Some((key, val)) = item {
-                output_callbacks[output_callbacks_i] = (key, val);
-                output_callbacks_i = output_callbacks_i + 1;
+                outputs[outputs_i] = (key, val);
+                outputs_i = outputs_i + 1;
             }
         }
 
@@ -95,7 +94,7 @@ impl<C> minicbor::CborLen<C> for EncodedResourceInstanceSpecification<'_> {
             }
         }
 
-        len = len + output_callbacks[..output_callbacks_i].cbor_len(ctx);
+        len = len + outputs[..outputs_i].cbor_len(ctx);
 
         len = len + configuration[..configuration_i].cbor_len(ctx);
 

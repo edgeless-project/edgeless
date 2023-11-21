@@ -7,7 +7,7 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "include_code_file": "./requestor/http_requestor.wasm",
-                "output_callbacks": [
+                "outputs": [
                     "http_e"
                 ]
             },

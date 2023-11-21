@@ -70,14 +70,14 @@ impl crate::resource_configuration::ResourceConfigurationAPI for CoapClient {
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<crate::resource_configuration::SpawnResourceResponse> {
-        let mut output_callbacks: [Option<(&str, edgeless_api_core::instance_id::InstanceId)>; 16] = [None; 16];
-        let mut output_callbacks_i: usize = 0;
+        let mut outputs: [Option<(&str, edgeless_api_core::instance_id::InstanceId)>; 16] = [None; 16];
+        let mut outputs_i: usize = 0;
         let mut configuration: [Option<(&str, &str)>; 16] = [None; 16];
         let mut configuration_i: usize = 0;
 
         for (key, val) in &instance_specification.output_callback_definitions {
-            output_callbacks[output_callbacks_i] = Some((key, val.clone()));
-            output_callbacks_i = output_callbacks_i + 1;
+            outputs[outputs_i] = Some((key, val.clone()));
+            outputs_i = outputs_i + 1;
         }
 
         for (key, val) in &instance_specification.configuration {
@@ -87,7 +87,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for CoapClient {
 
         let encoded_resource_spec = edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification {
             provider_id: &instance_specification.provider_id,
-            output_callback_definitions: output_callbacks,
+            output_callback_definitions: outputs,
             configuration: configuration,
         };
 

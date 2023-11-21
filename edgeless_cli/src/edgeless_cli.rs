@@ -106,7 +106,7 @@ async fn main() -> anyhow::Result<()> {
                                                 function_class_type: func_spec.class_specification.function_type,
                                                 function_class_version: func_spec.class_specification.version,
                                                 function_class_inlude_code: std::fs::read(p).unwrap(),
-                                                output_callback_declarations: func_spec.class_specification.output_callbacks,
+                                                outputs: func_spec.class_specification.outputs,
                                             },
                                             output_callback_definitions: func_spec.output_callback_definitions,
                                             annotations: func_spec.annotations,

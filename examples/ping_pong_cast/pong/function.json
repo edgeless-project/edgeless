@@ -3,7 +3,7 @@
     "function_type": "RUST_WASM",
     "version": "0.1",
     "build": "Cargo.toml",
-    "output_callbacks": [
+    "outputs": [
         "pinger"
     ]
 }
