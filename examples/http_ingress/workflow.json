@@ -1,7 +1,7 @@
 {
     "functions": [
         {
-            "alias": "http_processor",
+            "name": "http_processor",
             "class_specification": {
                 "id": "http_processor",
                 "function_type": "RUST_WASM",
@@ -15,7 +15,7 @@
     ],
     "resources": [
         {
-            "alias": "http-ingress-1-1",
+            "name": "http-ingress-1-1",
             "class_type": "http-ingress",
             "output_callback_definitions": {
                 "new_request": "http_processor"

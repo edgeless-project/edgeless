@@ -23,15 +23,15 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
         Ok(())
     }
 
-    async fn cast(&mut self, alias: String, msg: String) -> wasmtime::Result<()> {
-        if alias == "self" {
+    async fn cast(&mut self, name: String, msg: String) -> wasmtime::Result<()> {
+        if name == "self" {
             self.data_plane.send(self.instance_id.clone(), msg).await;
             Ok(())
-        } else if let Some(target) = self.callback_table.lock().await.alias_map.get(&alias) {
+        } else if let Some(target) = self.callback_table.lock().await.mapping.get(&name) {
             self.data_plane.send(target.clone(), msg).await;
             Ok(())
         } else {
-            log::warn!("Unknown alias: {}", &alias);
+            log::warn!("Unknown name: {}", &name);
             Ok(())
         }
     }
@@ -46,13 +46,13 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
         })
     }
 
-    async fn call(&mut self, alias: String, msg: String) -> wasmtime::Result<wit_binding::CallRet> {
-        let target = match alias.as_str() {
+    async fn call(&mut self, name: String, msg: String) -> wasmtime::Result<wit_binding::CallRet> {
+        let target = match name.as_str() {
             "self" => self.instance_id,
-            _ => *match self.callback_table.lock().await.alias_map.get(&alias) {
+            _ => *match self.callback_table.lock().await.mapping.get(&name) {
                 Some(val) => val,
                 None => {
-                    log::warn!("Unknown alias: {}", &alias);
+                    log::warn!("Unknown name: {}", &name);
                     return Ok(wit_binding::CallRet::Err);
                 }
             },
@@ -82,13 +82,13 @@ impl wit_binding::EdgefunctionImports for GuestAPI {
         })
     }
 
-    async fn delayed_cast(&mut self, delay: u64, alias: String, payload: String) -> wasmtime::Result<()> {
-        let target = match alias.as_str() {
+    async fn delayed_cast(&mut self, delay: u64, name: String, payload: String) -> wasmtime::Result<()> {
+        let target = match name.as_str() {
             "self" => self.instance_id,
-            _ => *match self.callback_table.lock().await.alias_map.get(&alias) {
+            _ => *match self.callback_table.lock().await.mapping.get(&name) {
                 Some(val) => val,
                 None => {
-                    log::warn!("Unknown alias: {}", &alias);
+                    log::warn!("Unknown name: {}", &name);
                     return Ok(());
                 }
             },

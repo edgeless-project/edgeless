@@ -1,7 +1,7 @@
 {
     "functions": [
         {
-            "alias": "sensor_simulator",
+            "name": "sensor_simulator",
             "class_specification": {
                 "id": "sensor_simulator",
                 "function_type": "RUST_WASM",
@@ -17,7 +17,7 @@
             "annotations": {}
         },
         {
-            "alias": "filter_in_range",
+            "name": "filter_in_range",
             "class_specification": {
                 "id": "filter_in_range",
                 "function_type": "RUST_WASM",
@@ -37,7 +37,7 @@
             }
         },
         {
-            "alias": "moving_avg",
+            "name": "moving_avg",
             "class_specification": {
                 "id": "moving_avg",
                 "function_type": "RUST_WASM",
@@ -59,7 +59,7 @@
     ],
     "resources": [
         {
-            "alias": "file-log",
+            "name": "file-log",
             "class_type": "file-log",
             "output_callback_definitions": {},
             "configurations": {
@@ -67,7 +67,7 @@
             }
         },
         {
-            "alias": "redis",
+            "name": "redis",
             "class_type": "redis",
             "output_callback_definitions": {},
             "configurations": {

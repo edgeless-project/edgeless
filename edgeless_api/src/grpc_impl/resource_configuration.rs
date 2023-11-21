@@ -12,10 +12,10 @@ impl ResourceConfigurationConverters {
             output_callback_definitions: api_spec
                 .output_callback_definitions
                 .iter()
-                .flat_map(|(alias, id)| {
+                .flat_map(|(name, id)| {
                     let id = CommonConverters::parse_instance_id(id);
                     match id {
-                        Ok(val) => Some((alias.to_string(), val)),
+                        Ok(val) => Some((name.to_string(), val)),
                         Err(_) => None,
                     }
                 })
@@ -52,7 +52,7 @@ impl ResourceConfigurationConverters {
             output_callback_definitions: crate_spec
                 .output_callback_definitions
                 .iter()
-                .map(|(alias, id)| (alias.to_string(), CommonConverters::serialize_instance_id(id)))
+                .map(|(name, id)| (name.to_string(), CommonConverters::serialize_instance_id(id)))
                 .collect(),
         }
     }

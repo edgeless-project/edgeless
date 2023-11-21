@@ -14,12 +14,12 @@ world edgefunction {
   }
 
   import cast-raw: func(target: instance-id, msg: string)
-  import cast: func(alias: string, msg: string)
+  import cast: func(name: string, msg: string)
   import call-raw: func(target: instance-id, msg: string) -> call-ret
-  import call: func(alias: string, msg: string) -> call-ret
+  import call: func(name: string, msg: string) -> call-ret
   import telemetry-log: func(lvl: string, target: string, message: string)
   import slf: func() -> instance-id
-  import delayed-cast: func(delayms: u64, alias: string, payload: string)
+  import delayed-cast: func(delayms: u64, name: string, payload: string)
   import sync: func(state: string)
 
   export handle-cast: func(source: instance-id, msg: string)

@@ -1,7 +1,7 @@
 {
     "functions": [
         {
-            "alias": "external_trigger",
+            "name": "external_trigger",
             "class_specification": {
                 "id": "http_read_number",
                 "function_type": "RUST_WASM",
@@ -17,7 +17,7 @@
             "annotations": {}
         },
         {
-            "alias": "incr",
+            "name": "incr",
             "class_specification": {
                 "id": "incr",
                 "function_type": "RUST_WASM",
@@ -33,7 +33,7 @@
             "annotations": {}
         },
         {
-            "alias": "double",
+            "name": "double",
             "class_specification": {
                 "id": "double",
                 "function_type": "RUST_WASM",
@@ -49,7 +49,7 @@
             "annotations": {}
         },
         {
-            "alias": "external_sink",
+            "name": "external_sink",
             "class_specification": {
                 "id": "http_write_number",
                 "function_type": "RUST_WASM",
@@ -69,7 +69,7 @@
     ],
     "resources": [
         {
-            "alias": "http-ingress",
+            "name": "http-ingress",
             "class_type": "http-ingress",
             "output_callback_definitions": {
                 "new_request": "external_trigger"
@@ -80,7 +80,7 @@
             }
         },
         {
-            "alias": "http-egress",
+            "name": "http-egress",
             "class_type": "http-egress",
             "output_callback_definitions": {},
             "configurations": {}

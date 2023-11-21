@@ -4,7 +4,7 @@ type nid = int (* Nodes *)
 type wid = int (* Workflows *)
 type fid = int (* Instantiated functions*)
 type rid = string (* Repository identified *)
-type alias = string (* Naming things *)
+type name = string (* Naming things *)
 
 (** Forwarding tables.
 
@@ -52,7 +52,7 @@ particular runtime.
 module Function : sig
   type t
 end = struct
-  type t = { repository : rid; alias : alias; runtime : runtime }
+  type t = { repository : rid; name : name; runtime : runtime }
 end
 
 (** Function instance.
@@ -75,7 +75,7 @@ or more outputs.
 module Invocation : sig
   type t
 end = struct
-  type t = { alias : alias; func : Function.t; outputs : output list }
+  type t = { name : name; func : Function.t; outputs : output list }
 end
 
 (** Workflows.
@@ -86,7 +86,7 @@ A workflow is a named list of function invocations, representing a DAG.
 module Workflow : sig
   type t
 end = struct
-  type t = { alias : string; functions : Invocation.t list }
+  type t = { name : string; functions : Invocation.t list }
 end
 
 (** Nodes.

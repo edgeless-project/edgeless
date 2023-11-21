@@ -94,33 +94,33 @@ async fn main() -> anyhow::Result<()> {
                                 workflow_functions: workflow
                                     .functions
                                     .into_iter()
-                                    .map(|wf| {
+                                    .map(|func_spec| {
                                         let p = std::path::Path::new(&spec_file)
                                             .parent()
                                             .unwrap()
-                                            .join(wf.class_specification.include_code_file.unwrap());
+                                            .join(func_spec.class_specification.include_code_file.unwrap());
                                         edgeless_api::workflow_instance::WorkflowFunction {
-                                            name: wf.alias,
+                                            name: func_spec.name,
                                             function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                                                function_class_id: wf.class_specification.id,
-                                                function_class_type: wf.class_specification.function_type,
-                                                function_class_version: wf.class_specification.version,
+                                                function_class_id: func_spec.class_specification.id,
+                                                function_class_type: func_spec.class_specification.function_type,
+                                                function_class_version: func_spec.class_specification.version,
                                                 function_class_inlude_code: std::fs::read(p).unwrap(),
-                                                output_callback_declarations: wf.class_specification.output_callbacks,
+                                                output_callback_declarations: func_spec.class_specification.output_callbacks,
                                             },
-                                            output_callback_definitions: wf.output_callback_definitions,
-                                            annotations: wf.annotations,
+                                            output_callback_definitions: func_spec.output_callback_definitions,
+                                            annotations: func_spec.annotations,
                                         }
                                     })
                                     .collect(),
                                 workflow_resources: workflow
                                     .resources
                                     .into_iter()
-                                    .map(|wr| edgeless_api::workflow_instance::WorkflowResource {
-                                        alias: wr.alias,
-                                        class_type: wr.class_type,
-                                        output_callback_definitions: wr.output_callback_definitions,
-                                        configurations: wr.configurations,
+                                    .map(|res_spec| edgeless_api::workflow_instance::WorkflowResource {
+                                        name: res_spec.name,
+                                        class_type: res_spec.class_type,
+                                        output_callback_definitions: res_spec.output_callback_definitions,
+                                        configurations: res_spec.configurations,
                                     })
                                     .collect(),
                                 annotations: workflow.annotations.clone(),
