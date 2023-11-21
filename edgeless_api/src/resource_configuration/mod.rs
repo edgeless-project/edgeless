@@ -12,6 +12,7 @@ pub struct ResourceInstanceSpecification {
 
 #[derive(Debug, Clone)]
 pub struct SpawnResourceResponse {
+    // XXX#78
     pub response_error: Option<crate::common::ResponseError>,
     pub instance_id: Option<crate::function_instance::InstanceId>,
 }

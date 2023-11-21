@@ -1,7 +1,7 @@
 mod workflow_spec;
 
 use clap::Parser;
-use edgeless_api::controller::ControllerAPI;
+use edgeless_api::{controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -128,10 +128,13 @@ async fn main() -> anyhow::Result<()> {
                             .await;
                         match res {
                             Ok(response) => {
-                                if let Some(instance) = &response.workflow_status {
-                                    println!("{}", instance.workflow_id.workflow_id.to_string());
-                                } else if let Some(error) = &response.response_error {
-                                    println!("{:?}", error);
+                                match &response {
+                                    SpawnWorkflowResponse::ResponseError(err) => {
+                                        println!("{:?}", err);
+                                    }
+                                    SpawnWorkflowResponse::WorkflowInstance(val) => {
+                                        println!("{}", val.workflow_id.workflow_id.to_string());
+                                    }
                                 }
                                 log::info!("{:?}", response)
                             }
