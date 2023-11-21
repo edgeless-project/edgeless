@@ -1,7 +1,7 @@
 {
     "functions": [
         {
-            "alias": "test_fun",
+            "name": "test_fun",
             "class_specification": {
                 "id": "esp_test_fun",
                 "function_type": "RUST_WASM",
@@ -19,7 +19,7 @@
     ],
     "resources": [
         {
-            "alias": "test_sensor",
+            "name": "test_sensor",
             "class_type": "scd30-sensor",
             "output_callback_definitions": {
                 "data_out": "test_fun"
@@ -27,7 +27,7 @@
             "configurations": {}
         },
         {
-            "alias": "test_display",
+            "name": "test_display",
             "class_type": "text-display",
             "output_callback_definitions": {},
             "configurations": {}

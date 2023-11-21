@@ -74,10 +74,10 @@ message UpdateFunctionLinksRequest {
 // Message definining a workflow resource.
 message WorkflowResource {
     // Name of the resource, local to the workflow specification,
-    string alias = 1;
+    string name = 1;
     // Resource type.
     string class_type = 2;
-    // Map between a possible action and the function aliases to call.
+    // Mapping of the outputs to other functions/resources in the workflow.
     map<string, string> output_callback_definitions = 3;
     // Configuration of the resource, which depends on the resource type.
     map<string, string> configurations = 4;
@@ -89,7 +89,7 @@ message WorkflowFunction {
     string name = 1;
     // Specification of the function.
     FunctionClassSpecification class_spec = 2;
-    // Map between a possible action and the function aliases to call.
+    // Mapping of the outputs to other functions/resources in the workflow.
     map<string, string> output_callback_definitions = 3;
     // Annotations associated to this function.
     map<string, string> annotations = 5;

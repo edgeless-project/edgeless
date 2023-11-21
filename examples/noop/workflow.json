@@ -1,7 +1,7 @@
 {
     "functions": [
         {
-            "alias": "noop",
+            "name": "noop",
             "class_specification": {
                 "id": "noop",
                 "function_type": "RUST_WASM",

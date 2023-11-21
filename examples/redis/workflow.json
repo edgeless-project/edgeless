@@ -1,7 +1,7 @@
 {
     "functions": [
         {
-            "alias": "my-message-generator",
+            "name": "my-message-generator",
             "class_specification": {
                 "id": "counter",
                 "function_type": "RUST_WASM",
@@ -19,7 +19,7 @@
     ],
     "resources": [
         {
-            "alias": "my-redis",
+            "name": "my-redis",
             "class_type": "redis",
             "output_callback_definitions": {},
             "configurations": {

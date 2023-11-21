@@ -222,7 +222,7 @@ async fn resource_to_function_start_stop() {
                 annotations: std::collections::HashMap::new(),
             }],
             workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
-                alias: "r1".to_string(),
+                name: "r1".to_string(),
                 class_type: "test-res".to_string(),
                 output_callback_definitions: std::collections::HashMap::from([("test_out".to_string(), "f1".to_string())]),
                 configurations: std::collections::HashMap::new(),

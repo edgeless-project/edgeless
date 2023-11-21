@@ -38,12 +38,12 @@ struct ActiveWorkflow {
 }
 
 impl ActiveWorkflow {
-    fn instances(&self, alias: &str) -> Vec<edgeless_api::function_instance::InstanceId> {
+    fn instances(&self, name: &str) -> Vec<edgeless_api::function_instance::InstanceId> {
         let mut all_instances = Vec::new();
-        if let Some(function_instances) = self.function_instances.get(alias) {
+        if let Some(function_instances) = self.function_instances.get(name) {
             all_instances.append(&mut function_instances.clone());
         }
-        if let Some(resource_instances) = self.resource_instances.get(alias) {
+        if let Some(resource_instances) = self.resource_instances.get(name) {
             all_instances.extend(&mut resource_instances.iter().map(|(_provider, id)| id.clone()));
         }
         return all_instances;
@@ -138,7 +138,7 @@ impl Controller {
 
                     let mut to_upsert = std::collections::HashSet::<String>::new();
                     to_upsert.extend(spawn_workflow_request.workflow_functions.iter().map(|wf| wf.name.to_string()));
-                    to_upsert.extend(spawn_workflow_request.workflow_resources.iter().map(|wr| wr.alias.to_string()));
+                    to_upsert.extend(spawn_workflow_request.workflow_resources.iter().map(|wr| wr.name.to_string()));
 
                     let mut iteration_count = 100;
 
@@ -149,7 +149,7 @@ impl Controller {
                     //  and because there might be dependency loops. By doing
                     //  this in multiple iterations (and updating the sets) we
                     //  can create workflows that also contain loops from the
-                    //  alias system (and we don't need to find the order in a
+                    //  name system (and we don't need to find the order in a
                     //  loop-free graph). In case there is a loop, the iteration
                     //  count of 100 will be reached and the workflow creation
                     //  would fail.
@@ -164,8 +164,8 @@ impl Controller {
                                 let outputs: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> = fun
                                     .output_callback_definitions
                                     .iter()
-                                    .filter_map(|(output_id, output_alias)| {
-                                        let instances = current_workflow.instances(&output_alias);
+                                    .filter_map(|(output_id, output_name)| {
+                                        let instances = current_workflow.instances(&output_name);
                                         if instances.len() > 0 {
                                             Some((output_id.to_string(), instances[0].clone()))
                                         } else {
@@ -246,17 +246,15 @@ impl Controller {
                         }
 
                         for resource in &spawn_workflow_request.workflow_resources {
-                            if to_upsert.contains(&resource.alias) {
+                            if to_upsert.contains(&resource.name) {
                                 let output_mapping: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> = resource
                                     .output_callback_definitions
                                     .iter()
-                                    .map(|(callback, alias)| {
-                                        (callback.to_string(), current_workflow.function_instances.get(alias).unwrap()[0].clone())
-                                    })
+                                    .map(|(callback, name)| (callback.to_string(), current_workflow.function_instances.get(name).unwrap()[0].clone()))
                                     .collect();
 
                                 // Update resource instance
-                                if let Some(_instances) = current_workflow.resource_instances.get(&resource.alias) {
+                                if let Some(_instances) = current_workflow.resource_instances.get(&resource.name) {
                                     // resources currently don't have an update
                                     // function.
                                     todo!();
@@ -278,9 +276,9 @@ impl Controller {
                                                 edgeless_api::resource_configuration::SpawnResourceResponse::InstanceId(instance_id) => {
                                                     current_workflow
                                                         .resource_instances
-                                                        .insert(resource.alias.clone(), vec![(provider_id.clone(), instance_id)]);
+                                                        .insert(resource.name.clone(), vec![(provider_id.clone(), instance_id)]);
                                                     if output_mapping.len() == resource.output_callback_definitions.len() {
-                                                        to_upsert.remove(&resource.alias);
+                                                        to_upsert.remove(&resource.name);
                                                     }
                                                 }
                                                 edgeless_api::resource_configuration::SpawnResourceResponse::ResponseError(err) => {
@@ -302,7 +300,7 @@ impl Controller {
                     // Everything should be mapped now. Fails if there is
                     // invalid mappings or large dependency loops.
                     if to_upsert.len() > 0 {
-                        reply_sender.send(Err(anyhow::anyhow!("Failed to resolve alias-links."))).unwrap();
+                        reply_sender.send(Err(anyhow::anyhow!("Failed to resolve names."))).unwrap();
                         continue;
                     }
 
@@ -313,8 +311,8 @@ impl Controller {
                             functions: current_workflow
                                 .function_instances
                                 .iter()
-                                .map(|(alias, instances)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                                    name: alias.to_string(),
+                                .map(|(name, instances)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                                    name: name.to_string(),
                                     instances: instances.clone(),
                                 })
                                 .collect(),
@@ -331,7 +329,7 @@ impl Controller {
                         // Send stop to all function instances associated with
                         // this workflow. For now only one orchestrator is
                         // supported.
-                        for (_alias, instances) in workflow_to_remove.function_instances {
+                        for (_name, instances) in workflow_to_remove.function_instances {
                             for f_id in instances {
                                 match fn_client.stop(f_id).await {
                                     Ok(_) => {}
@@ -343,7 +341,7 @@ impl Controller {
                         }
                         // Stop all of the resources using the
                         // ResourceConfigurationAPI
-                        for (_alias, instances) in workflow_to_remove.resource_instances {
+                        for (_name, instances) in workflow_to_remove.resource_instances {
                             for (provider, instance_id) in instances {
                                 match resources.get_mut(&provider) {
                                     Some(provider) => match provider.config_api.stop(instance_id).await {
@@ -371,8 +369,8 @@ impl Controller {
                                 functions: wf
                                     .function_instances
                                     .iter()
-                                    .map(|(alias, instances)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                                        name: alias.to_string(),
+                                    .map(|(name, instances)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                                        name: name.to_string(),
                                         instances: instances.clone(),
                                     })
                                     .collect(),
@@ -386,8 +384,8 @@ impl Controller {
                                 functions: wf
                                     .function_instances
                                     .iter()
-                                    .map(|(alias, instances)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                                        name: alias.to_string(),
+                                    .map(|(name, instances)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                                        name: name.to_string(),
                                         instances: instances.clone(),
                                     })
                                     .collect(),
