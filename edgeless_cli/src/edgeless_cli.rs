@@ -67,7 +67,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     match args.command {
-        None => println!("Bye"),
+        None => log::debug!("Bye"),
         Some(x) => match x {
             Commands::Workflow { workflow_command } => {
                 if std::fs::metadata(&args.config_file).is_err() {
@@ -76,13 +76,13 @@ async fn main() -> anyhow::Result<()> {
                         &args.config_file
                     ));
                 }
-                println!("Got Config");
+                log::debug!("Got Config");
                 let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
                 let mut con_client = edgeless_api::grpc_impl::controller::ControllerAPIClient::new(&conf.controller_url).await;
                 let mut con_wf_client = con_client.workflow_instance_api();
                 match workflow_command {
                     WorkflowCommands::Start { spec_file } => {
-                        println!("Start Workflow");
+                        log::debug!("Start Workflow");
                         let workflow: workflow_spec::WorkflowSpec =
                             serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
                         let my_wf_id = edgeless_api::workflow_instance::WorkflowId {
