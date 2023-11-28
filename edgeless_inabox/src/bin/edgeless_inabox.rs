@@ -3,10 +3,8 @@ use std::{collections::HashMap, path::Path};
 use anyhow::anyhow;
 use clap::Parser;
 use edgeless_con::{EdgelessConOrcConfig, EdgelessConResourceConfig};
-use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
 use edgeless_inabox::InABoxConfig;
 use edgeless_node::EdgelessNodeSettings;
-use edgeless_orc::EdgelessOrcNodeConfig;
 use std::fs;
 use uuid::Uuid;
 
@@ -94,57 +92,12 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         invocation_url: next_url(),
         resource_configuration_url: next_url(),
         http_ingress_url: next_url(),
-        // filled with all values from the node_invocation_urls
-        nodes: node_invocation_urls
-            .iter()
-            .map(|(key, value)| EdgelessDataplanePeerSettings {
-                id: key.clone(),
-                invocation_url: value.clone(),
-            })
-            .collect(),
     };
-
-    // Nodes
-    // node peers: its own invocation_url, inv_url of balancer, invocation_urls
-    // of other nodes
-    let mut node_confs: Vec<EdgelessNodeSettings> = vec![];
-    let node_peers: Vec<EdgelessDataplanePeerSettings> = node_invocation_urls
-        .iter()
-        .map(|(key, value)| EdgelessDataplanePeerSettings {
-            id: key.clone(),
-            invocation_url: value.clone(),
-        })
-        .collect();
-    for node_id in node_invocation_urls.keys() {
-        let mut peers: Vec<EdgelessDataplanePeerSettings> = vec![
-            // peer for the balancer
-            EdgelessDataplanePeerSettings {
-                id: bal_conf.balancer_id.clone(),
-                invocation_url: bal_conf.invocation_url.clone(),
-            },
-        ];
-        peers.extend(node_peers.clone());
-        node_confs.push(EdgelessNodeSettings {
-            node_id: node_id.clone(),
-            agent_url: node_orc_agent_urls.get(node_id).expect("").clone(), // we are sure that it is there
-            invocation_url: node_invocation_urls.get(node_id).expect("").clone(), // we are sure that it is there
-            metrics_url: next_url(),
-            peers,
-        })
-    }
 
     // Orchestrator
     let orc_conf = edgeless_orc::EdgelessOrcSettings {
         domain_id: "domain-1".to_string(),
         orchestrator_url: next_url(),
-        // filled with all values from the node_orc_agent_urls
-        nodes: node_orc_agent_urls
-            .iter()
-            .map(|(key, value)| EdgelessOrcNodeConfig {
-                node_id: key.clone(),
-                agent_url: value.clone(),
-            })
-            .collect(),
         orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
     };
 
@@ -184,6 +137,20 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
             },
         ],
     };
+
+    // Nodes
+    // node peers: its own invocation_url, inv_url of balancer, invocation_urls
+    // of other nodes
+    let mut node_confs: Vec<EdgelessNodeSettings> = vec![];
+    for node_id in node_invocation_urls.keys() {
+        node_confs.push(EdgelessNodeSettings {
+            node_id: node_id.clone(),
+            agent_url: node_orc_agent_urls.get(node_id).expect("").clone(), // we are sure that it is there
+            invocation_url: node_invocation_urls.get(node_id).expect("").clone(), // we are sure that it is there
+            metrics_url: next_url(),
+            orchestrator_url: orc_conf.orchestrator_url.clone(),
+        })
+    }
 
     // Save the config files to a hard-coded directory if its empty, to give
     // users reference on how the cluster is configured

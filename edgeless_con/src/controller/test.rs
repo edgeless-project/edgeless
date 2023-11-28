@@ -11,7 +11,10 @@ enum MockFunctionInstanceEvent {
         ),
     ),
     Stop(edgeless_api::function_instance::InstanceId),
-    Update(edgeless_api::function_instance::UpdateFunctionLinksRequest),
+    UpdateLinks(edgeless_api::function_instance::UpdateFunctionLinksRequest),
+    UpdateNode(edgeless_api::function_instance::UpdateNodeRequest),
+    UpdatePeers(edgeless_api::function_instance::UpdatePeersRequest),
+    KeepAlive(),
 }
 
 struct MockOrchestrator {
@@ -51,8 +54,23 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for MockFunctionInstan
         self.sender.send(MockFunctionInstanceEvent::Stop(id)).await.unwrap();
         Ok(())
     }
-    async fn update_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
-        self.sender.send(MockFunctionInstanceEvent::Update(update)).await.unwrap();
+    async fn update_links(&mut self, request: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+        self.sender.send(MockFunctionInstanceEvent::UpdateLinks(request)).await.unwrap();
+        Ok(())
+    }
+    async fn update_node(
+        &mut self,
+        request: edgeless_api::function_instance::UpdateNodeRequest,
+    ) -> anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse> {
+        self.sender.send(MockFunctionInstanceEvent::UpdateNode(request)).await.unwrap();
+        Ok(edgeless_api::function_instance::UpdateNodeResponse::Accepted)
+    }
+    async fn update_peers(&mut self, request: edgeless_api::function_instance::UpdatePeersRequest) -> anyhow::Result<()> {
+        self.sender.send(MockFunctionInstanceEvent::UpdatePeers(request)).await.unwrap();
+        Ok(())
+    }
+    async fn keep_alive(&mut self) -> anyhow::Result<()> {
+        self.sender.send(MockFunctionInstanceEvent::KeepAlive()).await.unwrap();
         Ok(())
     }
 }
@@ -349,7 +367,7 @@ async fn function_link_loop_start_stop() {
         panic!();
     }
     let res3 = mock_orc_receiver.try_next().unwrap().unwrap();
-    if let MockFunctionInstanceEvent::Update(update_req) = res3 {
+    if let MockFunctionInstanceEvent::UpdateLinks(update_req) = res3 {
         assert_eq!(update_req.instance_id.unwrap(), to_patch.unwrap());
         assert_eq!(update_req.output_mapping.len(), 1);
     } else {

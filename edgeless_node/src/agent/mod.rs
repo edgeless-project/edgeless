@@ -1,3 +1,5 @@
+use edgeless_api::function_instance::UpdatePeersRequest;
+use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
 use futures::{Future, SinkExt, StreamExt};
 
 use crate::runner_api;
@@ -5,7 +7,8 @@ use crate::runner_api;
 enum AgentRequest {
     SPAWN(edgeless_api::function_instance::SpawnFunctionRequest),
     STOP(edgeless_api::function_instance::InstanceId),
-    UPDATE(edgeless_api::function_instance::UpdateFunctionLinksRequest),
+    UPDATELINKS(edgeless_api::function_instance::UpdateFunctionLinksRequest),
+    UPDATEPEERS(edgeless_api::function_instance::UpdatePeersRequest),
 }
 
 pub struct Agent {
@@ -17,19 +20,25 @@ impl Agent {
     pub fn new(
         runner: Box<dyn runner_api::RunnerAPI + Send>,
         node_settings: crate::EdgelessNodeSettings,
+        data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, runner).await;
+            Self::main_task(receiver, runner, data_plane_provider).await;
         });
 
         (Agent { sender, node_settings }, main_task)
     }
 
-    async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<AgentRequest>, runner: Box<dyn runner_api::RunnerAPI + Send>) {
+    async fn main_task(
+        receiver: futures::channel::mpsc::UnboundedReceiver<AgentRequest>,
+        runner: Box<dyn runner_api::RunnerAPI + Send>,
+        data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    ) {
         let mut receiver = std::pin::pin!(receiver);
         let mut runner = runner;
+        let mut data_plane_provider = data_plane_provider;
         log::info!("Starting Edgeless Agent");
         while let Some(req) = receiver.next().await {
             match req {
@@ -51,14 +60,26 @@ impl Agent {
                         }
                     }
                 }
-                AgentRequest::UPDATE(update) => {
-                    log::debug!("Agent Update {:?}", update);
+                AgentRequest::UPDATELINKS(update) => {
+                    log::debug!("Agent UpdatePeers {:?}", update);
                     match runner.update_links(update).await {
                         Ok(_) => {}
                         Err(err) => {
-                            log::error!("Unhandled Update Error: {}", err);
+                            log::error!("Unhandled UpdateLinks Error: {}", err);
                         }
                     }
+                }
+                AgentRequest::UPDATEPEERS(request) => {
+                    log::debug!("Agent UpdatePeers {:?}", request);
+                    match request {
+                        UpdatePeersRequest::Add(node_id, invocation_url) => {
+                            data_plane_provider
+                                .add_peer(EdgelessDataplanePeerSettings { node_id, invocation_url })
+                                .await
+                        }
+                        UpdatePeersRequest::Del(node_id) => data_plane_provider.del_peer(node_id).await,
+                        UpdatePeersRequest::Clear => panic!("UpdatePeersRequest::Clear not implemented"),
+                    };
                 }
             }
         }
@@ -119,13 +140,34 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
     }
 
     async fn update_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
-        match self.sender.send(AgentRequest::UPDATE(update)).await {
+        match self.sender.send(AgentRequest::UPDATELINKS(update)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Agent channel error when updating the links of a function instance: {}",
                 err.to_string()
             )),
         }
+    }
+
+    async fn update_node(
+        &mut self,
+        _request: edgeless_api::function_instance::UpdateNodeRequest,
+    ) -> anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse> {
+        Err(anyhow::anyhow!("Method UpdateNode not supported by agent"))
+    }
+
+    async fn update_peers(&mut self, request: edgeless_api::function_instance::UpdatePeersRequest) -> anyhow::Result<()> {
+        match self.sender.send(AgentRequest::UPDATEPEERS(request)).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(
+                "Agent channel error when updating the peers of a node: {}",
+                err.to_string()
+            )),
+        }
+    }
+
+    async fn keep_alive(&mut self) -> anyhow::Result<()> {
+        Ok(())
     }
 }
 

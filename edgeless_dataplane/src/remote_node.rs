@@ -115,6 +115,10 @@ impl RemoteLinkProvider {
     pub async fn add_peer(&mut self, peer_id: NodeId, peer_api: Box<dyn edgeless_api::invocation::InvocationAPI>) {
         self.remotes.lock().await.receivers.insert(peer_id, peer_api);
     }
+
+    pub async fn del_peer(&mut self, peer_id: NodeId) {
+        self.remotes.lock().await.receivers.remove(&peer_id);
+    }
 }
 
 #[cfg(test)]

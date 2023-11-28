@@ -10,20 +10,27 @@ pub struct OrchestrationLogic {
     orchestration_strategy: OrchestrationStrategy,
     round_robin_current_index: usize,
     rng: StdRng,
-    orchestrated_nodes: Vec<Uuid>,
+    nodes: Vec<Uuid>,
 }
 
 impl OrchestrationLogic {
-    pub fn new(orchestration_strategy: Option<OrchestrationStrategy>, orchestrated_nodes: Vec<Uuid>) -> Self {
+    pub fn new(orchestration_strategy: OrchestrationStrategy) -> Self {
+        match orchestration_strategy {
+            OrchestrationStrategy::Random => log::info!("Orchestration logic strategy: random"),
+            OrchestrationStrategy::RoundRobin => log::info!("Orchestration logic strategy: round-robin"),
+        };
+
         Self {
-            orchestration_strategy: match orchestration_strategy {
-                Some(s) => s,
-                None => OrchestrationStrategy::Random,
-            },
+            orchestration_strategy,
             round_robin_current_index: 0,
             rng: StdRng::from_entropy(),
-            orchestrated_nodes,
+            nodes: vec![],
         }
+    }
+
+    pub fn update_nodes(&mut self, nodes: Vec<Uuid>) -> () {
+        self.nodes = nodes;
+        self.round_robin_current_index = 0;
     }
 }
 
@@ -35,16 +42,12 @@ impl Iterator for OrchestrationLogic {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.orchestration_strategy {
-            OrchestrationStrategy::Random => {
-                log::info!("Orchestration Logic used Random strategy");
-                self.orchestrated_nodes.choose(&mut self.rng).cloned()
-            }
+            OrchestrationStrategy::Random => self.nodes.choose(&mut self.rng).cloned(),
             OrchestrationStrategy::RoundRobin => {
-                log::info!("Orchestration Logic used RoundRobin strategy");
-                if self.round_robin_current_index >= self.orchestrated_nodes.len() {
+                if self.round_robin_current_index >= self.nodes.len() {
                     self.round_robin_current_index = 0;
                 }
-                let next_node = Some(self.orchestrated_nodes[self.round_robin_current_index]);
+                let next_node = Some(self.nodes[self.round_robin_current_index]);
                 self.round_robin_current_index += 1;
                 next_node
             }
