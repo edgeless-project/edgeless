@@ -166,9 +166,7 @@ pub struct DataplaneProvider {
 
 impl DataplaneProvider {
     pub async fn new(node_id: uuid::Uuid, invocation_url: String) -> Self {
-        let remote_provider = std::sync::Arc::new(tokio::sync::Mutex::new(
-            RemoteLinkProvider::new(node_id, std::collections::HashMap::new()).await,
-        ));
+        let remote_provider = std::sync::Arc::new(tokio::sync::Mutex::new(RemoteLinkProvider::new(node_id).await));
 
         let (_, _, port) = edgeless_api::util::parse_http_host(&invocation_url.clone()).unwrap();
 

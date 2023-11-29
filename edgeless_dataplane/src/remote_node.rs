@@ -77,15 +77,14 @@ impl edgeless_api::invocation::InvocationAPI for RemoteRouter {
 }
 
 impl RemoteLinkProvider {
-    pub async fn new(
-        own_node_id: edgeless_api::function_instance::NodeId,
-        peers: std::collections::HashMap<NodeId, Box<dyn edgeless_api::invocation::InvocationAPI>>,
-    ) -> Self {
+    pub async fn new(own_node_id: edgeless_api::function_instance::NodeId) -> Self {
         let locals = std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalRouter {
             receivers: std::collections::HashMap::<NodeLocalComponentId, futures::channel::mpsc::UnboundedSender<DataplaneEvent>>::new(),
         }));
 
-        let remotes = std::sync::Arc::new(tokio::sync::Mutex::new(RemoteRouter { receivers: peers }));
+        let remotes = std::sync::Arc::new(tokio::sync::Mutex::new(RemoteRouter {
+            receivers: std::collections::HashMap::new(),
+        }));
 
         Self {
             own_node_id,
@@ -140,7 +139,7 @@ mod test {
             function_id: fid_target.function_id.clone(),
         };
 
-        let mut provider = RemoteLinkProvider::new(node_id.clone(), std::collections::HashMap::new()).await;
+        let mut provider = RemoteLinkProvider::new(node_id.clone()).await;
         let mut api = provider.incomming_api().await;
 
         let (sender_1, mut receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
@@ -218,7 +217,8 @@ mod test {
             own_node_id: node_id_2.clone(),
             events: api_sender_node_2,
         });
-        let provider = RemoteLinkProvider::new(node_id.clone(), std::collections::HashMap::from([(node_id_2.clone(), node_2_api)])).await;
+        let mut provider = RemoteLinkProvider::new(node_id.clone()).await;
+        provider.add_peer(node_id_2.clone(), node_2_api).await;
         // let mut api = provider.incomming_api().await;
 
         let (sender_1, _receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
