@@ -36,6 +36,12 @@ pub struct OrchestratorFunctionInstanceClient {
 
 impl OrchestratorFunctionInstanceClient {}
 
+pub struct ClientDesc {
+    agent_url: String,
+    invocation_url: String,
+    api: Box<dyn edgeless_api::agent::AgentAPI + Send>,
+}
+
 impl Orchestrator {
     pub fn new(node_settings: crate::EdgelessOrcSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
@@ -47,7 +53,7 @@ impl Orchestrator {
     }
 
     async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
-        let mut clients = HashMap::<uuid::Uuid, Box<dyn edgeless_api::agent::AgentAPI + Send>>::new();
+        let mut clients = HashMap::<uuid::Uuid, ClientDesc>::new();
         let mut receiver = receiver;
         let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy);
 
@@ -74,6 +80,7 @@ impl Orchestrator {
                             return;
                         }
                     }
+                    .api
                     .function_instance_api();
                     log::debug!("Orchestrator Spawn {:?} at worker node with node_id {:?}", spawn_req, selected_node_id);
 
@@ -104,7 +111,7 @@ impl Orchestrator {
                             log::error!("This orchestrator does not manage the node where this function instance {:?} is located! Please note that support for multiple orchestrators is not implemented yet!", stop_function_id);
                             return;
                         }
-                    }.function_instance_api();
+                    }.api.function_instance_api();
 
                     match fn_client.stop(stop_function_id).await {
                         Ok(_) => {}
@@ -122,7 +129,7 @@ impl Orchestrator {
                                 log::error!("This orchestrator does not manage the node where this function instance {:?} is located! Please note that support for multiple orchestrators is not implemented yet!", instance_id);
                                 return;
                             }
-                        }.function_instance_api();
+                        }.api.function_instance_api();
 
                         match fn_client.update_links(update).await {
                             Ok(_) => {}
@@ -139,36 +146,86 @@ impl Orchestrator {
                     // the UpdatePeersRequest message to be sent to all the
                     // clients to notify that a new node exists (Register) or
                     // that an existing node left the system (Deregister).
+                    let mut this_node_id = None;
                     let msg = match request {
                         UpdateNodeRequest::Registration(node_id, agent_url, invocation_url) => {
-                            clients.insert(node_id, Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&agent_url).await));
-                            UpdatePeersRequest::Add(node_id, invocation_url)
+                            let mut dup_entry = false;
+                            if let Some(client_desc) = clients.get(&node_id) {
+                                if client_desc.agent_url == agent_url && client_desc.invocation_url == invocation_url {
+                                    dup_entry = true;
+                                }
+                            }
+                            if dup_entry {
+                                // A client with same node_id, agent_url, and
+                                // invocation_url already exists.
+                                None
+                            } else {
+                                this_node_id = Some(node_id.clone());
+                                clients.insert(
+                                    node_id,
+                                    ClientDesc {
+                                        agent_url: agent_url.clone(),
+                                        invocation_url: invocation_url.clone(),
+                                        api: Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&agent_url).await),
+                                    },
+                                );
+                                Some(UpdatePeersRequest::Add(node_id, invocation_url))
+                            }
                         }
                         UpdateNodeRequest::Deregistration(node_id) => {
-                            clients.remove(&node_id);
-                            UpdatePeersRequest::Del(node_id)
+                            if let None = clients.get(&node_id) {
+                                // There is no client with that node_id
+                                None
+                            } else {
+                                clients.remove(&node_id);
+                                Some(UpdatePeersRequest::Del(node_id))
+                            }
                         }
                     };
 
-                    // Update the orchestration logic with the new set of nodes.
-                    orchestration_logic.update_nodes(clients.keys().cloned().collect());
+                    // If no operation was done (either a new node was already
+                    // present with same agent/invocation URLs or a deregistering
+                    // node did not exist) we accept the command.
+                    let mut response = edgeless_api::function_instance::UpdateNodeResponse::Accepted;
 
-                    // Update all the peers. This does not include the node
-                    // that has been removed above (Deregister).
-                    let mut num_failures: u32 = 0;
-                    for (_node_id, client) in clients.iter_mut() {
-                        if let Err(_) = client.function_instance_api().update_peers(msg.clone()).await {
-                            num_failures += 1;
+                    if let Some(msg) = msg {
+                        // Update the orchestration logic with the new set of nodes.
+                        orchestration_logic.update_nodes(clients.keys().cloned().collect());
+
+                        // Update all the peers (including the node, unless it
+                        // was a deregister operation).
+                        let mut num_failures: u32 = 0;
+                        for (_node_id, client) in clients.iter_mut() {
+                            if let Err(_) = client.api.function_instance_api().update_peers(msg.clone()).await {
+                                num_failures += 1;
+                            }
                         }
+
+                        // Only with registration, we also update the new node
+                        // by adding as peers all the existing nodes.
+                        if let Some(this_node_id) = this_node_id {
+                            let mut new_node_client = clients.get_mut(&this_node_id).unwrap().api.function_instance_api();
+                            for (other_node_id, client_desc) in clients.iter_mut() {
+                                if other_node_id.eq(&this_node_id) {
+                                    continue;
+                                }
+                                if let Err(_) = new_node_client
+                                    .update_peers(UpdatePeersRequest::Add(*other_node_id, client_desc.invocation_url.clone()))
+                                    .await
+                                {
+                                    num_failures += 1;
+                                }
+                            }
+                        }
+
+                        response = match num_failures {
+                            0 => edgeless_api::function_instance::UpdateNodeResponse::Accepted,
+                            _ => edgeless_api::function_instance::UpdateNodeResponse::ResponseError(edgeless_api::common::ResponseError {
+                                summary: "UpdatePeers() failed on some node when updating a node".to_string(),
+                                detail: None,
+                            }),
+                        };
                     }
-
-                    let response = match num_failures {
-                        0 => edgeless_api::function_instance::UpdateNodeResponse::Accepted,
-                        _ => edgeless_api::function_instance::UpdateNodeResponse::ResponseError(edgeless_api::common::ResponseError {
-                            summary: "UpdatePeers() failed on some node when updating a node".to_string(),
-                            detail: None,
-                        }),
-                    };
 
                     if let Err(err) = reply_channel.send(Ok(response)) {
                         log::error!("Orchestrator channel error in UPDATENODE: {:?}", err);
