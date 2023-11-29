@@ -201,7 +201,7 @@ impl DataplaneProvider {
     }
 
     pub async fn add_peer(&mut self, peer: EdgelessDataplanePeerSettings) {
-        log::info!("XXX add_peer {:?}", peer);
+        log::debug!("add_peer {:?}", peer);
         self.remote_provider
             .lock()
             .await
@@ -210,7 +210,7 @@ impl DataplaneProvider {
     }
 
     pub async fn del_peer(&mut self, node_id: uuid::Uuid) {
-        log::info!("XXX del_peer {:?}", node_id);
+        log::debug!("del_peer {:?}", node_id);
         self.remote_provider.lock().await.del_peer(node_id).await;
     }
 

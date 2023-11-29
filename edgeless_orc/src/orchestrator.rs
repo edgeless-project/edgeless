@@ -1,6 +1,6 @@
 use edgeless_api::function_instance::{SpawnFunctionResponse, UpdateNodeRequest, UpdatePeersRequest};
 use futures::{Future, SinkExt, StreamExt};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub struct Orchestrator {
     sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
@@ -17,6 +17,7 @@ enum OrchestratorRequest {
         edgeless_api::function_instance::UpdateNodeRequest,
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse>>,
     ),
+    KEEPALIVE(),
 }
 
 pub struct OrchestratorClient {
@@ -50,6 +51,10 @@ impl Orchestrator {
         });
 
         (Orchestrator { sender }, main_task)
+    }
+
+    pub async fn keep_alive(&mut self) {
+        let _ = self.sender.send(OrchestratorRequest::KEEPALIVE()).await;
     }
 
     async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
@@ -229,6 +234,43 @@ impl Orchestrator {
 
                     if let Err(err) = reply_channel.send(Ok(response)) {
                         log::error!("Orchestrator channel error in UPDATENODE: {:?}", err);
+                    }
+                }
+                OrchestratorRequest::KEEPALIVE() => {
+                    log::debug!("keep alive");
+
+                    // First check if there nodes that must be disconnected,
+                    // since they fail to reply to a keep-alive.
+                    let mut to_be_disconnected = HashSet::new();
+                    for (node_id, client_desc) in &mut clients {
+                        if let Err(_) = client_desc.api.function_instance_api().keep_alive().await {
+                            to_be_disconnected.insert(*node_id);
+                        }
+                    }
+
+                    // Second, remove all those nodes from the map of clients.
+                    for node_id in to_be_disconnected.iter() {
+                        log::info!("disconnect node not replying to keep alive: {}", &node_id);
+                        let val = clients.remove(&node_id);
+                        assert!(val.is_some());
+                    }
+
+                    // Finally, update the peers of (still alive) nodes by
+                    // deleting the missing-in-action peers.
+                    for removed_node_id in to_be_disconnected {
+                        for (_, client_desc) in clients.iter_mut() {
+                            match client_desc
+                                .api
+                                .function_instance_api()
+                                .update_peers(UpdatePeersRequest::Del(removed_node_id))
+                                .await
+                            {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    log::error!("Unhandled: {}", err);
+                                }
+                            }
+                        }
                     }
                 }
             }
