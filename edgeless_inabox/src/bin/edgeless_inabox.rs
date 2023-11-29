@@ -75,6 +75,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         port += 1;
         format!("http://127.0.0.1:{}", port)
     };
+    let controller_url = next_url();
 
     // At first generate endpoints for invocation_urls and orc_agent_urls
     let mut node_invocation_urls: HashMap<Uuid, String> = HashMap::new();
@@ -103,7 +104,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
 
     // Controller
     let con_conf = edgeless_con::EdgelessConSettings {
-        controller_url: next_url(),
+        controller_url: controller_url,
         // for now only one orchestrator
         orchestrators: vec![EdgelessConOrcConfig {
             domain_id: orc_conf.domain_id.clone(),
