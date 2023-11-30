@@ -21,16 +21,16 @@ impl crate::agent::AgentAPI for AgentAPIClient {
 pub struct AgentAPIServer {}
 
 impl AgentAPIServer {
-    pub fn run(agent_api: Box<dyn crate::agent::AgentAPI + Send>, listen_addr: String) -> futures::future::BoxFuture<'static, ()> {
+    pub fn run(agent_api: Box<dyn crate::agent::AgentAPI + Send>, agent_url: String) -> futures::future::BoxFuture<'static, ()> {
         let mut agent_api = agent_api;
         let function_api = FunctionInstanceAPIServer {
             root_api: tokio::sync::Mutex::new(agent_api.function_instance_api()),
         };
         Box::pin(async move {
             let function_api = function_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&listen_addr) {
+            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&agent_url) {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start AgentAPI GRPC Server");
+                    log::info!("Start AgentAPI GRPC Server at {}", agent_url);
 
                     match tonic::transport::Server::builder()
                         .add_service(

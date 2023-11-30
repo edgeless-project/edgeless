@@ -19,15 +19,16 @@ impl crate::orc::OrchestratorAPI for OrchestratorAPIClient {
 pub struct OrchestratorAPIServer {}
 
 impl OrchestratorAPIServer {
-    pub fn run(agent_api: Box<dyn crate::orc::OrchestratorAPI + Send>, listen_addr: String) -> futures::future::BoxFuture<'static, ()> {
+    pub fn run(agent_api: Box<dyn crate::orc::OrchestratorAPI + Send>, orchestrator_url: String) -> futures::future::BoxFuture<'static, ()> {
         let mut agent_api = agent_api;
         let function_api = crate::grpc_impl::function_instance::FunctionInstanceAPIServer {
             root_api: tokio::sync::Mutex::new(agent_api.function_instance_api()),
         };
         Box::pin(async move {
             let function_api = function_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&listen_addr) {
+            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&orchestrator_url) {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
+                    log::info!("Start OrchestratorAPIServer GRPC Server at {}", orchestrator_url);
                     match tonic::transport::Server::builder()
                         .add_service(
                             crate::grpc_impl::api::function_instance_server::FunctionInstanceServer::new(function_api)
