@@ -76,6 +76,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         format!("http://127.0.0.1:{}", port)
     };
     let controller_url = next_url();
+    let resource_configuration_url = next_url();
 
     // At first generate endpoints for invocation_urls and orc_agent_urls
     let mut node_invocation_urls: HashMap<Uuid, String> = HashMap::new();
@@ -91,8 +92,6 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     let bal_conf = edgeless_bal::EdgelessBalSettings {
         balancer_id: Uuid::new_v4(),
         invocation_url: next_url(),
-        resource_configuration_url: next_url(),
-        http_ingress_url: next_url(),
     };
 
     // Orchestrator
@@ -117,33 +116,33 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 resource_provider_id: "file-log-1".to_string(),
                 class_type: "file-log".to_string(),
                 outputs: vec![],
-                resource_configuration_url: bal_conf.resource_configuration_url.clone(),
+                resource_configuration_url: resource_configuration_url.clone(),
             },
             EdgelessConResourceConfig {
                 resource_provider_id: "http-ingress-1".to_string(),
                 class_type: "http-ingress".to_string(),
                 outputs: vec!["new_request".to_string()],
-                resource_configuration_url: bal_conf.resource_configuration_url.clone(),
+                resource_configuration_url: resource_configuration_url.clone(),
             },
             EdgelessConResourceConfig {
                 resource_provider_id: "http-egress-1".to_string(),
                 class_type: "http-egress".to_string(),
                 outputs: vec![],
-                resource_configuration_url: bal_conf.resource_configuration_url.clone(),
+                resource_configuration_url: resource_configuration_url.clone(),
             },
             EdgelessConResourceConfig {
                 resource_provider_id: "redis-1".to_string(),
                 class_type: "redis".to_string(),
                 outputs: vec![],
-                resource_configuration_url: bal_conf.resource_configuration_url.clone(),
+                resource_configuration_url: resource_configuration_url.clone(),
             },
         ],
     };
 
     // Nodes
-    // node peers: its own invocation_url, inv_url of balancer, invocation_urls
-    // of other nodes
+    // Only the first node gets resources
     let mut node_confs: Vec<EdgelessNodeSettings> = vec![];
+    let mut first_node = true;
     for node_id in node_invocation_urls.keys() {
         node_confs.push(EdgelessNodeSettings {
             node_id: node_id.clone(),
@@ -151,6 +150,14 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
             invocation_url: node_invocation_urls.get(node_id).expect("").clone(), // we are sure that it is there
             metrics_url: next_url(),
             orchestrator_url: orc_conf.orchestrator_url.clone(),
+            resource_configuration_url: match first_node {
+                true => {
+                    first_node = false;
+                    resource_configuration_url.clone()
+                }
+                false => "".to_string(),
+            },
+            http_ingress_url: next_url(),
         })
     }
 

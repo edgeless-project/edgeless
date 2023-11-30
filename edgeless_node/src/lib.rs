@@ -2,6 +2,7 @@ use edgeless_api::orc::OrchestratorAPI;
 use futures::join;
 
 pub mod agent;
+pub mod resources;
 pub mod runner_api;
 pub mod state_management;
 pub mod wasm_runner;
@@ -13,6 +14,8 @@ pub struct EdgelessNodeSettings {
     pub invocation_url: String,
     pub metrics_url: String,
     pub orchestrator_url: String,
+    pub resource_configuration_url: String,
+    pub http_ingress_url: String,
 }
 
 async fn register_node(settings: &EdgelessNodeSettings) {
@@ -40,11 +43,19 @@ async fn register_node(settings: &EdgelessNodeSettings) {
 pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     log::info!("Starting Edgeless Node");
     log::debug!("Settings: {:?}", settings);
+
+    // Create the state manager.
     let state_manager = Box::new(state_management::StateManager::new().await);
+
+    // Create the data plane.
     let data_plane = edgeless_dataplane::handle::DataplaneProvider::new(settings.node_id.clone(), settings.invocation_url.clone()).await;
+
+    // Create the telemetry provider.
     let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.metrics_url.clone())
         .await
         .expect(&format!("could not build the telemetry provider at URL {}", &settings.metrics_url));
+
+    // Create the WebAssembly runner.
     let (rust_runner_client, rust_runner_task) = wasm_runner::runner::Runner::new(
         data_plane.clone(),
         state_manager.clone(),
@@ -53,10 +64,59 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
             ("NODE_ID".to_string(), settings.node_id.to_string()),
         ]))),
     );
+
+    // Create the agent.
     let (mut agent, agent_task) = agent::Agent::new(Box::new(rust_runner_client.clone()), settings.clone(), data_plane.clone());
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.agent_url.clone());
 
-    join!(rust_runner_task, agent_task, agent_api_server, register_node(&settings));
+    // Create the resources, if needed.
+    let ingress = resources::http_ingress::ingress_task(
+        data_plane.clone(),
+        edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+        settings.http_ingress_url.clone(),
+    )
+    .await;
+
+    let egress = Box::new(
+        resources::http_egress::EgressResourceProvider::new(
+            data_plane.clone(),
+            edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+        )
+        .await,
+    );
+
+    let file_log = Box::new(
+        resources::file_log::FileLogResourceProvider::new(
+            data_plane.clone(),
+            edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+        )
+        .await,
+    );
+
+    let redis = Box::new(
+        resources::redis::RedisResourceProvider::new(
+            data_plane.clone(),
+            edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+        )
+        .await,
+    );
+
+    let multi_resouce_api = Box::new(edgeless_api::resource_configuration::MultiResouceConfigurationAPI::new(
+        std::collections::HashMap::<String, Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI>>::from([
+            ("http-ingress-1".to_string(), ingress),
+            ("http-egress-1".to_string(), egress),
+            ("file-log-1".to_string(), file_log),
+            ("redis-1".to_string(), redis),
+        ]),
+    ));
+
+    let api_server = edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationServer::run(
+        multi_resouce_api,
+        settings.resource_configuration_url.clone(),
+    );
+
+    // Wait for all the tasks to complete.
+    join!(rust_runner_task, agent_task, agent_api_server, api_server, register_node(&settings));
 }
 
 pub fn edgeless_node_default_conf() -> String {
@@ -66,6 +126,8 @@ agent_url = "http://127.0.0.1:7001"
 invocation_url = "http://127.0.0.1:7002"
 metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://127.0.0.1:7011"
+resource_configuration_url = "http://127.0.0.1:7033"
+http_ingress_url = "http://127.0.0.1:7035"
 "##,
     )
 }
