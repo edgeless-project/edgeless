@@ -151,14 +151,15 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
             metrics_url: next_url(),
             orchestrator_url: orc_conf.orchestrator_url.clone(),
             resource_configuration_url: match first_node {
-                true => {
-                    first_node = false;
-                    resource_configuration_url.clone()
-                }
+                true => resource_configuration_url.clone(),
                 false => "".to_string(),
             },
-            http_ingress_url: next_url(),
-        })
+            http_ingress_url: match first_node {
+                true => next_url(),
+                false => "".to_string(),
+            },
+        });
+        first_node = false;
     }
 
     // Save the config files to a hard-coded directory if its empty, to give

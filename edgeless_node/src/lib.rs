@@ -20,24 +20,88 @@ pub struct EdgelessNodeSettings {
 
 async fn register_node(settings: &EdgelessNodeSettings) {
     log::info!("Registering this node '{}' on e-ORC {}", &settings.node_id, &settings.orchestrator_url);
-    let mut orc_client = edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&settings.orchestrator_url).await;
-    match orc_client
-        .function_instance_api()
-        .update_node(edgeless_api::function_instance::UpdateNodeRequest::Registration(
-            settings.node_id.clone(),
-            settings.agent_url.clone(),
-            settings.invocation_url.clone(),
-        ))
-        .await
-    {
-        Ok(res) => match res {
-            edgeless_api::function_instance::UpdateNodeResponse::ResponseError(err) => panic!("could not register to e-ORC: {}", err),
-            edgeless_api::function_instance::UpdateNodeResponse::Accepted => {
-                log::info!("this node '{}' registered to e-ORC '{}'", &settings.node_id, &settings.orchestrator_url)
-            }
+    match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&settings.orchestrator_url, None).await {
+        Ok(mut orc_client) => match orc_client
+            .function_instance_api()
+            .update_node(edgeless_api::function_instance::UpdateNodeRequest::Registration(
+                settings.node_id.clone(),
+                settings.agent_url.clone(),
+                settings.invocation_url.clone(),
+            ))
+            .await
+        {
+            Ok(res) => match res {
+                edgeless_api::function_instance::UpdateNodeResponse::ResponseError(err) => {
+                    panic!("could not register to e-ORC {}: {}", &settings.orchestrator_url, err)
+                }
+                edgeless_api::function_instance::UpdateNodeResponse::Accepted => {
+                    log::info!("this node '{}' registered to e-ORC '{}'", &settings.node_id, &settings.orchestrator_url)
+                }
+            },
+            Err(err) => panic!("channel error when registering to e-ORC {}: {}", &settings.orchestrator_url, err),
         },
-        Err(err) => panic!("channel error when registering to e-ORC: {}", err),
+        Err(err) => panic!("could not connect to e-ORC {}: {}", &settings.orchestrator_url, err),
     }
+}
+
+async fn fill_resources(
+    data_plane: edgeless_dataplane::handle::DataplaneProvider,
+    settings: &EdgelessNodeSettings,
+) -> std::collections::HashMap<String, Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI>> {
+    let mut ret = std::collections::HashMap::<String, Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI>>::new();
+
+    if !settings.resource_configuration_url.is_empty() {
+        if !settings.http_ingress_url.is_empty() {
+            log::info!("Creating resource 'http-ingress-1' at {}", &settings.http_ingress_url);
+            ret.insert(
+                "http-ingress-1".to_string(),
+                resources::http_ingress::ingress_task(
+                    data_plane.clone(),
+                    edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+                    settings.http_ingress_url.clone(),
+                )
+                .await,
+            );
+        }
+
+        log::info!("Creating resource 'http-egress-1'");
+        ret.insert(
+            "http-egress-1".to_string(),
+            Box::new(
+                resources::http_egress::EgressResourceProvider::new(
+                    data_plane.clone(),
+                    edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+                )
+                .await,
+            ),
+        );
+
+        log::info!("Creating resource 'file-log-1'");
+        ret.insert(
+            "file-log-1".to_string(),
+            Box::new(
+                resources::file_log::FileLogResourceProvider::new(
+                    data_plane.clone(),
+                    edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+                )
+                .await,
+            ),
+        );
+
+        log::info!("Creating resource 'redis-1'");
+        ret.insert(
+            "redis-1".to_string(),
+            Box::new(
+                resources::redis::RedisResourceProvider::new(
+                    data_plane.clone(),
+                    edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+                )
+                .await,
+            ),
+        );
+    }
+
+    ret
 }
 
 pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
@@ -69,60 +133,28 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let (mut agent, agent_task) = agent::Agent::new(Box::new(rust_runner_client.clone()), settings.clone(), data_plane.clone());
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.agent_url.clone());
 
-    // Create the resources, if needed.
-    let ingress = resources::http_ingress::ingress_task(
-        data_plane.clone(),
-        edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
-        settings.http_ingress_url.clone(),
-    )
-    .await;
-
-    let egress = Box::new(
-        resources::http_egress::EgressResourceProvider::new(
-            data_plane.clone(),
-            edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
-        )
-        .await,
-    );
-
-    let file_log = Box::new(
-        resources::file_log::FileLogResourceProvider::new(
-            data_plane.clone(),
-            edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
-        )
-        .await,
-    );
-
-    let redis = Box::new(
-        resources::redis::RedisResourceProvider::new(
-            data_plane.clone(),
-            edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
-        )
-        .await,
-    );
-
-    let multi_resouce_api = Box::new(edgeless_api::resource_configuration::MultiResouceConfigurationAPI::new(
-        std::collections::HashMap::<String, Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI>>::from([
-            ("http-ingress-1".to_string(), ingress),
-            ("http-egress-1".to_string(), egress),
-            ("file-log-1".to_string(), file_log),
-            ("redis-1".to_string(), redis),
-        ]),
-    ));
-
-    let api_server = edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationServer::run(
-        multi_resouce_api,
+    // Create the resources.
+    let resource_api_server = edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationServer::run(
+        Box::new(edgeless_api::resource_configuration::MultiResouceConfigurationAPI::new(
+            fill_resources(data_plane, &settings).await,
+        )),
         settings.resource_configuration_url.clone(),
     );
 
     // Wait for all the tasks to complete.
-    join!(rust_runner_task, agent_task, agent_api_server, api_server, register_node(&settings));
+    join!(
+        rust_runner_task,
+        agent_task,
+        agent_api_server,
+        resource_api_server,
+        register_node(&settings)
+    );
 }
 
 pub fn edgeless_node_default_conf() -> String {
     String::from(
         r##"node_id = "fda6ce79-46df-4f96-a0d2-456f720f606c"
-agent_url = "http://127.0.0.1:7001"
+agent_url = "http://127.0.0.1:7021"
 invocation_url = "http://127.0.0.1:7002"
 metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://127.0.0.1:7011"

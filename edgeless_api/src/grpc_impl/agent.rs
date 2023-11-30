@@ -7,7 +7,11 @@ pub struct AgentAPIClient {
 impl AgentAPIClient {
     pub async fn new(api_addr: &str) -> Self {
         Self {
-            function_instance_client: Box::new(crate::grpc_impl::function_instance::FunctionInstanceAPIClient::new(api_addr).await),
+            function_instance_client: Box::new(
+                crate::grpc_impl::function_instance::FunctionInstanceAPIClient::new(api_addr, Some(1))
+                    .await
+                    .unwrap(),
+            ),
         }
     }
 }

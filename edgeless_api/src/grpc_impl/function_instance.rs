@@ -313,16 +313,19 @@ pub struct FunctionInstanceAPIClient {
 }
 
 impl FunctionInstanceAPIClient {
-    pub async fn new(server_addr: &str) -> Self {
+    pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
         loop {
             match crate::grpc_impl::api::function_instance_client::FunctionInstanceClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    return Self { client };
+                    return Ok(Self { client });
                 }
-                Err(_) => {
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                }
+                Err(err) => match retry_interval {
+                    Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
+                    None => {
+                        return Err(anyhow::anyhow!("Error when connecting to {}: {}", server_addr, err));
+                    }
+                },
             }
         }
     }

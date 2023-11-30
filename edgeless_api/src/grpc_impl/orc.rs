@@ -3,9 +3,12 @@ pub struct OrchestratorAPIClient {
 }
 
 impl OrchestratorAPIClient {
-    pub async fn new(api_addr: &str) -> Self {
-        Self {
-            function_instance_client: Box::new(crate::grpc_impl::function_instance::FunctionInstanceAPIClient::new(api_addr).await),
+    pub async fn new(api_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
+        match crate::grpc_impl::function_instance::FunctionInstanceAPIClient::new(api_addr, retry_interval).await {
+            Ok(val) => Ok(Self {
+                function_instance_client: Box::new(val),
+            }),
+            Err(err) => Err(err),
         }
     }
 }
