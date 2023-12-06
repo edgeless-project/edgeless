@@ -3,10 +3,8 @@ use std::{collections::HashMap, path::Path};
 use anyhow::anyhow;
 use clap::Parser;
 use edgeless_con::{EdgelessConOrcConfig, EdgelessConResourceConfig};
-use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
 use edgeless_inabox::InABoxConfig;
 use edgeless_node::EdgelessNodeSettings;
-use edgeless_orc::EdgelessOrcNodeConfig;
 use std::fs;
 use uuid::Uuid;
 
@@ -77,6 +75,8 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         port += 1;
         format!("http://127.0.0.1:{}", port)
     };
+    let controller_url = next_url();
+    let resource_configuration_url = next_url();
 
     // At first generate endpoints for invocation_urls and orc_agent_urls
     let mut node_invocation_urls: HashMap<Uuid, String> = HashMap::new();
@@ -92,65 +92,19 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     let bal_conf = edgeless_bal::EdgelessBalSettings {
         balancer_id: Uuid::new_v4(),
         invocation_url: next_url(),
-        resource_configuration_url: next_url(),
-        http_ingress_url: next_url(),
-        // filled with all values from the node_invocation_urls
-        nodes: node_invocation_urls
-            .iter()
-            .map(|(key, value)| EdgelessDataplanePeerSettings {
-                id: key.clone(),
-                invocation_url: value.clone(),
-            })
-            .collect(),
     };
-
-    // Nodes
-    // node peers: its own invocation_url, inv_url of balancer, invocation_urls
-    // of other nodes
-    let mut node_confs: Vec<EdgelessNodeSettings> = vec![];
-    let node_peers: Vec<EdgelessDataplanePeerSettings> = node_invocation_urls
-        .iter()
-        .map(|(key, value)| EdgelessDataplanePeerSettings {
-            id: key.clone(),
-            invocation_url: value.clone(),
-        })
-        .collect();
-    for node_id in node_invocation_urls.keys() {
-        let mut peers: Vec<EdgelessDataplanePeerSettings> = vec![
-            // peer for the balancer
-            EdgelessDataplanePeerSettings {
-                id: bal_conf.balancer_id.clone(),
-                invocation_url: bal_conf.invocation_url.clone(),
-            },
-        ];
-        peers.extend(node_peers.clone());
-        node_confs.push(EdgelessNodeSettings {
-            node_id: node_id.clone(),
-            agent_url: node_orc_agent_urls.get(node_id).expect("").clone(), // we are sure that it is there
-            invocation_url: node_invocation_urls.get(node_id).expect("").clone(), // we are sure that it is there
-            metrics_url: next_url(),
-            peers,
-        })
-    }
 
     // Orchestrator
     let orc_conf = edgeless_orc::EdgelessOrcSettings {
         domain_id: "domain-1".to_string(),
         orchestrator_url: next_url(),
-        // filled with all values from the node_orc_agent_urls
-        nodes: node_orc_agent_urls
-            .iter()
-            .map(|(key, value)| EdgelessOrcNodeConfig {
-                node_id: key.clone(),
-                agent_url: value.clone(),
-            })
-            .collect(),
         orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
+        keep_alive_interval_secs: 2,
     };
 
     // Controller
     let con_conf = edgeless_con::EdgelessConSettings {
-        controller_url: next_url(),
+        controller_url: controller_url,
         // for now only one orchestrator
         orchestrators: vec![EdgelessConOrcConfig {
             domain_id: orc_conf.domain_id.clone(),
@@ -162,28 +116,51 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 resource_provider_id: "file-log-1".to_string(),
                 class_type: "file-log".to_string(),
                 outputs: vec![],
-                resource_configuration_url: bal_conf.resource_configuration_url.clone(),
+                resource_configuration_url: resource_configuration_url.clone(),
             },
             EdgelessConResourceConfig {
                 resource_provider_id: "http-ingress-1".to_string(),
                 class_type: "http-ingress".to_string(),
                 outputs: vec!["new_request".to_string()],
-                resource_configuration_url: bal_conf.resource_configuration_url.clone(),
+                resource_configuration_url: resource_configuration_url.clone(),
             },
             EdgelessConResourceConfig {
                 resource_provider_id: "http-egress-1".to_string(),
                 class_type: "http-egress".to_string(),
                 outputs: vec![],
-                resource_configuration_url: bal_conf.resource_configuration_url.clone(),
+                resource_configuration_url: resource_configuration_url.clone(),
             },
             EdgelessConResourceConfig {
                 resource_provider_id: "redis-1".to_string(),
                 class_type: "redis".to_string(),
                 outputs: vec![],
-                resource_configuration_url: bal_conf.resource_configuration_url.clone(),
+                resource_configuration_url: resource_configuration_url.clone(),
             },
         ],
     };
+
+    // Nodes
+    // Only the first node gets resources
+    let mut node_confs: Vec<EdgelessNodeSettings> = vec![];
+    let mut first_node = true;
+    for node_id in node_invocation_urls.keys() {
+        node_confs.push(EdgelessNodeSettings {
+            node_id: node_id.clone(),
+            agent_url: node_orc_agent_urls.get(node_id).expect("").clone(), // we are sure that it is there
+            invocation_url: node_invocation_urls.get(node_id).expect("").clone(), // we are sure that it is there
+            metrics_url: next_url(),
+            orchestrator_url: orc_conf.orchestrator_url.clone(),
+            resource_configuration_url: match first_node {
+                true => resource_configuration_url.clone(),
+                false => "".to_string(),
+            },
+            http_ingress_url: match first_node {
+                true => next_url(),
+                false => "".to_string(),
+            },
+        });
+        first_node = false;
+    }
 
     // Save the config files to a hard-coded directory if its empty, to give
     // users reference on how the cluster is configured

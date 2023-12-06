@@ -57,10 +57,14 @@ impl Controller {
 
         // Connect to all orchestrators in the orchestration domain
         for orc in &controller_settings.orchestrators {
-            orc_clients.insert(
-                orc.domain_id.to_string(),
-                Box::new(edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&orc.orchestrator_url).await),
-            );
+            match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&orc.orchestrator_url, Some(1)).await {
+                Ok(val) => {
+                    orc_clients.insert(orc.domain_id.to_string(), Box::new(val));
+                }
+                Err(err) => {
+                    log::error!("Could not connect to e-ORC {}: {}", &orc.orchestrator_url, err);
+                }
+            }
         }
 
         // Prepare all resources defined for this controller

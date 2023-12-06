@@ -35,7 +35,7 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
 
 pub fn edgeless_con_default_conf() -> String {
     String::from(
-        r##"controller_url = "http://127.0.0.1:7021"
+        r##"controller_url = "http://127.0.0.1:7001"
 orchestrators = [
     { domain_id = "domain-1", orchestrator_url="http://127.0.0.1:7011" }
 ]

@@ -12,9 +12,9 @@ message InstanceId {
 
 // Consistency model of state.
 enum StatePolicy {
-   TRANSIENT = 0;
+   TRANSIENT  = 0;
    NODE_LOCAL = 1;
-   GLOBAL = 2;
+   GLOBAL     = 2;
 }
 
 // State specification.
@@ -53,7 +53,7 @@ message SpawnFunctionRequest {
     StateSpecification state_specification = 6;
 }
 
-// Message to request the creation a new function instance.
+// Response message to the creation a new function instance.
 message SpawnFunctionResponse {
     // If present it means that the request has been rejected.
     // In this case, other fields may not be present or contain meaningful data.
@@ -61,6 +61,54 @@ message SpawnFunctionResponse {
 
     // The identifier of the newly-spawned function instance, if accepted.
     optional InstanceId instance_id = 2;
+}
+
+// Possible message types of FunctionInstance::UpdateNode().
+enum UpdateNodeRequestType {
+    REGISTER   = 0;
+    DEREGISTER = 1;
+}
+
+// Request message of FunctionInstance::UpdateNode().
+message UpdateNodeRequest {
+    // Request type: registration or deregistration. Always present.
+    UpdateNodeRequestType request_type = 1;
+    // Identifier of the node that is entering/leaving the orchestration domain.
+    // This field must be always present.
+    string node_id                     = 2;
+    // URL of the node's agent server. Always present if REGISTER type.
+    optional string agent_url          = 3;
+    // URL of the node's invocation server. Always present if REGISTER type.
+    optional string invocation_url     = 4;
+}
+
+// Response message of FunctionInstance::UpdateNode().
+message UpdateNodeResponse {
+    // If present it means that the request has been rejected.
+    // In this case, other fields may not be present or contain meaningful data.
+    optional ResponseError response_error = 1;
+}
+
+// Possible message type of FunctionInstance::UpdatePeersRequest().
+enum UpdatePeersRequestType {
+    ADD   = 0; // add one peer
+    DEL   = 1; // delete one peer
+    CLEAR = 2; // delete all peers
+}
+
+// Request message of FunctionInstance::UpdatePeersRequest().
+message UpdatePeersRequest {
+    // Request type. Always present.
+    UpdatePeersRequestType request_type = 1;
+    // Identifier of the peer node. Always present, unless type is CLEAR.
+    optional string node_id             = 2;
+    // URL of the peer node's invocation server. Always present if ADD type.
+    optional string invocation_url      = 3;
+}
+
+// Response message of FunctionInstance::KeepAlive().
+message HealthStatus {
+    // health status info to be added (include node/service monitoring?)
 }
 
 // Message to request the update of a function instance.
@@ -146,15 +194,15 @@ message WorkflowInstanceList {
 // Event types.
 enum EventType {
     // Function invocation for which a return value is expected.
-    CALL = 0;
+    CALL        = 0;
     // Function invocation for which no return is expected.
-    CAST = 1;
+    CAST        = 1;
     // Return value of a function invocation, with data.
-    CALL_RET = 2;
+    CALL_RET    = 2;
     // Return value of a function invocation, without any data.
     CALL_NO_RET = 3;
     // Error return type.
-    ERR = 4;
+    ERR         = 4;
 }
 
 // Data associated to an event.
