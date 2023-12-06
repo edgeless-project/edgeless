@@ -19,16 +19,16 @@ impl crate::controller::ControllerAPI for ControllerAPIClient {
 pub struct WorkflowInstanceAPIServer {}
 
 impl WorkflowInstanceAPIServer {
-    pub fn run(controller_api: Box<dyn crate::controller::ControllerAPI + Send>, listen_addr: String) -> futures::future::BoxFuture<'static, ()> {
+    pub fn run(controller_api: Box<dyn crate::controller::ControllerAPI + Send>, controller_url: String) -> futures::future::BoxFuture<'static, ()> {
         let mut controller_api = controller_api;
         let workflow_api = crate::grpc_impl::workflow_instance::WorkflowInstanceAPIServer {
             root_api: tokio::sync::Mutex::new(controller_api.workflow_instance_api()),
         };
         Box::pin(async move {
             let workflow_api = workflow_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&listen_addr) {
+            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&controller_url) {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start ControllerAPI GRPC Server");
+                    log::info!("Start ControllerAPI GRPC Server at {}", controller_url);
 
                     match tonic::transport::Server::builder()
                         .add_service(

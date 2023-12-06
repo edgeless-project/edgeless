@@ -176,16 +176,16 @@ pub struct ResourceConfigurationServer {}
 impl ResourceConfigurationServer {
     pub fn run(
         root_api: Box<dyn crate::resource_configuration::ResourceConfigurationAPI>,
-        listen_addr: String,
+        resource_configuration_url: String,
     ) -> futures::future::BoxFuture<'static, ()> {
         let function_api = crate::grpc_impl::resource_configuration::ResourceConfigurationServerHandler {
             root_api: tokio::sync::Mutex::new(root_api),
         };
         Box::pin(async move {
             let function_api = function_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&listen_addr) {
+            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&resource_configuration_url) {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start ResourceConfiguration GRPC Server");
+                    log::info!("Start ResourceConfiguration GRPC Server at {}", resource_configuration_url);
                     match tonic::transport::Server::builder()
                         .add_service(
                             crate::grpc_impl::api::resource_configuration_server::ResourceConfigurationServer::new(function_api)

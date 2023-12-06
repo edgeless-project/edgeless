@@ -121,16 +121,16 @@ impl crate::grpc_impl::api::function_invocation_server::FunctionInvocation for I
 pub struct InvocationAPIServer {}
 
 impl InvocationAPIServer {
-    pub fn run(data_plane: Box<dyn crate::invocation::InvocationAPI>, listen_addr: String) -> futures::future::BoxFuture<'static, ()> {
+    pub fn run(data_plane: Box<dyn crate::invocation::InvocationAPI>, invocation_url: String) -> futures::future::BoxFuture<'static, ()> {
         let data_plane = data_plane;
         let function_api = crate::grpc_impl::invocation::InvocationAPIServerHandler {
             root_api: tokio::sync::Mutex::new(data_plane),
         };
         Box::pin(async move {
             let function_api = function_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&listen_addr) {
+            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&invocation_url) {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start InvocationAPI GRPC Server");
+                    log::info!("Start InvocationAPI GRPC Server at {}", invocation_url);
                     match tonic::transport::Server::builder()
                         .add_service(
                             crate::grpc_impl::api::function_invocation_server::FunctionInvocationServer::new(function_api)

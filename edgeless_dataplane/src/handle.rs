@@ -165,10 +165,8 @@ pub struct DataplaneProvider {
 }
 
 impl DataplaneProvider {
-    pub async fn new(node_id: uuid::Uuid, invocation_url: String, peers: Vec<EdgelessDataplanePeerSettings>) -> Self {
-        let remote_provider = std::sync::Arc::new(tokio::sync::Mutex::new(
-            RemoteLinkProvider::new(node_id, std::collections::HashMap::new()).await,
-        ));
+    pub async fn new(node_id: uuid::Uuid, invocation_url: String) -> Self {
+        let remote_provider = std::sync::Arc::new(tokio::sync::Mutex::new(RemoteLinkProvider::new(node_id).await));
 
         let (_, _, port) = edgeless_api::util::parse_http_host(&invocation_url.clone()).unwrap();
 
@@ -185,14 +183,9 @@ impl DataplaneProvider {
             std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
         ));
 
-        for peer in peers {
-            let (id, api) = Self::connect_peer(&peer).await;
-            remote_provider.lock().await.add_peer(id, api).await;
-        }
-
         Self {
             local_provider: std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalLinkProvider::new())),
-            remote_provider: remote_provider,
+            remote_provider,
         }
     }
 
@@ -205,21 +198,27 @@ impl DataplaneProvider {
         DataplaneHandle::new(target, output_chain, receiver).await
     }
 
-    async fn connect_peer(
-        target: &EdgelessDataplanePeerSettings,
-    ) -> (edgeless_api::function_instance::NodeId, Box<dyn edgeless_api::invocation::InvocationAPI>) {
-        let (proto, url, port) = edgeless_api::util::parse_http_host(&target.invocation_url).unwrap();
+    pub async fn add_peer(&mut self, peer: EdgelessDataplanePeerSettings) {
+        log::debug!("add_peer {:?}", peer);
+        self.remote_provider
+            .lock()
+            .await
+            .add_peer(peer.node_id, Self::connect_peer(&peer).await)
+            .await;
+    }
 
-        if proto == edgeless_api::util::Proto::COAP {
-            (
-                target.id.clone(),
-                Box::new(edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port)).await),
-            )
-        } else {
-            (
-                target.id.clone(),
-                Box::new(edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&target.invocation_url).await),
-            )
+    pub async fn del_peer(&mut self, node_id: uuid::Uuid) {
+        log::debug!("del_peer {:?}", node_id);
+        self.remote_provider.lock().await.del_peer(node_id).await;
+    }
+
+    async fn connect_peer(target: &EdgelessDataplanePeerSettings) -> Box<dyn edgeless_api::invocation::InvocationAPI> {
+        let (proto, url, port) = edgeless_api::util::parse_http_host(&target.invocation_url).unwrap();
+        match proto {
+            edgeless_api::util::Proto::COAP => {
+                Box::new(edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port)).await)
+            }
+            _ => Box::new(edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&target.invocation_url).await),
         }
     }
 }
@@ -234,7 +233,7 @@ mod test {
         let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
         let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
 
-        let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7096".to_string(), vec![]).await;
+        let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7096".to_string()).await;
 
         let mut handle_1 = provider.get_handle_for(fid_1.clone()).await;
         let mut handle_2 = provider.get_handle_for(fid_2.clone()).await;
@@ -254,7 +253,7 @@ mod test {
         let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
         let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
 
-        let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7097".to_string(), vec![]).await;
+        let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7097".to_string()).await;
 
         let mut handle_1 = provider.get_handle_for(fid_1.clone()).await;
         let mut handle_2 = provider.get_handle_for(fid_2.clone()).await;
@@ -280,23 +279,27 @@ mod test {
         let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
         let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id_2.clone());
 
-        let provider1_f = tokio::spawn(DataplaneProvider::new(
-            node_id.clone(),
-            "http://127.0.0.1:7099".to_string(),
-            vec![EdgelessDataplanePeerSettings {
-                id: node_id_2.clone(),
-                invocation_url: "http://127.0.0.1:7098".to_string(),
-            }],
-        ));
+        let provider1_f = tokio::spawn(async move {
+            let mut dataplane = DataplaneProvider::new(node_id.clone(), "http://127.0.0.1:7099".to_string()).await;
+            dataplane
+                .add_peer(EdgelessDataplanePeerSettings {
+                    node_id: node_id_2.clone(),
+                    invocation_url: "http://127.0.0.1:7098".to_string(),
+                })
+                .await;
+            dataplane
+        });
 
-        let provider2_f = tokio::spawn(DataplaneProvider::new(
-            node_id_2.clone(),
-            "http://127.0.0.1:7098".to_string(),
-            vec![EdgelessDataplanePeerSettings {
-                id: node_id.clone(),
-                invocation_url: "http://127.0.0.1:7099".to_string(),
-            }],
-        ));
+        let provider2_f = tokio::spawn(async move {
+            let mut dataplane = DataplaneProvider::new(node_id_2.clone(), "http://127.0.0.1:7098".to_string()).await;
+            dataplane
+                .add_peer(EdgelessDataplanePeerSettings {
+                    node_id: node_id.clone(),
+                    invocation_url: "http://127.0.0.1:7099".to_string(),
+                })
+                .await;
+            dataplane
+        });
 
         // This test got stuck during initial testing. I suspect that this was due to the use of common ports across the testsuite
         // but the timeouts should prevent it from blocking the entire testsuite if that was not the reason (timeout will lead to failure).

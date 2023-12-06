@@ -53,7 +53,7 @@ struct CLiConfig {
 }
 
 pub fn edgeless_cli_default_conf() -> String {
-    String::from("controller_url = \"http://127.0.0.1:7021\"")
+    String::from("controller_url = \"http://127.0.0.1:7001\"")
 }
 
 #[tokio::main]

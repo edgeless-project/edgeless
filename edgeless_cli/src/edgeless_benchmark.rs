@@ -14,7 +14,7 @@ use std::time;
 #[command(long_about = None)]
 struct Args {
     /// URL of the controller
-    #[arg(short, long, default_value_t = String::from("http://127.0.0.1:7021"))]
+    #[arg(short, long, default_value_t = String::from("http://127.0.0.1:7001"))]
     controller_url: String,
     /// Duration of the benchmarking experiment, in s
     #[arg(short, long, default_value_t = 30.0)]

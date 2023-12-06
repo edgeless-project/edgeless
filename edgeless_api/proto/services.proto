@@ -10,18 +10,40 @@ service FunctionInstance {
     // Start a new function instance.
     // Input: request containing the description of the function to create.
     // Output: the function instance identifier assigned, if accepted.
+    // Implemented by: e-ORC, node.
     rpc Start (SpawnFunctionRequest) returns (SpawnFunctionResponse);
     
     // Stop a running function instance.
     // Input: the identifier of the function instance to tear down.
     // Output: none.
+    // Implemented by: e-ORC, node.
     rpc Stop (InstanceId) returns (google.protobuf.Empty );
 
     // Update a running function instance by changing the mapping between the
     // callback declarations and function instances.
     // Input: the update mapping.
     // Output: none.
+    // Implemented by: e-ORC, node.
     rpc UpdateLinks (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
+
+    // Register a new node on an orchestrator or deregister an existing node.
+    // Input: registration: identifier of the new node and agent/invocation URLs;
+    // deregistration: identifier of the existing node to be deregistered.
+    // Output: UpdateNodeResponse.
+    // Implemented by: e-ORC.
+    rpc UpdateNode (UpdateNodeRequest) returns (UpdateNodeResponse);
+
+    // Update the dataplane of a node by adding/removing peers.
+    // Input: the node identifier and invocation URL (only for add operations).
+    // Output: none.
+    // Implemented by: node.
+    rpc UpdatePeers (UpdatePeersRequest) returns (google.protobuf.Empty);
+
+    // Check if the component is still alive.
+    // Input: none.
+    // Output: health status information.
+    // Implemented by: e-ORC, node.
+    rpc KeepAlive (google.protobuf.Empty) returns (HealthStatus);
 }
 
 // API to manage the lifecycle of workflow instances (s04).

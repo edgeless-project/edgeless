@@ -1,6 +1,6 @@
-use edgeless_api::function_instance::SpawnFunctionResponse;
+use edgeless_api::function_instance::{SpawnFunctionResponse, UpdateNodeRequest, UpdatePeersRequest};
 use futures::{Future, SinkExt, StreamExt};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 pub struct Orchestrator {
     sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
@@ -12,7 +12,12 @@ enum OrchestratorRequest {
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse>>,
     ),
     STOP(edgeless_api::function_instance::InstanceId),
-    UPDATE(edgeless_api::function_instance::UpdateFunctionLinksRequest),
+    UPDATELINKS(edgeless_api::function_instance::UpdateFunctionLinksRequest),
+    UPDATENODE(
+        edgeless_api::function_instance::UpdateNodeRequest,
+        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse>>,
+    ),
+    KEEPALIVE(),
 }
 
 pub struct OrchestratorClient {
@@ -32,6 +37,12 @@ pub struct OrchestratorFunctionInstanceClient {
 
 impl OrchestratorFunctionInstanceClient {}
 
+pub struct ClientDesc {
+    agent_url: String,
+    invocation_url: String,
+    api: Box<dyn edgeless_api::agent::AgentAPI + Send>,
+}
+
 impl Orchestrator {
     pub fn new(node_settings: crate::EdgelessOrcSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
@@ -42,25 +53,14 @@ impl Orchestrator {
         (Orchestrator { sender }, main_task)
     }
 
-    async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
-        log::info!("Main_task started!");
-        let mut clients = HashMap::<uuid::Uuid, Box<dyn edgeless_api::agent::AgentAPI + Send>>::new();
-        // Goes through the list of all worker nodes in this orchestration
-        // domain and creates AgentAPIClient objects for them that will be used
-        // to control them
-        for node in &orchestrator_settings.nodes {
-            clients.insert(
-                node.node_id,
-                Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&node.agent_url).await),
-            );
-        }
-        let mut receiver = receiver;
+    pub async fn keep_alive(&mut self) {
+        let _ = self.sender.send(OrchestratorRequest::KEEPALIVE()).await;
+    }
 
-        // Initializes the OrchestrationLogic
-        let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(
-            Some(orchestrator_settings.orchestration_strategy),
-            clients.keys().cloned().collect(),
-        );
+    async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
+        let mut clients = HashMap::<uuid::Uuid, ClientDesc>::new();
+        let mut receiver = receiver;
+        let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy);
 
         // Main loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
@@ -85,6 +85,7 @@ impl Orchestrator {
                             return;
                         }
                     }
+                    .api
                     .function_instance_api();
                     log::debug!("Orchestrator Spawn {:?} at worker node with node_id {:?}", spawn_req, selected_node_id);
 
@@ -103,8 +104,8 @@ impl Orchestrator {
                             Err(anyhow::anyhow!("Orchestrator->Node Spawn Request failed"))
                         }
                     };
-                    if let Err(_) = reply_channel.send(res) {
-                        log::error!("Orchestrator Reply Channel Error");
+                    if let Err(err) = reply_channel.send(res) {
+                        log::error!("Orchestrator channel error in SPAWN: {:?}", err);
                     }
                 }
                 OrchestratorRequest::STOP(stop_function_id) => {
@@ -115,7 +116,7 @@ impl Orchestrator {
                             log::error!("This orchestrator does not manage the node where this function instance {:?} is located! Please note that support for multiple orchestrators is not implemented yet!", stop_function_id);
                             return;
                         }
-                    }.function_instance_api();
+                    }.api.function_instance_api();
 
                     match fn_client.stop(stop_function_id).await {
                         Ok(_) => {}
@@ -124,7 +125,7 @@ impl Orchestrator {
                         }
                     };
                 }
-                OrchestratorRequest::UPDATE(update) => {
+                OrchestratorRequest::UPDATELINKS(update) => {
                     log::debug!("Orchestrator Update {:?}", update);
                     if let Some(instance_id) = update.clone().instance_id {
                         let mut fn_client = match clients.get_mut(&instance_id.node_id) {
@@ -133,7 +134,7 @@ impl Orchestrator {
                                 log::error!("This orchestrator does not manage the node where this function instance {:?} is located! Please note that support for multiple orchestrators is not implemented yet!", instance_id);
                                 return;
                             }
-                        }.function_instance_api();
+                        }.api.function_instance_api();
 
                         match fn_client.update_links(update).await {
                             Ok(_) => {}
@@ -143,6 +144,133 @@ impl Orchestrator {
                         };
                     } else {
                         log::error!("A request to an orchestrator to update links must contain a valid InstanceId!");
+                    }
+                }
+                OrchestratorRequest::UPDATENODE(request, reply_channel) => {
+                    // Update the map of clients and, at the same time, prepare
+                    // the UpdatePeersRequest message to be sent to all the
+                    // clients to notify that a new node exists (Register) or
+                    // that an existing node left the system (Deregister).
+                    let mut this_node_id = None;
+                    let msg = match request {
+                        UpdateNodeRequest::Registration(node_id, agent_url, invocation_url) => {
+                            let mut dup_entry = false;
+                            if let Some(client_desc) = clients.get(&node_id) {
+                                if client_desc.agent_url == agent_url && client_desc.invocation_url == invocation_url {
+                                    dup_entry = true;
+                                }
+                            }
+                            if dup_entry {
+                                // A client with same node_id, agent_url, and
+                                // invocation_url already exists.
+                                None
+                            } else {
+                                this_node_id = Some(node_id.clone());
+                                clients.insert(
+                                    node_id,
+                                    ClientDesc {
+                                        agent_url: agent_url.clone(),
+                                        invocation_url: invocation_url.clone(),
+                                        api: Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&agent_url).await),
+                                    },
+                                );
+                                Some(UpdatePeersRequest::Add(node_id, invocation_url))
+                            }
+                        }
+                        UpdateNodeRequest::Deregistration(node_id) => {
+                            if let None = clients.get(&node_id) {
+                                // There is no client with that node_id
+                                None
+                            } else {
+                                clients.remove(&node_id);
+                                Some(UpdatePeersRequest::Del(node_id))
+                            }
+                        }
+                    };
+
+                    // If no operation was done (either a new node was already
+                    // present with same agent/invocation URLs or a deregistering
+                    // node did not exist) we accept the command.
+                    let mut response = edgeless_api::function_instance::UpdateNodeResponse::Accepted;
+
+                    if let Some(msg) = msg {
+                        // Update the orchestration logic with the new set of nodes.
+                        orchestration_logic.update_nodes(clients.keys().cloned().collect());
+
+                        // Update all the peers (including the node, unless it
+                        // was a deregister operation).
+                        let mut num_failures: u32 = 0;
+                        for (_node_id, client) in clients.iter_mut() {
+                            if let Err(_) = client.api.function_instance_api().update_peers(msg.clone()).await {
+                                num_failures += 1;
+                            }
+                        }
+
+                        // Only with registration, we also update the new node
+                        // by adding as peers all the existing nodes.
+                        if let Some(this_node_id) = this_node_id {
+                            let mut new_node_client = clients.get_mut(&this_node_id).unwrap().api.function_instance_api();
+                            for (other_node_id, client_desc) in clients.iter_mut() {
+                                if other_node_id.eq(&this_node_id) {
+                                    continue;
+                                }
+                                if let Err(_) = new_node_client
+                                    .update_peers(UpdatePeersRequest::Add(*other_node_id, client_desc.invocation_url.clone()))
+                                    .await
+                                {
+                                    num_failures += 1;
+                                }
+                            }
+                        }
+
+                        response = match num_failures {
+                            0 => edgeless_api::function_instance::UpdateNodeResponse::Accepted,
+                            _ => edgeless_api::function_instance::UpdateNodeResponse::ResponseError(edgeless_api::common::ResponseError {
+                                summary: "UpdatePeers() failed on some node when updating a node".to_string(),
+                                detail: None,
+                            }),
+                        };
+                    }
+
+                    if let Err(err) = reply_channel.send(Ok(response)) {
+                        log::error!("Orchestrator channel error in UPDATENODE: {:?}", err);
+                    }
+                }
+                OrchestratorRequest::KEEPALIVE() => {
+                    log::debug!("keep alive");
+
+                    // First check if there nodes that must be disconnected,
+                    // since they fail to reply to a keep-alive.
+                    let mut to_be_disconnected = HashSet::new();
+                    for (node_id, client_desc) in &mut clients {
+                        if let Err(_) = client_desc.api.function_instance_api().keep_alive().await {
+                            to_be_disconnected.insert(*node_id);
+                        }
+                    }
+
+                    // Second, remove all those nodes from the map of clients.
+                    for node_id in to_be_disconnected.iter() {
+                        log::info!("disconnect node not replying to keep alive: {}", &node_id);
+                        let val = clients.remove(&node_id);
+                        assert!(val.is_some());
+                    }
+
+                    // Finally, update the peers of (still alive) nodes by
+                    // deleting the missing-in-action peers.
+                    for removed_node_id in to_be_disconnected {
+                        for (_, client_desc) in clients.iter_mut() {
+                            match client_desc
+                                .api
+                                .function_instance_api()
+                                .update_peers(UpdatePeersRequest::Del(removed_node_id))
+                                .await
+                            {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    log::error!("Unhandled: {}", err);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -162,8 +290,8 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFuncti
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse> {
+        log::debug!("FunctionInstance::Start() {:?}", request);
         let request = request;
-        println!("{:?}", request.instance_id);
         let (reply_sender, reply_receiver) =
             tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse>>();
         if let Err(err) = self.sender.send(OrchestratorRequest::SPAWN(request, reply_sender)).await {
@@ -182,6 +310,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFuncti
     }
 
     async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+        log::debug!("FunctionInstance::Stop() {:?}", id);
         match self.sender.send(OrchestratorRequest::STOP(id)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
@@ -192,12 +321,37 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFuncti
     }
 
     async fn update_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
-        match self.sender.send(OrchestratorRequest::UPDATE(update)).await {
+        log::debug!("FunctionInstance::UpdateLinks() {:?}", update);
+        match self.sender.send(OrchestratorRequest::UPDATELINKS(update)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Orchestrator channel error when updating the links of a function instance: {}",
                 err.to_string()
             )),
         }
+    }
+
+    async fn update_node(
+        &mut self,
+        request: edgeless_api::function_instance::UpdateNodeRequest,
+    ) -> anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse> {
+        log::debug!("FunctionInstance::UpdateNode() {:?}", request);
+        let request = request;
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse>>();
+        if let Err(err) = self.sender.send(OrchestratorRequest::UPDATENODE(request, reply_sender)).await {
+            return Err(anyhow::anyhow!("Orchestrator channel error when updating a node: {}", err.to_string()));
+        }
+        match reply_receiver.await {
+            Ok(res) => res,
+            Err(err) => Err(anyhow::anyhow!("Orchestrator channel error  when updating a node: {}", err.to_string())),
+        }
+    }
+
+    async fn update_peers(&mut self, _request: edgeless_api::function_instance::UpdatePeersRequest) -> anyhow::Result<()> {
+        Err(anyhow::anyhow!("Method UpdatePeers not supported by e-ORC"))
+    }
+
+    async fn keep_alive(&mut self) -> anyhow::Result<()> {
+        Ok(())
     }
 }
