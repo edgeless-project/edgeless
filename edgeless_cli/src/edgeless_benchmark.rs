@@ -76,10 +76,6 @@ impl ClientInterface {
     }
 
     async fn start_workflow(&mut self) -> anyhow::Result<String> {
-        let my_wf_id = edgeless_api::workflow_instance::WorkflowId {
-            workflow_id: uuid::Uuid::new_v4(),
-        };
-
         let mut functions: Vec<WorkflowFunction> = vec![];
 
         match &self.wf_type {
@@ -105,7 +101,6 @@ impl ClientInterface {
         let res = self
             .client
             .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                workflow_id: my_wf_id.clone(),
                 workflow_functions: functions,
                 workflow_resources: vec![],
                 annotations: std::collections::HashMap::new(),

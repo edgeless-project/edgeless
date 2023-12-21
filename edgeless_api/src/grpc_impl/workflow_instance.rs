@@ -40,12 +40,6 @@ impl WorkflowInstanceConverters {
         api_request: &crate::grpc_impl::api::SpawnWorkflowRequest,
     ) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowRequest> {
         Ok(crate::workflow_instance::SpawnWorkflowRequest {
-            workflow_id: WorkflowInstanceConverters::parse_workflow_id(match api_request.workflow_id.as_ref() {
-                Some(val) => val,
-                None => {
-                    return Err(anyhow::anyhow!("Missing Workflow Id"));
-                }
-            })?,
             workflow_functions: api_request
                 .workflow_functions
                 .iter()
@@ -168,7 +162,6 @@ impl WorkflowInstanceConverters {
         crate_request: &crate::workflow_instance::SpawnWorkflowRequest,
     ) -> crate::grpc_impl::api::SpawnWorkflowRequest {
         crate::grpc_impl::api::SpawnWorkflowRequest {
-            workflow_id: Some(Self::serialize_workflow_id(&crate_request.workflow_id)),
             workflow_functions: crate_request
                 .workflow_functions
                 .iter()

@@ -85,12 +85,8 @@ async fn main() -> anyhow::Result<()> {
                         log::debug!("Start Workflow");
                         let workflow: workflow_spec::WorkflowSpec =
                             serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
-                        let my_wf_id = edgeless_api::workflow_instance::WorkflowId {
-                            workflow_id: uuid::Uuid::new_v4(),
-                        };
                         let res = con_wf_client
                             .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                                workflow_id: my_wf_id.clone(),
                                 workflow_functions: workflow
                                     .functions
                                     .into_iter()

@@ -62,7 +62,6 @@ pub struct WorkflowFunction {
 
 #[derive(Clone, Debug)]
 pub struct SpawnWorkflowRequest {
-    pub workflow_id: WorkflowId,
     pub workflow_functions: Vec<WorkflowFunction>,
     pub workflow_resources: Vec<WorkflowResource>,
     pub annotations: std::collections::HashMap<String, String>,

@@ -155,13 +155,8 @@ async fn single_function_start_stop() {
     assert!(mock_orc_receiver.try_next().is_err());
     assert!(mock_res_receiver.try_next().is_err());
 
-    let wf_id = edgeless_api::workflow_instance::WorkflowId {
-        workflow_id: uuid::Uuid::new_v4(),
-    };
-
     let response = wf_client
         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-            workflow_id: wf_id.clone(),
             workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
                 name: "f1".to_string(),
                 function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
@@ -197,7 +192,7 @@ async fn single_function_start_stop() {
 
     assert!(mock_orc_receiver.try_next().is_err());
 
-    wf_client.stop(wf_id).await.unwrap();
+    wf_client.stop(instance.workflow_id.clone()).await.unwrap();
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
@@ -220,13 +215,8 @@ async fn resource_to_function_start_stop() {
     assert!(mock_orc_receiver.try_next().is_err());
     assert!(mock_res_receiver.try_next().is_err());
 
-    let wf_id = edgeless_api::workflow_instance::WorkflowId {
-        workflow_id: uuid::Uuid::new_v4(),
-    };
-
     let response = wf_client
         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-            workflow_id: wf_id.clone(),
             workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
                 name: "f1".to_string(),
                 function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
@@ -274,7 +264,7 @@ async fn resource_to_function_start_stop() {
     assert!(mock_orc_receiver.try_next().is_err());
     assert!(mock_res_receiver.try_next().is_err());
 
-    wf_client.stop(wf_id).await.unwrap();
+    wf_client.stop(instance.workflow_id.clone()).await.unwrap();
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
@@ -302,13 +292,8 @@ async fn function_link_loop_start_stop() {
     assert!(mock_orc_receiver.try_next().is_err());
     assert!(mock_res_receiver.try_next().is_err());
 
-    let wf_id = edgeless_api::workflow_instance::WorkflowId {
-        workflow_id: uuid::Uuid::new_v4(),
-    };
-
     let response = wf_client
         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-            workflow_id: wf_id.clone(),
             workflow_functions: vec![
                 edgeless_api::workflow_instance::WorkflowFunction {
                     name: "f1".to_string(),
@@ -377,7 +362,7 @@ async fn function_link_loop_start_stop() {
     assert!(mock_res_receiver.try_next().is_err());
     assert!(mock_orc_receiver.try_next().is_err());
 
-    wf_client.stop(wf_id).await.unwrap();
+    wf_client.stop(instance.workflow_id.clone()).await.unwrap();
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
