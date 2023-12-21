@@ -308,10 +308,15 @@ impl Controller {
                         continue;
                     }
 
-                    active_workflows.insert(spawn_workflow_request.workflow_id.clone(), current_workflow.clone());
+                    // Assign a new identifier to the newly-created workflow.
+                    let my_wf_id = edgeless_api::workflow_instance::WorkflowId {
+                        workflow_id: uuid::Uuid::new_v4(),
+                    };
+
+                    active_workflows.insert(my_wf_id.clone(), current_workflow.clone());
                     match reply_sender.send(Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(
                         edgeless_api::workflow_instance::WorkflowInstance {
-                            workflow_id: spawn_workflow_request.workflow_id,
+                            workflow_id: my_wf_id,
                             functions: current_workflow
                                 .function_instances
                                 .iter()
