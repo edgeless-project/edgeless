@@ -31,18 +31,6 @@ impl FunctonInstanceConverters {
                     return Err(anyhow::anyhow!("Request does not contain actor class."));
                 }
             })?,
-            output_mapping: api_request
-                .output_mapping
-                .iter()
-                .filter_map(|(key, value)| {
-                    return {
-                        match CommonConverters::parse_instance_id(&value) {
-                            Ok(val) => Some((key.clone(), val)),
-                            Err(_) => None,
-                        }
-                    };
-                })
-                .collect(),
             annotations: api_request.annotations.clone(),
             state_specification: Self::parse_state_specification(match &api_request.state_specification {
                 Some(val) => val,
@@ -51,26 +39,6 @@ impl FunctonInstanceConverters {
                 }
             })?,
         })
-    }
-
-    pub fn parse_spawn_function_response(
-        api_instance: &crate::grpc_impl::api::SpawnFunctionResponse,
-    ) -> anyhow::Result<crate::function_instance::SpawnFunctionResponse> {
-        match api_instance.instance_id.as_ref() {
-            Some(val) => match CommonConverters::parse_instance_id(val) {
-                Ok(val) => Ok(crate::function_instance::SpawnFunctionResponse::InstanceId(val)),
-                Err(err) => Err(anyhow::anyhow!(err.to_string())),
-            },
-            None => match api_instance.response_error.as_ref() {
-                Some(val) => match CommonConverters::parse_response_error(val) {
-                    Ok(val) => Ok(crate::function_instance::SpawnFunctionResponse::ResponseError(val)),
-                    Err(err) => Err(anyhow::anyhow!(err.to_string())),
-                },
-                None => Err(anyhow::anyhow!(
-                    "Ill-formed SpawnFunctionResponse message: both ResponseError and InstanceId are empty"
-                )),
-            },
-        }
     }
 
     pub fn parse_update_node_request(
@@ -205,11 +173,6 @@ impl FunctonInstanceConverters {
                 .as_ref()
                 .and_then(|instance_id| Some(CommonConverters::serialize_instance_id(instance_id))),
             code: Some(Self::serialize_function_class_specification(&req.code)),
-            output_mapping: req
-                .output_mapping
-                .iter()
-                .map(|(key, value)| (key.clone(), CommonConverters::serialize_instance_id(&value)))
-                .collect(),
             annotations: req.annotations.clone(),
             state_specification: Some(Self::serialize_state_specification(&req.state_specification)),
         }
@@ -266,19 +229,6 @@ impl FunctonInstanceConverters {
         }
     }
 
-    pub fn serialize_spawn_function_response(req: &crate::function_instance::SpawnFunctionResponse) -> crate::grpc_impl::api::SpawnFunctionResponse {
-        match req {
-            crate::function_instance::SpawnFunctionResponse::ResponseError(err) => crate::grpc_impl::api::SpawnFunctionResponse {
-                response_error: Some(CommonConverters::serialize_response_error(&err)),
-                instance_id: None,
-            },
-            crate::function_instance::SpawnFunctionResponse::InstanceId(id) => crate::grpc_impl::api::SpawnFunctionResponse {
-                response_error: None,
-                instance_id: Some(CommonConverters::serialize_instance_id(&id)),
-            },
-        }
-    }
-
     pub fn serialize_update_function_links_request(
         crate_update: &crate::function_instance::UpdateFunctionLinksRequest,
     ) -> crate::grpc_impl::api::UpdateFunctionLinksRequest {
@@ -307,15 +257,19 @@ impl FunctonInstanceConverters {
     }
 }
 
+//
+// orc
+//
+
 #[derive(Clone)]
-pub struct FunctionInstanceAPIClient {
-    client: crate::grpc_impl::api::function_instance_client::FunctionInstanceClient<tonic::transport::Channel>,
+pub struct FunctionInstanceOrcAPIClient {
+    client: crate::grpc_impl::api::function_instance_orc_client::FunctionInstanceOrcClient<tonic::transport::Channel>,
 }
 
-impl FunctionInstanceAPIClient {
+impl FunctionInstanceOrcAPIClient {
     pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
         loop {
-            match crate::grpc_impl::api::function_instance_client::FunctionInstanceClient::connect(server_addr.to_string()).await {
+            match crate::grpc_impl::api::function_instance_orc_client::FunctionInstanceOrcClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
                     return Ok(Self { client });
@@ -332,17 +286,273 @@ impl FunctionInstanceAPIClient {
 }
 
 #[async_trait::async_trait]
-impl crate::function_instance::FunctionInstanceAPI for FunctionInstanceAPIClient {
-    async fn start(
+impl crate::function_instance::FunctionInstanceOrcAPI for FunctionInstanceOrcAPIClient {
+    async fn start_function(
         &mut self,
         request: crate::function_instance::SpawnFunctionRequest,
-    ) -> anyhow::Result<crate::function_instance::SpawnFunctionResponse> {
+    ) -> anyhow::Result<crate::common::StartComponentResponse> {
+        match self
+            .client
+            .start_function(tonic::Request::new(FunctonInstanceConverters::serialize_spawn_function_request(&request)))
+            .await
+        {
+            Ok(res) => CommonConverters::parse_start_component_response(&res.into_inner()),
+            Err(err) => Err(anyhow::anyhow!(
+                "Communication error while starting a function instance: {}",
+                err.to_string()
+            )),
+        }
+    }
+
+    async fn stop_function(&mut self, id: crate::function_instance::InstanceId) -> anyhow::Result<()> {
+        match self
+            .client
+            .stop_function(tonic::Request::new(CommonConverters::serialize_instance_id(&id)))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(
+                "Communication error while stopping a function instance: {}",
+                err.to_string()
+            )),
+        }
+    }
+
+    async fn start_resource(
+        &mut self,
+        instance_specification: crate::workflow_instance::WorkflowResource,
+    ) -> anyhow::Result<crate::common::StartComponentResponse> {
+        let serialized_request =
+            crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_resource(&instance_specification);
+        match self.client.start_resource(tonic::Request::new(serialized_request)).await {
+            Ok(ret) => crate::grpc_impl::common::CommonConverters::parse_start_component_response(&ret.into_inner()),
+            Err(err) => Err(anyhow::anyhow!("Resource configuration request failed: {}", err)),
+        }
+    }
+
+    async fn stop_resource(&mut self, resource_id: crate::function_instance::InstanceId) -> anyhow::Result<()> {
+        let encoded_id = CommonConverters::serialize_instance_id(&resource_id);
+        match self.client.stop_resource(encoded_id).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!("Resource configuration request failed: {}", err)),
+        }
+    }
+
+    async fn update_links(&mut self, update: crate::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+        match self
+            .client
+            .update_links(tonic::Request::new(FunctonInstanceConverters::serialize_update_function_links_request(
+                &update,
+            )))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(
+                "Communication error while updating the links of a function instance: {}",
+                err.to_string()
+            )),
+        }
+    }
+
+    async fn update_node(
+        &mut self,
+        request: crate::function_instance::UpdateNodeRequest,
+    ) -> anyhow::Result<crate::function_instance::UpdateNodeResponse> {
+        match self
+            .client
+            .update_node(tonic::Request::new(FunctonInstanceConverters::serialize_update_node_request(&request)))
+            .await
+        {
+            Ok(res) => FunctonInstanceConverters::parse_update_node_response(&res.into_inner()),
+            Err(err) => Err(anyhow::anyhow!("Communication error while updating a node: {}", err.to_string())),
+        }
+    }
+}
+
+pub struct FunctionInstanceOrcAPIServer {
+    pub root_api: tokio::sync::Mutex<Box<dyn crate::function_instance::FunctionInstanceOrcAPI>>,
+}
+
+#[async_trait::async_trait]
+impl crate::grpc_impl::api::function_instance_orc_server::FunctionInstanceOrc for FunctionInstanceOrcAPIServer {
+    async fn start_function(
+        &self,
+        request: tonic::Request<crate::grpc_impl::api::SpawnFunctionRequest>,
+    ) -> Result<tonic::Response<crate::grpc_impl::api::StartComponentResponse>, tonic::Status> {
+        let inner_request = request.into_inner();
+        let parsed_request = match FunctonInstanceConverters::parse_spawn_function_request(&inner_request) {
+            Ok(val) => val,
+            Err(err) => {
+                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
+                    response_error: Some(crate::grpc_impl::api::ResponseError {
+                        summary: "Invalid function instance creation request".to_string(),
+                        detail: Some(err.to_string()),
+                    }),
+                    instance_id: None,
+                }))
+            }
+        };
+        match self.root_api.lock().await.start_function(parsed_request).await {
+            Ok(response) => Ok(tonic::Response::new(
+                crate::grpc_impl::common::CommonConverters::serialize_start_component_response(&response),
+            )),
+            Err(err) => {
+                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
+                    response_error: Some(crate::grpc_impl::api::ResponseError {
+                        summary: "Function instance creation request rejected".to_string(),
+                        detail: Some(err.to_string()),
+                    }),
+                    instance_id: None,
+                }))
+            }
+        }
+    }
+
+    async fn stop_function(&self, request: tonic::Request<crate::grpc_impl::api::InstanceId>) -> Result<tonic::Response<()>, tonic::Status> {
+        let stop_function_id = match CommonConverters::parse_instance_id(&request.into_inner()) {
+            Ok(parsed_update) => parsed_update,
+            Err(err) => {
+                log::error!("Error when stopping a function instance: {}", err);
+                return Err(tonic::Status::invalid_argument(format!(
+                    "Error when stopping a function instance: {}",
+                    err
+                )));
+            }
+        };
+        match self.root_api.lock().await.stop_function(stop_function_id).await {
+            Ok(_) => Ok(tonic::Response::new(())),
+            Err(err) => Err(tonic::Status::internal(format!("Function instance stopping error: {}", err))),
+        }
+    }
+
+    async fn start_resource(
+        &self,
+        request: tonic::Request<crate::grpc_impl::api::WorkflowResource>,
+    ) -> tonic::Result<tonic::Response<crate::grpc_impl::api::StartComponentResponse>> {
+        let inner = request.into_inner();
+        let parsed_spec = match crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_workflow_resource(&inner) {
+            Ok(val) => val,
+            Err(err) => {
+                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
+                    response_error: Some(crate::grpc_impl::api::ResponseError {
+                        summary: "Invalid resource specification".to_string(),
+                        detail: Some(err.to_string()),
+                    }),
+                    instance_id: None,
+                }))
+            }
+        };
+        match self.root_api.lock().await.start_resource(parsed_spec).await {
+            Ok(response) => Ok(tonic::Response::new(
+                crate::grpc_impl::common::CommonConverters::serialize_start_component_response(&response),
+            )),
+            Err(err) => {
+                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
+                    response_error: Some(crate::grpc_impl::api::ResponseError {
+                        summary: "Resource creation rejected".to_string(),
+                        detail: Some(err.to_string()),
+                    }),
+                    instance_id: None,
+                }))
+            }
+        }
+    }
+
+    async fn stop_resource(&self, request: tonic::Request<crate::grpc_impl::api::InstanceId>) -> tonic::Result<tonic::Response<()>> {
+        let inner = request.into_inner();
+        let parsed_id = match CommonConverters::parse_instance_id(&inner) {
+            Ok(val) => val,
+            Err(err) => {
+                return Err(tonic::Status::invalid_argument(format!("Error when deleting a resource: {}", err)));
+            }
+        };
+        match self.root_api.lock().await.stop_resource(parsed_id).await {
+            Ok(_) => Ok(tonic::Response::new(())),
+            Err(err) => Err(tonic::Status::internal(format!("Error when deleting a resource: {}", err))),
+        }
+    }
+
+    async fn update_links(
+        &self,
+        update: tonic::Request<crate::grpc_impl::api::UpdateFunctionLinksRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let parsed_update = match FunctonInstanceConverters::parse_update_function_links_request(&update.into_inner()) {
+            Ok(parsed_update) => parsed_update,
+            Err(err) => {
+                log::error!("Parse UpdateFunctionLinks Failed: {}", err);
+                return Err(tonic::Status::invalid_argument(format!(
+                    "Error when updating the links of a function instance: {}",
+                    err
+                )));
+            }
+        };
+        match self.root_api.lock().await.update_links(parsed_update).await {
+            Ok(_) => Ok(tonic::Response::new(())),
+            Err(err) => Err(tonic::Status::internal(format!(
+                "Error when updating the links of a function instance: {}",
+                err
+            ))),
+        }
+    }
+
+    async fn update_node(
+        &self,
+        request: tonic::Request<crate::grpc_impl::api::UpdateNodeRequest>,
+    ) -> Result<tonic::Response<crate::grpc_impl::api::UpdateNodeResponse>, tonic::Status> {
+        let parsed_request = match FunctonInstanceConverters::parse_update_node_request(&request.into_inner()) {
+            Ok(parsed_request) => parsed_request,
+            Err(err) => {
+                log::error!("Parse UpdateNodeRequest Failed: {}", err);
+                return Err(tonic::Status::invalid_argument(format!(
+                    "Error when parsing an UpdateNodeRequest message: {}",
+                    err
+                )));
+            }
+        };
+        match self.root_api.lock().await.update_node(parsed_request).await {
+            Ok(res) => Ok(tonic::Response::new(FunctonInstanceConverters::serialize_update_node_response(&res))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when updating a node: {}", err))),
+        }
+    }
+}
+
+//
+// node
+//
+
+#[derive(Clone)]
+pub struct FunctionInstanceNodeAPIClient {
+    client: crate::grpc_impl::api::function_instance_node_client::FunctionInstanceNodeClient<tonic::transport::Channel>,
+}
+
+impl FunctionInstanceNodeAPIClient {
+    pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
+        loop {
+            match crate::grpc_impl::api::function_instance_node_client::FunctionInstanceNodeClient::connect(server_addr.to_string()).await {
+                Ok(client) => {
+                    let client = client.max_decoding_message_size(usize::MAX);
+                    return Ok(Self { client });
+                }
+                Err(err) => match retry_interval {
+                    Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
+                    None => {
+                        return Err(anyhow::anyhow!("Error when connecting to {}: {}", server_addr, err));
+                    }
+                },
+            }
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::function_instance::FunctionInstanceNodeAPI for FunctionInstanceNodeAPIClient {
+    async fn start(&mut self, request: crate::function_instance::SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse> {
         match self
             .client
             .start(tonic::Request::new(FunctonInstanceConverters::serialize_spawn_function_request(&request)))
             .await
         {
-            Ok(res) => FunctonInstanceConverters::parse_spawn_function_response(&res.into_inner()),
+            Ok(res) => CommonConverters::parse_start_component_response(&res.into_inner()),
             Err(err) => Err(anyhow::anyhow!(
                 "Communication error while starting a function instance: {}",
                 err.to_string()
@@ -376,20 +586,6 @@ impl crate::function_instance::FunctionInstanceAPI for FunctionInstanceAPIClient
         }
     }
 
-    async fn update_node(
-        &mut self,
-        request: crate::function_instance::UpdateNodeRequest,
-    ) -> anyhow::Result<crate::function_instance::UpdateNodeResponse> {
-        match self
-            .client
-            .update_node(tonic::Request::new(FunctonInstanceConverters::serialize_update_node_request(&request)))
-            .await
-        {
-            Ok(res) => FunctonInstanceConverters::parse_update_node_response(&res.into_inner()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while updating a node: {}", err.to_string())),
-        }
-    }
-
     async fn update_peers(&mut self, request: crate::function_instance::UpdatePeersRequest) -> anyhow::Result<()> {
         match self
             .client
@@ -409,21 +605,21 @@ impl crate::function_instance::FunctionInstanceAPI for FunctionInstanceAPIClient
     }
 }
 
-pub struct FunctionInstanceAPIServer {
-    pub root_api: tokio::sync::Mutex<Box<dyn crate::function_instance::FunctionInstanceAPI>>,
+pub struct FunctionInstanceNodeAPIServer {
+    pub root_api: tokio::sync::Mutex<Box<dyn crate::function_instance::FunctionInstanceNodeAPI>>,
 }
 
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::function_instance_server::FunctionInstance for FunctionInstanceAPIServer {
+impl crate::grpc_impl::api::function_instance_node_server::FunctionInstanceNode for FunctionInstanceNodeAPIServer {
     async fn start(
         &self,
         request: tonic::Request<crate::grpc_impl::api::SpawnFunctionRequest>,
-    ) -> Result<tonic::Response<crate::grpc_impl::api::SpawnFunctionResponse>, tonic::Status> {
+    ) -> Result<tonic::Response<crate::grpc_impl::api::StartComponentResponse>, tonic::Status> {
         let inner_request = request.into_inner();
         let parsed_request = match FunctonInstanceConverters::parse_spawn_function_request(&inner_request) {
             Ok(val) => val,
             Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::SpawnFunctionResponse {
+                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
                     response_error: Some(crate::grpc_impl::api::ResponseError {
                         summary: "Invalid function instance creation request".to_string(),
                         detail: Some(err.to_string()),
@@ -433,11 +629,9 @@ impl crate::grpc_impl::api::function_instance_server::FunctionInstance for Funct
             }
         };
         match self.root_api.lock().await.start(parsed_request).await {
-            Ok(response) => Ok(tonic::Response::new(FunctonInstanceConverters::serialize_spawn_function_response(
-                &response,
-            ))),
+            Ok(response) => Ok(tonic::Response::new(CommonConverters::serialize_start_component_response(&response))),
             Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::SpawnFunctionResponse {
+                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
                     response_error: Some(crate::grpc_impl::api::ResponseError {
                         summary: "Function instance creation request rejected".to_string(),
                         detail: Some(err.to_string()),
@@ -488,26 +682,6 @@ impl crate::grpc_impl::api::function_instance_server::FunctionInstance for Funct
         }
     }
 
-    async fn update_node(
-        &self,
-        request: tonic::Request<crate::grpc_impl::api::UpdateNodeRequest>,
-    ) -> Result<tonic::Response<crate::grpc_impl::api::UpdateNodeResponse>, tonic::Status> {
-        let parsed_request = match FunctonInstanceConverters::parse_update_node_request(&request.into_inner()) {
-            Ok(parsed_request) => parsed_request,
-            Err(err) => {
-                log::error!("Parse UpdateNodeRequest Failed: {}", err);
-                return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing an UpdateNodeRequest message: {}",
-                    err
-                )));
-            }
-        };
-        match self.root_api.lock().await.update_node(parsed_request).await {
-            Ok(res) => Ok(tonic::Response::new(FunctonInstanceConverters::serialize_update_node_response(&res))),
-            Err(err) => Err(tonic::Status::internal(format!("Error when updating a node: {}", err))),
-        }
-    }
-
     async fn update_peers(&self, request: tonic::Request<crate::grpc_impl::api::UpdatePeersRequest>) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match FunctonInstanceConverters::parse_update_peers_request(&request.into_inner()) {
             Ok(parsed_request) => parsed_request,
@@ -536,11 +710,12 @@ impl crate::grpc_impl::api::function_instance_server::FunctionInstance for Funct
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::StartComponentResponse;
     use crate::function_instance::FunctionClassSpecification;
     use crate::function_instance::SpawnFunctionRequest;
-    use crate::function_instance::SpawnFunctionResponse;
     use crate::function_instance::StatePolicy;
     use crate::function_instance::StateSpecification;
+    use crate::function_instance::UpdateFunctionLinksRequest;
     use crate::function_instance::UpdateNodeRequest;
     use crate::function_instance::UpdateNodeResponse;
     use crate::function_instance::UpdatePeersRequest;
@@ -560,22 +735,6 @@ mod tests {
                 function_class_inlude_code: "binary-code".as_bytes().to_vec(),
                 outputs: vec!["out".to_string(), "err".to_string()],
             },
-            output_mapping: std::collections::HashMap::from([
-                (
-                    "out".to_string(),
-                    InstanceId {
-                        node_id: uuid::Uuid::new_v4(),
-                        function_id: uuid::Uuid::new_v4(),
-                    },
-                ),
-                (
-                    "err".to_string(),
-                    InstanceId {
-                        node_id: uuid::Uuid::new_v4(),
-                        function_id: uuid::Uuid::new_v4(),
-                    },
-                ),
-            ]),
             annotations: std::collections::HashMap::from([("key1".to_string(), "value1".to_string())]),
             state_specification: StateSpecification {
                 state_id: uuid::Uuid::new_v4(),
@@ -591,19 +750,19 @@ mod tests {
     }
 
     #[test]
-    fn serialize_deserialize_spawn_function_response() {
+    fn serialize_deserialize_start_component_response() {
         let messages = vec![
-            SpawnFunctionResponse::ResponseError(crate::common::ResponseError {
+            StartComponentResponse::ResponseError(crate::common::ResponseError {
                 summary: "error summary".to_string(),
                 detail: Some("error details".to_string()),
             }),
-            SpawnFunctionResponse::InstanceId(InstanceId {
+            StartComponentResponse::InstanceId(InstanceId {
                 node_id: uuid::Uuid::new_v4(),
                 function_id: uuid::Uuid::new_v4(),
             }),
         ];
         for msg in messages {
-            match FunctonInstanceConverters::parse_spawn_function_response(&FunctonInstanceConverters::serialize_spawn_function_response(&msg)) {
+            match CommonConverters::parse_start_component_response(&CommonConverters::serialize_start_component_response(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }
@@ -654,6 +813,64 @@ mod tests {
         ];
         for msg in messages {
             match FunctonInstanceConverters::parse_update_peers_request(&FunctonInstanceConverters::serialize_update_peers_request(&msg)) {
+                Ok(val) => assert_eq!(msg, val),
+                Err(err) => panic!("{}", err),
+            }
+        }
+    }
+
+    #[test]
+    fn serialize_deserialize_update_links_request() {
+        let messages = vec![
+            UpdateFunctionLinksRequest {
+                instance_id: Some(InstanceId {
+                    node_id: uuid::Uuid::new_v4(),
+                    function_id: uuid::Uuid::new_v4(),
+                }),
+                output_mapping: std::collections::HashMap::from([
+                    (
+                        "out".to_string(),
+                        InstanceId {
+                            node_id: uuid::Uuid::new_v4(),
+                            function_id: uuid::Uuid::new_v4(),
+                        },
+                    ),
+                    (
+                        "err".to_string(),
+                        InstanceId {
+                            node_id: uuid::Uuid::new_v4(),
+                            function_id: uuid::Uuid::new_v4(),
+                        },
+                    ),
+                ]),
+            },
+            UpdateFunctionLinksRequest {
+                instance_id: Some(InstanceId {
+                    node_id: uuid::Uuid::nil(),
+                    function_id: uuid::Uuid::new_v4(),
+                }),
+                output_mapping: std::collections::HashMap::from([
+                    (
+                        "out".to_string(),
+                        InstanceId {
+                            node_id: uuid::Uuid::nil(),
+                            function_id: uuid::Uuid::new_v4(),
+                        },
+                    ),
+                    (
+                        "err".to_string(),
+                        InstanceId {
+                            node_id: uuid::Uuid::nil(),
+                            function_id: uuid::Uuid::new_v4(),
+                        },
+                    ),
+                ]),
+            },
+        ];
+        for msg in messages {
+            match FunctonInstanceConverters::parse_update_function_links_request(&FunctonInstanceConverters::serialize_update_function_links_request(
+                &msg,
+            )) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }

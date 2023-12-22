@@ -130,13 +130,13 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for EgressRe
     async fn start(
         &mut self,
         _instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::resource_configuration::SpawnResourceResponse> {
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
         let new_id = edgeless_api::function_instance::InstanceId::new(self.resource_provider_id.node_id);
         let dataplane_handle = self.dataplane_provider.get_handle_for(new_id.clone()).await;
 
         self.egress_instances.insert(new_id.clone(), EgressResource::new(dataplane_handle).await);
 
-        Ok(edgeless_api::resource_configuration::SpawnResourceResponse::InstanceId(new_id))
+        Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
     }
 
     async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {

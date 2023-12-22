@@ -1,7 +1,7 @@
 use futures::SinkExt;
 use std::time::Duration;
 
-use edgeless_api::function_instance::InstanceId;
+use edgeless_api::function_instance::{InstanceId, UpdateFunctionLinksRequest};
 use edgeless_dataplane::handle::DataplaneHandle;
 use edgeless_telemetry::telemetry_events::TelemetryEvent;
 
@@ -90,7 +90,6 @@ async fn basic_lifecycle() {
             function_class_inlude_code: include_bytes!("fixtures/messaging_test.wasm").to_vec(),
             outputs: vec![],
         },
-        output_mapping: std::collections::HashMap::new(),
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
             state_id: instance_id.function_id.clone(),
@@ -223,7 +222,6 @@ async fn messaging_test_setup() -> (
             function_class_inlude_code: include_bytes!("fixtures/messaging_test.wasm").to_vec(),
             outputs: vec!["test".to_string()],
         },
-        output_mapping: std::collections::HashMap::from([("test".to_string(), next_fid.clone())]),
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
             state_id: instance_id.function_id.clone(),
@@ -234,6 +232,15 @@ async fn messaging_test_setup() -> (
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
     let res = client.start(spawn_req).await;
+    assert!(res.is_ok());
+
+    let res = client
+        .update_links(UpdateFunctionLinksRequest {
+            instance_id: Some(instance_id.clone()),
+            output_mapping: std::collections::HashMap::from([("test".to_string(), next_fid.clone())]),
+        })
+        .await;
+
     assert!(res.is_ok());
 
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -449,7 +456,6 @@ async fn state_management() {
             function_class_inlude_code: include_bytes!("fixtures/state_test.wasm").to_vec(),
             outputs: Vec::new(),
         },
-        output_mapping: std::collections::HashMap::new(),
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
             state_id: instance_id.function_id.clone(),

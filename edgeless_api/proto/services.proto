@@ -5,44 +5,74 @@ import "messages.proto";
 
 package edgeless_api;
 
-// API to manage the lifecycle of function instances (s07).
-service FunctionInstance {
+// API exposed by the e-ORC to manage the lifecycle of function instances (s07).
+service FunctionInstanceOrc {
     // Start a new function instance.
     // Input: request containing the description of the function to create.
     // Output: the function instance identifier assigned, if accepted.
-    // Implemented by: e-ORC, node.
-    rpc Start (SpawnFunctionRequest) returns (SpawnFunctionResponse);
+    // The node identifier is all zeroes.
+    rpc StartFunction (SpawnFunctionRequest) returns (StartComponentResponse);
     
     // Stop a running function instance.
-    // Input: the identifier of the function instance to tear down.
+    // Input: the identifier of the function instance to tear down. The node
+    // idenfier is ignored (recommended to be all zeroes).
     // Output: none.
-    // Implemented by: e-ORC, node.
-    rpc Stop (InstanceId) returns (google.protobuf.Empty );
+    rpc StopFunction (InstanceId) returns (google.protobuf.Empty );
 
-    // Update a running function instance by changing the mapping between the
-    // callback declarations and function instances.
+    // Start a new resource.
+    // Input: request containing the description of the resource to start.
+    // Output: the function instance identifier assigned, if accepted.
+    // The node identifier is all zeroes.
+    rpc StartResource (WorkflowResource) returns (StartComponentResponse);
+    
+    // Stop a resource.
+    // Input: the identifier of the resource instance to stop. The node
+    // idenfier is ignored (recommended to be all zeroes).
+    // Output: none.
+    rpc StopResource (InstanceId) returns (google.protobuf.Empty );
+
+    // Patch functions/resources by updating for a given function/resource the
+    // mapping from the channel to a list of functions/resources to which events
+    // should be directed. The node identifies are ignored and should be
+    // set to all zeroes.
     // Input: the update mapping.
     // Output: none.
-    // Implemented by: e-ORC, node.
     rpc UpdateLinks (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
 
     // Register a new node on an orchestrator or deregister an existing node.
     // Input: registration: identifier of the new node and agent/invocation URLs;
     // deregistration: identifier of the existing node to be deregistered.
     // Output: UpdateNodeResponse.
-    // Implemented by: e-ORC.
     rpc UpdateNode (UpdateNodeRequest) returns (UpdateNodeResponse);
+}
+
+// API exposed by the nodes to manage the lifecycle of function instances (s07).
+service FunctionInstanceNode {
+    // Start a new function instance.
+    // Input: request containing the description of the function to create.
+    // Output: the function instance identifier assigned, if accepted.
+    rpc Start (SpawnFunctionRequest) returns (StartComponentResponse);
+    
+    // Stop a running function instance.
+    // Input: the identifier of the function instance to tear down.
+    // Output: none.
+    rpc Stop (InstanceId) returns (google.protobuf.Empty );
+
+    // Patch functions/resources by updating for a given function/resource the
+    // mapping from the channel to a list of functions/resources to which events
+    // should be directed.
+    // Input: the update mapping.
+    // Output: none.
+    rpc UpdateLinks (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
 
     // Update the dataplane of a node by adding/removing peers.
     // Input: the node identifier and invocation URL (only for add operations).
     // Output: none.
-    // Implemented by: node.
     rpc UpdatePeers (UpdatePeersRequest) returns (google.protobuf.Empty);
 
     // Check if the component is still alive.
     // Input: none.
     // Output: health status information.
-    // Implemented by: e-ORC, node.
     rpc KeepAlive (google.protobuf.Empty) returns (HealthStatus);
 }
 
@@ -77,7 +107,7 @@ service ResourceConfiguration {
     // Create a new resource.
     // Input: specification of the resource to be created.
     // Output: the identifier of the newly created resource, if accepted.
-    rpc Start (ResourceInstanceSpecification) returns (SpawnResourceResponse);
+    rpc Start (ResourceInstanceSpecification) returns (StartComponentResponse);
 
     // Terminate an existing resource.
     // Input: the identifier of the resource to be terminated.
