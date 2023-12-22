@@ -66,14 +66,7 @@ impl WorkflowInstanceConverters {
     ) -> anyhow::Result<crate::workflow_instance::WorkflowFunctionMapping> {
         Ok(crate::workflow_instance::WorkflowFunctionMapping {
             name: api_mapping.name.to_string(),
-            instances: api_mapping
-                .instances
-                .iter()
-                .filter_map(|fun| match CommonConverters::parse_instance_id(fun) {
-                    Ok(val) => Some(val),
-                    Err(_) => None,
-                })
-                .collect(),
+            domain_id: api_mapping.domain_id.to_string(),
         })
     }
 
@@ -87,8 +80,8 @@ impl WorkflowInstanceConverters {
                     return Err(anyhow::anyhow!("WorkflowId Missing"));
                 }
             })?,
-            functions: api_instance
-                .functions
+            domain_mapping: api_instance
+                .domain_mapping
                 .iter()
                 .map(|mapping| WorkflowInstanceConverters::parse_workflow_function_mapping(mapping))
                 .filter_map(|x| match x {
@@ -194,8 +187,8 @@ impl WorkflowInstanceConverters {
     pub fn serialize_workflow_instance(crate_instance: &crate::workflow_instance::WorkflowInstance) -> crate::grpc_impl::api::WorkflowInstanceStatus {
         crate::grpc_impl::api::WorkflowInstanceStatus {
             workflow_id: Some(Self::serialize_workflow_id(&crate_instance.workflow_id)),
-            functions: crate_instance
-                .functions
+            domain_mapping: crate_instance
+                .domain_mapping
                 .iter()
                 .map(|fun_mapping| Self::serialize_workflow_function_mapping(fun_mapping))
                 .collect(),
@@ -215,11 +208,7 @@ impl WorkflowInstanceConverters {
     ) -> crate::grpc_impl::api::WorkflowFunctionMapping {
         crate::grpc_impl::api::WorkflowFunctionMapping {
             name: crate_mapping.name.to_string(),
-            instances: crate_mapping
-                .instances
-                .iter()
-                .map(|instance| CommonConverters::serialize_instance_id(instance))
-                .collect(),
+            domain_id: crate_mapping.domain_id.to_string(),
         }
     }
 }
@@ -367,6 +356,201 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
                 "Internal error when listing workflows: {}",
                 err.to_string()
             ))),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashMap;
+
+    use super::*;
+    use crate::function_instance::FunctionClassSpecification;
+    use crate::workflow_instance::SpawnWorkflowRequest;
+    use crate::workflow_instance::SpawnWorkflowResponse;
+    use crate::workflow_instance::WorkflowFunction;
+    use crate::workflow_instance::WorkflowFunctionMapping;
+    use crate::workflow_instance::WorkflowId;
+    use crate::workflow_instance::WorkflowInstance;
+    use crate::workflow_instance::WorkflowResource;
+
+    #[test]
+    fn serialize_deserialize_workflow_id() {
+        let messages = vec![WorkflowId {
+            workflow_id: uuid::Uuid::new_v4(),
+        }];
+
+        for msg in messages {
+            match WorkflowInstanceConverters::parse_workflow_id(&WorkflowInstanceConverters::serialize_workflow_id(&msg)) {
+                Ok(val) => assert_eq!(msg, val),
+                Err(err) => panic!("{}", err),
+            }
+        }
+    }
+
+    #[test]
+    fn serialize_deserialize_workflow_function() {
+        let messages = vec![WorkflowFunction {
+            name: "f1".to_string(),
+            function_class_specification: FunctionClassSpecification {
+                function_class_id: "my_fun_class".to_string(),
+                function_class_type: "my_fun_class_type".to_string(),
+                function_class_version: "0.0.1".to_string(),
+                function_class_inlude_code: "byte-code".to_string().as_bytes().to_vec(),
+                outputs: vec!["out1".to_string(), "out2".to_string()],
+            },
+            output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),
+            annotations: HashMap::from([("ann1".to_string(), "val1".to_string()), ("ann2".to_string(), "val2".to_string())]),
+        }];
+
+        for msg in messages {
+            match WorkflowInstanceConverters::parse_workflow_function(&WorkflowInstanceConverters::serialize_workflow_function(&msg)) {
+                Ok(val) => assert_eq!(msg, val),
+                Err(err) => panic!("{}", err),
+            }
+        }
+    }
+
+    #[test]
+    fn serialize_deserialize_workflow_resource() {
+        let messages = vec![WorkflowResource {
+            name: "res1".to_string(),
+            class_type: "my_res_class_type".to_string(),
+            output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),
+            configurations: HashMap::from([("conf1".to_string(), "val1".to_string()), ("conf2".to_string(), "val2".to_string())]),
+        }];
+
+        for msg in messages {
+            match WorkflowInstanceConverters::parse_workflow_resource(&WorkflowInstanceConverters::serialize_workflow_resource(&msg)) {
+                Ok(val) => assert_eq!(msg, val),
+                Err(err) => panic!("{}", err),
+            }
+        }
+    }
+
+    #[test]
+    fn serialize_deserialize_workflow_workflow_spawn_request() {
+        let messages = vec![SpawnWorkflowRequest {
+            workflow_functions: vec![WorkflowFunction {
+                name: "f1".to_string(),
+                function_class_specification: FunctionClassSpecification {
+                    function_class_id: "my_fun_class".to_string(),
+                    function_class_type: "my_fun_class_type".to_string(),
+                    function_class_version: "0.0.1".to_string(),
+                    function_class_inlude_code: "byte-code".to_string().as_bytes().to_vec(),
+                    outputs: vec!["out1".to_string(), "out2".to_string()],
+                },
+                output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),
+                annotations: HashMap::from([("ann1".to_string(), "val1".to_string()), ("ann2".to_string(), "val2".to_string())]),
+            }],
+            annotations: HashMap::from([("ann1".to_string(), "val1".to_string()), ("ann2".to_string(), "val2".to_string())]),
+            workflow_resources: vec![WorkflowResource {
+                name: "res1".to_string(),
+                class_type: "my_res_class_type".to_string(),
+                output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),
+                configurations: HashMap::from([("conf1".to_string(), "val1".to_string()), ("conf2".to_string(), "val2".to_string())]),
+            }],
+        }];
+
+        for msg in messages {
+            match WorkflowInstanceConverters::parse_workflow_spawn_request(&WorkflowInstanceConverters::serialize_workflow_spawn_request(&msg)) {
+                Ok(val) => assert_eq!(msg, val),
+                Err(err) => panic!("{}", err),
+            }
+        }
+    }
+
+    #[test]
+    fn serialize_deserialize_workflow_function_mapping() {
+        let messages = vec![WorkflowFunctionMapping {
+            name: "fun1".to_string(),
+            domain_id: "domain1".to_string(),
+        }];
+
+        for msg in messages {
+            match WorkflowInstanceConverters::parse_workflow_function_mapping(&WorkflowInstanceConverters::serialize_workflow_function_mapping(&msg))
+            {
+                Ok(val) => assert_eq!(msg, val),
+                Err(err) => panic!("{}", err),
+            }
+        }
+    }
+
+    #[test]
+    fn serialize_deserialize_workflow_instance() {
+        let messages = vec![WorkflowInstance {
+            workflow_id: WorkflowId {
+                workflow_id: uuid::Uuid::new_v4(),
+            },
+            domain_mapping: vec![
+                WorkflowFunctionMapping {
+                    name: "fun1".to_string(),
+                    domain_id: "domain1".to_string(),
+                },
+                WorkflowFunctionMapping {
+                    name: "fun2".to_string(),
+                    domain_id: "domain2".to_string(),
+                },
+            ],
+        }];
+
+        for msg in messages {
+            match WorkflowInstanceConverters::parse_workflow_instance(&WorkflowInstanceConverters::serialize_workflow_instance(&msg)) {
+                Ok(val) => assert_eq!(msg, val),
+                Err(err) => panic!("{}", err),
+            }
+        }
+    }
+
+    #[test]
+    fn serialize_deserialize_spawn_response() {
+        let messages = vec![SpawnWorkflowResponse::WorkflowInstance(WorkflowInstance {
+            workflow_id: WorkflowId {
+                workflow_id: uuid::Uuid::new_v4(),
+            },
+            domain_mapping: vec![
+                WorkflowFunctionMapping {
+                    name: "fun1".to_string(),
+                    domain_id: "domain1".to_string(),
+                },
+                WorkflowFunctionMapping {
+                    name: "fun2".to_string(),
+                    domain_id: "domain2".to_string(),
+                },
+            ],
+        })];
+
+        for msg in messages {
+            match WorkflowInstanceConverters::parse_workflow_spawn_response(&WorkflowInstanceConverters::serialize_workflow_spawn_response(&msg)) {
+                Ok(val) => assert_eq!(msg, val),
+                Err(err) => panic!("{}", err),
+            }
+        }
+    }
+
+    #[test]
+    fn serialize_deserialize_workflow_instance_list() {
+        let messages = vec![vec![WorkflowInstance {
+            workflow_id: WorkflowId {
+                workflow_id: uuid::Uuid::new_v4(),
+            },
+            domain_mapping: vec![
+                WorkflowFunctionMapping {
+                    name: "fun1".to_string(),
+                    domain_id: "domain1".to_string(),
+                },
+                WorkflowFunctionMapping {
+                    name: "fun2".to_string(),
+                    domain_id: "domain2".to_string(),
+                },
+            ],
+        }]];
+
+        for msg in messages {
+            match WorkflowInstanceConverters::parse_workflow_instance_list(&WorkflowInstanceConverters::serialize_workflow_instance_list(&msg)) {
+                Ok(val) => assert_eq!(msg, val),
+                Err(err) => panic!("{}", err),
+            }
         }
     }
 }
