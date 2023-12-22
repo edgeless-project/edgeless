@@ -50,7 +50,7 @@ pub enum UpdatePeersRequest {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct UpdateFunctionLinksRequest {
+pub struct PatchRequest {
     pub instance_id: Option<InstanceId>,
     pub output_mapping: std::collections::HashMap<String, InstanceId>,
 }
@@ -64,7 +64,7 @@ pub trait FunctionInstanceOrcAPI: FunctionInstanceOrcAPIClone + Sync + Send {
         spawn_request: crate::workflow_instance::WorkflowResource,
     ) -> anyhow::Result<crate::common::StartComponentResponse>;
     async fn stop_resource(&mut self, id: InstanceId) -> anyhow::Result<()>;
-    async fn update_links(&mut self, update: UpdateFunctionLinksRequest) -> anyhow::Result<()>;
+    async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()>;
     async fn update_node(&mut self, request: UpdateNodeRequest) -> anyhow::Result<UpdateNodeResponse>;
 }
 
@@ -72,7 +72,7 @@ pub trait FunctionInstanceOrcAPI: FunctionInstanceOrcAPIClone + Sync + Send {
 pub trait FunctionInstanceNodeAPI: FunctionInstanceNodeAPIClone + Sync + Send {
     async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse>;
     async fn stop(&mut self, id: InstanceId) -> anyhow::Result<()>;
-    async fn update_links(&mut self, update: UpdateFunctionLinksRequest) -> anyhow::Result<()>;
+    async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()>;
     async fn update_peers(&mut self, request: UpdatePeersRequest) -> anyhow::Result<()>;
     async fn keep_alive(&mut self) -> anyhow::Result<()>;
 }

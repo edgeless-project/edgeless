@@ -447,7 +447,7 @@ impl Controller {
         //                         if let Some(existing_instances) = current_workflow.function_instances.get(&fun.name) {
         //                             for instance in existing_instances {
         //                                 let res = fn_client
-        //                                     .update_links(edgeless_api::function_instance::UpdateFunctionLinksRequest {
+        //                                     .patch(edgeless_api::function_instance::PatchRequest {
         //                                         instance_id: Some(instance.clone()),
         //                                         output_mapping: outputs.clone(),
         //                                     })

@@ -18,7 +18,7 @@ enum OrchestratorRequest {
         tokio::sync::oneshot::Sender<anyhow::Result<StartComponentResponse>>,
     ),
     STOPRESOURCE(edgeless_api::function_instance::InstanceId),
-    UPDATELINKS(edgeless_api::function_instance::UpdateFunctionLinksRequest),
+    UPDATELINKS(edgeless_api::function_instance::PatchRequest),
     UPDATENODE(
         edgeless_api::function_instance::UpdateNodeRequest,
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse>>,
@@ -184,7 +184,7 @@ impl Orchestrator {
                             }
                         }.api.function_instance_api();
 
-                        match fn_client.update_links(update).await {
+                        match fn_client.patch(update).await {
                             Ok(_) => {}
                             Err(err) => {
                                 log::error!("Unhandled: {}", err);
@@ -397,8 +397,8 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for OrchestratorFun
         }
     }
 
-    async fn update_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
-        log::debug!("FunctionInstance::UpdateLinks() {:?}", update);
+    async fn patch(&mut self, update: edgeless_api::function_instance::PatchRequest) -> anyhow::Result<()> {
+        log::debug!("FunctionInstance::Patch() {:?}", update);
         match self.sender.send(OrchestratorRequest::UPDATELINKS(update)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
