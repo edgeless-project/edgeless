@@ -1,5 +1,3 @@
-use std::net::SocketAddrV4;
-
 use edgeless_api::{
     function_instance::{ComponentId, InstanceId},
     workflow_instance::{WorkflowId, WorkflowInstance},
@@ -25,12 +23,6 @@ enum ControllerRequest {
         edgeless_api::workflow_instance::WorkflowId,
         tokio::sync::oneshot::Sender<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>,
     ),
-}
-
-struct ResourceHandle {
-    resource_type: String,
-    _outputs: Vec<String>,
-    config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send>,
 }
 
 #[derive(Clone)]
@@ -74,10 +66,8 @@ struct ActiveWorkflow {
 
 impl Controller {
     pub async fn new_from_config(controller_settings: crate::EdgelessConSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
+        // Connect to all orchestrators.
         let mut orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>::new();
-        let mut resources = std::collections::HashMap::<String, ResourceHandle>::new();
-
-        // Connect to all orchestrators in the orchestration domain
         for orc in &controller_settings.orchestrators {
             match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&orc.orchestrator_url, Some(1)).await {
                 Ok(val) => {
@@ -89,40 +79,16 @@ impl Controller {
             }
         }
 
-        // Prepare all resources defined for this controller
-        for resource in &controller_settings.resources {
-            let (proto, url, port) = edgeless_api::util::parse_http_host(&resource.resource_configuration_url).unwrap();
-            let config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send> = match proto {
-                edgeless_api::util::Proto::COAP => {
-                    log::info!("coap called");
-                    Box::new(edgeless_api::coap_impl::CoapClient::new(SocketAddrV4::new(url.parse().unwrap(), port)).await)
-                }
-                _ => Box::new(
-                    edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationClient::new(&resource.resource_configuration_url).await,
-                ),
-            };
-
-            resources.insert(
-                resource.resource_provider_id.clone(),
-                ResourceHandle {
-                    resource_type: resource.class_type.clone(),
-                    _outputs: resource.outputs.clone(),
-                    config_api: config_api,
-                },
-            );
-        }
-
-        Self::new(orc_clients, resources)
+        Self::new(orc_clients)
     }
 
     fn new(
         orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>,
-        resources: std::collections::HashMap<String, ResourceHandle>,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, orchestrators, resources).await;
+            Self::main_task(receiver, orchestrators).await;
         });
 
         (Controller { sender }, main_task)
@@ -194,10 +160,7 @@ impl Controller {
     async fn main_task(
         receiver: futures::channel::mpsc::UnboundedReceiver<ControllerRequest>,
         mut orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>,
-        resources: std::collections::HashMap<String, ResourceHandle>,
     ) {
-        let _resources = resources;
-
         let mut receiver = receiver;
 
         if orchestrators.is_empty() {
