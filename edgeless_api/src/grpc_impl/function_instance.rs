@@ -118,10 +118,8 @@ impl FunctonInstanceConverters {
         }
     }
 
-    pub fn parse_update_function_links_request(
-        api_update: &crate::grpc_impl::api::UpdateFunctionLinksRequest,
-    ) -> anyhow::Result<crate::function_instance::UpdateFunctionLinksRequest> {
-        Ok(crate::function_instance::UpdateFunctionLinksRequest {
+    pub fn parse_patch_request(api_update: &crate::grpc_impl::api::PatchRequest) -> anyhow::Result<crate::function_instance::PatchRequest> {
+        Ok(crate::function_instance::PatchRequest {
             instance_id: match api_update.instance_id.as_ref() {
                 Some(id) => Some(CommonConverters::parse_instance_id(id)?),
                 None => None,
@@ -229,10 +227,8 @@ impl FunctonInstanceConverters {
         }
     }
 
-    pub fn serialize_update_function_links_request(
-        crate_update: &crate::function_instance::UpdateFunctionLinksRequest,
-    ) -> crate::grpc_impl::api::UpdateFunctionLinksRequest {
-        crate::grpc_impl::api::UpdateFunctionLinksRequest {
+    pub fn serialize_patch_request(crate_update: &crate::function_instance::PatchRequest) -> crate::grpc_impl::api::PatchRequest {
+        crate::grpc_impl::api::PatchRequest {
             instance_id: crate_update
                 .instance_id
                 .as_ref()
@@ -338,12 +334,10 @@ impl crate::function_instance::FunctionInstanceOrcAPI for FunctionInstanceOrcAPI
         }
     }
 
-    async fn update_links(&mut self, update: crate::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+    async fn patch(&mut self, update: crate::function_instance::PatchRequest) -> anyhow::Result<()> {
         match self
             .client
-            .update_links(tonic::Request::new(FunctonInstanceConverters::serialize_update_function_links_request(
-                &update,
-            )))
+            .patch(tonic::Request::new(FunctonInstanceConverters::serialize_patch_request(&update)))
             .await
         {
             Ok(_) => Ok(()),
@@ -472,11 +466,8 @@ impl crate::grpc_impl::api::function_instance_orc_server::FunctionInstanceOrc fo
         }
     }
 
-    async fn update_links(
-        &self,
-        update: tonic::Request<crate::grpc_impl::api::UpdateFunctionLinksRequest>,
-    ) -> Result<tonic::Response<()>, tonic::Status> {
-        let parsed_update = match FunctonInstanceConverters::parse_update_function_links_request(&update.into_inner()) {
+    async fn patch(&self, update: tonic::Request<crate::grpc_impl::api::PatchRequest>) -> Result<tonic::Response<()>, tonic::Status> {
+        let parsed_update = match FunctonInstanceConverters::parse_patch_request(&update.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
                 log::error!("Parse UpdateFunctionLinks Failed: {}", err);
@@ -486,7 +477,7 @@ impl crate::grpc_impl::api::function_instance_orc_server::FunctionInstanceOrc fo
                 )));
             }
         };
-        match self.root_api.lock().await.update_links(parsed_update).await {
+        match self.root_api.lock().await.patch(parsed_update).await {
             Ok(_) => Ok(tonic::Response::new(())),
             Err(err) => Err(tonic::Status::internal(format!(
                 "Error when updating the links of a function instance: {}",
@@ -570,12 +561,10 @@ impl crate::function_instance::FunctionInstanceNodeAPI for FunctionInstanceNodeA
         }
     }
 
-    async fn update_links(&mut self, update: crate::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+    async fn patch(&mut self, update: crate::function_instance::PatchRequest) -> anyhow::Result<()> {
         match self
             .client
-            .update_links(tonic::Request::new(FunctonInstanceConverters::serialize_update_function_links_request(
-                &update,
-            )))
+            .patch(tonic::Request::new(FunctonInstanceConverters::serialize_patch_request(&update)))
             .await
         {
             Ok(_) => Ok(()),
@@ -659,11 +648,8 @@ impl crate::grpc_impl::api::function_instance_node_server::FunctionInstanceNode 
         }
     }
 
-    async fn update_links(
-        &self,
-        update: tonic::Request<crate::grpc_impl::api::UpdateFunctionLinksRequest>,
-    ) -> Result<tonic::Response<()>, tonic::Status> {
-        let parsed_update = match FunctonInstanceConverters::parse_update_function_links_request(&update.into_inner()) {
+    async fn patch(&self, update: tonic::Request<crate::grpc_impl::api::PatchRequest>) -> Result<tonic::Response<()>, tonic::Status> {
+        let parsed_update = match FunctonInstanceConverters::parse_patch_request(&update.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
                 log::error!("Parse UpdateFunctionLinks Failed: {}", err);
@@ -673,7 +659,7 @@ impl crate::grpc_impl::api::function_instance_node_server::FunctionInstanceNode 
                 )));
             }
         };
-        match self.root_api.lock().await.update_links(parsed_update).await {
+        match self.root_api.lock().await.patch(parsed_update).await {
             Ok(_) => Ok(tonic::Response::new(())),
             Err(err) => Err(tonic::Status::internal(format!(
                 "Error when updating the links of a function instance: {}",
@@ -712,10 +698,10 @@ mod tests {
     use super::*;
     use crate::common::StartComponentResponse;
     use crate::function_instance::FunctionClassSpecification;
+    use crate::function_instance::PatchRequest;
     use crate::function_instance::SpawnFunctionRequest;
     use crate::function_instance::StatePolicy;
     use crate::function_instance::StateSpecification;
-    use crate::function_instance::UpdateFunctionLinksRequest;
     use crate::function_instance::UpdateNodeRequest;
     use crate::function_instance::UpdateNodeResponse;
     use crate::function_instance::UpdatePeersRequest;
@@ -820,9 +806,9 @@ mod tests {
     }
 
     #[test]
-    fn serialize_deserialize_update_links_request() {
+    fn serialize_deserialize_patch_request() {
         let messages = vec![
-            UpdateFunctionLinksRequest {
+            PatchRequest {
                 instance_id: Some(InstanceId {
                     node_id: uuid::Uuid::new_v4(),
                     function_id: uuid::Uuid::new_v4(),
@@ -844,7 +830,7 @@ mod tests {
                     ),
                 ]),
             },
-            UpdateFunctionLinksRequest {
+            PatchRequest {
                 instance_id: Some(InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: uuid::Uuid::new_v4(),
@@ -868,9 +854,7 @@ mod tests {
             },
         ];
         for msg in messages {
-            match FunctonInstanceConverters::parse_update_function_links_request(&FunctonInstanceConverters::serialize_update_function_links_request(
-                &msg,
-            )) {
+            match FunctonInstanceConverters::parse_patch_request(&FunctonInstanceConverters::serialize_patch_request(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }

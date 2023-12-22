@@ -1,7 +1,7 @@
 use futures::SinkExt;
 use std::time::Duration;
 
-use edgeless_api::function_instance::{InstanceId, UpdateFunctionLinksRequest};
+use edgeless_api::function_instance::{InstanceId, PatchRequest};
 use edgeless_dataplane::handle::DataplaneHandle;
 use edgeless_telemetry::telemetry_events::TelemetryEvent;
 
@@ -235,7 +235,7 @@ async fn messaging_test_setup() -> (
     assert!(res.is_ok());
 
     let res = client
-        .update_links(UpdateFunctionLinksRequest {
+        .patch(PatchRequest {
             instance_id: Some(instance_id.clone()),
             output_mapping: std::collections::HashMap::from([("test".to_string(), next_fid.clone())]),
         })
