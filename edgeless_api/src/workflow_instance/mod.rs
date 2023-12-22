@@ -32,19 +32,19 @@ impl WorkflowId {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct WorkflowFunctionMapping {
     pub name: String,
-    pub instances: Vec<InstanceId>,
+    pub domain_id: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct WorkflowInstance {
     pub workflow_id: WorkflowId,
-    pub functions: Vec<WorkflowFunctionMapping>,
+    pub domain_mapping: Vec<WorkflowFunctionMapping>,
 }
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize, PartialEq)]
 pub struct WorkflowResource {
     pub name: String,
     pub class_type: String,
@@ -52,7 +52,7 @@ pub struct WorkflowResource {
     pub configurations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Clone, Debug, serde::Deserialize)]
+#[derive(Clone, Debug, serde::Deserialize, PartialEq)]
 pub struct WorkflowFunction {
     pub name: String,
     pub function_class_specification: crate::function_instance::FunctionClassSpecification,
@@ -60,14 +60,14 @@ pub struct WorkflowFunction {
     pub annotations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct SpawnWorkflowRequest {
     pub workflow_functions: Vec<WorkflowFunction>,
     pub workflow_resources: Vec<WorkflowResource>,
     pub annotations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum SpawnWorkflowResponse {
     ResponseError(ResponseError),
     WorkflowInstance(WorkflowInstance),

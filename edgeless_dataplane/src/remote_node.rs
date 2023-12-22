@@ -1,6 +1,6 @@
 use crate::core::*;
 use crate::node_local::NodeLocalRouter;
-use edgeless_api::function_instance::{NodeId, NodeLocalComponentId};
+use edgeless_api::function_instance::{ComponentId, NodeId};
 use edgeless_api::invocation::InvocationAPI;
 
 // Link allowing to send messages to a remote node using the InvocationAPI.
@@ -79,7 +79,7 @@ impl edgeless_api::invocation::InvocationAPI for RemoteRouter {
 impl RemoteLinkProvider {
     pub async fn new(own_node_id: edgeless_api::function_instance::NodeId) -> Self {
         let locals = std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalRouter {
-            receivers: std::collections::HashMap::<NodeLocalComponentId, futures::channel::mpsc::UnboundedSender<DataplaneEvent>>::new(),
+            receivers: std::collections::HashMap::<ComponentId, futures::channel::mpsc::UnboundedSender<DataplaneEvent>>::new(),
         }));
 
         let remotes = std::sync::Arc::new(tokio::sync::Mutex::new(RemoteRouter {
