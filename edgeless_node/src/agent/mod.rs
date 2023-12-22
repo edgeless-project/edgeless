@@ -7,7 +7,7 @@ use crate::runner_api;
 enum AgentRequest {
     SPAWN(edgeless_api::function_instance::SpawnFunctionRequest),
     STOP(edgeless_api::function_instance::InstanceId),
-    UPDATELINKS(edgeless_api::function_instance::UpdateFunctionLinksRequest),
+    UPDATELINKS(edgeless_api::function_instance::PatchRequest),
     UPDATEPEERS(edgeless_api::function_instance::UpdatePeersRequest),
 }
 
@@ -62,10 +62,10 @@ impl Agent {
                 }
                 AgentRequest::UPDATELINKS(update) => {
                     log::debug!("Agent UpdatePeers {:?}", update);
-                    match runner.update_links(update).await {
+                    match runner.patch(update).await {
                         Ok(_) => {}
                         Err(err) => {
-                            log::error!("Unhandled UpdateLinks Error: {}", err);
+                            log::error!("Unhandled Patch Error: {}", err);
                         }
                     }
                 }
@@ -139,7 +139,7 @@ impl edgeless_api::function_instance::FunctionInstanceNodeAPI for FunctionInstan
         }
     }
 
-    async fn update_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
+    async fn patch(&mut self, update: edgeless_api::function_instance::PatchRequest) -> anyhow::Result<()> {
         match self.sender.send(AgentRequest::UPDATELINKS(update)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(

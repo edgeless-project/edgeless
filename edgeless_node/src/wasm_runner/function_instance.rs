@@ -86,7 +86,7 @@ impl FunctionInstance {
         }
     }
 
-    pub async fn update_links(&mut self, update_req: edgeless_api::function_instance::UpdateFunctionLinksRequest) {
+    pub async fn patch(&mut self, update_req: edgeless_api::function_instance::PatchRequest) {
         self.callback_table.lock().await.mapping = update_req.output_mapping;
     }
 }

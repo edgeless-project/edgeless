@@ -10,7 +10,7 @@ pub struct RunnerClient {
 pub enum WasmRunnerRequest {
     Start(edgeless_api::function_instance::SpawnFunctionRequest),
     Stop(edgeless_api::function_instance::InstanceId),
-    UpdateLinks(edgeless_api::function_instance::UpdateFunctionLinksRequest),
+    Patch(edgeless_api::function_instance::PatchRequest),
     FunctionExit(edgeless_api::function_instance::InstanceId),
 }
 
@@ -66,10 +66,10 @@ impl Runner {
                             // This will also create a FUNCTION_EXIT event.
                             functions.remove(&instance_id.function_id);
                         }
-                        WasmRunnerRequest::UpdateLinks(update) => {
-                            log::info!("UpdateLinks Function {:?}", update.instance_id);
+                        WasmRunnerRequest::Patch(update) => {
+                            log::info!("Patch Function {:?}", update.instance_id);
                             if let Some(instance) = functions.get_mut(&update.instance_id.as_ref().unwrap().function_id) {
-                                instance.update_links(update).await;
+                                instance.patch(update).await;
                             }
                         }
                         WasmRunnerRequest::FunctionExit(id) => {
@@ -98,8 +98,8 @@ impl crate::runner_api::RunnerAPI for RunnerClient {
         }
     }
 
-    async fn update_links(&mut self, update: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
-        match self.sender.send(WasmRunnerRequest::UpdateLinks(update)).await {
+    async fn patch(&mut self, update: edgeless_api::function_instance::PatchRequest) -> anyhow::Result<()> {
+        match self.sender.send(WasmRunnerRequest::Patch(update)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
         }

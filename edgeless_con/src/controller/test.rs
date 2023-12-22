@@ -19,7 +19,7 @@ enum MockFunctionInstanceEvent {
         ),
     ),
     StopResource(edgeless_api::function_instance::InstanceId),
-    UpdateLinks(edgeless_api::function_instance::UpdateFunctionLinksRequest),
+    Patch(edgeless_api::function_instance::PatchRequest),
     UpdateNode(edgeless_api::function_instance::UpdateNodeRequest),
 }
 
@@ -75,8 +75,8 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for MockFunctionIns
         self.sender.send(MockFunctionInstanceEvent::StopResource(id)).await.unwrap();
         Ok(())
     }
-    async fn update_links(&mut self, request: edgeless_api::function_instance::UpdateFunctionLinksRequest) -> anyhow::Result<()> {
-        self.sender.send(MockFunctionInstanceEvent::UpdateLinks(request)).await.unwrap();
+    async fn patch(&mut self, request: edgeless_api::function_instance::PatchRequest) -> anyhow::Result<()> {
+        self.sender.send(MockFunctionInstanceEvent::Patch(request)).await.unwrap();
         Ok(())
     }
     async fn update_node(
@@ -316,7 +316,7 @@ async fn function_link_loop_start_stop() {
     //     panic!();
     // }
     // let res3 = mock_orc_receiver.try_next().unwrap().unwrap();
-    // if let MockFunctionInstanceEvent::UpdateLinks(update_req) = res3 {
+    // if let MockFunctionInstanceEvent::Patch(update_req) = res3 {
     //     assert_eq!(update_req.instance_id.unwrap(), to_patch.unwrap());
     //     assert_eq!(update_req.output_mapping.len(), 1);
     // } else {

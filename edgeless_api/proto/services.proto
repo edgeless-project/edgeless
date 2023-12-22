@@ -37,7 +37,7 @@ service FunctionInstanceOrc {
     // set to all zeroes.
     // Input: the update mapping.
     // Output: none.
-    rpc UpdateLinks (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
+    rpc Patch (PatchRequest) returns (google.protobuf.Empty);
 
     // Register a new node on an orchestrator or deregister an existing node.
     // Input: registration: identifier of the new node and agent/invocation URLs;
@@ -63,7 +63,7 @@ service FunctionInstanceNode {
     // should be directed.
     // Input: the update mapping.
     // Output: none.
-    rpc UpdateLinks (UpdateFunctionLinksRequest) returns (google.protobuf.Empty);
+    rpc Patch (PatchRequest) returns (google.protobuf.Empty);
 
     // Update the dataplane of a node by adding/removing peers.
     // Input: the node identifier and invocation URL (only for add operations).

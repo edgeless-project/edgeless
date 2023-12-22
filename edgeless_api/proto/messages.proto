@@ -112,7 +112,7 @@ message HealthStatus {
 }
 
 // Message to request the update of a function instance.
-message UpdateFunctionLinksRequest {
+message PatchRequest {
     // The function instance identifier.
     InstanceId instance_id = 1;
     // Mapping of the outputs to concrete function/resource instances.
