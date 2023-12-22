@@ -26,15 +26,8 @@ pub struct FunctionClassSpecification {
 pub struct SpawnFunctionRequest {
     pub instance_id: Option<InstanceId>,
     pub code: FunctionClassSpecification,
-    pub output_mapping: std::collections::HashMap<String, InstanceId>,
     pub annotations: std::collections::HashMap<String, String>,
     pub state_specification: StateSpecification,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum SpawnFunctionResponse {
-    ResponseError(crate::common::ResponseError),
-    InstanceId(InstanceId),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -56,36 +49,65 @@ pub enum UpdatePeersRequest {
     Clear,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct UpdateFunctionLinksRequest {
     pub instance_id: Option<InstanceId>,
     pub output_mapping: std::collections::HashMap<String, InstanceId>,
 }
 
 #[async_trait::async_trait]
-pub trait FunctionInstanceAPI: FunctionInstanceAPIClone + Sync + Send {
-    async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<SpawnFunctionResponse>;
-    async fn stop(&mut self, id: InstanceId) -> anyhow::Result<()>;
+pub trait FunctionInstanceOrcAPI: FunctionInstanceOrcAPIClone + Sync + Send {
+    async fn start_function(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse>;
+    async fn stop_function(&mut self, id: InstanceId) -> anyhow::Result<()>;
+    async fn start_resource(
+        &mut self,
+        spawn_request: crate::workflow_instance::WorkflowResource,
+    ) -> anyhow::Result<crate::common::StartComponentResponse>;
+    async fn stop_resource(&mut self, id: InstanceId) -> anyhow::Result<()>;
     async fn update_links(&mut self, update: UpdateFunctionLinksRequest) -> anyhow::Result<()>;
     async fn update_node(&mut self, request: UpdateNodeRequest) -> anyhow::Result<UpdateNodeResponse>;
+}
+
+#[async_trait::async_trait]
+pub trait FunctionInstanceNodeAPI: FunctionInstanceNodeAPIClone + Sync + Send {
+    async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse>;
+    async fn stop(&mut self, id: InstanceId) -> anyhow::Result<()>;
+    async fn update_links(&mut self, update: UpdateFunctionLinksRequest) -> anyhow::Result<()>;
     async fn update_peers(&mut self, request: UpdatePeersRequest) -> anyhow::Result<()>;
     async fn keep_alive(&mut self) -> anyhow::Result<()>;
 }
 
 // https://stackoverflow.com/a/30353928
-pub trait FunctionInstanceAPIClone {
-    fn clone_box(&self) -> Box<dyn FunctionInstanceAPI>;
+pub trait FunctionInstanceOrcAPIClone {
+    fn clone_box(&self) -> Box<dyn FunctionInstanceOrcAPI>;
 }
-impl<T> FunctionInstanceAPIClone for T
+impl<T> FunctionInstanceOrcAPIClone for T
 where
-    T: 'static + FunctionInstanceAPI + Clone,
+    T: 'static + FunctionInstanceOrcAPI + Clone,
 {
-    fn clone_box(&self) -> Box<dyn FunctionInstanceAPI> {
+    fn clone_box(&self) -> Box<dyn FunctionInstanceOrcAPI> {
         Box::new(self.clone())
     }
 }
-impl Clone for Box<dyn FunctionInstanceAPI> {
-    fn clone(&self) -> Box<dyn FunctionInstanceAPI> {
+impl Clone for Box<dyn FunctionInstanceOrcAPI> {
+    fn clone(&self) -> Box<dyn FunctionInstanceOrcAPI> {
+        self.clone_box()
+    }
+}
+
+pub trait FunctionInstanceNodeAPIClone {
+    fn clone_box(&self) -> Box<dyn FunctionInstanceNodeAPI>;
+}
+impl<T> FunctionInstanceNodeAPIClone for T
+where
+    T: 'static + FunctionInstanceNodeAPI + Clone,
+{
+    fn clone_box(&self) -> Box<dyn FunctionInstanceNodeAPI> {
+        Box::new(self.clone())
+    }
+}
+impl Clone for Box<dyn FunctionInstanceNodeAPI> {
+    fn clone(&self) -> Box<dyn FunctionInstanceNodeAPI> {
         self.clone_box()
     }
 }

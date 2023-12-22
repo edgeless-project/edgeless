@@ -4,21 +4,16 @@
 //     outputs: Vec<String>,
 // }
 
+#[derive(Debug)]
 pub struct ResourceInstanceSpecification {
     pub provider_id: String,
     pub output_mapping: std::collections::HashMap<String, crate::function_instance::InstanceId>,
     pub configuration: std::collections::HashMap<String, String>,
 }
 
-#[derive(Debug, Clone)]
-pub enum SpawnResourceResponse {
-    ResponseError(crate::common::ResponseError),
-    InstanceId(crate::function_instance::InstanceId),
-}
-
 #[async_trait::async_trait]
 pub trait ResourceConfigurationAPI: Sync + Send {
-    async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<SpawnResourceResponse>;
+    async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<crate::common::StartComponentResponse>;
     async fn stop(&mut self, resource_id: crate::function_instance::InstanceId) -> anyhow::Result<()>;
 }
 
@@ -38,18 +33,18 @@ impl MultiResouceConfigurationAPI {
 
 #[async_trait::async_trait]
 impl ResourceConfigurationAPI for MultiResouceConfigurationAPI {
-    async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<SpawnResourceResponse> {
+    async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<crate::common::StartComponentResponse> {
         if let Some(resource) = self.resource_providers.get_mut(&instance_specification.provider_id) {
             let provider = instance_specification.provider_id.clone();
             let res = resource.start(instance_specification).await?;
-            if let SpawnResourceResponse::InstanceId(id) = res {
+            if let crate::common::StartComponentResponse::InstanceId(id) = res {
                 self.resource_instances.insert(id.clone(), provider.clone());
-                Ok(SpawnResourceResponse::InstanceId(id))
+                Ok(crate::common::StartComponentResponse::InstanceId(id))
             } else {
                 Ok(res)
             }
         } else {
-            Ok(SpawnResourceResponse::ResponseError(crate::common::ResponseError {
+            Ok(crate::common::StartComponentResponse::ResponseError(crate::common::ResponseError {
                 summary: "Error when creating a resource".to_string(),
                 detail: Some("Provider does not exist".to_string()),
             }))

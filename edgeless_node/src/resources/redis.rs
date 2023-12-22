@@ -81,7 +81,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for RedisRes
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::resource_configuration::SpawnResourceResponse> {
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
         if let (Some(url), Some(key)) = (
             instance_specification.configuration.get("url"),
             instance_specification.configuration.get("key"),
@@ -92,10 +92,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for RedisRes
             match RedisResource::new(dataplane_handle, url, key).await {
                 Ok(resource) => {
                     self.instances.insert(new_id.clone(), resource);
-                    return Ok(edgeless_api::resource_configuration::SpawnResourceResponse::InstanceId(new_id));
+                    return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
                 }
                 Err(err) => {
-                    return Ok(edgeless_api::resource_configuration::SpawnResourceResponse::ResponseError(
+                    return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                         edgeless_api::common::ResponseError {
                             summary: "Invalid resource configuration".to_string(),
                             detail: Some(err.to_string()),
@@ -105,7 +105,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for RedisRes
             }
         }
 
-        Ok(edgeless_api::resource_configuration::SpawnResourceResponse::ResponseError(
+        Ok(edgeless_api::common::StartComponentResponse::ResponseError(
             edgeless_api::common::ResponseError {
                 summary: "Invalid resource configuration".to_string(),
                 detail: Some("One of the fields 'url' or 'key' is missing".to_string()),

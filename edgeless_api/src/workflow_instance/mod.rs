@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use crate::{common::ResponseError, function_instance::InstanceId};
+use crate::common::ResponseError;
 
 const WORKFLOW_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
 

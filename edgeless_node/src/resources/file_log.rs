@@ -79,7 +79,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for FileLogR
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::resource_configuration::SpawnResourceResponse> {
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
         if let Some(filename) = instance_specification.configuration.get("filename") {
             let new_id = edgeless_api::function_instance::InstanceId::new(self.resource_provider_id.node_id);
             let dataplane_handle = self.dataplane_provider.get_handle_for(new_id.clone()).await;
@@ -87,10 +87,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for FileLogR
             match FileLogResource::new(dataplane_handle, filename).await {
                 Ok(resource) => {
                     self.instances.insert(new_id.clone(), resource);
-                    return Ok(edgeless_api::resource_configuration::SpawnResourceResponse::InstanceId(new_id));
+                    return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
                 }
                 Err(err) => {
-                    return Ok(edgeless_api::resource_configuration::SpawnResourceResponse::ResponseError(
+                    return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                         edgeless_api::common::ResponseError {
                             summary: "Invalid resource configuration".to_string(),
                             detail: Some(err.to_string()),
@@ -99,7 +99,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for FileLogR
                 }
             }
         }
-        Ok(edgeless_api::resource_configuration::SpawnResourceResponse::ResponseError(
+        Ok(edgeless_api::common::StartComponentResponse::ResponseError(
             edgeless_api::common::ResponseError {
                 summary: "Invalid resource configuration".to_string(),
                 detail: Some("Field 'filename' missing".to_string()),

@@ -87,7 +87,7 @@ impl Agent {
 
     pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::agent::AgentAPI + Send> {
         Box::new(AgentClient {
-            function_instance_client: Box::new(FunctionInstanceClient {
+            function_instance_client: Box::new(FunctionInstanceNodeClient {
                 sender: self.sender.clone(),
                 node_id: self.node_settings.node_id.clone(),
             }),
@@ -96,22 +96,22 @@ impl Agent {
 }
 
 #[derive(Clone)]
-pub struct FunctionInstanceClient {
+pub struct FunctionInstanceNodeClient {
     sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
     node_id: uuid::Uuid,
 }
 
 #[derive(Clone)]
 pub struct AgentClient {
-    function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceAPI>,
+    function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceNodeAPI>,
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceClient {
+impl edgeless_api::function_instance::FunctionInstanceNodeAPI for FunctionInstanceNodeClient {
     async fn start(
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
-    ) -> anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse> {
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
         let mut request = request;
         let f_id = match request.instance_id.clone() {
             Some(id) => id,
@@ -122,7 +122,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
             }
         };
         match self.sender.send(AgentRequest::SPAWN(request)).await {
-            Ok(_) => Ok(edgeless_api::function_instance::SpawnFunctionResponse::InstanceId(f_id)),
+            Ok(_) => Ok(edgeless_api::common::StartComponentResponse::InstanceId(f_id)),
             Err(err) => Err(anyhow::anyhow!(
                 "Agent channel error when creating a function instance: {}",
                 err.to_string()
@@ -149,13 +149,6 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
         }
     }
 
-    async fn update_node(
-        &mut self,
-        _request: edgeless_api::function_instance::UpdateNodeRequest,
-    ) -> anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse> {
-        Err(anyhow::anyhow!("Method UpdateNode not supported by agent"))
-    }
-
     async fn update_peers(&mut self, request: edgeless_api::function_instance::UpdatePeersRequest) -> anyhow::Result<()> {
         match self.sender.send(AgentRequest::UPDATEPEERS(request)).await {
             Ok(_) => Ok(()),
@@ -172,7 +165,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for FunctionInstanceCl
 }
 
 impl edgeless_api::agent::AgentAPI for AgentClient {
-    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI> {
+    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceNodeAPI> {
         self.function_instance_client.clone()
     }
 }

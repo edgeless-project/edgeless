@@ -69,7 +69,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for CoapClient {
     async fn start(
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<crate::resource_configuration::SpawnResourceResponse> {
+    ) -> anyhow::Result<crate::common::StartComponentResponse> {
         let mut outputs: [Option<(&str, edgeless_api_core::instance_id::InstanceId)>; 16] = [None; 16];
         let mut outputs_i: usize = 0;
         let mut configuration: [Option<(&str, &str)>; 16] = [None; 16];
@@ -115,17 +115,15 @@ impl crate::resource_configuration::ResourceConfigurationAPI for CoapClient {
                     if response_token == token {
                         match ok {
                             true => {
-                                return Ok(crate::resource_configuration::SpawnResourceResponse::InstanceId(
+                                return Ok(crate::common::StartComponentResponse::InstanceId(
                                     edgeless_api_core::coap_mapping::CoapDecoder::decode_instance_id(response_data).unwrap(),
                                 ));
                             }
                             false => {
-                                return Ok(crate::resource_configuration::SpawnResourceResponse::ResponseError(
-                                    crate::common::ResponseError {
-                                        summary: minicbor::decode::<&str>(response_data).unwrap().to_string(),
-                                        detail: None,
-                                    },
-                                ));
+                                return Ok(crate::common::StartComponentResponse::ResponseError(crate::common::ResponseError {
+                                    summary: minicbor::decode::<&str>(response_data).unwrap().to_string(),
+                                    detail: None,
+                                }));
                             }
                         }
                     }
