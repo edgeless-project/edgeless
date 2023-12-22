@@ -140,17 +140,19 @@ message WorkflowFunction {
     // Mapping of the outputs to other functions/resources in the workflow.
     map<string, string> output_mapping = 3;
     // Annotations associated with this function, if any.
-    map<string, string> annotations = 5;
+    map<string, string> annotations = 4;
 }
 
 // Message defining a request to create a new workflow.
 message SpawnWorkflowRequest {
-    // Chain of functions to be called. Cannot be empty.
-    repeated WorkflowFunction workflow_functions = 2;
-    // List of resources required by the workflow, if any.
-    repeated WorkflowResource workflow_resources = 3;
+    // Functions of the workflow, in arbitrary order. Cannot be empty.
+    // The functions and resources are identified within the workflow by
+    // the names, which must be unique.
+    repeated WorkflowFunction workflow_functions = 1;
+    // Resources used within the workflow, if any, in arbitrary order.
+    repeated WorkflowResource workflow_resources = 2;
     // Annotations associated with this workflow, if any.
-    map<string, string> annotations = 4;
+    map<string, string> annotations = 3;
 }
 
 // Response to a request to create a new workflow.
@@ -163,20 +165,22 @@ message SpawnWorkflowResponse {
     optional WorkflowInstanceStatus workflow_status = 2;
 }
 
-// Function instance mapping.
+// Mapping between the function/resource names within a workflow and
+// the orchestration domain to which they have been allocated.
 message WorkflowFunctionMapping {
-    // Name of the function within the workflow.
+    // Name of the function/resource within the workflow.
     string name = 1;
-    // Function instances implementing this function.
-    repeated InstanceId instances = 2;
+    // Unique identifier of the function.
+    string domain_id = 2;
 }
 
-// Status of a workflow instance.
+// Status of a workflow instance returned to a client when its request to create
+// a workflow has been accepted.
 message WorkflowInstanceStatus {
     // Workflow identifier.
     WorkflowId workflow_id = 1;
     // List of function instance mappings.
-    repeated WorkflowFunctionMapping functions = 2;
+    repeated WorkflowFunctionMapping domain_mapping = 2;
 }
 
 // Identifier of the workflow.
