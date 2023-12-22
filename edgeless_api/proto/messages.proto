@@ -45,21 +45,21 @@ message SpawnFunctionRequest {
     InstanceId instance_id = 1;
     // The function class specification.
     FunctionClassSpecification code = 2;
-    // Mapping of the outputs to concrete function/resource instances.
-    map<string, InstanceId> output_mapping = 3;
     // The set of annotations associated with this function instance.
     map<string, string> annotations = 5;
     // The state specification.
     StateSpecification state_specification = 6;
 }
 
-// Response message to the creation a new function instance.
-message SpawnFunctionResponse {
+// Response message to the creation a new function instance or the start of a
+// resource.
+message StartComponentResponse {
     // If present it means that the request has been rejected.
     // In this case, other fields may not be present or contain meaningful data.
     optional ResponseError response_error = 1;
 
-    // The identifier of the newly-spawned function instance, if accepted.
+    // The identifier of the newly-spawned function instance / newly-started
+    // resource, if accepted. The node identifier may be all-zeroes.
     optional InstanceId instance_id = 2;
 }
 
@@ -245,16 +245,6 @@ message ResourceInstanceSpecification {
     map<string, string> configuration = 2;
     // Mapping of the outputs to concrete function/resource instances.
     map<string, InstanceId> output_mapping = 3;
-}
-
-// Response to a request to create a new resource.
-message SpawnResourceResponse {
-    // If present it means that the request has been rejected.
-    // In this case, other fields may not be present or contain meaningful data.
-    optional ResponseError response_error = 1;
-
-    // The status of the newly-created resource, if request accepted.
-    optional InstanceId instance_id = 2;
 }
 
 // Message containing information provided as response to failed request.

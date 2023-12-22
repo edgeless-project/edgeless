@@ -23,26 +23,6 @@ impl ResourceConfigurationConverters {
         })
     }
 
-    pub fn parse_spawn_resource_response(
-        api_instance: &crate::grpc_impl::api::SpawnResourceResponse,
-    ) -> anyhow::Result<crate::resource_configuration::SpawnResourceResponse> {
-        match api_instance.instance_id.as_ref() {
-            Some(val) => match CommonConverters::parse_instance_id(val) {
-                Ok(val) => Ok(crate::resource_configuration::SpawnResourceResponse::InstanceId(val)),
-                Err(err) => Err(anyhow::anyhow!(err.to_string())),
-            },
-            None => match api_instance.response_error.as_ref() {
-                Some(val) => match CommonConverters::parse_response_error(val) {
-                    Ok(val) => Ok(crate::resource_configuration::SpawnResourceResponse::ResponseError(val)),
-                    Err(err) => Err(anyhow::anyhow!(err.to_string())),
-                },
-                None => Err(anyhow::anyhow!(
-                    "Ill-formed SpawnResourceResponse message: both ResponseError and InstanceId are empty"
-                )),
-            },
-        }
-    }
-
     pub fn serialize_resource_instance_specification(
         crate_spec: &crate::resource_configuration::ResourceInstanceSpecification,
     ) -> crate::grpc_impl::api::ResourceInstanceSpecification {
@@ -54,21 +34,6 @@ impl ResourceConfigurationConverters {
                 .iter()
                 .map(|(name, id)| (name.to_string(), CommonConverters::serialize_instance_id(id)))
                 .collect(),
-        }
-    }
-
-    pub fn serialize_spawn_resource_response(
-        req: &crate::resource_configuration::SpawnResourceResponse,
-    ) -> crate::grpc_impl::api::SpawnResourceResponse {
-        match req {
-            crate::resource_configuration::SpawnResourceResponse::ResponseError(err) => crate::grpc_impl::api::SpawnResourceResponse {
-                response_error: Some(CommonConverters::serialize_response_error(&err)),
-                instance_id: None,
-            },
-            crate::resource_configuration::SpawnResourceResponse::InstanceId(id) => crate::grpc_impl::api::SpawnResourceResponse {
-                response_error: None,
-                instance_id: Some(CommonConverters::serialize_instance_id(&id)),
-            },
         }
     }
 }
@@ -99,10 +64,10 @@ impl crate::resource_configuration::ResourceConfigurationAPI for ResourceConfigu
     async fn start(
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<crate::resource_configuration::SpawnResourceResponse> {
+    ) -> anyhow::Result<crate::common::StartComponentResponse> {
         let serialized_request = ResourceConfigurationConverters::serialize_resource_instance_specification(&instance_specification);
         match self.client.start(tonic::Request::new(serialized_request)).await {
-            Ok(ret) => ResourceConfigurationConverters::parse_spawn_resource_response(&ret.into_inner()),
+            Ok(ret) => CommonConverters::parse_start_component_response(&ret.into_inner()),
             Err(err) => Err(anyhow::anyhow!("Resource configuration request failed: {}", err)),
         }
     }
@@ -125,13 +90,13 @@ impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
     async fn start(
         &self,
         request: tonic::Request<crate::grpc_impl::api::ResourceInstanceSpecification>,
-    ) -> tonic::Result<tonic::Response<crate::grpc_impl::api::SpawnResourceResponse>> {
+    ) -> tonic::Result<tonic::Response<crate::grpc_impl::api::StartComponentResponse>> {
         let inner = request.into_inner();
         let parsed_spec =
             match crate::grpc_impl::resource_configuration::ResourceConfigurationConverters::parse_resource_instance_specification(&inner) {
                 Ok(val) => val,
                 Err(err) => {
-                    return Ok(tonic::Response::new(crate::grpc_impl::api::SpawnResourceResponse {
+                    return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
                         response_error: Some(crate::grpc_impl::api::ResponseError {
                             summary: "Invalid resource specification".to_string(),
                             detail: Some(err.to_string()),
@@ -141,11 +106,9 @@ impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
                 }
             };
         match self.root_api.lock().await.start(parsed_spec).await {
-            Ok(response) => Ok(tonic::Response::new(ResourceConfigurationConverters::serialize_spawn_resource_response(
-                &response,
-            ))),
+            Ok(response) => Ok(tonic::Response::new(CommonConverters::serialize_start_component_response(&response))),
             Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::SpawnResourceResponse {
+                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
                     response_error: Some(crate::grpc_impl::api::ResponseError {
                         summary: "Resource creation rejected".to_string(),
                         detail: Some(err.to_string()),

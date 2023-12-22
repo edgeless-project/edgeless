@@ -1,9 +1,7 @@
-use std::{net::SocketAddrV4, str::FromStr};
+use std::net::SocketAddrV4;
 
 use edgeless_api::{
     function_instance::{ComponentId, InstanceId},
-    grpc_impl::orc,
-    orc::OrchestratorAPI,
     workflow_instance::{WorkflowId, WorkflowInstance},
 };
 use futures::{Future, SinkExt, StreamExt};
@@ -162,8 +160,8 @@ impl Controller {
             log::debug!("stopping function/resource of workflow {}: {}", wf_id.to_string(), &component);
             match component.component_type {
                 ComponentType::Function => match fn_client
-                    .stop(InstanceId {
-                        node_id: uuid::Uuid::nil(), // XXX Issue#60
+                    .stop_function(InstanceId {
+                        node_id: uuid::Uuid::nil(),
                         function_id: component.fid.clone(),
                     })
                     .await
@@ -173,9 +171,18 @@ impl Controller {
                         log::error!("Unhandled: {}", err);
                     }
                 },
-                ComponentType::Resource => {
-                    // XXX Issue#60 stop resource
-                }
+                ComponentType::Resource => match fn_client
+                    .stop_resource(InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: component.fid.clone(),
+                    })
+                    .await
+                {
+                    Ok(_) => {}
+                    Err(err) => {
+                        log::error!("Unhandled: {}", err);
+                    }
+                },
             }
         }
 
@@ -189,7 +196,7 @@ impl Controller {
         mut orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>,
         resources: std::collections::HashMap<String, ResourceHandle>,
     ) {
-        let mut resources = resources;
+        let _resources = resources;
 
         let mut receiver = receiver;
 
@@ -254,13 +261,12 @@ impl Controller {
                         if res.is_err() {
                             break;
                         }
-                        // XXX Issue#60 remove output_mapping and state_specification
+                        // XXX Issue#60 remove state_specification
                         let response = fn_client
-                            .start(edgeless_api::function_instance::SpawnFunctionRequest {
+                            .start_function(edgeless_api::function_instance::SpawnFunctionRequest {
                                 instance_id: None,
                                 code: function.function_class_specification.clone(),
                                 annotations: function.annotations.clone(),
-                                output_mapping: std::collections::HashMap::new(),
                                 state_specification: edgeless_api::function_instance::StateSpecification {
                                     state_id: uuid::Uuid::new_v4(),
                                     state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
@@ -270,10 +276,11 @@ impl Controller {
 
                         match response {
                             Ok(response) => match response {
-                                edgeless_api::function_instance::SpawnFunctionResponse::ResponseError(error) => {
+                                edgeless_api::common::StartComponentResponse::ResponseError(error) => {
                                     log::error!("function instance creation rejected: {}", error);
                                 }
-                                edgeless_api::function_instance::SpawnFunctionResponse::InstanceId(id) => {
+                                edgeless_api::common::StartComponentResponse::InstanceId(id) => {
+                                    // id.node_id is unused
                                     workflow_function_mapping.push(edgeless_api::workflow_instance::WorkflowFunctionMapping {
                                         name: function.name.clone(),
                                         domain_id: orc_domain.clone(),
@@ -282,7 +289,7 @@ impl Controller {
                                         component_type: ComponentType::Function,
                                         name: function.name.clone(),
                                         domain_id: orc_domain.clone(),
-                                        fid: id.function_id.clone(), // XXX Issue#60
+                                        fid: id.function_id.clone(),
                                     });
                                 }
                             },
@@ -297,17 +304,38 @@ impl Controller {
                         if res.is_err() {
                             break;
                         }
-                        // XXX Issue#60 API to start resources to be added
-                        workflow_function_mapping.push(edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                            name: resource.name.clone(),
-                            domain_id: orc_domain.clone(),
-                        });
-                        cur_workflow.domain_mapping.push(ActiveComponent {
-                            component_type: ComponentType::Resource,
-                            name: resource.name.clone(),
-                            domain_id: orc_domain.clone(),
-                            fid: uuid::Uuid::new_v4(), // XXX Issue#60
-                        });
+                        let response = fn_client
+                            .start_resource(edgeless_api::workflow_instance::WorkflowResource {
+                                name: resource.name.clone(),
+                                class_type: resource.class_type.clone(),
+                                output_mapping: std::collections::HashMap::new(),
+                                configurations: resource.configurations.clone(),
+                            })
+                            .await;
+
+                        match response {
+                            Ok(response) => match response {
+                                edgeless_api::common::StartComponentResponse::ResponseError(error) => {
+                                    log::error!("resource start rejected: {}", error);
+                                }
+                                edgeless_api::common::StartComponentResponse::InstanceId(id) => {
+                                    // id.node_id is unused
+                                    workflow_function_mapping.push(edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                                        name: resource.name.clone(),
+                                        domain_id: orc_domain.clone(),
+                                    });
+                                    cur_workflow.domain_mapping.push(ActiveComponent {
+                                        component_type: ComponentType::Resource,
+                                        name: resource.name.clone(),
+                                        domain_id: orc_domain.clone(),
+                                        fid: id.function_id.clone(),
+                                    });
+                                }
+                            },
+                            Err(err) => {
+                                res = Err(format!("failed interaction when startinga a resource: {}", err.to_string()));
+                            }
+                        }
                     }
 
                     //
@@ -493,10 +521,10 @@ impl Controller {
 
         //                             match response {
         //                                 Ok(response) => match response {
-        //                                     edgeless_api::function_instance::SpawnFunctionResponse::ResponseError(error) => {
+        //                                     edgeless_api::function_instance::StartComponentResponse::ResponseError(error) => {
         //                                         log::error!("function instance creation rejected: {}", error);
         //                                     }
-        //                                     edgeless_api::function_instance::SpawnFunctionResponse::InstanceId(id) => {
+        //                                     edgeless_api::function_instance::StartComponentResponse::InstanceId(id) => {
         //                                         current_workflow.function_instances.insert(fun.name.clone(), vec![id]);
         //                                         if all_outputs_mapped {
         //                                             to_upsert.remove(&fun.name);
@@ -542,7 +570,7 @@ impl Controller {
         //                                     .await
         //                                 {
         //                                     Ok(response) => match response {
-        //                                         edgeless_api::resource_configuration::SpawnResourceResponse::InstanceId(instance_id) => {
+        //                                         edgeless_api::common::StartComponentResponse::InstanceId(instance_id) => {
         //                                             current_workflow
         //                                                 .resource_instances
         //                                                 .insert(resource.name.clone(), vec![(provider_id.clone(), instance_id)]);
@@ -550,7 +578,7 @@ impl Controller {
         //                                                 to_upsert.remove(&resource.name);
         //                                             }
         //                                         }
-        //                                         edgeless_api::resource_configuration::SpawnResourceResponse::ResponseError(err) => {
+        //                                         edgeless_api::common::StartComponentResponse::ResponseError(err) => {
         //                                             log::error!("resource creation rejected: {:?}", &err);
         //                                         }
         //                                     },

@@ -1,4 +1,5 @@
-use edgeless_api::function_instance::{SpawnFunctionResponse, UpdateNodeRequest, UpdatePeersRequest};
+use edgeless_api::common::StartComponentResponse;
+use edgeless_api::function_instance::{UpdateNodeRequest, UpdatePeersRequest};
 use futures::{Future, SinkExt, StreamExt};
 use std::collections::{HashMap, HashSet};
 
@@ -7,11 +8,16 @@ pub struct Orchestrator {
 }
 
 enum OrchestratorRequest {
-    SPAWN(
+    STARTFUNCTION(
         edgeless_api::function_instance::SpawnFunctionRequest,
-        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse>>,
+        tokio::sync::oneshot::Sender<anyhow::Result<StartComponentResponse>>,
     ),
-    STOP(edgeless_api::function_instance::InstanceId),
+    STOPFUNCTION(edgeless_api::function_instance::InstanceId),
+    STARTRESOURCE(
+        edgeless_api::workflow_instance::WorkflowResource,
+        tokio::sync::oneshot::Sender<anyhow::Result<StartComponentResponse>>,
+    ),
+    STOPRESOURCE(edgeless_api::function_instance::InstanceId),
     UPDATELINKS(edgeless_api::function_instance::UpdateFunctionLinksRequest),
     UPDATENODE(
         edgeless_api::function_instance::UpdateNodeRequest,
@@ -21,21 +27,21 @@ enum OrchestratorRequest {
 }
 
 pub struct OrchestratorClient {
-    function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceAPI>,
+    function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI>,
 }
 
 impl edgeless_api::orc::OrchestratorAPI for OrchestratorClient {
-    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI> {
+    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI> {
         self.function_instance_client.clone()
     }
 }
 
 #[derive(Clone)]
-pub struct OrchestratorFunctionInstanceClient {
+pub struct OrchestratorFunctionInstanceOrcClient {
     sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
 }
 
-impl OrchestratorFunctionInstanceClient {}
+impl OrchestratorFunctionInstanceOrcClient {}
 
 pub struct ClientDesc {
     agent_url: String,
@@ -65,7 +71,7 @@ impl Orchestrator {
         // Main loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
             match req {
-                OrchestratorRequest::SPAWN(spawn_req, reply_channel) => {
+                OrchestratorRequest::STARTFUNCTION(spawn_req, reply_channel) => {
                     // Orchestration step: select the node to spawn this
                     // function instance by using the orchestration logic.
                     // Orchestration strategy can also be changed during
@@ -93,8 +99,8 @@ impl Orchestrator {
                     // selected client
                     let res = match fn_client.start(spawn_req).await {
                         Ok(res) => match res {
-                            SpawnFunctionResponse::ResponseError(err) => Err(anyhow::anyhow!("Orchestrator->Node Spawn Request failed: {}", &err)),
-                            SpawnFunctionResponse::InstanceId(id) => {
+                            StartComponentResponse::ResponseError(err) => Err(anyhow::anyhow!("Orchestrator->Node Spawn Request failed: {}", &err)),
+                            StartComponentResponse::InstanceId(id) => {
                                 log::info!("Spawned at: {:?}", &id);
                                 Ok(res)
                             }
@@ -108,8 +114,8 @@ impl Orchestrator {
                         log::error!("Orchestrator channel error in SPAWN: {:?}", err);
                     }
                 }
-                OrchestratorRequest::STOP(stop_function_id) => {
-                    log::debug!("Orchestrator Stop {:?}", stop_function_id);
+                OrchestratorRequest::STOPFUNCTION(stop_function_id) => {
+                    log::debug!("Orchestrator StopFunction {:?}", stop_function_id);
                     let mut fn_client = match clients.get_mut(&stop_function_id.node_id) {
                         Some(c) => c,
                         None => {
@@ -124,6 +130,13 @@ impl Orchestrator {
                             log::error!("Unhandled: {}", err);
                         }
                     };
+                }
+                OrchestratorRequest::STARTRESOURCE(spawn_req, reply_channel) => {
+                    // XXX Issue#60
+                }
+                OrchestratorRequest::STOPRESOURCE(stop_function_id) => {
+                    log::debug!("Orchestrator StopResource {:?}", stop_function_id);
+                    // XXX Issue#60
                 }
                 OrchestratorRequest::UPDATELINKS(update) => {
                     log::debug!("Orchestrator Update {:?}", update);
@@ -279,22 +292,18 @@ impl Orchestrator {
 
     pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::orc::OrchestratorAPI + Send> {
         Box::new(OrchestratorClient {
-            function_instance_client: Box::new(OrchestratorFunctionInstanceClient { sender: self.sender.clone() }),
+            function_instance_client: Box::new(OrchestratorFunctionInstanceOrcClient { sender: self.sender.clone() }),
         })
     }
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFunctionInstanceClient {
-    async fn start(
-        &mut self,
-        request: edgeless_api::function_instance::SpawnFunctionRequest,
-    ) -> anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse> {
-        log::debug!("FunctionInstance::Start() {:?}", request);
+impl edgeless_api::function_instance::FunctionInstanceOrcAPI for OrchestratorFunctionInstanceOrcClient {
+    async fn start_function(&mut self, request: edgeless_api::function_instance::SpawnFunctionRequest) -> anyhow::Result<StartComponentResponse> {
+        log::debug!("FunctionInstance::StartFunction() {:?}", request);
         let request = request;
-        let (reply_sender, reply_receiver) =
-            tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::function_instance::SpawnFunctionResponse>>();
-        if let Err(err) = self.sender.send(OrchestratorRequest::SPAWN(request, reply_sender)).await {
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<StartComponentResponse>>();
+        if let Err(err) = self.sender.send(OrchestratorRequest::STARTFUNCTION(request, reply_sender)).await {
             return Err(anyhow::anyhow!(
                 "Orchestrator channel error when creating a function instance: {}",
                 err.to_string()
@@ -309,12 +318,45 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFuncti
         }
     }
 
-    async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-        log::debug!("FunctionInstance::Stop() {:?}", id);
-        match self.sender.send(OrchestratorRequest::STOP(id)).await {
+    async fn stop_function(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+        log::debug!("FunctionInstance::StopFunction() {:?}", id);
+        match self.sender.send(OrchestratorRequest::STOPFUNCTION(id)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Orchestrator channel error when stopping a function instance: {}",
+                err.to_string()
+            )),
+        }
+    }
+
+    async fn start_resource(
+        &mut self,
+        request: edgeless_api::workflow_instance::WorkflowResource,
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
+        log::debug!("FunctionInstance::StartResource() {:?}", request);
+        let request = request;
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::common::StartComponentResponse>>();
+        if let Err(err) = self.sender.send(OrchestratorRequest::STARTRESOURCE(request, reply_sender)).await {
+            return Err(anyhow::anyhow!(
+                "Orchestrator channel error when starting a resource: {}",
+                err.to_string()
+            ));
+        }
+        match reply_receiver.await {
+            Ok(f_id) => f_id,
+            Err(err) => Err(anyhow::anyhow!(
+                "Orchestrator channel error when starting a resource: {}",
+                err.to_string()
+            )),
+        }
+    }
+
+    async fn stop_resource(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+        log::debug!("FunctionInstance::StopResource() {:?}", id);
+        match self.sender.send(OrchestratorRequest::STOPRESOURCE(id)).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(
+                "Orchestrator channel error when stopping a resource: {}",
                 err.to_string()
             )),
         }
@@ -345,13 +387,5 @@ impl edgeless_api::function_instance::FunctionInstanceAPI for OrchestratorFuncti
             Ok(res) => res,
             Err(err) => Err(anyhow::anyhow!("Orchestrator channel error  when updating a node: {}", err.to_string())),
         }
-    }
-
-    async fn update_peers(&mut self, _request: edgeless_api::function_instance::UpdatePeersRequest) -> anyhow::Result<()> {
-        Err(anyhow::anyhow!("Method UpdatePeers not supported by e-ORC"))
-    }
-
-    async fn keep_alive(&mut self) -> anyhow::Result<()> {
-        Ok(())
     }
 }

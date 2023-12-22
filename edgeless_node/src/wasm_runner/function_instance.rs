@@ -38,7 +38,7 @@ impl FunctionInstance {
         let mut telemetry_handle = telemetry_handle;
 
         let callback_table = std::sync::Arc::new(tokio::sync::Mutex::new(FunctionInstanceCallbackTable {
-            mapping: spawn_req.output_mapping.clone(),
+            mapping: std::collections::HashMap::new(),
         }));
         let instance_id = match spawn_req.instance_id.clone() {
             Some(id) => id,
