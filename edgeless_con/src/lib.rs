@@ -7,18 +7,9 @@ pub struct EdgelessConOrcConfig {
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct EdgelessConResourceConfig {
-    pub resource_provider_id: String,
-    pub class_type: String,
-    pub outputs: Vec<String>,
-    pub resource_configuration_url: String,
-}
-
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessConSettings {
     pub controller_url: String,
     pub orchestrators: Vec<EdgelessConOrcConfig>,
-    pub resources: Vec<EdgelessConResourceConfig>,
 }
 
 pub async fn edgeless_con_main(settings: EdgelessConSettings) {
@@ -38,12 +29,6 @@ pub fn edgeless_con_default_conf() -> String {
         r##"controller_url = "http://127.0.0.1:7001"
 orchestrators = [
     { domain_id = "domain-1", orchestrator_url="http://127.0.0.1:7011" }
-]
-resources = [
-    { resource_provider_id = "file-log-1",     class_type = "file-log",     outputs = [],              resource_configuration_url = "http://127.0.0.1:7033" },
-    { resource_provider_id = "http-ingress-1", class_type = "http-ingress", outputs = ["new_request"], resource_configuration_url = "http://127.0.0.1:7033" },
-    { resource_provider_id = "http-egress-1",  class_type = "http-egress",  outputs = [],              resource_configuration_url = "http://127.0.0.1:7033" },
-    { resource_provider_id = "redis-1",        class_type = "redis",        outputs = [],              resource_configuration_url = "http://127.0.0.1:7033" }
 ]
 "##,
     )
