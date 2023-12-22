@@ -26,6 +26,12 @@ enum OrchestratorRequest {
     KEEPALIVE(),
 }
 
+struct ResourceHandle {
+    resource_type: String,
+    _outputs: Vec<String>,
+    config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send>,
+}
+
 pub struct OrchestratorClient {
     function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI>,
 }
@@ -50,10 +56,34 @@ pub struct ClientDesc {
 }
 
 impl Orchestrator {
-    pub fn new(node_settings: crate::EdgelessOrcSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
+    pub async fn new(settings: crate::EdgelessOrcSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
+        // Prepare all resources known by the orchestrator.
+        let mut resources = std::collections::HashMap::<String, ResourceHandle>::new();
+        for resource in &settings.resources {
+            let (proto, url, port) = edgeless_api::util::parse_http_host(&resource.resource_configuration_url).unwrap();
+            let config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send> = match proto {
+                edgeless_api::util::Proto::COAP => {
+                    log::info!("coap called");
+                    Box::new(edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port)).await)
+                }
+                _ => Box::new(
+                    edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationClient::new(&resource.resource_configuration_url).await,
+                ),
+            };
+
+            resources.insert(
+                resource.resource_provider_id.clone(),
+                ResourceHandle {
+                    resource_type: resource.class_type.clone(),
+                    _outputs: resource.outputs.clone(),
+                    config_api,
+                },
+            );
+        }
+
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, node_settings).await;
+            Self::main_task(receiver, resources, settings).await;
         });
 
         (Orchestrator { sender }, main_task)
@@ -63,7 +93,12 @@ impl Orchestrator {
         let _ = self.sender.send(OrchestratorRequest::KEEPALIVE()).await;
     }
 
-    async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
+    async fn main_task(
+        receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>,
+        resources: std::collections::HashMap<String, ResourceHandle>,
+        orchestrator_settings: crate::EdgelessOrcSettings,
+    ) {
+        let _resources = resources;
         let mut clients = HashMap::<uuid::Uuid, ClientDesc>::new();
         let mut receiver = receiver;
         let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy);

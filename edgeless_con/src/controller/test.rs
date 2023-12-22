@@ -102,18 +102,8 @@ async fn test_setup() -> (
         "domain-1".to_string(),
         Box::new(mock_orc) as Box<dyn edgeless_api::orc::OrchestratorAPI>,
     )]);
-    // XXX Issue#60 remove resource
-    let resources = std::collections::HashMap::new();
-    // let resources = std::collections::HashMap::<String, ResourceHandle>::from([(
-    //     "resource-1".to_string(),
-    //     ResourceHandle {
-    //         resource_type: "test-res".to_string(),
-    //         _outputs: vec!["test_out".to_string()],
-    //         config_api: Box::new(mock_res) as Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send>,
-    //     },
-    // )]);
 
-    let (mut controller, controller_task) = Controller::new(orc_clients, resources);
+    let (mut controller, controller_task) = Controller::new(orc_clients);
     tokio::spawn(controller_task);
     let mut client = controller.get_api_client();
     let wf_client = client.workflow_instance_api();
