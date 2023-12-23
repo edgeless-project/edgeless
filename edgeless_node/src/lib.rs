@@ -1,4 +1,4 @@
-use edgeless_api::orc::OrchestratorAPI;
+use edgeless_api::{function_instance::ResourceProviderSpecification, orc::OrchestratorAPI};
 use futures::join;
 
 pub mod agent;
@@ -18,7 +18,7 @@ pub struct EdgelessNodeSettings {
     pub http_ingress_url: String,
 }
 
-async fn register_node(settings: &EdgelessNodeSettings) {
+async fn register_node(settings: &EdgelessNodeSettings, resource_provider_specifications: Vec<ResourceProviderSpecification>) {
     log::info!("Registering this node '{}' on e-ORC {}", &settings.node_id, &settings.orchestrator_url);
     match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&settings.orchestrator_url, None).await {
         Ok(mut orc_client) => match orc_client
@@ -27,7 +27,7 @@ async fn register_node(settings: &EdgelessNodeSettings) {
                 settings.node_id.clone(),
                 settings.agent_url.clone(),
                 settings.invocation_url.clone(),
-                vec![], // XXX Issue#60
+                resource_provider_specifications,
             ))
             .await
         {
@@ -48,6 +48,7 @@ async fn register_node(settings: &EdgelessNodeSettings) {
 async fn fill_resources(
     data_plane: edgeless_dataplane::handle::DataplaneProvider,
     settings: &EdgelessNodeSettings,
+    provider_specifications: &mut Vec<ResourceProviderSpecification>,
 ) -> std::collections::HashMap<String, Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI>> {
     let mut ret = std::collections::HashMap::<String, Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI>>::new();
 
@@ -63,6 +64,12 @@ async fn fill_resources(
                 )
                 .await,
             );
+            provider_specifications.push(ResourceProviderSpecification {
+                provider_id: "http-ingress-1".to_string(),
+                class_type: "http-ingress".to_string(),
+                outputs: vec!["new_request".to_string()],
+                configuration_url: settings.resource_configuration_url.clone(),
+            });
         }
 
         log::info!("Creating resource 'http-egress-1'");
@@ -76,6 +83,12 @@ async fn fill_resources(
                 .await,
             ),
         );
+        provider_specifications.push(ResourceProviderSpecification {
+            provider_id: "http-egress-1".to_string(),
+            class_type: "http-egress".to_string(),
+            outputs: vec![],
+            configuration_url: settings.resource_configuration_url.clone(),
+        });
 
         log::info!("Creating resource 'file-log-1'");
         ret.insert(
@@ -88,6 +101,12 @@ async fn fill_resources(
                 .await,
             ),
         );
+        provider_specifications.push(ResourceProviderSpecification {
+            provider_id: "file-log-1".to_string(),
+            class_type: "file-log".to_string(),
+            outputs: vec![],
+            configuration_url: settings.resource_configuration_url.clone(),
+        });
 
         log::info!("Creating resource 'redis-1'");
         ret.insert(
@@ -100,6 +119,12 @@ async fn fill_resources(
                 .await,
             ),
         );
+        provider_specifications.push(ResourceProviderSpecification {
+            provider_id: "redis-1".to_string(),
+            class_type: "redis".to_string(),
+            outputs: vec![],
+            configuration_url: settings.resource_configuration_url.clone(),
+        });
     }
 
     ret
@@ -135,9 +160,10 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.agent_url.clone());
 
     // Create the resources.
+    let mut resource_provider_specifications = vec![];
     let resource_api_server = edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationServer::run(
         Box::new(edgeless_api::resource_configuration::MultiResouceConfigurationAPI::new(
-            fill_resources(data_plane, &settings).await,
+            fill_resources(data_plane, &settings, &mut resource_provider_specifications).await,
         )),
         settings.resource_configuration_url.clone(),
     );
@@ -148,7 +174,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         agent_task,
         agent_api_server,
         resource_api_server,
-        register_node(&settings)
+        register_node(&settings, resource_provider_specifications)
     );
 }
 
