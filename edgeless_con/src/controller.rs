@@ -346,6 +346,12 @@ impl Controller {
                                 // target function/resource (once for each
                                 // assigned orchestration domain).
                                 for target_fid in cur_workflow.mapped_fids(&to_name) {
+                                    // [TODO] The output_mapping structure
+                                    // should be changed so that multiple
+                                    // values are possible (with weights), and
+                                    // this change must be applied to runners,
+                                    // as well. For now, we just keep
+                                    // overwriting the same entry.
                                     output_mapping.insert(
                                         from_channel.clone(),
                                         InstanceId {
@@ -353,14 +359,6 @@ impl Controller {
                                             function_id: target_fid,
                                         },
                                     );
-
-                                    // [TODO] The output_mapping structure
-                                    // should be changed so that multiple
-                                    // values are possible (with weights), and
-                                    // this change must be applied to runners,
-                                    // as well. For now we break after the first
-                                    // loop.
-                                    break;
                                 }
                             }
 
