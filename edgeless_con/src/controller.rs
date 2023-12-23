@@ -1,5 +1,5 @@
 use edgeless_api::{
-    function_instance::{ComponentId, InstanceId},
+    function_instance::{ComponentId, InstanceId, PatchRequest},
     workflow_instance::{WorkflowId, WorkflowInstance},
 };
 use futures::{Future, SinkExt, StreamExt};
@@ -62,6 +62,16 @@ struct ActiveWorkflow {
 
     // Mapping of each function/resource to a list of domains.
     domain_mapping: Vec<ActiveComponent>,
+}
+
+impl ActiveWorkflow {
+    pub fn mapped_fids(&self, name: &str) -> Vec<ComponentId> {
+        self.domain_mapping
+            .iter()
+            .filter(|x| x.name == name)
+            .map(|x| x.fid)
+            .collect::<Vec<ComponentId>>()
+    }
 }
 
 impl Controller {
@@ -220,11 +230,13 @@ impl Controller {
                     //
 
                     // Start the functions on the orchestration domain.
-                    for function in spawn_workflow_request.workflow_functions {
+                    for function in &spawn_workflow_request.workflow_functions {
                         if res.is_err() {
                             break;
                         }
-                        // XXX Issue#60 remove state_specification
+                        // [TODO] The state_specification configuration should be
+                        // read from the function annotations.
+                        log::warn!("function annotations currently ignored: {:?}", function.annotations);
                         let response = fn_client
                             .start_function(edgeless_api::function_instance::SpawnFunctionRequest {
                                 instance_id: None,
@@ -263,7 +275,7 @@ impl Controller {
                     }
 
                     // Start the resources on the orchestration domain.
-                    for resource in spawn_workflow_request.workflow_resources {
+                    for resource in &spawn_workflow_request.workflow_resources {
                         if res.is_err() {
                             break;
                         }
@@ -306,7 +318,76 @@ impl Controller {
                     // have been created successfully.
                     //
 
-                    // XXX Issue#60 do the patching
+                    // Collect all the names+output_mapping from the
+                    // functions and resources of this workflow.
+                    let mut function_resources = std::collections::HashMap::new();
+                    for function in &spawn_workflow_request.workflow_functions {
+                        function_resources.insert(function.name.clone(), function.output_mapping.clone());
+                    }
+                    for resource in &spawn_workflow_request.workflow_resources {
+                        function_resources.insert(resource.name.clone(), resource.output_mapping.clone());
+                    }
+
+                    // Loop on all the functions and resources of the workflow.
+                    for (component_name, component_mapping) in function_resources {
+                        if res.is_err() {
+                            break;
+                        }
+
+                        // Loop on all the identifiers for this function/resource
+                        // (once for each orchestration domain to which the
+                        // function/resource was allocated).
+                        for origin_fid in cur_workflow.mapped_fids(&component_name) {
+                            // Loop on all the channels that needed to be
+                            // mapped for this function/resource.
+                            let mut output_mapping = std::collections::HashMap::new();
+                            for (from_channel, to_name) in &component_mapping {
+                                // Loop on all the identifiers for the
+                                // target function/resource (once for each
+                                // assigned orchestration domain).
+                                for target_fid in cur_workflow.mapped_fids(&to_name) {
+                                    output_mapping.insert(
+                                        from_channel.clone(),
+                                        InstanceId {
+                                            node_id: uuid::Uuid::nil(),
+                                            function_id: target_fid,
+                                        },
+                                    );
+
+                                    // [TODO] The output_mapping structure
+                                    // should be changed so that multiple
+                                    // values are possible (with weights), and
+                                    // this change must be applied to runners,
+                                    // as well. For now we break after the first
+                                    // loop.
+                                    break;
+                                }
+                            }
+
+                            if output_mapping.is_empty() {
+                                continue;
+                            }
+                            match fn_client
+                                .patch(PatchRequest {
+                                    instance_id: Some(InstanceId {
+                                        node_id: uuid::Uuid::nil(),
+                                        function_id: origin_fid,
+                                    }),
+                                    output_mapping,
+                                })
+                                .await
+                            {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    res = Err(format!(
+                                        "failed interaction when patching component {}: {}",
+                                        &component_name,
+                                        err.to_string()
+                                    ));
+                                }
+                            }
+                        }
+                    }
 
                     //
                     // If all went OK, notify the client that the workflow
