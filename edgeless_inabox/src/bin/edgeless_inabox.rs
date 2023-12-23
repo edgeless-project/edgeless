@@ -5,7 +5,6 @@ use clap::Parser;
 use edgeless_con::EdgelessConOrcConfig;
 use edgeless_inabox::InABoxConfig;
 use edgeless_node::EdgelessNodeSettings;
-use edgeless_orc::EdgelessResourceConfig;
 use std::fs;
 use uuid::Uuid;
 
@@ -101,33 +100,6 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         orchestrator_url: next_url(),
         orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
         keep_alive_interval_secs: 2,
-        resources: vec![
-            // resources are hardcoded mostly
-            EdgelessResourceConfig {
-                resource_provider_id: "file-log-1".to_string(),
-                class_type: "file-log".to_string(),
-                outputs: vec![],
-                resource_configuration_url: resource_configuration_url.clone(),
-            },
-            EdgelessResourceConfig {
-                resource_provider_id: "http-ingress-1".to_string(),
-                class_type: "http-ingress".to_string(),
-                outputs: vec!["new_request".to_string()],
-                resource_configuration_url: resource_configuration_url.clone(),
-            },
-            EdgelessResourceConfig {
-                resource_provider_id: "http-egress-1".to_string(),
-                class_type: "http-egress".to_string(),
-                outputs: vec![],
-                resource_configuration_url: resource_configuration_url.clone(),
-            },
-            EdgelessResourceConfig {
-                resource_provider_id: "redis-1".to_string(),
-                class_type: "redis".to_string(),
-                outputs: vec![],
-                resource_configuration_url: resource_configuration_url.clone(),
-            },
-        ],
     };
 
     // Controller
