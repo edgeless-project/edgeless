@@ -206,6 +206,7 @@ impl Orchestrator {
                                             .await,
                                         ),
                                     };
+                                    log::info!("new resource advertised by node {}: {}", this_node_id.unwrap(), resource);
 
                                     resources.insert(
                                         resource.provider_id.clone(),
