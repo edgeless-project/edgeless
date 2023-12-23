@@ -72,14 +72,16 @@ enum UpdateNodeRequestType {
 // Request message of FunctionInstance::UpdateNode().
 message UpdateNodeRequest {
     // Request type: registration or deregistration. Always present.
-    UpdateNodeRequestType request_type = 1;
+    UpdateNodeRequestType request_type                        = 1;
     // Identifier of the node that is entering/leaving the orchestration domain.
     // This field must be always present.
-    string node_id                     = 2;
+    string node_id                                            = 2;
     // URL of the node's agent server. Always present if REGISTER type.
-    optional string agent_url          = 3;
+    optional string agent_url                                 = 3;
     // URL of the node's invocation server. Always present if REGISTER type.
-    optional string invocation_url     = 4;
+    optional string invocation_url                            = 4;
+    // Resources offered by this node.
+    repeated ResourceProviderSpecification resource_providers = 5;
 }
 
 // Response message of FunctionInstance::UpdateNode().
@@ -222,19 +224,21 @@ message Event {
     // The function instance that generated the event (caller).
     InstanceId source = 2;
     // Ongoing transaction identifier.
-    uint64 stream_id = 3;
+    uint64 stream_id  = 3;
     // Event data.
-    EventData msg = 4;
+    EventData msg     = 4;
 }
 
 // Resource provider specification.
 message ResourceProviderSpecification {
     // Unique identifier of the resource provider.
-    string provider_id = 1;
+    string provider_id       = 1;
     // Type of the resource provided.
-    string class_type = 2;
+    string class_type        = 2;
     // List of callbacks that can be invoked.
-    repeated string outputs = 3;
+    repeated string outputs  = 3;
+    // URL of the resource configuration API.
+    string configuration_url = 4;
 }
 
 // Resource instance specification.

@@ -27,6 +27,7 @@ async fn register_node(settings: &EdgelessNodeSettings) {
                 settings.node_id.clone(),
                 settings.agent_url.clone(),
                 settings.invocation_url.clone(),
+                vec![], // XXX Issue#60
             ))
             .await
         {
