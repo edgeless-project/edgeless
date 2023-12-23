@@ -50,11 +50,21 @@ impl FunctonInstanceConverters {
         }
         match api_instance.request_type {
             x if x == crate::grpc_impl::api::UpdateNodeRequestType::Register as i32 => {
+                let mut resource_providers = vec![];
+                for resource_provider in &api_instance.resource_providers {
+                    match Self::parse_resource_provider_specification(&resource_provider) {
+                        Ok(val) => resource_providers.push(val),
+                        Err(err) => {
+                            return Err(anyhow::anyhow!("Ill-formed resource provider in UpdateNodeRequest message: {}", err));
+                        }
+                    }
+                }
                 if let (Some(agent_url), Some(invocation_url)) = (api_instance.agent_url.as_ref(), api_instance.invocation_url.as_ref()) {
                     Ok(crate::function_instance::UpdateNodeRequest::Registration(
                         node_id.unwrap(),
                         agent_url.to_string(),
                         invocation_url.to_string(),
+                        resource_providers,
                     ))
                 } else {
                     return Err(anyhow::anyhow!(
@@ -152,6 +162,32 @@ impl FunctonInstanceConverters {
         })
     }
 
+    pub fn parse_resource_provider_specification(
+        api_spec: &crate::grpc_impl::api::ResourceProviderSpecification,
+    ) -> anyhow::Result<crate::function_instance::ResourceProviderSpecification> {
+        if api_spec.provider_id.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Ill-formed ResourceProviderSpecification message: provider_id cannot be empty"
+            ));
+        }
+        if api_spec.class_type.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Ill-formed ResourceProviderSpecification message: class_type cannot be empty"
+            ));
+        }
+        if api_spec.configuration_url.is_empty() {
+            return Err(anyhow::anyhow!(
+                "Ill-formed ResourceProviderSpecification message: configuration_url cannot be empty"
+            ));
+        }
+        Ok(crate::function_instance::ResourceProviderSpecification {
+            provider_id: api_spec.provider_id.clone(),
+            class_type: api_spec.class_type.clone(),
+            outputs: api_spec.outputs.clone(),
+            configuration_url: api_spec.configuration_url.clone(),
+        })
+    }
+
     pub fn serialize_function_class_specification(
         spec: &crate::function_instance::FunctionClassSpecification,
     ) -> crate::grpc_impl::api::FunctionClassSpecification {
@@ -178,12 +214,16 @@ impl FunctonInstanceConverters {
 
     pub fn serialize_update_node_request(req: &crate::function_instance::UpdateNodeRequest) -> crate::grpc_impl::api::UpdateNodeRequest {
         match req {
-            crate::function_instance::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url) => {
+            crate::function_instance::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resource_providers) => {
                 crate::grpc_impl::api::UpdateNodeRequest {
                     request_type: crate::grpc_impl::api::UpdateNodeRequestType::Register as i32,
                     node_id: node_id.to_string(),
                     agent_url: Some(agent_url.to_string()),
                     invocation_url: Some(invocation_url.to_string()),
+                    resource_providers: resource_providers
+                        .iter()
+                        .map(|x| Self::serialize_resource_provider_specification(x))
+                        .collect(),
                 }
             }
             crate::function_instance::UpdateNodeRequest::Deregistration(node_id) => crate::grpc_impl::api::UpdateNodeRequest {
@@ -191,6 +231,7 @@ impl FunctonInstanceConverters {
                 node_id: node_id.to_string(),
                 agent_url: None,
                 invocation_url: None,
+                resource_providers: vec![],
             },
         }
     }
@@ -249,6 +290,17 @@ impl FunctonInstanceConverters {
                 crate::function_instance::StatePolicy::Global => crate::grpc_impl::api::StatePolicy::Global as i32,
                 crate::function_instance::StatePolicy::NodeLocal => crate::grpc_impl::api::StatePolicy::NodeLocal as i32,
             },
+        }
+    }
+
+    pub fn serialize_resource_provider_specification(
+        crate_spec: &crate::function_instance::ResourceProviderSpecification,
+    ) -> crate::grpc_impl::api::ResourceProviderSpecification {
+        crate::grpc_impl::api::ResourceProviderSpecification {
+            provider_id: crate_spec.provider_id.clone(),
+            class_type: crate_spec.class_type.clone(),
+            outputs: crate_spec.outputs.clone(),
+            configuration_url: crate_spec.configuration_url.clone(),
         }
     }
 }
@@ -699,6 +751,7 @@ mod tests {
     use crate::common::StartComponentResponse;
     use crate::function_instance::FunctionClassSpecification;
     use crate::function_instance::PatchRequest;
+    use crate::function_instance::ResourceProviderSpecification;
     use crate::function_instance::SpawnFunctionRequest;
     use crate::function_instance::StatePolicy;
     use crate::function_instance::StateSpecification;
@@ -762,6 +815,18 @@ mod tests {
                 uuid::Uuid::new_v4(),
                 "http://127.0.0.1:10000".to_string(),
                 "http://127.0.0.1:10001".to_string(),
+                vec![ResourceProviderSpecification {
+                    provider_id: "provider-1".to_string(),
+                    class_type: "class-type-1".to_string(),
+                    outputs: vec!["out1".to_string(), "out2".to_string()],
+                    configuration_url: "http://127.0.0.1:10002".to_string(),
+                }],
+            ),
+            UpdateNodeRequest::Registration(
+                uuid::Uuid::new_v4(),
+                "http://127.0.0.1:10000".to_string(),
+                "http://127.0.0.1:10001".to_string(),
+                vec![],
             ),
             UpdateNodeRequest::Deregistration(uuid::Uuid::new_v4()),
         ];

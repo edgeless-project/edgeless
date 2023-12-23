@@ -31,9 +31,23 @@ pub struct SpawnFunctionRequest {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct ResourceProviderSpecification {
+    pub provider_id: String,
+    pub class_type: String,
+    pub outputs: Vec<String>,
+    pub configuration_url: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum UpdateNodeRequest {
-    Registration(uuid::Uuid, String, String), // node_id, agent_url, invocation_url
-    Deregistration(uuid::Uuid),               // node_id
+    // 0: node_id (cannot be nil)
+    // 1: agent_url (cannot be empty)
+    // 2: invocation_url (cannot be empty)
+    // 3: resource provider specifications (can be empty)
+    Registration(uuid::Uuid, String, String, Vec<ResourceProviderSpecification>),
+
+    // 0: node_id (cannot be empty)
+    Deregistration(uuid::Uuid),
 }
 
 #[derive(Debug, Clone, PartialEq)]

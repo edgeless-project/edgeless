@@ -201,7 +201,8 @@ impl Orchestrator {
                     // that an existing node left the system (Deregister).
                     let mut this_node_id = None;
                     let msg = match request {
-                        UpdateNodeRequest::Registration(node_id, agent_url, invocation_url) => {
+                        UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, _resource_providers) => {
+                            // XXX Issue#60 use resource_providers
                             let mut dup_entry = false;
                             if let Some(client_desc) = clients.get(&node_id) {
                                 if client_desc.agent_url == agent_url && client_desc.invocation_url == invocation_url {
