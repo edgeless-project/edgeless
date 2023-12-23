@@ -1,9 +1,3 @@
-// struct ResourceProviderSpecification {
-//     resource_provider_id: String,
-//     class_type: String,
-//     outputs: Vec<String>,
-// }
-
 #[derive(Debug)]
 pub struct ResourceInstanceSpecification {
     pub provider_id: String,
