@@ -49,7 +49,10 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for MockFunctionIns
         &mut self,
         spawn_request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
-        let new_id = edgeless_api::function_instance::InstanceId::new(self.node_id);
+        let new_id = edgeless_api::function_instance::InstanceId {
+            node_id: uuid::Uuid::nil(),
+            function_id: uuid::Uuid::new_v4(),
+        };
         self.sender
             .send(MockFunctionInstanceEvent::StartFunction((new_id.clone(), spawn_request)))
             .await
@@ -64,7 +67,10 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for MockFunctionIns
         &mut self,
         spawn_request: edgeless_api::workflow_instance::WorkflowResource,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
-        let new_id = edgeless_api::function_instance::InstanceId::new(self.node_id);
+        let new_id = edgeless_api::function_instance::InstanceId {
+            node_id: uuid::Uuid::nil(),
+            function_id: uuid::Uuid::new_v4(),
+        };
         self.sender
             .send(MockFunctionInstanceEvent::StartResource((new_id.clone(), spawn_request)))
             .await
@@ -91,10 +97,12 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for MockFunctionIns
 async fn test_setup() -> (
     Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>,
     futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>,
+    uuid::Uuid,
 ) {
     let (mock_orc_sender, mock_orc_receiver) = futures::channel::mpsc::unbounded::<MockFunctionInstanceEvent>();
+    let node_id = uuid::Uuid::new_v4();
     let mock_orc = MockOrchestrator {
-        node_id: uuid::Uuid::new_v4(),
+        node_id: node_id.clone(),
         sender: mock_orc_sender,
     };
 
@@ -108,34 +116,33 @@ async fn test_setup() -> (
     let mut client = controller.get_api_client();
     let wf_client = client.workflow_instance_api();
 
-    (wf_client, mock_orc_receiver)
+    (wf_client, mock_orc_receiver, node_id)
 }
 
 #[tokio::test]
 async fn single_function_start_stop() {
-    let (mut wf_client, mut mock_orc_receiver) = test_setup().await;
+    let (mut wf_client, mut mock_orc_receiver, node_id) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
 
-    let response = wf_client
-        .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-            workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
-                name: "f1".to_string(),
-                function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                    function_class_id: "fc1".to_string(),
-                    function_class_type: "RUST_WASM".to_string(),
-                    function_class_version: "0.1".to_string(),
-                    function_class_inlude_code: vec![],
-                    outputs: vec![],
-                },
-                output_mapping: std::collections::HashMap::new(),
-                annotations: std::collections::HashMap::new(),
-            }],
-            workflow_resources: vec![],
+    let function_class_specification = edgeless_api::function_instance::FunctionClassSpecification {
+        function_class_id: "fc1".to_string(),
+        function_class_type: "RUST_WASM".to_string(),
+        function_class_version: "0.1".to_string(),
+        function_class_inlude_code: vec![],
+        outputs: vec![],
+    };
+    let start_workflow_request = edgeless_api::workflow_instance::SpawnWorkflowRequest {
+        workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
+            name: "f1".to_string(),
+            function_class_specification: function_class_specification.clone(),
+            output_mapping: std::collections::HashMap::new(),
             annotations: std::collections::HashMap::new(),
-        })
-        .await
-        .unwrap();
+        }],
+        workflow_resources: vec![],
+        annotations: std::collections::HashMap::new(),
+    };
+    let response = wf_client.start(start_workflow_request).await.unwrap();
 
     let instance = match &response {
         SpawnWorkflowResponse::ResponseError(err) => panic!("{}", err),
@@ -147,9 +154,14 @@ async fn single_function_start_stop() {
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    let start_res = mock_orc_receiver.try_next().unwrap().unwrap();
-    if let MockFunctionInstanceEvent::StartFunction((_id, _spawn_req)) = start_res {
-        // XXX Issue#60
+    let mut new_func_id = uuid::Uuid::nil();
+    if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
+        assert!(id.node_id.is_nil());
+        new_func_id = id.function_id.clone();
+        assert!(spawn_req.instance_id.is_none());
+        assert_eq!(function_class_specification, spawn_req.code);
+        assert!(spawn_req.annotations.is_empty());
+        // TODO check state specifications
     } else {
         panic!();
     }
@@ -160,10 +172,9 @@ async fn single_function_start_stop() {
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    let stop_res = mock_orc_receiver.try_next().unwrap().unwrap();
-
-    if let MockFunctionInstanceEvent::StopFunction(_id) = stop_res {
-        // XXX Issue#60
+    if let MockFunctionInstanceEvent::StopFunction(id) = mock_orc_receiver.try_next().unwrap().unwrap() {
+        assert!(id.node_id.is_nil());
+        assert_eq!(new_func_id, id.function_id);
     } else {
         panic!();
     }
@@ -173,7 +184,7 @@ async fn single_function_start_stop() {
 
 #[tokio::test]
 async fn resource_to_function_start_stop() {
-    let (mut wf_client, mut mock_orc_receiver) = test_setup().await;
+    let (mut wf_client, mut mock_orc_receiver, node_id) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
 
@@ -212,33 +223,51 @@ async fn resource_to_function_start_stop() {
     assert_eq!(instance.domain_mapping[0].name, "f1".to_string());
     assert_eq!(instance.domain_mapping[0].domain_id, "domain-1".to_string());
 
-    if let MockFunctionInstanceEvent::StartFunction((_id, _spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        // XXX Issue#60
+    let mut new_func_id = uuid::Uuid::nil();
+    if let MockFunctionInstanceEvent::StartFunction((id, _spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
+        assert!(id.node_id.is_nil());
+        new_func_id = id.function_id.clone();
     } else {
         panic!();
     }
 
-    if let MockFunctionInstanceEvent::StartResource((_id, _spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        // XXX Issue#60
+    let mut new_res_id = uuid::Uuid::nil();
+    if let MockFunctionInstanceEvent::StartResource((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
+        assert!(id.node_id.is_nil());
+        new_res_id = id.function_id.clone();
+        assert_eq!("r1".to_string(), spawn_req.name);
+        assert_eq!("test-res".to_string(), spawn_req.class_type);
+        assert!(spawn_req.configurations.is_empty());
+        // TODO output_mapping to be removed from start_resource
+        assert!(spawn_req.output_mapping.is_empty());
+    } else {
+        panic!();
+    }
+
+    if let MockFunctionInstanceEvent::Patch(patch_req) = mock_orc_receiver.try_next().unwrap().unwrap() {
+        assert!(patch_req.instance_id.is_some());
+        assert!(patch_req.instance_id.unwrap().node_id.is_nil());
+        assert_eq!(1, patch_req.output_mapping.len());
     } else {
         panic!();
     }
 
     assert!(mock_orc_receiver.try_next().is_err());
-    // assert!(mock_res_receiver.try_next().is_err());
 
     wf_client.stop(instance.workflow_id.clone()).await.unwrap();
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    if let MockFunctionInstanceEvent::StopFunction(_id) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        // XXX Issue#60
+    if let MockFunctionInstanceEvent::StopFunction(id) = mock_orc_receiver.try_next().unwrap().unwrap() {
+        assert!(id.node_id.is_nil());
+        assert_eq!(new_func_id, id.function_id);
     } else {
         panic!();
     }
 
-    if let MockFunctionInstanceEvent::StopResource(_id) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        // XXX Issue#60
+    if let MockFunctionInstanceEvent::StopResource(id) = mock_orc_receiver.try_next().unwrap().unwrap() {
+        assert!(id.node_id.is_nil());
+        assert_eq!(new_res_id, id.function_id);
     } else {
         panic!();
     }
@@ -248,7 +277,7 @@ async fn resource_to_function_start_stop() {
 
 #[tokio::test]
 async fn function_link_loop_start_stop() {
-    let (mut wf_client, mut mock_orc_receiver) = test_setup().await;
+    let (mut wf_client, mut mock_orc_receiver, node_id) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
 
