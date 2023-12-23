@@ -39,18 +39,21 @@ impl ResourceConfigurationConverters {
 }
 
 pub struct ResourceConfigurationClient {
-    client: crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient<tonic::transport::Channel>,
+    client: Option<crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient<tonic::transport::Channel>>,
 }
 
 impl ResourceConfigurationClient {
-    pub async fn new(server_addr: &str) -> Self {
+    pub async fn new(server_addr: &str, no_retry: bool) -> Self {
         loop {
             match crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    return Self { client };
+                    return Self { client: Some(client) };
                 }
                 Err(_) => {
+                    if no_retry {
+                        return Self { client: None };
+                    }
                     log::warn!("could not connect to {:?}, retrying", server_addr);
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 }
@@ -65,18 +68,32 @@ impl crate::resource_configuration::ResourceConfigurationAPI for ResourceConfigu
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<crate::common::StartComponentResponse> {
-        let serialized_request = ResourceConfigurationConverters::serialize_resource_instance_specification(&instance_specification);
-        match self.client.start(tonic::Request::new(serialized_request)).await {
-            Ok(ret) => CommonConverters::parse_start_component_response(&ret.into_inner()),
-            Err(err) => Err(anyhow::anyhow!("Resource configuration request failed: {}", err)),
+        match &mut self.client {
+            Some(client) => {
+                let serialized_request = ResourceConfigurationConverters::serialize_resource_instance_specification(&instance_specification);
+                match client.start(tonic::Request::new(serialized_request)).await {
+                    Ok(ret) => CommonConverters::parse_start_component_response(&ret.into_inner()),
+                    Err(err) => Err(anyhow::anyhow!("Resource configuration request failed: {}", err)),
+                }
+            }
+            None => {
+                return Err(anyhow::anyhow!("Resource configuration not connected"));
+            }
         }
     }
 
     async fn stop(&mut self, resource_id: crate::function_instance::InstanceId) -> anyhow::Result<()> {
-        let encoded_id = CommonConverters::serialize_instance_id(&resource_id);
-        match self.client.stop(encoded_id).await {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Resource configuration request failed: {}", err)),
+        match &mut self.client {
+            Some(client) => {
+                let encoded_id = CommonConverters::serialize_instance_id(&resource_id);
+                match client.stop(encoded_id).await {
+                    Ok(_) => Ok(()),
+                    Err(err) => Err(anyhow::anyhow!("Resource configuration request failed: {}", err)),
+                }
+            }
+            None => {
+                return Err(anyhow::anyhow!("Resource configuration not connected"));
+            }
         }
     }
 }

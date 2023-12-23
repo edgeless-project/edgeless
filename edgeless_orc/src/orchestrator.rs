@@ -57,33 +57,9 @@ pub struct ClientDesc {
 
 impl Orchestrator {
     pub async fn new(settings: crate::EdgelessOrcSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
-        // Prepare all resources known by the orchestrator.
-        let mut resources = std::collections::HashMap::<String, ResourceHandle>::new();
-        for resource in &settings.resources {
-            let (proto, url, port) = edgeless_api::util::parse_http_host(&resource.resource_configuration_url).unwrap();
-            let config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send> = match proto {
-                edgeless_api::util::Proto::COAP => {
-                    log::info!("coap called");
-                    Box::new(edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port)).await)
-                }
-                _ => Box::new(
-                    edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationClient::new(&resource.resource_configuration_url).await,
-                ),
-            };
-
-            resources.insert(
-                resource.resource_provider_id.clone(),
-                ResourceHandle {
-                    resource_type: resource.class_type.clone(),
-                    _outputs: resource.outputs.clone(),
-                    config_api,
-                },
-            );
-        }
-
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, resources, settings).await;
+            Self::main_task(receiver, settings).await;
         });
 
         (Orchestrator { sender }, main_task)
@@ -93,15 +69,11 @@ impl Orchestrator {
         let _ = self.sender.send(OrchestratorRequest::KEEPALIVE()).await;
     }
 
-    async fn main_task(
-        receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>,
-        resources: std::collections::HashMap<String, ResourceHandle>,
-        orchestrator_settings: crate::EdgelessOrcSettings,
-    ) {
-        let _resources = resources;
+    async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
         let mut clients = HashMap::<uuid::Uuid, ClientDesc>::new();
         let mut receiver = receiver;
         let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy);
+        let mut resources = std::collections::HashMap::<String, ResourceHandle>::new();
 
         // Main loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
@@ -201,8 +173,7 @@ impl Orchestrator {
                     // that an existing node left the system (Deregister).
                     let mut this_node_id = None;
                     let msg = match request {
-                        UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, _resource_providers) => {
-                            // XXX Issue#60 use resource_providers
+                        UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resource_providers) => {
                             let mut dup_entry = false;
                             if let Some(client_desc) = clients.get(&node_id) {
                                 if client_desc.agent_url == agent_url && client_desc.invocation_url == invocation_url {
@@ -215,6 +186,38 @@ impl Orchestrator {
                                 None
                             } else {
                                 this_node_id = Some(node_id.clone());
+
+                                // Create the resource configuration APIs.
+                                for resource in &resource_providers {
+                                    let (proto, url, port) = edgeless_api::util::parse_http_host(&resource.configuration_url).unwrap();
+                                    let config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send> = match proto {
+                                        edgeless_api::util::Proto::COAP => {
+                                            log::info!("coap called");
+                                            Box::new(
+                                                edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port))
+                                                    .await,
+                                            )
+                                        }
+                                        _ => Box::new(
+                                            edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationClient::new(
+                                                &resource.configuration_url,
+                                                true,
+                                            )
+                                            .await,
+                                        ),
+                                    };
+
+                                    resources.insert(
+                                        resource.provider_id.clone(),
+                                        ResourceHandle {
+                                            resource_type: resource.class_type.clone(),
+                                            _outputs: resource.outputs.clone(),
+                                            config_api,
+                                        },
+                                    );
+                                }
+
+                                // Crate the agent API.
                                 clients.insert(
                                     node_id,
                                     ClientDesc {

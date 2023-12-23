@@ -4,20 +4,11 @@ mod orchestrator;
 use futures::join;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct EdgelessResourceConfig {
-    pub resource_provider_id: String,
-    pub class_type: String,
-    pub outputs: Vec<String>,
-    pub resource_configuration_url: String,
-}
-
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessOrcSettings {
     pub domain_id: String,
     pub orchestrator_url: String,
     pub orchestration_strategy: OrchestrationStrategy,
     pub keep_alive_interval_secs: u64,
-    pub resources: Vec<EdgelessResourceConfig>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -60,12 +51,6 @@ pub fn edgeless_orc_default_conf() -> String {
 orchestrator_url = "http://127.0.0.1:7011"
 orchestration_strategy = "Random"
 keep_alive_interval_secs = 2
-resources = [
-    { resource_provider_id = "file-log-1",     class_type = "file-log",     outputs = [],              resource_configuration_url = "http://127.0.0.1:7033" },
-    { resource_provider_id = "http-ingress-1", class_type = "http-ingress", outputs = ["new_request"], resource_configuration_url = "http://127.0.0.1:7033" },
-    { resource_provider_id = "http-egress-1",  class_type = "http-egress",  outputs = [],              resource_configuration_url = "http://127.0.0.1:7033" },
-    { resource_provider_id = "redis-1",        class_type = "redis",        outputs = [],              resource_configuration_url = "http://127.0.0.1:7033" }
-]
 "##,
     )
 }
