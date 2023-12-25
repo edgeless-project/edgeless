@@ -27,9 +27,22 @@ enum OrchestratorRequest {
 }
 
 struct ResourceHandle {
+    node_id: edgeless_api::function_instance::NodeId,
     resource_type: String,
-    _outputs: Vec<String>,
+    outputs: Vec<String>,
     config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send>,
+}
+
+impl std::fmt::Display for ResourceHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "node_id {}, resource_type {}, outputs [{}]",
+            self.node_id,
+            self.resource_type,
+            self.outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
+        )
+    }
 }
 
 pub struct OrchestratorClient {
@@ -206,13 +219,15 @@ impl Orchestrator {
                                             .await,
                                         ),
                                     };
+                                    assert!(this_node_id.is_some());
                                     log::info!("new resource advertised by node {}: {}", this_node_id.unwrap(), resource);
 
                                     resources.insert(
                                         resource.provider_id.clone(),
                                         ResourceHandle {
+                                            node_id: this_node_id.unwrap().clone(),
                                             resource_type: resource.class_type.clone(),
-                                            _outputs: resource.outputs.clone(),
+                                            outputs: resource.outputs.clone(),
                                             config_api,
                                         },
                                     );
@@ -292,8 +307,8 @@ impl Orchestrator {
                 OrchestratorRequest::KEEPALIVE() => {
                     log::debug!("keep alive");
 
-                    // First check if there nodes that must be disconnected,
-                    // since they fail to reply to a keep-alive.
+                    // First check if there nodes that must be disconnected
+                    // because they failed to reply to a keep-alive.
                     let mut to_be_disconnected = HashSet::new();
                     for (node_id, client_desc) in &mut clients {
                         if let Err(_) = client_desc.api.function_instance_api().keep_alive().await {
@@ -303,10 +318,21 @@ impl Orchestrator {
 
                     // Second, remove all those nodes from the map of clients.
                     for node_id in to_be_disconnected.iter() {
-                        log::info!("disconnect node not replying to keep alive: {}", &node_id);
+                        log::info!("disconnected node not replying to keep alive: {}", &node_id);
                         let val = clients.remove(&node_id);
                         assert!(val.is_some());
                     }
+
+                    // Third, remove all the resources associated with the
+                    // removed nodes.
+                    resources.retain(|_k, v| {
+                        if to_be_disconnected.contains(&v.node_id) {
+                            log::info!("removed resource from disconnected node: {}", v);
+                            false
+                        } else {
+                            true
+                        }
+                    });
 
                     // Finally, update the peers of (still alive) nodes by
                     // deleting the missing-in-action peers.
