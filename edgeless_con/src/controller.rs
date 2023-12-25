@@ -236,7 +236,7 @@ impl Controller {
                         }
                         // [TODO] The state_specification configuration should be
                         // read from the function annotations.
-                        log::warn!("function annotations currently ignored: {:?}", function.annotations);
+                        log::warn!("state specifications currently forced to NodeLocal");
                         let response = fn_client
                             .start_function(edgeless_api::function_instance::SpawnFunctionRequest {
                                 instance_id: None,
