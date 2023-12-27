@@ -255,6 +255,12 @@ impl Controller {
                                     log::error!("function instance creation rejected: {}", error);
                                 }
                                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
+                                    log::info!(
+                                        "workflow {} function {} started with fid {}",
+                                        wf_id.to_string(),
+                                        function.name,
+                                        &id.function_id
+                                    );
                                     // id.node_id is unused
                                     workflow_function_mapping.push(edgeless_api::workflow_instance::WorkflowFunctionMapping {
                                         name: function.name.clone(),
@@ -294,6 +300,12 @@ impl Controller {
                                     log::error!("resource start rejected: {}", error);
                                 }
                                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
+                                    log::info!(
+                                        "workflow {} resource {} started with fid {}",
+                                        wf_id.to_string(),
+                                        resource.name,
+                                        &id.function_id
+                                    );
                                     // id.node_id is unused
                                     workflow_function_mapping.push(edgeless_api::workflow_instance::WorkflowFunctionMapping {
                                         name: resource.name.clone(),
