@@ -15,7 +15,7 @@ enum MockFunctionInstanceEvent {
         (
             // this is the id passed from the orchestrator to the controller
             edgeless_api::function_instance::InstanceId,
-            edgeless_api::workflow_instance::WorkflowResource,
+            edgeless_api::function_instance::StartResourceRequest,
         ),
     ),
     StopResource(edgeless_api::function_instance::InstanceId),
@@ -65,7 +65,7 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for MockFunctionIns
     }
     async fn start_resource(
         &mut self,
-        spawn_request: edgeless_api::workflow_instance::WorkflowResource,
+        spawn_request: edgeless_api::function_instance::StartResourceRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
         let new_id = edgeless_api::function_instance::InstanceId {
             node_id: uuid::Uuid::nil(),
@@ -235,11 +235,8 @@ async fn resource_to_function_start_stop() {
     if let MockFunctionInstanceEvent::StartResource((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
         assert!(id.node_id.is_nil());
         new_res_id = id.function_id.clone();
-        assert_eq!("r1".to_string(), spawn_req.name);
         assert_eq!("test-res".to_string(), spawn_req.class_type);
         assert!(spawn_req.configurations.is_empty());
-        // TODO output_mapping to be removed from start_resource
-        assert!(spawn_req.output_mapping.is_empty());
     } else {
         panic!();
     }

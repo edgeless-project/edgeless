@@ -15,7 +15,7 @@ enum OrchestratorRequest {
     ),
     STOPFUNCTION(edgeless_api::function_instance::InstanceId),
     STARTRESOURCE(
-        edgeless_api::workflow_instance::WorkflowResource,
+        edgeless_api::function_instance::StartResourceRequest,
         tokio::sync::oneshot::Sender<anyhow::Result<StartComponentResponse>>,
     ),
     STOPRESOURCE(edgeless_api::function_instance::InstanceId),
@@ -494,7 +494,7 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for OrchestratorFun
 
     async fn start_resource(
         &mut self,
-        request: edgeless_api::workflow_instance::WorkflowResource,
+        request: edgeless_api::function_instance::StartResourceRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
         log::debug!("FunctionInstance::StartResource() {:?}", request);
         let request = request;
