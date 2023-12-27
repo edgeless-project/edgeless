@@ -84,7 +84,7 @@ pub enum UpdatePeersRequest {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatchRequest {
-    pub instance_id: Option<InstanceId>,
+    pub function_id: ComponentId,
     pub output_mapping: std::collections::HashMap<String, InstanceId>,
 }
 

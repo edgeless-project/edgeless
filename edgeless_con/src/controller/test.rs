@@ -24,14 +24,14 @@ enum MockFunctionInstanceEvent {
 }
 
 struct MockOrchestrator {
-    node_id: uuid::Uuid,
+    _node_id: uuid::Uuid,
     sender: futures::channel::mpsc::UnboundedSender<MockFunctionInstanceEvent>,
 }
 
 impl edgeless_api::orc::OrchestratorAPI for MockOrchestrator {
     fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI> {
         Box::new(MockFunctionInstanceAPI {
-            node_id: self.node_id.clone(),
+            _node_id: self._node_id.clone(),
             sender: self.sender.clone(),
         })
     }
@@ -39,7 +39,7 @@ impl edgeless_api::orc::OrchestratorAPI for MockOrchestrator {
 
 #[derive(Clone)]
 struct MockFunctionInstanceAPI {
-    node_id: uuid::Uuid,
+    _node_id: uuid::Uuid,
     sender: futures::channel::mpsc::UnboundedSender<MockFunctionInstanceEvent>,
 }
 
@@ -102,7 +102,7 @@ async fn test_setup() -> (
     let (mock_orc_sender, mock_orc_receiver) = futures::channel::mpsc::unbounded::<MockFunctionInstanceEvent>();
     let node_id = uuid::Uuid::new_v4();
     let mock_orc = MockOrchestrator {
-        node_id: node_id.clone(),
+        _node_id: node_id.clone(),
         sender: mock_orc_sender,
     };
 
@@ -121,7 +121,7 @@ async fn test_setup() -> (
 
 #[tokio::test]
 async fn single_function_start_stop() {
-    let (mut wf_client, mut mock_orc_receiver, node_id) = test_setup().await;
+    let (mut wf_client, mut mock_orc_receiver, _node_id) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
 
@@ -155,6 +155,7 @@ async fn single_function_start_stop() {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     let mut new_func_id = uuid::Uuid::nil();
+    assert!(new_func_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
         assert!(id.node_id.is_nil());
         new_func_id = id.function_id.clone();
@@ -184,7 +185,7 @@ async fn single_function_start_stop() {
 
 #[tokio::test]
 async fn resource_to_function_start_stop() {
-    let (mut wf_client, mut mock_orc_receiver, node_id) = test_setup().await;
+    let (mut wf_client, mut mock_orc_receiver, _node_id) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
 
@@ -224,6 +225,7 @@ async fn resource_to_function_start_stop() {
     assert_eq!(instance.domain_mapping[0].domain_id, "domain-1".to_string());
 
     let mut new_func_id = uuid::Uuid::nil();
+    assert!(new_func_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, _spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
         assert!(id.node_id.is_nil());
         new_func_id = id.function_id.clone();
@@ -232,6 +234,7 @@ async fn resource_to_function_start_stop() {
     }
 
     let mut new_res_id = uuid::Uuid::nil();
+    assert!(new_res_id.is_nil());
     if let MockFunctionInstanceEvent::StartResource((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
         assert!(id.node_id.is_nil());
         new_res_id = id.function_id.clone();
@@ -242,8 +245,7 @@ async fn resource_to_function_start_stop() {
     }
 
     if let MockFunctionInstanceEvent::Patch(patch_req) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        assert!(patch_req.instance_id.is_some());
-        assert!(patch_req.instance_id.unwrap().node_id.is_nil());
+        assert!(!patch_req.function_id.is_nil());
         assert_eq!(1, patch_req.output_mapping.len());
     } else {
         panic!();
@@ -274,7 +276,7 @@ async fn resource_to_function_start_stop() {
 
 #[tokio::test]
 async fn function_link_loop_start_stop() {
-    let (mut wf_client, mut mock_orc_receiver, node_id) = test_setup().await;
+    let (mut wf_client, mut mock_orc_receiver, _node_id) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
 

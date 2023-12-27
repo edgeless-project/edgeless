@@ -125,7 +125,7 @@ message HealthStatus {
 // Message to request the update of a function instance.
 message PatchRequest {
     // The function instance identifier.
-    InstanceId instance_id = 1;
+    string function_id = 1;
     // Mapping of the outputs to concrete function/resource instances.
     map<string, InstanceId> output_mapping = 3;
 }

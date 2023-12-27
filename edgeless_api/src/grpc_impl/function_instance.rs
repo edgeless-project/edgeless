@@ -139,10 +139,7 @@ impl FunctonInstanceConverters {
 
     pub fn parse_patch_request(api_update: &crate::grpc_impl::api::PatchRequest) -> anyhow::Result<crate::function_instance::PatchRequest> {
         Ok(crate::function_instance::PatchRequest {
-            instance_id: match api_update.instance_id.as_ref() {
-                Some(id) => Some(CommonConverters::parse_instance_id(id)?),
-                None => None,
-            },
+            function_id: uuid::Uuid::parse_str(&api_update.function_id)?,
             output_mapping: api_update
                 .output_mapping
                 .iter()
@@ -288,10 +285,7 @@ impl FunctonInstanceConverters {
 
     pub fn serialize_patch_request(crate_update: &crate::function_instance::PatchRequest) -> crate::grpc_impl::api::PatchRequest {
         crate::grpc_impl::api::PatchRequest {
-            instance_id: crate_update
-                .instance_id
-                .as_ref()
-                .and_then(|instance_id| Some(CommonConverters::serialize_instance_id(instance_id))),
+            function_id: crate_update.function_id.to_string(),
             output_mapping: crate_update
                 .output_mapping
                 .iter()
@@ -916,10 +910,7 @@ mod tests {
     fn serialize_deserialize_patch_request() {
         let messages = vec![
             PatchRequest {
-                instance_id: Some(InstanceId {
-                    node_id: uuid::Uuid::new_v4(),
-                    function_id: uuid::Uuid::new_v4(),
-                }),
+                function_id: uuid::Uuid::new_v4(),
                 output_mapping: std::collections::HashMap::from([
                     (
                         "out".to_string(),
@@ -938,10 +929,7 @@ mod tests {
                 ]),
             },
             PatchRequest {
-                instance_id: Some(InstanceId {
-                    node_id: uuid::Uuid::nil(),
-                    function_id: uuid::Uuid::new_v4(),
-                }),
+                function_id: uuid::Uuid::new_v4(),
                 output_mapping: std::collections::HashMap::from([
                     (
                         "out".to_string(),
