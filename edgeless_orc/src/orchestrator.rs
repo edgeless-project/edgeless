@@ -1,5 +1,7 @@
 use edgeless_api::common::StartComponentResponse;
-use edgeless_api::function_instance::{InstanceId, SpawnFunctionRequest, StartResourceRequest, UpdateNodeRequest, UpdatePeersRequest};
+use edgeless_api::function_instance::{
+    ComponentId, InstanceId, PatchRequest, SpawnFunctionRequest, StartResourceRequest, UpdateNodeRequest, UpdatePeersRequest,
+};
 use edgeless_api::resource_configuration::ResourceInstanceSpecification;
 use futures::{Future, SinkExt, StreamExt};
 use std::collections::{HashMap, HashSet};
@@ -108,6 +110,27 @@ impl Orchestrator {
 
     pub async fn keep_alive(&mut self) {
         let _ = self.sender.send(OrchestratorRequest::KEEPALIVE()).await;
+    }
+
+    fn ext_to_int(active_instances: &std::collections::HashMap<ComponentId, ActiveInstance>, ext_fid: &ComponentId) -> Vec<InstanceId> {
+        match active_instances.get(ext_fid) {
+            Some(active_instance) => match active_instance {
+                ActiveInstance::Function(_req, instances) => instances
+                    .iter()
+                    .map(|x| InstanceId {
+                        node_id: x.node_id,
+                        function_id: x.function_id,
+                    })
+                    .collect(),
+                ActiveInstance::Resource(_req, instance) => {
+                    vec![InstanceId {
+                        node_id: instance.node_id,
+                        function_id: instance.function_id,
+                    }]
+                }
+            },
+            None => vec![],
+        }
     }
 
     async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
@@ -346,25 +369,46 @@ impl Orchestrator {
                 }
                 OrchestratorRequest::PATCH(update) => {
                     log::debug!("Orchestrator Patch {:?}", update);
-                    // XXX Issue#60
-                    // if let Some(instance_id) = update.clone().instance_id {
-                    //     let mut fn_client = match clients.get_mut(&instance_id.node_id) {
-                    //         Some(c) => c,
-                    //         None => {
-                    //             log::error!("This orchestrator does not manage the node where this function instance {:?} is located! Please note that support for multiple orchestrators is not implemented yet!", instance_id);
-                    //             continue;
-                    //         }
-                    //     }.api.function_instance_api();
 
-                    //     match fn_client.patch(update).await {
-                    //         Ok(_) => {}
-                    //         Err(err) => {
-                    //             log::error!("Unhandled: {}", err);
-                    //         }
-                    //     };
-                    // } else {
-                    //     log::error!("A request to an orchestrator to update links must contain a valid InstanceId!");
-                    // }
+                    // Transform the external function identifiers into
+                    // internal ones.
+                    for source in Self::ext_to_int(&active_instances, &update.function_id) {
+                        let mut output_mapping = std::collections::HashMap::new();
+                        for (channel, instance_id) in &update.output_mapping {
+                            for target in Self::ext_to_int(&active_instances, &instance_id.function_id) {
+                                // [TODO] The output_mapping structure
+                                // should be changed so that multiple
+                                // values are possible (with weights), and
+                                // this change must be applied to runners,
+                                // as well. For now, we just keep
+                                // overwriting the same entry.
+                                output_mapping.insert(channel.clone(), target);
+                            }
+                        }
+
+                        // Notify the new mapping to the node.
+                        match clients.get_mut(&source.node_id) {
+                            Some(client_desc) => match client_desc
+                                .api
+                                .function_instance_api()
+                                .patch(PatchRequest {
+                                    function_id: source.function_id.clone(),
+                                    output_mapping,
+                                })
+                                .await
+                            {
+                                Ok(_) => {
+                                    log::info!("Patched node_id {} int_fid {}", source.node_id, source.function_id);
+                                }
+                                Err(err) => {
+                                    log::error!("Error when patching node_id {} int_fid {}: {}", source.node_id, source.function_id, err);
+                                }
+                            },
+                            None => {
+                                log::error!("Cannot patch unknown node_id {}", source.node_id);
+                            }
+                        }
+                    }
                 }
                 OrchestratorRequest::UPDATENODE(request, reply_channel) => {
                     // Update the map of clients and, at the same time, prepare
