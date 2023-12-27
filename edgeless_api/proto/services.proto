@@ -23,7 +23,7 @@ service FunctionInstanceOrc {
     // Input: request containing the description of the resource to start.
     // Output: the function instance identifier assigned, if accepted.
     // The node identifier is all zeroes.
-    rpc StartResource (WorkflowResource) returns (StartComponentResponse);
+    rpc StartResource (StartResourceRequest) returns (StartComponentResponse);
     
     // Stop a resource.
     // Input: the identifier of the resource instance to stop. The node

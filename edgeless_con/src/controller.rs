@@ -286,10 +286,8 @@ impl Controller {
                             break;
                         }
                         let response = fn_client
-                            .start_resource(edgeless_api::workflow_instance::WorkflowResource {
-                                name: resource.name.clone(),
+                            .start_resource(edgeless_api::function_instance::StartResourceRequest {
                                 class_type: resource.class_type.clone(),
-                                output_mapping: std::collections::HashMap::new(),
                                 configurations: resource.configurations.clone(),
                             })
                             .await;

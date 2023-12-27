@@ -46,10 +46,19 @@ message SpawnFunctionRequest {
     // The function class specification.
     FunctionClassSpecification code = 2;
     // The set of annotations associated with this function instance.
-    map<string, string> annotations = 5;
+    map<string, string> annotations = 3;
     // The state specification.
-    StateSpecification state_specification = 6;
+    StateSpecification state_specification = 4;
 }
+
+// Message to start a new resource instance.
+message StartResourceRequest {
+    // Resource type.
+    string class_type = 1;
+    // Configuration of the resource, which depends on the resource type.
+    map<string, string> configurations = 2;
+}
+
 
 // Response message to the creation a new function instance or the start of a
 // resource.
