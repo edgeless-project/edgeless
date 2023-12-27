@@ -1,5 +1,6 @@
 use edgeless_api::common::StartComponentResponse;
-use edgeless_api::function_instance::{InstanceId, SpawnFunctionRequest, UpdateNodeRequest, UpdatePeersRequest};
+use edgeless_api::function_instance::{InstanceId, SpawnFunctionRequest, StartResourceRequest, UpdateNodeRequest, UpdatePeersRequest};
+use edgeless_api::resource_configuration::ResourceInstanceSpecification;
 use edgeless_api::workflow_instance::WorkflowResource;
 use futures::{Future, SinkExt, StreamExt};
 use std::collections::{HashMap, HashSet};
@@ -28,8 +29,8 @@ enum OrchestratorRequest {
 }
 
 struct ResourceProvider {
+    provider_id: String,
     node_id: edgeless_api::function_instance::NodeId,
-    resource_type: String,
     outputs: Vec<String>,
     config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send>,
 }
@@ -37,7 +38,7 @@ struct ResourceProvider {
 #[derive(Clone)]
 enum InstanceType {
     Function(SpawnFunctionRequest),
-    Resource(WorkflowResource),
+    Resource(StartResourceRequest),
 }
 
 #[derive(Clone)]
@@ -68,9 +69,9 @@ impl std::fmt::Display for ResourceProvider {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "node_id {}, resource_type {}, outputs [{}]",
+            "provider_id {}, node_id {}, outputs [{}]",
+            self.provider_id,
             self.node_id,
-            self.resource_type,
             self.outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
         )
     }
@@ -122,7 +123,7 @@ impl Orchestrator {
         let mut clients = HashMap::<uuid::Uuid, ClientDesc>::new();
 
         // known resources providers as notified by nodes upon registration
-        // key: provider_id
+        // key: resource type (class_type)
         let mut resource_providers = std::collections::HashMap::<String, ResourceProvider>::new();
 
         // instances that the orchestrator promised to keep active
@@ -248,8 +249,58 @@ impl Orchestrator {
                         }
                     }
                 }
-                OrchestratorRequest::STARTRESOURCE(spawn_req, reply_channel) => {
-                    // XXX Issue#60
+                OrchestratorRequest::STARTRESOURCE(start_req, reply_channel) => {
+                    let start_req_copy = start_req.clone();
+                    let res = match resource_providers.get_mut(&start_req.class_type) {
+                        Some(resource_provider) => match resource_provider
+                            .config_api
+                            .start(ResourceInstanceSpecification {
+                                provider_id: resource_provider.provider_id.clone(),
+                                output_mapping: std::collections::HashMap::new(), // [TODO] remove
+                                configuration: start_req.configurations,
+                            })
+                            .await
+                        {
+                            Ok(start_response) => match start_response {
+                                StartComponentResponse::InstanceId(instance_id) => {
+                                    assert!(resource_provider.node_id == instance_id.node_id);
+                                    let ext_fid = uuid::Uuid::new_v4();
+                                    active_instances.insert(
+                                        ext_fid.clone(),
+                                        ActiveInstance {
+                                            instance_type: InstanceType::Resource(start_req_copy),
+                                            instances: vec![InstanceId {
+                                                node_id: resource_provider.node_id.clone(),
+                                                function_id: instance_id.function_id.clone(),
+                                            }],
+                                        },
+                                    );
+                                    log::info!(
+                                        "Started resource node_id {}, ext_fid {}, int_fid {}",
+                                        resource_provider.node_id,
+                                        &ext_fid,
+                                        instance_id.function_id
+                                    );
+                                    Ok(StartComponentResponse::InstanceId(InstanceId {
+                                        node_id: uuid::Uuid::nil(),
+                                        function_id: ext_fid,
+                                    }))
+                                }
+                                StartComponentResponse::ResponseError(err) => Ok(StartComponentResponse::ResponseError(err)),
+                            },
+                            Err(err) => Ok(StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
+                                summary: "could not start resource".to_string(),
+                                detail: Some(err.to_string()),
+                            })),
+                        },
+                        None => Ok(StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
+                            summary: "class type not found".to_string(),
+                            detail: None,
+                        })),
+                    };
+                    if let Err(err) = reply_channel.send(res) {
+                        log::error!("Orchestrator channel error in STARTRESOURCE: {:?}", err);
+                    }
                 }
                 OrchestratorRequest::STOPRESOURCE(stop_function_id) => {
                     log::debug!("Orchestrator StopResource {:?}", stop_function_id);
@@ -320,10 +371,10 @@ impl Orchestrator {
                                     log::info!("new resource advertised by node {}: {}", this_node_id.unwrap(), resource);
 
                                     resource_providers.insert(
-                                        resource.provider_id.clone(),
+                                        resource.class_type.clone(),
                                         ResourceProvider {
+                                            provider_id: resource.provider_id.clone(),
                                             node_id: this_node_id.unwrap().clone(),
-                                            resource_type: resource.class_type.clone(),
                                             outputs: resource.outputs.clone(),
                                             config_api,
                                         },
