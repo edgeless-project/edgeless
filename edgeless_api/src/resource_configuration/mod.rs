@@ -29,10 +29,16 @@ impl MultiResouceConfigurationAPI {
 impl ResourceConfigurationAPI for MultiResouceConfigurationAPI {
     async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<crate::common::StartComponentResponse> {
         if let Some(resource) = self.resource_providers.get_mut(&instance_specification.provider_id) {
-            let provider = instance_specification.provider_id.clone();
+            let provider_id = instance_specification.provider_id.clone();
             let res = resource.start(instance_specification).await?;
             if let crate::common::StartComponentResponse::InstanceId(id) = res {
-                self.resource_instances.insert(id.clone(), provider.clone());
+                log::info!(
+                    "Started resource provider_id {}, node_id {}, fid {}",
+                    provider_id,
+                    id.node_id,
+                    id.function_id
+                );
+                self.resource_instances.insert(id.clone(), provider_id.clone());
                 Ok(crate::common::StartComponentResponse::InstanceId(id))
             } else {
                 Ok(res)
@@ -48,6 +54,7 @@ impl ResourceConfigurationAPI for MultiResouceConfigurationAPI {
     async fn stop(&mut self, resource_id: crate::function_instance::InstanceId) -> anyhow::Result<()> {
         if let Some(instance_id) = self.resource_instances.get(&resource_id) {
             if let Some(provider) = self.resource_providers.get_mut(instance_id) {
+                log::info!("Stopped resource node_id {}, fid {}", resource_id.node_id, resource_id.function_id);
                 return provider.stop(resource_id).await;
             }
         }
