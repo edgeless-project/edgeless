@@ -1,7 +1,6 @@
 use edgeless_api::common::StartComponentResponse;
 use edgeless_api::function_instance::{InstanceId, SpawnFunctionRequest, StartResourceRequest, UpdateNodeRequest, UpdatePeersRequest};
 use edgeless_api::resource_configuration::ResourceInstanceSpecification;
-use edgeless_api::workflow_instance::WorkflowResource;
 use futures::{Future, SinkExt, StreamExt};
 use std::collections::{HashMap, HashSet};
 
@@ -36,31 +35,28 @@ struct ResourceProvider {
 }
 
 #[derive(Clone)]
-enum InstanceType {
-    Function(SpawnFunctionRequest),
-    Resource(StartResourceRequest),
-}
-
-#[derive(Clone)]
-struct ActiveInstance {
-    // Instance type (function of resource) and associated request.
-    pub instance_type: InstanceType,
-
-    // List of active instances.
-    pub instances: Vec<InstanceId>,
+enum ActiveInstance {
+    Function(SpawnFunctionRequest, Vec<InstanceId>),
+    Resource(StartResourceRequest, InstanceId),
 }
 
 impl std::fmt::Display for ActiveInstance {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let instances = self
-            .instances
-            .iter()
-            .map(|x| format!("node_id {}, int_fid {}", x.node_id, x.function_id))
-            .collect::<Vec<String>>()
-            .join(",");
-        match self.instance_type {
-            InstanceType::Function(_) => write!(f, "function, instances {}", instances),
-            InstanceType::Resource(_) => write!(f, "resource, instances {}", instances),
+        match self {
+            ActiveInstance::Function(_req, instances) => write!(
+                f,
+                "function, instances {}",
+                instances
+                    .iter()
+                    .map(|x| format!("node_id {}, int_fid {}", x.node_id, x.function_id))
+                    .collect::<Vec<String>>()
+                    .join(",")
+            ),
+            ActiveInstance::Resource(req, instance_id) => write!(
+                f,
+                "resource class type {}, node_id {}, function_id {}",
+                req.class_type, instance_id.node_id, instance_id.function_id
+            ),
         }
     }
 }
@@ -141,16 +137,16 @@ impl Orchestrator {
                     let selected_node_id = match orchestration_logic.next() {
                         Some(u) => u,
                         None => {
-                            log::error!("Could not select the next node. Either no nodes are specified or an error occured. Exiting.");
-                            return;
+                            log::error!("Could not select the next node. Either no nodes are specified or an error occured");
+                            continue;
                         }
                     };
 
                     let mut fn_client = match clients.get_mut(&selected_node_id) {
                         Some(c) => c,
                         None => {
-                            log::error!("Invalid node selected by the orchestration logic. Exiting.");
-                            return;
+                            log::error!("Invalid node selected by the orchestration logic");
+                            continue;
                         }
                     }
                     .api
@@ -173,13 +169,13 @@ impl Orchestrator {
                                 let ext_fid = uuid::Uuid::new_v4();
                                 active_instances.insert(
                                     ext_fid.clone(),
-                                    ActiveInstance {
-                                        instance_type: InstanceType::Function(spawn_req_copy),
-                                        instances: vec![InstanceId {
+                                    ActiveInstance::Function(
+                                        spawn_req_copy,
+                                        vec![InstanceId {
                                             node_id: selected_node_id.clone(),
                                             function_id: id.function_id.clone(),
                                         }],
-                                    },
+                                    ),
                                 );
                                 log::info!(
                                     "Spawned at node_id {}, ext_fid {}, int_fid {}",
@@ -203,53 +199,53 @@ impl Orchestrator {
                         log::error!("Orchestrator channel error in SPAWN: {:?}", err);
                     }
                 }
-                OrchestratorRequest::STOPFUNCTION(id) => {
-                    log::debug!("Orchestrator StopFunction {:?}", id);
+                OrchestratorRequest::STOPFUNCTION(instance_id) => {
+                    log::debug!("Orchestrator StopFunction {:?}", instance_id);
 
-                    match active_instances.remove(&id.function_id) {
+                    match active_instances.remove(&instance_id.function_id) {
                         Some(active_instance) => {
-                            match active_instance.instance_type {
-                                InstanceType::Function(_) => {
+                            match active_instance {
+                                ActiveInstance::Function(_req, instances) => {
                                     // Stop all the instances of this function.
-                                    for instance in active_instance.instances {
+                                    for instance in instances {
                                         match clients.get_mut(&instance.node_id) {
                                             Some(c) => match c.api.function_instance_api().stop(instance).await {
                                                 Ok(_) => {
                                                     log::info!(
                                                         "Stopped function ext_fid {}, node_id {}, int_fid {}",
-                                                        id.function_id,
+                                                        instance_id.function_id,
                                                         instance.node_id,
                                                         instance.function_id
                                                     );
                                                 }
                                                 Err(err) => {
-                                                    log::error!("Unhandled stop function ext_fid {}: {}", id.function_id, err);
+                                                    log::error!("Unhandled stop function ext_fid {}: {}", instance_id.function_id, err);
                                                 }
                                             },
                                             None => {
                                                 log::error!(
                                                     "This orchestrator does not manage the node where the function instance is located: {}",
-                                                    id.function_id
+                                                    instance_id.function_id
                                                 );
-                                                return;
                                             }
                                         }
                                     }
                                 }
-                                InstanceType::Resource(_) => {
+                                ActiveInstance::Resource(_, _) => {
                                     log::error!(
                                         "Request to stop a function but the ext_fid is associated with a resource: ext_fid {}",
-                                        id.function_id
+                                        instance_id.function_id
                                     );
                                 }
                             }
                         }
                         None => {
-                            log::error!("Request to stop a function that is not known: ext_fid {}", id.function_id);
+                            log::error!("Request to stop a function that is not known: ext_fid {}", instance_id.function_id);
                         }
                     }
                 }
                 OrchestratorRequest::STARTRESOURCE(start_req, reply_channel) => {
+                    log::debug!("Orchestrator StartResource {:?}", start_req);
                     let start_req_copy = start_req.clone();
                     let res = match resource_providers.get_mut(&start_req.class_type) {
                         Some(resource_provider) => match resource_provider
@@ -267,13 +263,13 @@ impl Orchestrator {
                                     let ext_fid = uuid::Uuid::new_v4();
                                     active_instances.insert(
                                         ext_fid.clone(),
-                                        ActiveInstance {
-                                            instance_type: InstanceType::Resource(start_req_copy),
-                                            instances: vec![InstanceId {
+                                        ActiveInstance::Resource(
+                                            start_req_copy,
+                                            InstanceId {
                                                 node_id: resource_provider.node_id.clone(),
                                                 function_id: instance_id.function_id.clone(),
-                                            }],
-                                        },
+                                            },
+                                        ),
                                     );
                                     log::info!(
                                         "Started resource node_id {}, ext_fid {}, int_fid {}",
@@ -302,9 +298,51 @@ impl Orchestrator {
                         log::error!("Orchestrator channel error in STARTRESOURCE: {:?}", err);
                     }
                 }
-                OrchestratorRequest::STOPRESOURCE(stop_function_id) => {
-                    log::debug!("Orchestrator StopResource {:?}", stop_function_id);
-                    // XXX Issue#60
+                OrchestratorRequest::STOPRESOURCE(instance_id) => {
+                    log::debug!("Orchestrator StopResource {:?}", instance_id);
+                    match active_instances.remove(&instance_id.function_id) {
+                        Some(active_instance) => {
+                            match active_instance {
+                                ActiveInstance::Function(_, _) => {
+                                    log::error!(
+                                        "Request to stop a resource but the ext_fid is associated with a function: ext_fid {}",
+                                        instance_id.function_id
+                                    );
+                                }
+                                ActiveInstance::Resource(req, instance) => {
+                                    // Stop the instance of this resource.
+                                    match resource_providers.get_mut(&req.class_type) {
+                                        Some(resource_provider) => {
+                                            assert!(resource_provider.node_id == instance.node_id);
+                                            match resource_provider.config_api.stop(instance).await {
+                                                Ok(_) => {
+                                                    log::info!(
+                                                        "Stopped resource ext_fid {}, node_id {}, int_fid {}",
+                                                        instance_id.function_id,
+                                                        instance.node_id,
+                                                        instance.function_id
+                                                    );
+                                                }
+                                                Err(err) => {
+                                                    log::error!("Unhandled stop resource ext_fid {}: {}", instance_id.function_id, err);
+                                                }
+                                            }
+                                        }
+                                        None => {
+                                            log::error!(
+                                                "Request to stop a resource of class type {} for which no provider exists, ext_fid {}",
+                                                req.class_type,
+                                                instance_id.function_id
+                                            );
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        None => {
+                            log::error!("Request to stop a resource that is not known: ext_fid {}", instance_id.function_id);
+                        }
+                    }
                 }
                 OrchestratorRequest::UPDATELINKS(update) => {
                     log::debug!("Orchestrator Update {:?}", update);
@@ -313,7 +351,7 @@ impl Orchestrator {
                             Some(c) => c,
                             None => {
                                 log::error!("This orchestrator does not manage the node where this function instance {:?} is located! Please note that support for multiple orchestrators is not implemented yet!", instance_id);
-                                return;
+                                continue;
                             }
                         }.api.function_instance_api();
 
