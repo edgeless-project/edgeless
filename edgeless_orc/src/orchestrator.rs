@@ -19,7 +19,7 @@ enum OrchestratorRequest {
         tokio::sync::oneshot::Sender<anyhow::Result<StartComponentResponse>>,
     ),
     STOPRESOURCE(edgeless_api::function_instance::InstanceId),
-    UPDATELINKS(edgeless_api::function_instance::PatchRequest),
+    PATCH(edgeless_api::function_instance::PatchRequest),
     UPDATENODE(
         edgeless_api::function_instance::UpdateNodeRequest,
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse>>,
@@ -344,26 +344,27 @@ impl Orchestrator {
                         }
                     }
                 }
-                OrchestratorRequest::UPDATELINKS(update) => {
-                    log::debug!("Orchestrator Update {:?}", update);
-                    if let Some(instance_id) = update.clone().instance_id {
-                        let mut fn_client = match clients.get_mut(&instance_id.node_id) {
-                            Some(c) => c,
-                            None => {
-                                log::error!("This orchestrator does not manage the node where this function instance {:?} is located! Please note that support for multiple orchestrators is not implemented yet!", instance_id);
-                                continue;
-                            }
-                        }.api.function_instance_api();
+                OrchestratorRequest::PATCH(update) => {
+                    log::debug!("Orchestrator Patch {:?}", update);
+                    // XXX Issue#60
+                    // if let Some(instance_id) = update.clone().instance_id {
+                    //     let mut fn_client = match clients.get_mut(&instance_id.node_id) {
+                    //         Some(c) => c,
+                    //         None => {
+                    //             log::error!("This orchestrator does not manage the node where this function instance {:?} is located! Please note that support for multiple orchestrators is not implemented yet!", instance_id);
+                    //             continue;
+                    //         }
+                    //     }.api.function_instance_api();
 
-                        match fn_client.patch(update).await {
-                            Ok(_) => {}
-                            Err(err) => {
-                                log::error!("Unhandled: {}", err);
-                            }
-                        };
-                    } else {
-                        log::error!("A request to an orchestrator to update links must contain a valid InstanceId!");
-                    }
+                    //     match fn_client.patch(update).await {
+                    //         Ok(_) => {}
+                    //         Err(err) => {
+                    //             log::error!("Unhandled: {}", err);
+                    //         }
+                    //     };
+                    // } else {
+                    //     log::error!("A request to an orchestrator to update links must contain a valid InstanceId!");
+                    // }
                 }
                 OrchestratorRequest::UPDATENODE(request, reply_channel) => {
                     // Update the map of clients and, at the same time, prepare
@@ -616,7 +617,7 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for OrchestratorFun
 
     async fn patch(&mut self, update: edgeless_api::function_instance::PatchRequest) -> anyhow::Result<()> {
         log::debug!("FunctionInstance::Patch() {:?}", update);
-        match self.sender.send(OrchestratorRequest::UPDATELINKS(update)).await {
+        match self.sender.send(OrchestratorRequest::PATCH(update)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Orchestrator channel error when updating the links of a function instance: {}",

@@ -236,7 +236,7 @@ async fn messaging_test_setup() -> (
 
     let res = client
         .patch(PatchRequest {
-            instance_id: Some(instance_id.clone()),
+            function_id: instance_id.function_id.clone(),
             output_mapping: std::collections::HashMap::from([("test".to_string(), next_fid.clone())]),
         })
         .await;

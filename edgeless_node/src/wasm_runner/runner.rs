@@ -67,8 +67,8 @@ impl Runner {
                             functions.remove(&instance_id.function_id);
                         }
                         WasmRunnerRequest::Patch(update) => {
-                            log::info!("Patch Function {:?}", update.instance_id);
-                            if let Some(instance) = functions.get_mut(&update.instance_id.as_ref().unwrap().function_id) {
+                            log::info!("Patch Function {:?}", update);
+                            if let Some(instance) = functions.get_mut(&update.function_id) {
                                 instance.patch(update).await;
                             }
                         }
