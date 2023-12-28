@@ -1,5 +1,6 @@
 use edgeless_api::{
-    function_instance::{ComponentId, InstanceId, PatchRequest},
+    common::PatchRequest,
+    function_instance::{ComponentId, InstanceId},
     workflow_instance::{WorkflowId, WorkflowInstance},
 };
 use futures::{Future, SinkExt, StreamExt};

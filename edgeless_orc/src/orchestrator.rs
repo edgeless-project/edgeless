@@ -1,7 +1,5 @@
-use edgeless_api::common::StartComponentResponse;
-use edgeless_api::function_instance::{
-    ComponentId, InstanceId, PatchRequest, SpawnFunctionRequest, StartResourceRequest, UpdateNodeRequest, UpdatePeersRequest,
-};
+use edgeless_api::common::{PatchRequest, StartComponentResponse};
+use edgeless_api::function_instance::{ComponentId, InstanceId, SpawnFunctionRequest, StartResourceRequest, UpdateNodeRequest, UpdatePeersRequest};
 use edgeless_api::resource_configuration::ResourceInstanceSpecification;
 use futures::{Future, SinkExt, StreamExt};
 use rand::seq::SliceRandom;
@@ -23,7 +21,7 @@ enum OrchestratorRequest {
         tokio::sync::oneshot::Sender<anyhow::Result<StartComponentResponse>>,
     ),
     STOPRESOURCE(edgeless_api::function_instance::InstanceId),
-    PATCH(edgeless_api::function_instance::PatchRequest),
+    PATCH(edgeless_api::common::PatchRequest),
     UPDATENODE(
         edgeless_api::function_instance::UpdateNodeRequest,
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse>>,
@@ -106,6 +104,14 @@ pub struct ClientDesc {
     api: Box<dyn edgeless_api::agent::AgentAPI + Send>,
 }
 
+enum IntFid {
+    // 0: node_id, int_fid
+    Function(InstanceId),
+    // 0: node_id, int_fid
+    // 1: provider_id
+    Resource(InstanceId, String),
+}
+
 impl Orchestrator {
     pub async fn new(settings: crate::EdgelessOrcSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
@@ -120,21 +126,26 @@ impl Orchestrator {
         let _ = self.sender.send(OrchestratorRequest::KEEPALIVE()).await;
     }
 
-    fn ext_to_int(active_instances: &std::collections::HashMap<ComponentId, ActiveInstance>, ext_fid: &ComponentId) -> Vec<InstanceId> {
+    fn ext_to_int(active_instances: &std::collections::HashMap<ComponentId, ActiveInstance>, ext_fid: &ComponentId) -> Vec<IntFid> {
         match active_instances.get(ext_fid) {
             Some(active_instance) => match active_instance {
                 ActiveInstance::Function(_req, instances) => instances
                     .iter()
-                    .map(|x| InstanceId {
-                        node_id: x.node_id,
-                        function_id: x.function_id,
+                    .map(|x| {
+                        IntFid::Function(InstanceId {
+                            node_id: x.node_id,
+                            function_id: x.function_id,
+                        })
                     })
                     .collect(),
-                ActiveInstance::Resource(_req, instance, _provider_id) => {
-                    vec![InstanceId {
-                        node_id: instance.node_id,
-                        function_id: instance.function_id,
-                    }]
+                ActiveInstance::Resource(_req, instance, provider_id) => {
+                    vec![IntFid::Resource(
+                        InstanceId {
+                            node_id: instance.node_id,
+                            function_id: instance.function_id,
+                        },
+                        provider_id.clone(),
+                    )]
                 }
             },
             None => vec![],
@@ -416,32 +427,68 @@ impl Orchestrator {
                                 // this change must be applied to runners,
                                 // as well. For now, we just keep
                                 // overwriting the same entry.
-                                output_mapping.insert(channel.clone(), target);
+                                let target_instance_id = match target {
+                                    IntFid::Function(instance_id) => instance_id,
+                                    IntFid::Resource(instance_id, _) => instance_id,
+                                };
+                                output_mapping.insert(channel.clone(), target_instance_id);
                             }
                         }
 
-                        // Notify the new mapping to the node.
-                        match clients.get_mut(&source.node_id) {
-                            Some(client_desc) => match client_desc
-                                .api
-                                .function_instance_api()
-                                .patch(PatchRequest {
-                                    function_id: source.function_id.clone(),
-                                    output_mapping,
-                                })
-                                .await
-                            {
-                                Ok(_) => {
-                                    log::info!("Patched node_id {} int_fid {}", source.node_id, source.function_id);
-                                }
-                                Err(err) => {
-                                    log::error!("Error when patching node_id {} int_fid {}: {}", source.node_id, source.function_id, err);
+                        // Notify the new mapping to the node / resource.
+                        match source {
+                            IntFid::Function(instance_id) => match clients.get_mut(&instance_id.node_id) {
+                                Some(client_desc) => match client_desc
+                                    .api
+                                    .function_instance_api()
+                                    .patch(PatchRequest {
+                                        function_id: instance_id.function_id.clone(),
+                                        output_mapping,
+                                    })
+                                    .await
+                                {
+                                    Ok(_) => {
+                                        log::info!("Patched node_id {} int_fid {}", instance_id.node_id, instance_id.function_id);
+                                    }
+                                    Err(err) => {
+                                        log::error!(
+                                            "Error when patching node_id {} int_fid {}: {}",
+                                            instance_id.node_id,
+                                            instance_id.function_id,
+                                            err
+                                        );
+                                    }
+                                },
+                                None => {
+                                    log::error!("Cannot patch unknown node_id {}", instance_id.node_id);
                                 }
                             },
-                            None => {
-                                log::error!("Cannot patch unknown node_id {}", source.node_id);
-                            }
-                        }
+                            IntFid::Resource(instance_id, provider_id) => match resource_providers.get_mut(&provider_id) {
+                                Some(client_desc) => match client_desc
+                                    .config_api
+                                    .patch(PatchRequest {
+                                        function_id: instance_id.function_id.clone(),
+                                        output_mapping,
+                                    })
+                                    .await
+                                {
+                                    Ok(_) => {
+                                        log::info!("Patched provider_id {} int_fid {}", provider_id, instance_id.function_id);
+                                    }
+                                    Err(err) => {
+                                        log::error!(
+                                            "Error when patching provider_id {} int_fid {}: {}",
+                                            provider_id,
+                                            instance_id.function_id,
+                                            err
+                                        );
+                                    }
+                                },
+                                None => {
+                                    log::error!("Cannot patch unknown provider_id {}", provider_id);
+                                }
+                            },
+                        };
                     }
                 }
                 OrchestratorRequest::UPDATENODE(request, reply_channel) => {
@@ -701,7 +748,7 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for OrchestratorFun
         }
     }
 
-    async fn patch(&mut self, update: edgeless_api::function_instance::PatchRequest) -> anyhow::Result<()> {
+    async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         log::debug!("FunctionInstance::Patch() {:?}", update);
         match self.sender.send(OrchestratorRequest::PATCH(update)).await {
             Ok(_) => Ok(()),

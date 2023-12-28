@@ -1,9 +1,15 @@
+use edgeless_api::function_instance::{ComponentId, InstanceId};
+use http_body_util::BodyExt;
 use std::str::FromStr;
 
-use http_body_util::BodyExt;
+struct ResourceDesc {
+    host: String,
+    allow: std::collections::HashSet<edgeless_http::EdgelessHTTPMethod>,
+}
 
 struct IngressState {
     interests: Vec<HTTPIngressInterest>,
+    active_resources: std::collections::HashMap<ComponentId, ResourceDesc>,
     dataplane: edgeless_dataplane::handle::DataplaneHandle,
 }
 
@@ -105,7 +111,8 @@ pub async fn ingress_task(
 
     let ingress_state = std::sync::Arc::new(tokio::sync::Mutex::new(IngressState {
         interests: Vec::<HTTPIngressInterest>::new(),
-        dataplane: dataplane,
+        active_resources: std::collections::HashMap::new(),
+        dataplane,
     }));
 
     let cloned_interests = ingress_state.clone();
@@ -163,29 +170,24 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for IngressR
             instance_specification.configuration.get("host"),
             instance_specification.configuration.get("methods"),
         ) {
+            // Assign a new component identifier to the newly-created  resource.
             let resource_id = edgeless_api::function_instance::InstanceId::new(self.own_node_id.clone());
-            let target = match instance_specification.output_mapping.get("new_request") {
-                Some(val) => val.clone(),
-                None => {
-                    return Err(anyhow::anyhow!("Missing Target"));
-                }
-            };
-            let allowed_methods: std::collections::HashSet<edgeless_http::EdgelessHTTPMethod> = methods
-                .split(",")
-                .filter_map(|str_method| match edgeless_http::string_method_to_edgeless(str_method) {
-                    Ok(val) => Some(val),
-                    Err(_) => {
-                        log::warn!("Bad HTTP Method");
-                        None
-                    }
-                })
-                .collect();
-            lck.interests.push(HTTPIngressInterest {
-                resource_id: resource_id.clone(),
-                host: host.to_string(),
-                allow: allowed_methods,
-                target: target,
-            });
+            lck.active_resources.insert(
+                resource_id.function_id.clone(),
+                ResourceDesc {
+                    host: host.clone(),
+                    allow: methods
+                        .split(",")
+                        .filter_map(|str_method| match edgeless_http::string_method_to_edgeless(str_method) {
+                            Ok(val) => Some(val),
+                            Err(_) => {
+                                log::warn!("Bad HTTP Method");
+                                None
+                            }
+                        })
+                        .collect(),
+                },
+            );
             Ok(edgeless_api::common::StartComponentResponse::InstanceId(resource_id))
         } else {
             Ok(edgeless_api::common::StartComponentResponse::ResponseError(
@@ -199,6 +201,33 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for IngressR
     async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
         let mut lck = self.configuration_state.lock().await;
         lck.interests.retain(|item| item.resource_id != resource_id);
+        Ok(())
+    }
+
+    async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
+        let target = match update.output_mapping.get("new_request") {
+            Some(val) => val.clone(),
+            None => {
+                return Err(anyhow::anyhow!("Missing mapping of channel: new_request"));
+            }
+        };
+        let mut lck = self.configuration_state.lock().await;
+        let (host, allow) = match lck.active_resources.get(&update.function_id) {
+            Some(val) => (val.host.clone(), val.allow.clone()),
+            None => {
+                return Err(anyhow::anyhow!("Patching a non-existing resource: {}", update.function_id));
+            }
+        };
+        lck.interests.push(HTTPIngressInterest {
+            resource_id: InstanceId {
+                node_id: self.own_node_id.clone(),
+                function_id: update.function_id.clone(),
+            },
+            host,
+            allow,
+            target,
+        });
+
         Ok(())
     }
 }
