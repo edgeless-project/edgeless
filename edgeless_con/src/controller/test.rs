@@ -322,55 +322,80 @@ async fn function_link_loop_start_stop() {
     let domain_ids: std::collections::HashSet<_> = instance.domain_mapping.iter().map(|instances| instances.domain_id.clone()).collect();
     assert_eq!(domain_ids.len(), 1);
     assert!(domain_ids.contains("domain-1"));
-    // XXX Issue#60
 
-    // let to_patch: Option<edgeless_api::function_instance::InstanceId>;
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    // tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    let mut new_func1_id = uuid::Uuid::nil();
+    assert!(new_func1_id.is_nil());
+    if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
+        assert!(id.node_id.is_nil());
+        new_func1_id = id.function_id.clone();
+        assert!(spawn_req.instance_id.is_none());
+        assert!(spawn_req.annotations.is_empty());
+        // TODO check state specifications
+    } else {
+        panic!();
+    }
 
-    // let res = mock_orc_receiver.try_next().unwrap().unwrap();
-    // if let MockFunctionInstanceEvent::Start((id, spawn_req)) = res {
-    //     assert!(fids.contains(&id));
-    //     assert_eq!(spawn_req.output_mapping.len(), 0);
-    //     to_patch = Some(id);
-    // } else {
-    //     panic!();
-    // }
-    // let res2 = mock_orc_receiver.try_next().unwrap().unwrap();
-    // if let MockFunctionInstanceEvent::Start((id, spawn_req)) = res2 {
-    //     assert!(fids.contains(&id));
-    //     assert_eq!(spawn_req.output_mapping.len(), 1);
-    // } else {
-    //     panic!();
-    // }
-    // let res3 = mock_orc_receiver.try_next().unwrap().unwrap();
-    // if let MockFunctionInstanceEvent::Patch(update_req) = res3 {
-    //     assert_eq!(update_req.instance_id.unwrap(), to_patch.unwrap());
-    //     assert_eq!(update_req.output_mapping.len(), 1);
-    // } else {
-    //     panic!();
-    // }
+    let mut new_func2_id = uuid::Uuid::nil();
+    assert!(new_func2_id.is_nil());
+    if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
+        assert!(id.node_id.is_nil());
+        new_func2_id = id.function_id.clone();
+        assert!(spawn_req.instance_id.is_none());
+        assert!(spawn_req.annotations.is_empty());
+        // TODO check state specifications
+    } else {
+        panic!();
+    }
 
-    // assert!(mock_res_receiver.try_next().is_err());
-    // assert!(mock_orc_receiver.try_next().is_err());
+    let mut label1 = "output-1".to_string();
+    let mut label2 = "output-2".to_string();
+    if let MockFunctionInstanceEvent::Patch(update_req) = mock_orc_receiver.try_next().unwrap().unwrap() {
+        if new_func1_id != update_req.function_id {
+            std::mem::swap(&mut new_func1_id, &mut new_func2_id);
+            std::mem::swap(&mut label1, &mut label2);
+        }
+        assert_eq!(new_func1_id, update_req.function_id);
+        assert_eq!(1, update_req.output_mapping.len());
+        assert!(update_req.output_mapping.contains_key(&label1));
+        let mapping = update_req.output_mapping.get(&label1).unwrap();
+        assert!(mapping.node_id.is_nil());
+        assert_eq!(new_func2_id, mapping.function_id);
+    } else {
+        panic!();
+    }
 
-    // wf_client.stop(instance.workflow_id.clone()).await.unwrap();
+    if let MockFunctionInstanceEvent::Patch(update_req) = mock_orc_receiver.try_next().unwrap().unwrap() {
+        assert_eq!(new_func2_id, update_req.function_id);
+        assert_eq!(1, update_req.output_mapping.len());
+        assert!(update_req.output_mapping.contains_key(&label2));
+        let mapping = update_req.output_mapping.get(&label2).unwrap();
+        assert!(mapping.node_id.is_nil());
+        assert_eq!(new_func1_id, mapping.function_id);
+    } else {
+        panic!();
+    }
 
-    // tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    wf_client.stop(instance.workflow_id.clone()).await.unwrap();
 
-    // let stop_res = mock_orc_receiver.try_next().unwrap().unwrap();
-    // if let MockFunctionInstanceEvent::Stop(id) = stop_res {
-    //     assert!(fids.contains(&id));
-    // } else {
-    //     panic!();
-    // }
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    // let stop_res2 = mock_orc_receiver.try_next().unwrap().unwrap();
-    // if let MockFunctionInstanceEvent::Stop(id) = stop_res2 {
-    //     assert!(fids.contains(&id));
-    // } else {
-    //     panic!();
-    // }
+    let mut fids = std::collections::HashSet::from([new_func1_id.clone(), new_func2_id.clone()]);
+    let stop_res = mock_orc_receiver.try_next().unwrap().unwrap();
+    if let MockFunctionInstanceEvent::StopFunction(id) = stop_res {
+        assert!(id.node_id.is_nil());
+        assert!(fids.remove(&id.function_id));
+    } else {
+        panic!();
+    }
 
-    // assert!(mock_res_receiver.try_next().is_err());
+    let stop_res2 = mock_orc_receiver.try_next().unwrap().unwrap();
+    if let MockFunctionInstanceEvent::StopFunction(id) = stop_res2 {
+        assert!(id.node_id.is_nil());
+        assert!(fids.remove(&id.function_id));
+    } else {
+        panic!();
+    }
+    assert!(fids.is_empty());
 }
