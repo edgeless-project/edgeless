@@ -235,7 +235,8 @@ impl Controller {
                         if res.is_err() {
                             break;
                         }
-                        // [TODO] The state_specification configuration should be
+                        // [TODO] Issue#95
+                        // The state_specification configuration should be
                         // read from the function annotations.
                         log::warn!("state specifications currently forced to NodeLocal");
                         let response = fn_client
@@ -359,11 +360,12 @@ impl Controller {
                                 // target function/resource (once for each
                                 // assigned orchestration domain).
                                 for target_fid in cur_workflow.mapped_fids(&to_name) {
-                                    // [TODO] The output_mapping structure
-                                    // should be changed so that multiple
-                                    // values are possible (with weights), and
-                                    // this change must be applied to runners,
-                                    // as well. For now, we just keep
+                                    // [TODO] Issue#96 The output_mapping
+                                    // structure should be changed so that
+                                    // multiple values are possible (with
+                                    // weights), and this change must be applied
+                                    // to runners, as well.
+                                    // For now, we just keep
                                     // overwriting the same entry.
                                     output_mapping.insert(
                                         from_channel.clone(),
