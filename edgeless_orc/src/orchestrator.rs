@@ -202,7 +202,7 @@ impl Orchestrator {
 
                     // Finally try to spawn the function instance on the
                     // selected client.
-                    // [TODO] We assume that a single instance is spawned.
+                    // [TODO] Issue#96 We assume that one instance is spawned.
                     let spawn_req_copy = spawn_req.clone();
                     let res = match fn_client.start(spawn_req).await {
                         Ok(res) => match res {
@@ -311,7 +311,8 @@ impl Orchestrator {
                                     .config_api
                                     .start(ResourceInstanceSpecification {
                                         provider_id: provider_id.clone(),
-                                        output_mapping: std::collections::HashMap::new(), // [TODO] remove
+                                        // [TODO] Issue #94 remove output mapping
+                                        output_mapping: std::collections::HashMap::new(),
                                         configuration: start_req.configurations,
                                     })
                                     .await
@@ -421,7 +422,7 @@ impl Orchestrator {
                         let mut output_mapping = std::collections::HashMap::new();
                         for (channel, instance_id) in &update.output_mapping {
                             for target in Self::ext_to_int(&active_instances, &instance_id.function_id) {
-                                // [TODO] The output_mapping structure
+                                // [TODO] Issue#96 The output_mapping structure
                                 // should be changed so that multiple
                                 // values are possible (with weights), and
                                 // this change must be applied to runners,
