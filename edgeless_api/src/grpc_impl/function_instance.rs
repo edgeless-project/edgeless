@@ -137,24 +137,6 @@ impl FunctonInstanceConverters {
         }
     }
 
-    pub fn parse_patch_request(api_update: &crate::grpc_impl::api::PatchRequest) -> anyhow::Result<crate::function_instance::PatchRequest> {
-        Ok(crate::function_instance::PatchRequest {
-            function_id: uuid::Uuid::parse_str(&api_update.function_id)?,
-            output_mapping: api_update
-                .output_mapping
-                .iter()
-                .filter_map(|(key, value)| {
-                    return {
-                        match CommonConverters::parse_instance_id(&value) {
-                            Ok(val) => Some((key.clone(), val)),
-                            Err(_) => None,
-                        }
-                    };
-                })
-                .collect(),
-        })
-    }
-
     pub fn parse_state_specification(
         api_spec: &crate::grpc_impl::api::StateSpecification,
     ) -> anyhow::Result<crate::function_instance::StateSpecification> {
@@ -283,17 +265,6 @@ impl FunctonInstanceConverters {
         }
     }
 
-    pub fn serialize_patch_request(crate_update: &crate::function_instance::PatchRequest) -> crate::grpc_impl::api::PatchRequest {
-        crate::grpc_impl::api::PatchRequest {
-            function_id: crate_update.function_id.to_string(),
-            output_mapping: crate_update
-                .output_mapping
-                .iter()
-                .map(|(key, value)| (key.clone(), CommonConverters::serialize_instance_id(&value)))
-                .collect(),
-        }
-    }
-
     pub fn serialize_state_specification(crate_spec: &crate::function_instance::StateSpecification) -> crate::grpc_impl::api::StateSpecification {
         crate::grpc_impl::api::StateSpecification {
             state_id: crate_spec.state_id.to_string(),
@@ -398,10 +369,10 @@ impl crate::function_instance::FunctionInstanceOrcAPI for FunctionInstanceOrcAPI
         }
     }
 
-    async fn patch(&mut self, update: crate::function_instance::PatchRequest) -> anyhow::Result<()> {
+    async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()> {
         match self
             .client
-            .patch(tonic::Request::new(FunctonInstanceConverters::serialize_patch_request(&update)))
+            .patch(tonic::Request::new(CommonConverters::serialize_patch_request(&update)))
             .await
         {
             Ok(_) => Ok(()),
@@ -531,7 +502,7 @@ impl crate::grpc_impl::api::function_instance_orc_server::FunctionInstanceOrc fo
     }
 
     async fn patch(&self, update: tonic::Request<crate::grpc_impl::api::PatchRequest>) -> Result<tonic::Response<()>, tonic::Status> {
-        let parsed_update = match FunctonInstanceConverters::parse_patch_request(&update.into_inner()) {
+        let parsed_update = match CommonConverters::parse_patch_request(&update.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
                 log::error!("Parse UpdateFunctionLinks Failed: {}", err);
@@ -625,10 +596,10 @@ impl crate::function_instance::FunctionInstanceNodeAPI for FunctionInstanceNodeA
         }
     }
 
-    async fn patch(&mut self, update: crate::function_instance::PatchRequest) -> anyhow::Result<()> {
+    async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()> {
         match self
             .client
-            .patch(tonic::Request::new(FunctonInstanceConverters::serialize_patch_request(&update)))
+            .patch(tonic::Request::new(CommonConverters::serialize_patch_request(&update)))
             .await
         {
             Ok(_) => Ok(()),
@@ -713,7 +684,7 @@ impl crate::grpc_impl::api::function_instance_node_server::FunctionInstanceNode 
     }
 
     async fn patch(&self, update: tonic::Request<crate::grpc_impl::api::PatchRequest>) -> Result<tonic::Response<()>, tonic::Status> {
-        let parsed_update = match FunctonInstanceConverters::parse_patch_request(&update.into_inner()) {
+        let parsed_update = match CommonConverters::parse_patch_request(&update.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
                 log::error!("Parse UpdateFunctionLinks Failed: {}", err);
@@ -762,7 +733,6 @@ mod tests {
     use super::*;
     use crate::common::StartComponentResponse;
     use crate::function_instance::FunctionClassSpecification;
-    use crate::function_instance::PatchRequest;
     use crate::function_instance::ResourceProviderSpecification;
     use crate::function_instance::SpawnFunctionRequest;
     use crate::function_instance::StartResourceRequest;
@@ -900,56 +870,6 @@ mod tests {
         ];
         for msg in messages {
             match FunctonInstanceConverters::parse_update_peers_request(&FunctonInstanceConverters::serialize_update_peers_request(&msg)) {
-                Ok(val) => assert_eq!(msg, val),
-                Err(err) => panic!("{}", err),
-            }
-        }
-    }
-
-    #[test]
-    fn serialize_deserialize_patch_request() {
-        let messages = vec![
-            PatchRequest {
-                function_id: uuid::Uuid::new_v4(),
-                output_mapping: std::collections::HashMap::from([
-                    (
-                        "out".to_string(),
-                        InstanceId {
-                            node_id: uuid::Uuid::new_v4(),
-                            function_id: uuid::Uuid::new_v4(),
-                        },
-                    ),
-                    (
-                        "err".to_string(),
-                        InstanceId {
-                            node_id: uuid::Uuid::new_v4(),
-                            function_id: uuid::Uuid::new_v4(),
-                        },
-                    ),
-                ]),
-            },
-            PatchRequest {
-                function_id: uuid::Uuid::new_v4(),
-                output_mapping: std::collections::HashMap::from([
-                    (
-                        "out".to_string(),
-                        InstanceId {
-                            node_id: uuid::Uuid::nil(),
-                            function_id: uuid::Uuid::new_v4(),
-                        },
-                    ),
-                    (
-                        "err".to_string(),
-                        InstanceId {
-                            node_id: uuid::Uuid::nil(),
-                            function_id: uuid::Uuid::new_v4(),
-                        },
-                    ),
-                ]),
-            },
-        ];
-        for msg in messages {
-            match FunctonInstanceConverters::parse_patch_request(&FunctonInstanceConverters::serialize_patch_request(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }

@@ -1,5 +1,7 @@
 pub use edgeless_api_core::instance_id::*;
 
+use crate::common::PatchRequest;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum StatePolicy {
     Transient,
@@ -80,12 +82,6 @@ pub enum UpdatePeersRequest {
     Add(uuid::Uuid, String), // node_id, invocation_url
     Del(uuid::Uuid),         // node_id
     Clear,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct PatchRequest {
-    pub function_id: ComponentId,
-    pub output_mapping: std::collections::HashMap<String, InstanceId>,
 }
 
 #[async_trait::async_trait]

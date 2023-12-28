@@ -10,7 +10,7 @@ pub struct RunnerClient {
 pub enum WasmRunnerRequest {
     Start(edgeless_api::function_instance::SpawnFunctionRequest),
     Stop(edgeless_api::function_instance::InstanceId),
-    Patch(edgeless_api::function_instance::PatchRequest),
+    Patch(edgeless_api::common::PatchRequest),
     FunctionExit(edgeless_api::function_instance::InstanceId),
 }
 
@@ -98,7 +98,7 @@ impl crate::runner_api::RunnerAPI for RunnerClient {
         }
     }
 
-    async fn patch(&mut self, update: edgeless_api::function_instance::PatchRequest) -> anyhow::Result<()> {
+    async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         match self.sender.send(WasmRunnerRequest::Patch(update)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),

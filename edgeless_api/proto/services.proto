@@ -58,10 +58,10 @@ service FunctionInstanceNode {
     // Output: none.
     rpc Stop (InstanceId) returns (google.protobuf.Empty );
 
-    // Patch functions/resources by updating for a given function/resource the
+    // Patch functions by updating for a given function identifier the
     // mapping from the channel to a list of functions/resources to which events
     // should be directed.
-    // Input: the update mapping.
+    // Input: the updated mapping.
     // Output: none.
     rpc Patch (PatchRequest) returns (google.protobuf.Empty);
 
@@ -113,4 +113,11 @@ service ResourceConfiguration {
     // Input: the identifier of the resource to be terminated.
     // Output: none.
     rpc Stop (InstanceId) returns (google.protobuf.Empty);
+
+    // Patch resources by updating for a given identifier the
+    // mapping from the channel to a list of functions/resources to which events
+    // should be directed.
+    // Input: the updated mapping.
+    // Output: none.
+    rpc Patch (PatchRequest) returns (google.protobuf.Empty);
 }

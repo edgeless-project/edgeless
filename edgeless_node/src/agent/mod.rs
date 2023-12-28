@@ -7,7 +7,7 @@ use crate::runner_api;
 enum AgentRequest {
     SPAWN(edgeless_api::function_instance::SpawnFunctionRequest),
     STOP(edgeless_api::function_instance::InstanceId),
-    PATCH(edgeless_api::function_instance::PatchRequest),
+    PATCH(edgeless_api::common::PatchRequest),
     UPDATEPEERS(edgeless_api::function_instance::UpdatePeersRequest),
 }
 
@@ -139,7 +139,7 @@ impl edgeless_api::function_instance::FunctionInstanceNodeAPI for FunctionInstan
         }
     }
 
-    async fn patch(&mut self, update: edgeless_api::function_instance::PatchRequest) -> anyhow::Result<()> {
+    async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         match self.sender.send(AgentRequest::PATCH(update)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
