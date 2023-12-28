@@ -4,6 +4,8 @@ use edgeless_api::function_instance::{
 };
 use edgeless_api::resource_configuration::ResourceInstanceSpecification;
 use futures::{Future, SinkExt, StreamExt};
+use rand::seq::SliceRandom;
+use rand::SeedableRng;
 use std::collections::{HashMap, HashSet};
 
 pub struct Orchestrator {
@@ -30,7 +32,7 @@ enum OrchestratorRequest {
 }
 
 struct ResourceProvider {
-    provider_id: String,
+    class_type: String,
     node_id: edgeless_api::function_instance::NodeId,
     outputs: Vec<String>,
     config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send>,
@@ -38,8 +40,14 @@ struct ResourceProvider {
 
 #[derive(Clone)]
 enum ActiveInstance {
+    // 0: request
+    // 1: [ (node_id, int_fid) ]
     Function(SpawnFunctionRequest, Vec<InstanceId>),
-    Resource(StartResourceRequest, InstanceId),
+
+    // 0: request
+    // 1: node_id, int_fid
+    // 2: provider_id
+    Resource(StartResourceRequest, InstanceId, String),
 }
 
 impl std::fmt::Display for ActiveInstance {
@@ -54,10 +62,10 @@ impl std::fmt::Display for ActiveInstance {
                     .collect::<Vec<String>>()
                     .join(",")
             ),
-            ActiveInstance::Resource(req, instance_id) => write!(
+            ActiveInstance::Resource(req, instance_id, provider_id) => write!(
                 f,
-                "resource class type {}, node_id {}, function_id {}",
-                req.class_type, instance_id.node_id, instance_id.function_id
+                "resource provider_id {}, class type {}, node_id {}, function_id {}",
+                provider_id, req.class_type, instance_id.node_id, instance_id.function_id
             ),
         }
     }
@@ -67,8 +75,8 @@ impl std::fmt::Display for ResourceProvider {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "provider_id {}, node_id {}, outputs [{}]",
-            self.provider_id,
+            "class_type {}, node_id {}, outputs [{}]",
+            self.class_type,
             self.node_id,
             self.outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
         )
@@ -122,7 +130,7 @@ impl Orchestrator {
                         function_id: x.function_id,
                     })
                     .collect(),
-                ActiveInstance::Resource(_req, instance) => {
+                ActiveInstance::Resource(_req, instance, _provider_id) => {
                     vec![InstanceId {
                         node_id: instance.node_id,
                         function_id: instance.function_id,
@@ -136,13 +144,14 @@ impl Orchestrator {
     async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
         let mut receiver = receiver;
         let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy);
+        let mut rng = rand::rngs::StdRng::from_entropy();
 
         // known agents
         // key: node_id
         let mut clients = HashMap::<uuid::Uuid, ClientDesc>::new();
 
         // known resources providers as notified by nodes upon registration
-        // key: resource type (class_type)
+        // key: provider_id
         let mut resource_providers = std::collections::HashMap::<String, ResourceProvider>::new();
 
         // instances that the orchestrator promised to keep active
@@ -254,7 +263,7 @@ impl Orchestrator {
                                         }
                                     }
                                 }
-                                ActiveInstance::Resource(_, _) => {
+                                ActiveInstance::Resource(_, _, _) => {
                                     log::error!(
                                         "Request to stop a function but the ext_fid is associated with a resource: ext_fid {}",
                                         instance_id.function_id
@@ -270,53 +279,77 @@ impl Orchestrator {
                 OrchestratorRequest::STARTRESOURCE(start_req, reply_channel) => {
                     log::debug!("Orchestrator StartResource {:?}", start_req);
                     let start_req_copy = start_req.clone();
-                    let res = match resource_providers.get_mut(&start_req.class_type) {
-                        Some(resource_provider) => match resource_provider
-                            .config_api
-                            .start(ResourceInstanceSpecification {
-                                provider_id: resource_provider.provider_id.clone(),
-                                output_mapping: std::collections::HashMap::new(), // [TODO] remove
-                                configuration: start_req.configurations,
-                            })
-                            .await
-                        {
-                            Ok(start_response) => match start_response {
-                                StartComponentResponse::InstanceId(instance_id) => {
-                                    assert!(resource_provider.node_id == instance_id.node_id);
-                                    let ext_fid = uuid::Uuid::new_v4();
-                                    active_instances.insert(
-                                        ext_fid.clone(),
-                                        ActiveInstance::Resource(
-                                            start_req_copy,
-                                            InstanceId {
-                                                node_id: resource_provider.node_id.clone(),
-                                                function_id: instance_id.function_id.clone(),
-                                            },
-                                        ),
-                                    );
-                                    log::info!(
-                                        "Started resource node_id {}, ext_fid {}, int_fid {}",
-                                        resource_provider.node_id,
-                                        &ext_fid,
-                                        instance_id.function_id
-                                    );
-                                    Ok(StartComponentResponse::InstanceId(InstanceId {
-                                        node_id: uuid::Uuid::nil(),
-                                        function_id: ext_fid,
-                                    }))
+
+                    // Find all resource providers that can start this resource.
+                    let matching_providers = resource_providers
+                        .iter()
+                        .filter_map(|(id, p)| {
+                            if p.class_type == start_req.class_type {
+                                return Some(id.clone());
+                            } else {
+                                return None;
+                            }
+                        })
+                        .collect::<Vec<String>>();
+
+                    // Select one provider at random.
+                    let res = match matching_providers.choose(&mut rng) {
+                        Some(provider_id) => {
+                            match resource_providers.get_mut(provider_id) {
+                                Some(resource_provider) => match resource_provider
+                                    .config_api
+                                    .start(ResourceInstanceSpecification {
+                                        provider_id: provider_id.clone(),
+                                        output_mapping: std::collections::HashMap::new(), // [TODO] remove
+                                        configuration: start_req.configurations,
+                                    })
+                                    .await
+                                {
+                                    Ok(start_response) => match start_response {
+                                        StartComponentResponse::InstanceId(instance_id) => {
+                                            assert!(resource_provider.node_id == instance_id.node_id);
+                                            let ext_fid = uuid::Uuid::new_v4();
+                                            active_instances.insert(
+                                                ext_fid.clone(),
+                                                ActiveInstance::Resource(
+                                                    start_req_copy,
+                                                    InstanceId {
+                                                        node_id: resource_provider.node_id.clone(),
+                                                        function_id: instance_id.function_id.clone(),
+                                                    },
+                                                    provider_id.clone(),
+                                                ),
+                                            );
+                                            log::info!(
+                                                "Started resource provider_id {}, node_id {}, ext_fid {}, int_fid {}",
+                                                provider_id,
+                                                resource_provider.node_id,
+                                                &ext_fid,
+                                                instance_id.function_id
+                                            );
+                                            Ok(StartComponentResponse::InstanceId(InstanceId {
+                                                node_id: uuid::Uuid::nil(),
+                                                function_id: ext_fid,
+                                            }))
+                                        }
+                                        StartComponentResponse::ResponseError(err) => Ok(StartComponentResponse::ResponseError(err)),
+                                    },
+                                    Err(err) => Ok(StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
+                                        summary: "could not start resource".to_string(),
+                                        detail: Some(err.to_string()),
+                                    })),
+                                },
+                                None => {
+                                    panic!("the impossible happened: a resource provider just disappeared");
                                 }
-                                StartComponentResponse::ResponseError(err) => Ok(StartComponentResponse::ResponseError(err)),
-                            },
-                            Err(err) => Ok(StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
-                                summary: "could not start resource".to_string(),
-                                detail: Some(err.to_string()),
-                            })),
-                        },
+                            }
+                        }
                         None => Ok(StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
                             summary: "class type not found".to_string(),
-                            detail: None,
+                            detail: Some(format!("class_type: {}", start_req.class_type)),
                         })),
                     };
+
                     if let Err(err) = reply_channel.send(res) {
                         log::error!("Orchestrator channel error in STARTRESOURCE: {:?}", err);
                     }
@@ -332,15 +365,16 @@ impl Orchestrator {
                                         instance_id.function_id
                                     );
                                 }
-                                ActiveInstance::Resource(req, instance) => {
+                                ActiveInstance::Resource(_req, instance, provider_id) => {
                                     // Stop the instance of this resource.
-                                    match resource_providers.get_mut(&req.class_type) {
+                                    match resource_providers.get_mut(&provider_id) {
                                         Some(resource_provider) => {
                                             assert!(resource_provider.node_id == instance.node_id);
                                             match resource_provider.config_api.stop(instance).await {
                                                 Ok(_) => {
                                                     log::info!(
-                                                        "Stopped resource ext_fid {}, node_id {}, int_fid {}",
+                                                        "Stopped resource provider_id {}, ext_fid {}, node_id {}, int_fid {}",
+                                                        provider_id,
                                                         instance_id.function_id,
                                                         instance.node_id,
                                                         instance.function_id
@@ -353,8 +387,8 @@ impl Orchestrator {
                                         }
                                         None => {
                                             log::error!(
-                                                "Request to stop a resource of class type {} for which no provider exists, ext_fid {}",
-                                                req.class_type,
+                                                "Request to stop a resource at provider_id {} but the provider does not exist anymore, ext_fid {}",
+                                                provider_id,
                                                 instance_id.function_id
                                             );
                                         }
@@ -433,38 +467,46 @@ impl Orchestrator {
 
                                 // Create the resource configuration APIs.
                                 for resource in &resources {
-                                    let (proto, url, port) = edgeless_api::util::parse_http_host(&resource.configuration_url).unwrap();
-                                    let config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send> = match proto {
-                                        edgeless_api::util::Proto::COAP => {
-                                            log::info!("coap called");
-                                            Box::new(
-                                                edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port))
-                                                    .await,
-                                            )
-                                        }
-                                        _ => Box::new(
-                                            edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationClient::new(
-                                                &resource.configuration_url,
-                                                true,
-                                            )
-                                            .await,
-                                        ),
-                                    };
-                                    assert!(this_node_id.is_some());
                                     log::info!("new resource advertised by node {}: {}", this_node_id.unwrap(), resource);
 
-                                    resource_providers.insert(
-                                        resource.class_type.clone(),
-                                        ResourceProvider {
-                                            provider_id: resource.provider_id.clone(),
-                                            node_id: this_node_id.unwrap().clone(),
-                                            outputs: resource.outputs.clone(),
-                                            config_api,
-                                        },
-                                    );
+                                    if resource_providers.contains_key(&resource.provider_id) {
+                                        log::warn!(
+                                            "cannot add resource because another one exists with the same provider_id: {}",
+                                            resource.provider_id
+                                        )
+                                    } else {
+                                        let (proto, url, port) = edgeless_api::util::parse_http_host(&resource.configuration_url).unwrap();
+                                        let config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send> = match proto {
+                                            edgeless_api::util::Proto::COAP => {
+                                                log::info!("coap called");
+                                                Box::new(
+                                                    edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port))
+                                                        .await,
+                                                )
+                                            }
+                                            _ => Box::new(
+                                                edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationClient::new(
+                                                    &resource.configuration_url,
+                                                    true,
+                                                )
+                                                .await,
+                                            ),
+                                        };
+                                        assert!(this_node_id.is_some());
+
+                                        resource_providers.insert(
+                                            resource.provider_id.clone(),
+                                            ResourceProvider {
+                                                class_type: resource.class_type.clone(),
+                                                node_id: this_node_id.unwrap().clone(),
+                                                outputs: resource.outputs.clone(),
+                                                config_api,
+                                            },
+                                        );
+                                    }
                                 }
 
-                                // Crate the agent API.
+                                // Create the agent API.
                                 clients.insert(
                                     node_id,
                                     ClientDesc {
