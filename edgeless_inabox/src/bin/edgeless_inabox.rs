@@ -155,16 +155,14 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     std::fs::write(Path::new(&path).join("orchestrator.toml"), toml::to_string(&orc_conf).expect("Wrong")).ok();
     std::fs::write(Path::new(&path).join("controller.toml"), toml::to_string(&con_conf).expect("Wrong")).ok();
     std::fs::write(Path::new(&path).join("balancer.toml"), toml::to_string(&bal_conf).expect("Wrong")).ok();
-    let mut count = 0;
     let mut node_files = vec![];
-    for node_conf in node_confs {
+    for (count, node_conf) in node_confs.into_iter().enumerate() {
         std::fs::write(
             Path::new(&path).join(format!("node{}.toml", count)),
             toml::to_string(&node_conf).expect("Wrong"),
         )
         .ok();
         node_files.push(format!("{}/node{}.toml", &path, count));
-        count += 1;
     }
 
     Ok(InABoxConfig {
