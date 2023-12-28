@@ -252,7 +252,8 @@ impl Controller {
                         match response {
                             Ok(response) => match response {
                                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
-                                    log::error!("function instance creation rejected: {}", error);
+                                    log::warn!("function instance creation rejected: {}", error);
+                                    res = Err(format!("function instance creation rejected: {} ", error));
                                 }
                                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                                     log::info!(
@@ -295,7 +296,8 @@ impl Controller {
                         match response {
                             Ok(response) => match response {
                                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
-                                    log::error!("resource start rejected: {}", error);
+                                    log::warn!("resource start rejected: {}", error);
+                                    res = Err(format!("resource start rejected: {} ", error));
                                 }
                                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                                     log::info!(
@@ -318,7 +320,7 @@ impl Controller {
                                 }
                             },
                             Err(err) => {
-                                res = Err(format!("failed interaction when startinga a resource: {}", err.to_string()));
+                                res = Err(format!("failed interaction when starting a resource: {}", err.to_string()));
                             }
                         }
                     }
