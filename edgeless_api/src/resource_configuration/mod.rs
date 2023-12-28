@@ -1,3 +1,7 @@
+use edgeless_api_core::instance_id::ComponentId;
+
+use crate::common::PatchRequest;
+
 #[derive(Debug)]
 pub struct ResourceInstanceSpecification {
     pub provider_id: String,
@@ -9,11 +13,16 @@ pub struct ResourceInstanceSpecification {
 pub trait ResourceConfigurationAPI: Sync + Send {
     async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<crate::common::StartComponentResponse>;
     async fn stop(&mut self, resource_id: crate::function_instance::InstanceId) -> anyhow::Result<()>;
+    async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()>;
 }
 
 pub struct MultiResouceConfigurationAPI {
+    // key: provider_id
+    // value: resource configuration API
     pub resource_providers: std::collections::HashMap<String, Box<dyn ResourceConfigurationAPI>>,
-    pub resource_instances: std::collections::HashMap<crate::function_instance::InstanceId, String>,
+    // key: fid
+    // value: provider_id
+    pub resource_instances: std::collections::HashMap<ComponentId, String>,
 }
 
 impl MultiResouceConfigurationAPI {
@@ -38,7 +47,7 @@ impl ResourceConfigurationAPI for MultiResouceConfigurationAPI {
                     id.node_id,
                     id.function_id
                 );
-                self.resource_instances.insert(id.clone(), provider_id.clone());
+                self.resource_instances.insert(id.function_id.clone(), provider_id.clone());
                 Ok(crate::common::StartComponentResponse::InstanceId(id))
             } else {
                 Ok(res)
@@ -46,18 +55,43 @@ impl ResourceConfigurationAPI for MultiResouceConfigurationAPI {
         } else {
             Ok(crate::common::StartComponentResponse::ResponseError(crate::common::ResponseError {
                 summary: "Error when creating a resource".to_string(),
-                detail: Some("Provider does not exist".to_string()),
+                detail: Some(format!("Provider does not exist: {}", instance_specification.provider_id)),
             }))
         }
     }
 
     async fn stop(&mut self, resource_id: crate::function_instance::InstanceId) -> anyhow::Result<()> {
-        if let Some(instance_id) = self.resource_instances.get(&resource_id) {
-            if let Some(provider) = self.resource_providers.get_mut(instance_id) {
-                log::info!("Stopped resource node_id {}, fid {}", resource_id.node_id, resource_id.function_id);
+        if let Some(provider_id) = self.resource_instances.get(&resource_id.function_id) {
+            if let Some(provider) = self.resource_providers.get_mut(provider_id) {
+                log::info!(
+                    "Stopped resource provider_id {} node_id {}, fid {}",
+                    provider_id,
+                    resource_id.node_id,
+                    resource_id.function_id
+                );
                 return provider.stop(resource_id).await;
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Cannot stop a resource, provider not found with provider_id: {}",
+                    provider_id
+                ));
             }
         }
-        Err(anyhow::anyhow!("Error when deleting a resource: the resource may not exist"))
+        Err(anyhow::anyhow!("Cannot stop a resource, not found with fid: {}", resource_id.function_id))
+    }
+
+    async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()> {
+        if let Some(provider_id) = self.resource_instances.get(&update.function_id) {
+            if let Some(provider) = self.resource_providers.get_mut(provider_id) {
+                log::info!("Patch resource provider_id {} fid {}", provider_id, update.function_id);
+                return provider.patch(update).await;
+            } else {
+                return Err(anyhow::anyhow!(
+                    "Cannot patch a resource, provider not found with provider_id: {}",
+                    provider_id
+                ));
+            }
+        }
+        Err(anyhow::anyhow!("Cannot patch a resource, not found with fid: {}", update.function_id))
     }
 }

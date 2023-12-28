@@ -88,7 +88,22 @@ impl crate::resource_configuration::ResourceConfigurationAPI for ResourceConfigu
                 let encoded_id = CommonConverters::serialize_instance_id(&resource_id);
                 match client.stop(encoded_id).await {
                     Ok(_) => Ok(()),
-                    Err(err) => Err(anyhow::anyhow!("Resource configuration request failed: {}", err)),
+                    Err(err) => Err(anyhow::anyhow!("Resource stop request failed: {}", err)),
+                }
+            }
+            None => {
+                return Err(anyhow::anyhow!("Resource configuration not connected"));
+            }
+        }
+    }
+
+    async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()> {
+        match &mut self.client {
+            Some(client) => {
+                let encoded_request = CommonConverters::serialize_patch_request(&update);
+                match client.patch(encoded_request).await {
+                    Ok(_) => Ok(()),
+                    Err(err) => Err(anyhow::anyhow!("Resource patch request failed: {}", err)),
                 }
             }
             None => {
@@ -147,6 +162,20 @@ impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
         match self.root_api.lock().await.stop(parsed_id).await {
             Ok(_) => Ok(tonic::Response::new(())),
             Err(err) => Err(tonic::Status::internal(format!("Error when deleting a resource: {}", err))),
+        }
+    }
+
+    async fn patch(&self, update: tonic::Request<crate::grpc_impl::api::PatchRequest>) -> tonic::Result<tonic::Response<()>> {
+        let inner = update.into_inner();
+        let parsed_request = match CommonConverters::parse_patch_request(&inner) {
+            Ok(val) => val,
+            Err(err) => {
+                return Err(tonic::Status::invalid_argument(format!("Error when patching a resource: {}", err)));
+            }
+        };
+        match self.root_api.lock().await.patch(parsed_request).await {
+            Ok(_) => Ok(tonic::Response::new(())),
+            Err(err) => Err(tonic::Status::internal(format!("Error when patching a resource: {}", err))),
         }
     }
 }

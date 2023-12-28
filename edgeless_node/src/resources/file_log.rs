@@ -111,4 +111,9 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for FileLogR
         self.instances.remove(&resource_id);
         Ok(())
     }
+
+    async fn patch(&mut self, _update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
+        // the resource has no channels: nothing to be patched
+        Ok(())
+    }
 }

@@ -1,7 +1,8 @@
 use futures::SinkExt;
 use std::time::Duration;
 
-use edgeless_api::function_instance::{InstanceId, PatchRequest};
+use edgeless_api::common::PatchRequest;
+use edgeless_api::function_instance::InstanceId;
 use edgeless_dataplane::handle::DataplaneHandle;
 use edgeless_telemetry::telemetry_events::TelemetryEvent;
 

@@ -19,7 +19,7 @@ enum MockFunctionInstanceEvent {
         ),
     ),
     StopResource(edgeless_api::function_instance::InstanceId),
-    Patch(edgeless_api::function_instance::PatchRequest),
+    Patch(edgeless_api::common::PatchRequest),
     UpdateNode(edgeless_api::function_instance::UpdateNodeRequest),
 }
 
@@ -81,7 +81,7 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for MockFunctionIns
         self.sender.send(MockFunctionInstanceEvent::StopResource(id)).await.unwrap();
         Ok(())
     }
-    async fn patch(&mut self, request: edgeless_api::function_instance::PatchRequest) -> anyhow::Result<()> {
+    async fn patch(&mut self, request: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         self.sender.send(MockFunctionInstanceEvent::Patch(request)).await.unwrap();
         Ok(())
     }

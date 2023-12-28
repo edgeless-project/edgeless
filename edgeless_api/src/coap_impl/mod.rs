@@ -163,6 +163,11 @@ impl crate::resource_configuration::ResourceConfigurationAPI for CoapClient {
             }
         }
     }
+
+    async fn patch(&mut self, _update: crate::common::PatchRequest) -> anyhow::Result<()> {
+        // [TODO] implement patch for CoAP resources
+        Ok(())
+    }
 }
 
 impl CoapInvocationServer {
