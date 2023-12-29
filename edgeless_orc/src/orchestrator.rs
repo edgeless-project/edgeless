@@ -4,7 +4,9 @@ use edgeless_api::resource_configuration::ResourceInstanceSpecification;
 use futures::{Future, SinkExt, StreamExt};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
-use std::collections::{HashMap, HashSet};
+
+#[cfg(test)]
+pub mod test;
 
 pub struct Orchestrator {
     sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
@@ -116,7 +118,20 @@ impl Orchestrator {
     pub async fn new(settings: crate::EdgelessOrcSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, settings).await;
+            Self::main_task(receiver, settings, std::collections::HashMap::new()).await;
+        });
+
+        (Orchestrator { sender }, main_task)
+    }
+
+    #[cfg(test)]
+    pub async fn new_with_clients(
+        settings: crate::EdgelessOrcSettings,
+        clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
+    ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
+        let (sender, receiver) = futures::channel::mpsc::unbounded();
+        let main_task = Box::pin(async move {
+            Self::main_task(receiver, settings, clients).await;
         });
 
         (Orchestrator { sender }, main_task)
@@ -152,14 +167,19 @@ impl Orchestrator {
         }
     }
 
-    async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
+    async fn main_task(
+        receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>,
+        settings: crate::EdgelessOrcSettings,
+        clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
+    ) {
         let mut receiver = receiver;
-        let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy);
+        let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(settings.orchestration_strategy);
         let mut rng = rand::rngs::StdRng::from_entropy();
 
         // known agents
         // key: node_id
-        let mut clients = HashMap::<uuid::Uuid, ClientDesc>::new();
+        let mut clients = clients;
+        orchestration_logic.update_nodes(clients.keys().cloned().collect());
 
         // known resources providers as notified by nodes upon registration
         // key: provider_id
@@ -630,7 +650,7 @@ impl Orchestrator {
 
                     // First check if there nodes that must be disconnected
                     // because they failed to reply to a keep-alive.
-                    let mut to_be_disconnected = HashSet::new();
+                    let mut to_be_disconnected = std::collections::HashSet::new();
                     for (node_id, client_desc) in &mut clients {
                         if let Err(_) = client_desc.api.function_instance_api().keep_alive().await {
                             to_be_disconnected.insert(*node_id);
