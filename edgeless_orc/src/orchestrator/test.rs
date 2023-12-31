@@ -165,6 +165,26 @@ async fn wait_for_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver
     panic!("timeout while waiting for an event");
 }
 
+async fn wait_for_event_multiple(
+    receivers: &mut std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>>,
+) -> (uuid::Uuid, MockFunctionInstanceEvent) {
+    for _ in 0..100 {
+        for (node_id, receiver) in receivers.iter_mut() {
+            match receiver.try_next() {
+                Ok(val) => match val {
+                    Some(event) => {
+                        return (node_id.clone(), event);
+                    }
+                    None => {}
+                },
+                Err(_) => {}
+            }
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+    }
+    panic!("timeout while waiting for an event");
+}
+
 async fn no_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>) {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     match receiver.try_next() {
@@ -178,11 +198,11 @@ async fn no_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockF
     }
 }
 
-fn make_spawn_function_request() -> SpawnFunctionRequest {
+fn make_spawn_function_request(class_id: &str) -> SpawnFunctionRequest {
     SpawnFunctionRequest {
         instance_id: None,
         code: FunctionClassSpecification {
-            function_class_id: "fc-1".to_string(),
+            function_class_id: class_id.to_string(),
             function_class_type: "ft-1".to_string(),
             function_class_version: "0.1".to_string(),
             function_class_inlude_code: "function_code".as_bytes().to_vec(),
@@ -198,7 +218,6 @@ fn make_spawn_function_request() -> SpawnFunctionRequest {
 
 #[tokio::test]
 async fn orc_single_node_function_start_stop() {
-    env_logger::init();
     let (mut client, mut nodes) = test_setup(1).await;
     assert_eq!(1, nodes.len());
     let (node_id, mock_node_receiver) = nodes.iter_mut().next().unwrap();
@@ -208,7 +227,7 @@ async fn orc_single_node_function_start_stop() {
 
     // Start a function.
 
-    let spawn_req = make_spawn_function_request();
+    let spawn_req = make_spawn_function_request("fc-1");
     let instance_id = match client.start_function(spawn_req.clone()).await.unwrap() {
         StartComponentResponse::InstanceId(id) => id,
         StartComponentResponse::ResponseError(err) => panic!("{}", err),
@@ -248,4 +267,62 @@ async fn orc_single_node_function_start_stop() {
         }
     }
     no_event(mock_node_receiver).await;
+}
+
+#[tokio::test]
+async fn orc_multiple_nodes_function_start() {
+    env_logger::init();
+    let (mut client, mut nodes) = test_setup(3).await;
+    assert_eq!(3, nodes.len());
+
+    // Start 100 functions.
+
+    let mut ext_instance_ids = vec![];
+    let mut int_instance_ids = vec![];
+    let mut node_ids = vec![];
+    for i in 0..100 {
+        let spawn_req = make_spawn_function_request(format!("fc-{}", i).as_str());
+        ext_instance_ids.push(match client.start_function(spawn_req.clone()).await.unwrap() {
+            StartComponentResponse::InstanceId(id) => id,
+            StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        });
+        assert!(ext_instance_ids.last().unwrap().node_id.is_nil());
+
+        if let (node_id, MockFunctionInstanceEvent::Start((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+            node_ids.push(node_id);
+            int_instance_ids.push(new_instance_id);
+            assert_eq!(spawn_req, spawn_req_rcvd);
+        } else {
+            panic!("wrong event received");
+        }
+    }
+
+    // Check that all nodes have been selected at least once.
+
+    let mut nodes_selected = std::collections::HashSet::new();
+    for node_id in node_ids.iter() {
+        nodes_selected.insert(node_id);
+    }
+    assert_eq!(3, nodes_selected.len());
+
+    // Stop the functions previously started.
+
+    assert_eq!(100, ext_instance_ids.len());
+    assert_eq!(100, int_instance_ids.len());
+    assert_eq!(100, node_ids.len());
+    for i in 0..100 {
+        match client.stop_function(ext_instance_ids[i]).await {
+            Ok(_) => {}
+            Err(err) => {
+                panic!("{}", err);
+            }
+        }
+
+        if let (node_id, MockFunctionInstanceEvent::Stop(instance_id_rcvd)) = wait_for_event_multiple(&mut nodes).await {
+            assert_eq!(node_ids[i], node_id);
+            assert_eq!(int_instance_ids[i], instance_id_rcvd);
+        } else {
+            panic!("wrong event received");
+        }
+    }
 }
