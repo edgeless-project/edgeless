@@ -248,7 +248,7 @@ impl Orchestrator {
                                 );
 
                                 Ok(StartComponentResponse::InstanceId(InstanceId {
-                                    node_id: selected_node_id.clone(),
+                                    node_id: uuid::Uuid::nil(),
                                     function_id: ext_fid.clone(),
                                 }))
                             }
@@ -264,6 +264,7 @@ impl Orchestrator {
                 }
                 OrchestratorRequest::STOPFUNCTION(instance_id) => {
                     log::debug!("Orchestrator StopFunction {:?}", instance_id);
+                    assert!(instance_id.node_id.is_nil());
 
                     match active_instances.remove(&instance_id.function_id) {
                         Some(active_instance) => {
