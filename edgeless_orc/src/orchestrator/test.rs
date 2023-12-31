@@ -3,7 +3,12 @@ use edgeless_api::function_instance::{FunctionClassSpecification, StatePolicy, S
 use super::*;
 
 enum MockFunctionInstanceEvent {
-    Start(edgeless_api::function_instance::SpawnFunctionRequest),
+    Start(
+        (
+            edgeless_api::function_instance::InstanceId,
+            edgeless_api::function_instance::SpawnFunctionRequest,
+        ),
+    ),
     Stop(edgeless_api::function_instance::InstanceId),
     Patch(edgeless_api::common::PatchRequest),
     UpdatePeers(UpdatePeersRequest),
@@ -40,7 +45,7 @@ impl edgeless_api::function_instance::FunctionInstanceNodeAPI for MockFunctionIn
             node_id: self.node_id.clone(),
             function_id: uuid::Uuid::new_v4(),
         };
-        self.sender.send(MockFunctionInstanceEvent::Start(spawn_request)).await.unwrap();
+        self.sender.send(MockFunctionInstanceEvent::Start((new_id, spawn_request))).await.unwrap();
         Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
     }
     async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
@@ -80,26 +85,32 @@ impl edgeless_api::function_instance::FunctionInstanceNodeAPI for MockFunctionIn
 //     Ok(())
 // }
 
-async fn test_setup() -> (
+async fn test_setup(
+    num_nodes: u32,
+) -> (
     Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI>,
-    futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>,
-    uuid::Uuid,
+    std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>>,
 ) {
-    let (mock_node_sender, mock_node_receiver) = futures::channel::mpsc::unbounded::<MockFunctionInstanceEvent>();
-    let node_id = uuid::Uuid::new_v4();
-    let mock_node = MockNode {
-        node_id: node_id.clone(),
-        sender: mock_node_sender,
-    };
+    assert_ne!(0, num_nodes);
+    let mut nodes = std::collections::HashMap::new();
 
-    let clients = std::collections::HashMap::from([(
-        node_id.clone(),
-        ClientDesc {
-            agent_url: "".to_string(),
-            invocation_url: "".to_string(),
-            api: Box::new(mock_node) as Box<dyn edgeless_api::agent::AgentAPI + Send>,
-        },
-    )]);
+    let mut clients = std::collections::HashMap::new();
+    for _ in 0..num_nodes {
+        let (mock_node_sender, mock_node_receiver) = futures::channel::mpsc::unbounded::<MockFunctionInstanceEvent>();
+        let node_id = uuid::Uuid::new_v4();
+        nodes.insert(node_id.clone(), mock_node_receiver);
+        clients.insert(
+            node_id.clone(),
+            ClientDesc {
+                agent_url: "".to_string(),
+                invocation_url: "".to_string(),
+                api: Box::new(MockNode {
+                    node_id: node_id.clone(),
+                    sender: mock_node_sender,
+                }) as Box<dyn edgeless_api::agent::AgentAPI + Send>,
+            },
+        );
+    }
 
     let (mut orchestrator, orchestrator_task) = Orchestrator::new_with_clients(
         crate::EdgelessOrcSettings {
@@ -113,57 +124,128 @@ async fn test_setup() -> (
     .await;
     tokio::spawn(orchestrator_task);
 
-    (orchestrator.get_api_client().function_instance_api(), mock_node_receiver, node_id)
+    (orchestrator.get_api_client().function_instance_api(), nodes)
 }
 
-fn event_to_string(msg: Result<Option<MockFunctionInstanceEvent>, futures::channel::mpsc::TryRecvError>) -> &'static str {
+#[allow(dead_code)]
+fn event_to_string(event: MockFunctionInstanceEvent) -> &'static str {
+    match event {
+        MockFunctionInstanceEvent::Start(_) => "start",
+        MockFunctionInstanceEvent::Stop(_) => "stop",
+        MockFunctionInstanceEvent::Patch(_) => "patch",
+        MockFunctionInstanceEvent::UpdatePeers(_) => "update_peers",
+        MockFunctionInstanceEvent::KeepAlive() => "keep_alive",
+    }
+}
+
+#[allow(dead_code)]
+fn msg_to_string(msg: Result<Option<MockFunctionInstanceEvent>, futures::channel::mpsc::TryRecvError>) -> &'static str {
     match msg {
         Ok(val) => match val {
-            Some(val) => match val {
-                MockFunctionInstanceEvent::Start(_) => "start",
-                MockFunctionInstanceEvent::Stop(_) => "stop",
-                MockFunctionInstanceEvent::Patch(_) => "patch",
-                MockFunctionInstanceEvent::UpdatePeers(_) => "update_peers",
-                MockFunctionInstanceEvent::KeepAlive() => "keep_alive",
-            },
+            Some(val) => event_to_string(val),
             None => "none",
         },
         Err(_) => "error",
     }
 }
 
-#[tokio::test]
-async fn orc_function_start_stop() {
-    let (mut client, mut mock_node_receiver, node_id) = test_setup().await;
-    assert!(!node_id.is_nil());
+async fn wait_for_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>) -> MockFunctionInstanceEvent {
+    for _ in 0..100 {
+        match receiver.try_next() {
+            Ok(val) => match val {
+                Some(event) => {
+                    return event;
+                }
+                None => {}
+            },
+            Err(_) => {}
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+    }
+    panic!("timeout while waiting for an event");
+}
 
-    println!("{}", event_to_string(mock_node_receiver.try_next()));
+async fn no_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>) {
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    match receiver.try_next() {
+        Ok(val) => match val {
+            Some(event) => {
+                panic!("expecting no event, but received one: {}", event_to_string(event));
+            }
+            None => {}
+        },
+        Err(_) => {}
+    }
+}
+
+fn make_spawn_function_request() -> SpawnFunctionRequest {
+    SpawnFunctionRequest {
+        instance_id: None,
+        code: FunctionClassSpecification {
+            function_class_id: "fc-1".to_string(),
+            function_class_type: "ft-1".to_string(),
+            function_class_version: "0.1".to_string(),
+            function_class_inlude_code: "function_code".as_bytes().to_vec(),
+            outputs: vec![],
+        },
+        annotations: std::collections::HashMap::new(),
+        state_specification: StateSpecification {
+            state_id: uuid::Uuid::new_v4(),
+            state_policy: StatePolicy::NodeLocal,
+        },
+    }
+}
+
+#[tokio::test]
+async fn orc_single_node_function_start_stop() {
+    env_logger::init();
+    let (mut client, mut nodes) = test_setup(1).await;
+    assert_eq!(1, nodes.len());
+    let (node_id, mock_node_receiver) = nodes.iter_mut().next().unwrap();
+    assert!(!node_id.is_nil());
 
     assert!(mock_node_receiver.try_next().is_err());
 
-    let instance_id = match client
-        .start_function(SpawnFunctionRequest {
-            instance_id: None,
-            code: FunctionClassSpecification {
-                function_class_id: "fc-1".to_string(),
-                function_class_type: "ft-1".to_string(),
-                function_class_version: "0.1".to_string(),
-                function_class_inlude_code: "function_code".as_bytes().to_vec(),
-                outputs: vec![],
-            },
-            annotations: std::collections::HashMap::new(),
-            state_specification: StateSpecification {
-                state_id: uuid::Uuid::new_v4(),
-                state_policy: StatePolicy::NodeLocal,
-            },
-        })
-        .await
-        .unwrap()
-    {
+    // Start a function.
+
+    let spawn_req = make_spawn_function_request();
+    let instance_id = match client.start_function(spawn_req.clone()).await.unwrap() {
         StartComponentResponse::InstanceId(id) => id,
         StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
+    assert!(instance_id.node_id.is_nil());
 
-    // [TODO] continue
-    println!("{:?}", instance_id);
+    let mut int_instance_id = None;
+    if let MockFunctionInstanceEvent::Start((new_instance_id, spawn_req_rcvd)) = wait_for_event(mock_node_receiver).await {
+        assert!(int_instance_id.is_none());
+        int_instance_id = Some(new_instance_id);
+        assert_eq!(spawn_req, spawn_req_rcvd);
+    } else {
+        panic!("wrong event received");
+    }
+
+    // Stop the function previously started.
+
+    match client.stop_function(instance_id).await {
+        Ok(_) => {}
+        Err(err) => {
+            panic!("{}", err);
+        }
+    }
+
+    if let MockFunctionInstanceEvent::Stop(instance_id_rcvd) = wait_for_event(mock_node_receiver).await {
+        assert!(int_instance_id.is_some());
+        assert_eq!(int_instance_id.unwrap(), instance_id_rcvd);
+    } else {
+        panic!("wrong event received");
+    }
+
+    // Stop the function again.
+    match client.stop_function(instance_id).await {
+        Ok(_) => {}
+        Err(err) => {
+            panic!("{}", err);
+        }
+    }
+    no_event(mock_node_receiver).await;
 }
