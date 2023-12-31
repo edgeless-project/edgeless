@@ -154,6 +154,7 @@ pub async fn ingress_task(
     })
 }
 
+#[derive(Clone)]
 struct IngressResource {
     own_node_id: uuid::Uuid,
     configuration_state: std::sync::Arc<tokio::sync::Mutex<IngressState>>,

@@ -1,13 +1,15 @@
 use edgeless_dataplane::core::Message;
 
+#[derive(Clone)]
 pub struct EgressResourceProvider {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     egress_instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, EgressResource>,
 }
 
+#[derive(Clone)]
 pub struct EgressResource {
-    join_handle: tokio::task::JoinHandle<()>,
+    join_handle: std::sync::Arc<tokio::task::JoinHandle<()>>,
 }
 
 impl Drop for EgressResource {
@@ -62,7 +64,9 @@ impl EgressResource {
             }
         });
 
-        Self { join_handle: handle }
+        Self {
+            join_handle: std::sync::Arc::new(handle),
+        }
     }
 
     async fn perform_request(req: edgeless_http::EdgelessHTTPRequest) -> anyhow::Result<edgeless_http::EdgelessHTTPResponse> {

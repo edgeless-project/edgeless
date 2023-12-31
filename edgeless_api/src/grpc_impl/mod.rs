@@ -17,3 +17,5 @@ pub mod orc;
 pub mod resource_configuration;
 
 pub mod workflow_instance;
+
+pub mod resource_provider;

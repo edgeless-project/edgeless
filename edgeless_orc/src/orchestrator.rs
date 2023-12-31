@@ -31,11 +31,11 @@ enum OrchestratorRequest {
     KEEPALIVE(),
 }
 
-struct ResourceProvider {
+pub struct ResourceProvider {
     class_type: String,
     node_id: edgeless_api::function_instance::NodeId,
     outputs: Vec<String>,
-    config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send>,
+    config_api: Box<dyn edgeless_api::resource_provider::ResourceProviderAPI + Send>,
 }
 
 #[derive(Clone)]
@@ -118,7 +118,7 @@ impl Orchestrator {
     pub async fn new(settings: crate::EdgelessOrcSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, settings, std::collections::HashMap::new()).await;
+            Self::main_task(receiver, settings, std::collections::HashMap::new(), std::collections::HashMap::new()).await;
         });
 
         (Orchestrator { sender }, main_task)
@@ -128,10 +128,11 @@ impl Orchestrator {
     pub async fn new_with_clients(
         settings: crate::EdgelessOrcSettings,
         clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        resource_providers: std::collections::HashMap<String, ResourceProvider>,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, settings, clients).await;
+            Self::main_task(receiver, settings, clients, resource_providers).await;
         });
 
         (Orchestrator { sender }, main_task)
@@ -171,6 +172,7 @@ impl Orchestrator {
         receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>,
         settings: crate::EdgelessOrcSettings,
         clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        resource_providers: std::collections::HashMap<String, ResourceProvider>,
     ) {
         let mut receiver = receiver;
         let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(settings.orchestration_strategy);
@@ -183,7 +185,7 @@ impl Orchestrator {
 
         // known resources providers as notified by nodes upon registration
         // key: provider_id
-        let mut resource_providers = std::collections::HashMap::<String, ResourceProvider>::new();
+        let mut resource_providers = resource_providers;
 
         // instances that the orchestrator promised to keep active
         // key: ext_fid
@@ -330,6 +332,7 @@ impl Orchestrator {
                             match resource_providers.get_mut(provider_id) {
                                 Some(resource_provider) => match resource_provider
                                     .config_api
+                                    .resource_configuration_api()
                                     .start(ResourceInstanceSpecification {
                                         provider_id: provider_id.clone(),
                                         // [TODO] Issue #94 remove output mapping
@@ -403,7 +406,7 @@ impl Orchestrator {
                                     match resource_providers.get_mut(&provider_id) {
                                         Some(resource_provider) => {
                                             assert!(resource_provider.node_id == instance.node_id);
-                                            match resource_provider.config_api.stop(instance).await {
+                                            match resource_provider.config_api.resource_configuration_api().stop(instance).await {
                                                 Ok(_) => {
                                                     log::info!(
                                                         "Stopped resource provider_id {}, ext_fid {}, node_id {}, int_fid {}",
@@ -488,6 +491,7 @@ impl Orchestrator {
                             IntFid::Resource(instance_id, provider_id) => match resource_providers.get_mut(&provider_id) {
                                 Some(client_desc) => match client_desc
                                     .config_api
+                                    .resource_configuration_api()
                                     .patch(PatchRequest {
                                         function_id: instance_id.function_id.clone(),
                                         output_mapping,
@@ -544,23 +548,6 @@ impl Orchestrator {
                                             resource.provider_id
                                         )
                                     } else {
-                                        let (proto, url, port) = edgeless_api::util::parse_http_host(&resource.configuration_url).unwrap();
-                                        let config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send> = match proto {
-                                            edgeless_api::util::Proto::COAP => {
-                                                log::info!("coap called");
-                                                Box::new(
-                                                    edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port))
-                                                        .await,
-                                                )
-                                            }
-                                            _ => Box::new(
-                                                edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationClient::new(
-                                                    &resource.configuration_url,
-                                                    true,
-                                                )
-                                                .await,
-                                            ),
-                                        };
                                         assert!(this_node_id.is_some());
 
                                         resource_providers.insert(
@@ -569,7 +556,12 @@ impl Orchestrator {
                                                 class_type: resource.class_type.clone(),
                                                 node_id: this_node_id.unwrap().clone(),
                                                 outputs: resource.outputs.clone(),
-                                                config_api,
+                                                config_api: Box::new(
+                                                    edgeless_api::grpc_impl::resource_provider::ResourceProviderAPIClient::new(
+                                                        &resource.configuration_url,
+                                                    )
+                                                    .await,
+                                                ),
                                             },
                                         );
                                     }

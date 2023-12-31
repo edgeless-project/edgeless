@@ -2,14 +2,16 @@ use edgeless_dataplane::core::Message;
 extern crate redis;
 use redis::Commands;
 
+#[derive(Clone)]
 pub struct RedisResourceProvider {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, RedisResource>,
 }
 
+#[derive(Clone)]
 pub struct RedisResource {
-    join_handle: tokio::task::JoinHandle<()>,
+    join_handle: std::sync::Arc<tokio::task::JoinHandle<()>>,
 }
 
 impl Drop for RedisResource {
@@ -59,7 +61,9 @@ impl RedisResource {
             }
         });
 
-        Ok(Self { join_handle: handle })
+        Ok(Self {
+            join_handle: std::sync::Arc::new(handle),
+        })
     }
 }
 

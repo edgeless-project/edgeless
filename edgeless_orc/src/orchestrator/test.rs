@@ -66,34 +66,70 @@ impl edgeless_api::function_instance::FunctionInstanceNodeAPI for MockFunctionIn
     }
 }
 
-// async fn start_resource(
-//     &mut self,
-//     spawn_request: edgeless_api::function_instance::StartResourceRequest,
-// ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
-//     let new_id = edgeless_api::function_instance::InstanceId {
-//         node_id: uuid::Uuid::nil(),
-//         function_id: uuid::Uuid::new_v4(),
-//     };
-//     self.sender
-//         .send(MockFunctionInstanceEvent::StartResource((new_id.clone(), spawn_request)))
-//         .await
-//         .unwrap();
-//     Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
-// }
-// async fn stop_resource(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-//     self.sender.send(MockFunctionInstanceEvent::StopResource(id)).await.unwrap();
-//     Ok(())
-// }
+enum MockResourceEvent {
+    Start(
+        (
+            edgeless_api::function_instance::InstanceId,
+            edgeless_api::resource_configuration::ResourceInstanceSpecification,
+        ),
+    ),
+    Stop(edgeless_api::function_instance::InstanceId),
+    Patch(edgeless_api::common::PatchRequest),
+}
+
+struct MockResourceProvider {
+    node_id: uuid::Uuid,
+    sender: futures::channel::mpsc::UnboundedSender<MockResourceEvent>,
+}
+
+impl edgeless_api::resource_provider::ResourceProviderAPI for MockResourceProvider {
+    fn resource_configuration_api(&mut self) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI> {
+        Box::new(MockResourceConfigurationAPI {
+            _node_id: self.node_id.clone(),
+            sender: self.sender.clone(),
+        })
+    }
+}
+
+#[derive(Clone)]
+struct MockResourceConfigurationAPI {
+    _node_id: uuid::Uuid,
+    sender: futures::channel::mpsc::UnboundedSender<MockResourceEvent>,
+}
+
+#[async_trait::async_trait]
+impl edgeless_api::resource_configuration::ResourceConfigurationAPI for MockResourceConfigurationAPI {
+    async fn start(
+        &mut self,
+        spawn_request: edgeless_api::resource_configuration::ResourceInstanceSpecification,
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
+        let new_id = edgeless_api::function_instance::InstanceId {
+            node_id: uuid::Uuid::nil(),
+            function_id: uuid::Uuid::new_v4(),
+        };
+        self.sender.send(MockResourceEvent::Start((new_id.clone(), spawn_request))).await.unwrap();
+        Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
+    }
+    async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+        self.sender.send(MockResourceEvent::Stop(id)).await.unwrap();
+        Ok(())
+    }
+    async fn patch(&mut self, request: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
+        self.sender.send(MockResourceEvent::Patch(request)).await.unwrap();
+        Ok(())
+    }
+}
 
 async fn test_setup(
     num_nodes: u32,
+    provider_names: Vec<String>,
 ) -> (
     Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI>,
     std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>>,
+    std::collections::HashMap<String, futures::channel::mpsc::UnboundedReceiver<MockResourceEvent>>,
 ) {
     assert_ne!(0, num_nodes);
     let mut nodes = std::collections::HashMap::new();
-
     let mut clients = std::collections::HashMap::new();
     for _ in 0..num_nodes {
         let (mock_node_sender, mock_node_receiver) = futures::channel::mpsc::unbounded::<MockFunctionInstanceEvent>();
@@ -112,6 +148,26 @@ async fn test_setup(
         );
     }
 
+    let mut providers = std::collections::HashMap::new();
+    let mut resource_providers = std::collections::HashMap::new();
+    for provider in provider_names.iter() {
+        let (mock_resource_provider_sender, mock_resource_provider_receiver) = futures::channel::mpsc::unbounded::<MockResourceEvent>();
+        providers.insert(provider.clone(), mock_resource_provider_receiver);
+        let node_id = uuid::Uuid::new_v4();
+        resource_providers.insert(
+            "provider-1".to_string(),
+            ResourceProvider {
+                class_type: "rc-1".to_string(),
+                node_id: node_id.clone(),
+                outputs: vec![],
+                config_api: Box::new(MockResourceProvider {
+                    node_id: node_id.clone(),
+                    sender: mock_resource_provider_sender,
+                }) as Box<dyn edgeless_api::resource_provider::ResourceProviderAPI + Send>,
+            },
+        );
+    }
+
     let (mut orchestrator, orchestrator_task) = Orchestrator::new_with_clients(
         crate::EdgelessOrcSettings {
             domain_id: "".to_string(),        // unused
@@ -120,11 +176,12 @@ async fn test_setup(
             keep_alive_interval_secs: 0 as u64, // unused
         },
         clients,
+        resource_providers,
     )
     .await;
     tokio::spawn(orchestrator_task);
 
-    (orchestrator.get_api_client().function_instance_api(), nodes)
+    (orchestrator.get_api_client().function_instance_api(), nodes, providers)
 }
 
 #[allow(dead_code)]
@@ -218,7 +275,7 @@ fn make_spawn_function_request(class_id: &str) -> SpawnFunctionRequest {
 
 #[tokio::test]
 async fn orc_single_node_function_start_stop() {
-    let (mut client, mut nodes) = test_setup(1).await;
+    let (mut client, mut nodes, _) = test_setup(1, vec![]).await;
     assert_eq!(1, nodes.len());
     let (node_id, mock_node_receiver) = nodes.iter_mut().next().unwrap();
     assert!(!node_id.is_nil());
@@ -271,8 +328,7 @@ async fn orc_single_node_function_start_stop() {
 
 #[tokio::test]
 async fn orc_multiple_nodes_function_start() {
-    env_logger::init();
-    let (mut client, mut nodes) = test_setup(3).await;
+    let (mut client, mut nodes, _) = test_setup(3, vec![]).await;
     assert_eq!(3, nodes.len());
 
     // Start 100 functions.
