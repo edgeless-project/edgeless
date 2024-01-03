@@ -1,14 +1,17 @@
 use edgeless_dataplane::core::Message;
 use std::io::prelude::*;
 
+#[derive(Clone)]
 pub struct FileLogResourceProvider {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, FileLogResource>,
 }
 
+#[derive(Clone)]
+
 pub struct FileLogResource {
-    join_handle: tokio::task::JoinHandle<()>,
+    join_handle: std::sync::Arc<tokio::task::JoinHandle<()>>,
 }
 
 impl Drop for FileLogResource {
@@ -57,7 +60,9 @@ impl FileLogResource {
             }
         });
 
-        Ok(Self { join_handle: handle })
+        Ok(Self {
+            join_handle: std::sync::Arc::new(handle),
+        })
     }
 }
 

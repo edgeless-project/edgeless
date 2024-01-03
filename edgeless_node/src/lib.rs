@@ -161,7 +161,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     // Create the resources.
     let mut resource_provider_specifications = vec![];
-    let resource_api_server = edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationServer::run(
+    let resource_api_server = edgeless_api::grpc_impl::resource_provider::ResourceProviderAPIServer::run(
         Box::new(edgeless_api::resource_configuration::MultiResouceConfigurationAPI::new(
             fill_resources(data_plane, &settings, &mut resource_provider_specifications).await,
         )),

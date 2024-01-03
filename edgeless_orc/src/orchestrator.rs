@@ -4,7 +4,9 @@ use edgeless_api::resource_configuration::ResourceInstanceSpecification;
 use futures::{Future, SinkExt, StreamExt};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
-use std::collections::{HashMap, HashSet};
+
+#[cfg(test)]
+pub mod test;
 
 pub struct Orchestrator {
     sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
@@ -29,11 +31,11 @@ enum OrchestratorRequest {
     KEEPALIVE(),
 }
 
-struct ResourceProvider {
+pub struct ResourceProvider {
     class_type: String,
     node_id: edgeless_api::function_instance::NodeId,
     outputs: Vec<String>,
-    config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send>,
+    config_api: Box<dyn edgeless_api::resource_provider::ResourceProviderAPI + Send>,
 }
 
 #[derive(Clone)]
@@ -116,7 +118,21 @@ impl Orchestrator {
     pub async fn new(settings: crate::EdgelessOrcSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, settings).await;
+            Self::main_task(receiver, settings, std::collections::HashMap::new(), std::collections::HashMap::new()).await;
+        });
+
+        (Orchestrator { sender }, main_task)
+    }
+
+    #[cfg(test)]
+    pub async fn new_with_clients(
+        settings: crate::EdgelessOrcSettings,
+        clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        resource_providers: std::collections::HashMap<String, ResourceProvider>,
+    ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
+        let (sender, receiver) = futures::channel::mpsc::unbounded();
+        let main_task = Box::pin(async move {
+            Self::main_task(receiver, settings, clients, resource_providers).await;
         });
 
         (Orchestrator { sender }, main_task)
@@ -152,18 +168,41 @@ impl Orchestrator {
         }
     }
 
-    async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
+    async fn main_task(
+        receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>,
+        settings: crate::EdgelessOrcSettings,
+        clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        resource_providers: std::collections::HashMap<String, ResourceProvider>,
+    ) {
         let mut receiver = receiver;
-        let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy);
+        let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(settings.orchestration_strategy);
         let mut rng = rand::rngs::StdRng::from_entropy();
 
         // known agents
         // key: node_id
-        let mut clients = HashMap::<uuid::Uuid, ClientDesc>::new();
+        let mut clients = clients;
+        orchestration_logic.update_nodes(clients.keys().cloned().collect());
+        for (node_id, client_desc) in &clients {
+            log::info!(
+                "added function instance client: node_id {}, agent URL {}, invocation URL {}",
+                node_id,
+                client_desc.agent_url,
+                client_desc.invocation_url
+            );
+        }
 
         // known resources providers as notified by nodes upon registration
         // key: provider_id
-        let mut resource_providers = std::collections::HashMap::<String, ResourceProvider>::new();
+        let mut resource_providers = resource_providers;
+        for (provider, resource_provider) in &resource_providers {
+            log::info!(
+                "added resource: provider {}, class_type {}, node_id {}, outputs [{}]",
+                provider,
+                resource_provider.class_type,
+                resource_provider.node_id,
+                resource_provider.outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+            );
+        }
 
         // instances that the orchestrator promised to keep active
         // key: ext_fid
@@ -228,7 +267,7 @@ impl Orchestrator {
                                 );
 
                                 Ok(StartComponentResponse::InstanceId(InstanceId {
-                                    node_id: selected_node_id.clone(),
+                                    node_id: uuid::Uuid::nil(),
                                     function_id: ext_fid.clone(),
                                 }))
                             }
@@ -244,6 +283,7 @@ impl Orchestrator {
                 }
                 OrchestratorRequest::STOPFUNCTION(instance_id) => {
                     log::debug!("Orchestrator StopFunction {:?}", instance_id);
+                    assert!(instance_id.node_id.is_nil());
 
                     match active_instances.remove(&instance_id.function_id) {
                         Some(active_instance) => {
@@ -309,6 +349,7 @@ impl Orchestrator {
                             match resource_providers.get_mut(provider_id) {
                                 Some(resource_provider) => match resource_provider
                                     .config_api
+                                    .resource_configuration_api()
                                     .start(ResourceInstanceSpecification {
                                         provider_id: provider_id.clone(),
                                         // [TODO] Issue #94 remove output mapping
@@ -382,7 +423,7 @@ impl Orchestrator {
                                     match resource_providers.get_mut(&provider_id) {
                                         Some(resource_provider) => {
                                             assert!(resource_provider.node_id == instance.node_id);
-                                            match resource_provider.config_api.stop(instance).await {
+                                            match resource_provider.config_api.resource_configuration_api().stop(instance).await {
                                                 Ok(_) => {
                                                     log::info!(
                                                         "Stopped resource provider_id {}, ext_fid {}, node_id {}, int_fid {}",
@@ -467,6 +508,7 @@ impl Orchestrator {
                             IntFid::Resource(instance_id, provider_id) => match resource_providers.get_mut(&provider_id) {
                                 Some(client_desc) => match client_desc
                                     .config_api
+                                    .resource_configuration_api()
                                     .patch(PatchRequest {
                                         function_id: instance_id.function_id.clone(),
                                         output_mapping,
@@ -523,38 +565,33 @@ impl Orchestrator {
                                             resource.provider_id
                                         )
                                     } else {
-                                        let (proto, url, port) = edgeless_api::util::parse_http_host(&resource.configuration_url).unwrap();
-                                        let config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send> = match proto {
-                                            edgeless_api::util::Proto::COAP => {
-                                                log::info!("coap called");
-                                                Box::new(
-                                                    edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port))
-                                                        .await,
-                                                )
-                                            }
-                                            _ => Box::new(
-                                                edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationClient::new(
-                                                    &resource.configuration_url,
-                                                    true,
-                                                )
-                                                .await,
-                                            ),
-                                        };
                                         assert!(this_node_id.is_some());
 
+                                        log::info!("added resource: {}", resource);
                                         resource_providers.insert(
                                             resource.provider_id.clone(),
                                             ResourceProvider {
                                                 class_type: resource.class_type.clone(),
                                                 node_id: this_node_id.unwrap().clone(),
                                                 outputs: resource.outputs.clone(),
-                                                config_api,
+                                                config_api: Box::new(
+                                                    edgeless_api::grpc_impl::resource_provider::ResourceProviderAPIClient::new(
+                                                        &resource.configuration_url,
+                                                    )
+                                                    .await,
+                                                ),
                                             },
                                         );
                                     }
                                 }
 
                                 // Create the agent API.
+                                log::info!(
+                                    "added function instance client: node_id {}, agent URL {}, invocation URL {}",
+                                    node_id,
+                                    agent_url,
+                                    invocation_url
+                                );
                                 clients.insert(
                                     node_id,
                                     ClientDesc {
@@ -630,7 +667,7 @@ impl Orchestrator {
 
                     // First check if there nodes that must be disconnected
                     // because they failed to reply to a keep-alive.
-                    let mut to_be_disconnected = HashSet::new();
+                    let mut to_be_disconnected = std::collections::HashSet::new();
                     for (node_id, client_desc) in &mut clients {
                         if let Err(_) = client_desc.api.function_instance_api().keep_alive().await {
                             to_be_disconnected.insert(*node_id);

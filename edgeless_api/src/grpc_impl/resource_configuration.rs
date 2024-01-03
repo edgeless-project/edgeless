@@ -38,11 +38,12 @@ impl ResourceConfigurationConverters {
     }
 }
 
-pub struct ResourceConfigurationClient {
+#[derive(Clone)]
+pub struct ResourceConfigurationAPIClient {
     client: Option<crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient<tonic::transport::Channel>>,
 }
 
-impl ResourceConfigurationClient {
+impl ResourceConfigurationAPIClient {
     pub async fn new(server_addr: &str, no_retry: bool) -> Self {
         loop {
             match crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient::connect(server_addr.to_string()).await {
@@ -63,7 +64,7 @@ impl ResourceConfigurationClient {
 }
 
 #[async_trait::async_trait]
-impl crate::resource_configuration::ResourceConfigurationAPI for ResourceConfigurationClient {
+impl crate::resource_configuration::ResourceConfigurationAPI for ResourceConfigurationAPIClient {
     async fn start(
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
@@ -113,12 +114,12 @@ impl crate::resource_configuration::ResourceConfigurationAPI for ResourceConfigu
     }
 }
 
-pub struct ResourceConfigurationServerHandler {
+pub struct ResourceConfigurationAPIServer {
     pub root_api: tokio::sync::Mutex<Box<dyn crate::resource_configuration::ResourceConfigurationAPI>>,
 }
 
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration for ResourceConfigurationServerHandler {
+impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration for ResourceConfigurationAPIServer {
     async fn start(
         &self,
         request: tonic::Request<crate::grpc_impl::api::ResourceInstanceSpecification>,
@@ -177,43 +178,5 @@ impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
             Ok(_) => Ok(tonic::Response::new(())),
             Err(err) => Err(tonic::Status::internal(format!("Error when patching a resource: {}", err))),
         }
-    }
-}
-
-pub struct ResourceConfigurationServer {}
-
-impl ResourceConfigurationServer {
-    pub fn run(
-        root_api: Box<dyn crate::resource_configuration::ResourceConfigurationAPI>,
-        resource_configuration_url: String,
-    ) -> futures::future::BoxFuture<'static, ()> {
-        let function_api = crate::grpc_impl::resource_configuration::ResourceConfigurationServerHandler {
-            root_api: tokio::sync::Mutex::new(root_api),
-        };
-        Box::pin(async move {
-            let function_api = function_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&resource_configuration_url) {
-                if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start ResourceConfiguration GRPC Server at {}", resource_configuration_url);
-                    match tonic::transport::Server::builder()
-                        .add_service(
-                            crate::grpc_impl::api::resource_configuration_server::ResourceConfigurationServer::new(function_api)
-                                .max_decoding_message_size(usize::MAX),
-                        )
-                        .serve(host)
-                        .await
-                    {
-                        Ok(_) => {
-                            log::debug!("Clean Exit");
-                        }
-                        Err(_) => {
-                            log::error!("GRPC ResourceConfiguration Failure");
-                        }
-                    }
-                }
-            }
-
-            log::info!("Stop ResourceConfiguration GRPC Server");
-        })
     }
 }

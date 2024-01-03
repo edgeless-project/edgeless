@@ -18,8 +18,9 @@ pub struct CoapInvocationServer {
     root_api: Box<dyn crate::invocation::InvocationAPI>,
 }
 
+#[derive(Clone)]
 pub struct CoapClient {
-    sock: tokio::net::UdpSocket,
+    sock: std::sync::Arc<tokio::net::UdpSocket>,
     endpoint: std::net::SocketAddrV4,
     next_token: u8,
 }
@@ -29,7 +30,7 @@ impl CoapClient {
         let sock = tokio::net::UdpSocket::bind("0.0.0.0:0").await.unwrap();
 
         CoapClient {
-            sock: sock,
+            sock: std::sync::Arc::new(sock),
             endpoint: peer,
             next_token: 0,
         }

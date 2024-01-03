@@ -10,12 +10,13 @@ pub struct ResourceInstanceSpecification {
 }
 
 #[async_trait::async_trait]
-pub trait ResourceConfigurationAPI: Sync + Send {
+pub trait ResourceConfigurationAPI: ResourceConfigurationAPIClone + Sync + Send {
     async fn start(&mut self, instance_specification: ResourceInstanceSpecification) -> anyhow::Result<crate::common::StartComponentResponse>;
     async fn stop(&mut self, resource_id: crate::function_instance::InstanceId) -> anyhow::Result<()>;
     async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()>;
 }
 
+#[derive(Clone)]
 pub struct MultiResouceConfigurationAPI {
     // key: provider_id
     // value: resource configuration API
@@ -93,5 +94,23 @@ impl ResourceConfigurationAPI for MultiResouceConfigurationAPI {
             }
         }
         Err(anyhow::anyhow!("Cannot patch a resource, not found with fid: {}", update.function_id))
+    }
+}
+
+// https://stackoverflow.com/a/30353928
+pub trait ResourceConfigurationAPIClone {
+    fn clone_box(&self) -> Box<dyn ResourceConfigurationAPI>;
+}
+impl<T> ResourceConfigurationAPIClone for T
+where
+    T: 'static + ResourceConfigurationAPI + Clone,
+{
+    fn clone_box(&self) -> Box<dyn ResourceConfigurationAPI> {
+        Box::new(self.clone())
+    }
+}
+impl Clone for Box<dyn ResourceConfigurationAPI> {
+    fn clone(&self) -> Box<dyn ResourceConfigurationAPI> {
+        self.clone_box()
     }
 }
