@@ -479,3 +479,101 @@ async fn orc_multiple_resources_start_stop() {
         }
     }
 }
+
+#[tokio::test]
+async fn orc_patch() {
+    let (mut client, mut nodes, mut providers) = test_setup(1, vec!["provider-1".to_string()]).await;
+    assert_eq!(1, nodes.len());
+    assert_eq!(1, providers.len());
+    let client_node_id = nodes.keys().next().unwrap().clone();
+
+    // Spawn a function instance.
+
+    let spawn_req = make_spawn_function_request("fc-1");
+    let ext_function_id = match client.start_function(spawn_req.clone()).await.unwrap() {
+        StartComponentResponse::InstanceId(id) => id,
+        StartComponentResponse::ResponseError(err) => panic!("{}", err),
+    };
+    assert!(ext_function_id.node_id.is_nil());
+
+    let mut int_function_id = None;
+    assert!(int_function_id.is_none());
+    if let (node_id, MockFunctionInstanceEvent::Start((new_instance_id, spawn_req_rcvd))) = wait_for_function_event_multiple(&mut nodes).await {
+        assert_eq!(client_node_id, node_id);
+        int_function_id = Some(new_instance_id);
+        assert_eq!(spawn_req, spawn_req_rcvd);
+    } else {
+        panic!("wrong event received");
+    }
+
+    // Start a resource.
+
+    let start_req = make_start_resource_request("rc-1");
+    let ext_resource_id = match client.start_resource(start_req.clone()).await.unwrap() {
+        StartComponentResponse::InstanceId(id) => id,
+        StartComponentResponse::ResponseError(err) => panic!("{}", err),
+    };
+    assert!(ext_resource_id.node_id.is_nil());
+
+    let mut int_resource_id = None;
+    assert!(int_resource_id.is_none());
+    if let (provider_id, MockResourceEvent::Start((new_instance_id, resource_instance_spec))) = wait_for_resource_event_multiple(&mut providers).await
+    {
+        int_resource_id = Some(new_instance_id);
+        assert!(resource_instance_spec.configuration.is_empty());
+        assert_eq!("provider-1".to_string(), provider_id);
+        assert_eq!(provider_id, resource_instance_spec.provider_id);
+    } else {
+        panic!("wrong event received");
+    }
+
+    // Gotta patch 'em all.
+
+    match client
+        .patch(PatchRequest {
+            function_id: ext_function_id.function_id.clone(),
+            output_mapping: std::collections::HashMap::from([("out-1".to_string(), ext_resource_id.clone())]),
+        })
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            panic!("{}", err);
+        }
+    };
+
+    if let (node_id, MockFunctionInstanceEvent::Patch(patch_request)) = wait_for_function_event_multiple(&mut nodes).await {
+        assert_eq!(client_node_id, node_id);
+        assert_eq!(int_function_id.unwrap().function_id, patch_request.function_id);
+        assert_eq!(1, patch_request.output_mapping.len());
+        let mapping = patch_request.output_mapping.get("out-1");
+        assert!(mapping.is_some());
+        assert_eq!(int_resource_id.unwrap(), mapping.unwrap().clone());
+    } else {
+        panic!("wrong event received");
+    }
+
+    match client
+        .patch(PatchRequest {
+            function_id: ext_resource_id.function_id.clone(),
+            output_mapping: std::collections::HashMap::from([("out-2".to_string(), ext_function_id.clone())]),
+        })
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            panic!("{}", err);
+        }
+    };
+
+    if let (provider_id, MockResourceEvent::Patch(patch_request)) = wait_for_resource_event_multiple(&mut providers).await {
+        assert_eq!("provider-1".to_string(), provider_id);
+        assert_eq!(int_resource_id.unwrap().function_id, patch_request.function_id);
+        assert_eq!(1, patch_request.output_mapping.len());
+        let mapping = patch_request.output_mapping.get("out-2");
+        assert!(mapping.is_some());
+        assert_eq!(int_function_id.unwrap(), mapping.unwrap().clone());
+    } else {
+        panic!("wrong event received");
+    }
+}
