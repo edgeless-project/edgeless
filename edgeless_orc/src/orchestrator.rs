@@ -182,10 +182,27 @@ impl Orchestrator {
         // key: node_id
         let mut clients = clients;
         orchestration_logic.update_nodes(clients.keys().cloned().collect());
+        for (node_id, client_desc) in &clients {
+            log::info!(
+                "added function instance client: node_id {}, agent URL {}, invocation URL {}",
+                node_id,
+                client_desc.agent_url,
+                client_desc.invocation_url
+            );
+        }
 
         // known resources providers as notified by nodes upon registration
         // key: provider_id
         let mut resource_providers = resource_providers;
+        for (provider, resource_provider) in &resource_providers {
+            log::info!(
+                "added resource: provider {}, class_type {}, node_id {}, outputs [{}]",
+                provider,
+                resource_provider.class_type,
+                resource_provider.node_id,
+                resource_provider.outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+            );
+        }
 
         // instances that the orchestrator promised to keep active
         // key: ext_fid
@@ -550,6 +567,7 @@ impl Orchestrator {
                                     } else {
                                         assert!(this_node_id.is_some());
 
+                                        log::info!("added resource: {}", resource);
                                         resource_providers.insert(
                                             resource.provider_id.clone(),
                                             ResourceProvider {
@@ -568,6 +586,12 @@ impl Orchestrator {
                                 }
 
                                 // Create the agent API.
+                                log::info!(
+                                    "added function instance client: node_id {}, agent URL {}, invocation URL {}",
+                                    node_id,
+                                    agent_url,
+                                    invocation_url
+                                );
                                 clients.insert(
                                     node_id,
                                     ClientDesc {

@@ -85,7 +85,7 @@ struct MockResourceProvider {
 impl edgeless_api::resource_provider::ResourceProviderAPI for MockResourceProvider {
     fn resource_configuration_api(&mut self) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI> {
         Box::new(MockResourceConfigurationAPI {
-            _node_id: self.node_id.clone(),
+            node_id: self.node_id.clone(),
             sender: self.sender.clone(),
         })
     }
@@ -93,7 +93,7 @@ impl edgeless_api::resource_provider::ResourceProviderAPI for MockResourceProvid
 
 #[derive(Clone)]
 struct MockResourceConfigurationAPI {
-    _node_id: uuid::Uuid,
+    node_id: uuid::Uuid,
     sender: futures::channel::mpsc::UnboundedSender<MockResourceEvent>,
 }
 
@@ -101,13 +101,13 @@ struct MockResourceConfigurationAPI {
 impl edgeless_api::resource_configuration::ResourceConfigurationAPI for MockResourceConfigurationAPI {
     async fn start(
         &mut self,
-        spawn_request: edgeless_api::resource_configuration::ResourceInstanceSpecification,
+        start_request: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
         let new_id = edgeless_api::function_instance::InstanceId {
-            node_id: uuid::Uuid::nil(),
+            node_id: self.node_id.clone(),
             function_id: uuid::Uuid::new_v4(),
         };
-        self.sender.send(MockResourceEvent::Start((new_id.clone(), spawn_request))).await.unwrap();
+        self.sender.send(MockResourceEvent::Start((new_id.clone(), start_request))).await.unwrap();
         Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
     }
     async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
@@ -128,7 +128,6 @@ async fn test_setup(
     std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>>,
     std::collections::HashMap<String, futures::channel::mpsc::UnboundedReceiver<MockResourceEvent>>,
 ) {
-    assert_ne!(0, num_nodes);
     let mut nodes = std::collections::HashMap::new();
     let mut clients = std::collections::HashMap::new();
     for _ in 0..num_nodes {
@@ -155,7 +154,7 @@ async fn test_setup(
         providers.insert(provider.clone(), mock_resource_provider_receiver);
         let node_id = uuid::Uuid::new_v4();
         resource_providers.insert(
-            "provider-1".to_string(),
+            provider.clone(),
             ResourceProvider {
                 class_type: "rc-1".to_string(),
                 node_id: node_id.clone(),
@@ -206,7 +205,7 @@ fn msg_to_string(msg: Result<Option<MockFunctionInstanceEvent>, futures::channel
     }
 }
 
-async fn wait_for_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>) -> MockFunctionInstanceEvent {
+async fn wait_for_function_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>) -> MockFunctionInstanceEvent {
     for _ in 0..100 {
         match receiver.try_next() {
             Ok(val) => match val {
@@ -222,7 +221,7 @@ async fn wait_for_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver
     panic!("timeout while waiting for an event");
 }
 
-async fn wait_for_event_multiple(
+async fn wait_for_function_event_multiple(
     receivers: &mut std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>>,
 ) -> (uuid::Uuid, MockFunctionInstanceEvent) {
     for _ in 0..100 {
@@ -242,7 +241,7 @@ async fn wait_for_event_multiple(
     panic!("timeout while waiting for an event");
 }
 
-async fn no_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>) {
+async fn no_function_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>) {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     match receiver.try_next() {
         Ok(val) => match val {
@@ -253,6 +252,26 @@ async fn no_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockF
         },
         Err(_) => {}
     }
+}
+
+async fn wait_for_resource_event_multiple(
+    receivers: &mut std::collections::HashMap<String, futures::channel::mpsc::UnboundedReceiver<MockResourceEvent>>,
+) -> (String, MockResourceEvent) {
+    for _ in 0..100 {
+        for (provider_id, receiver) in receivers.iter_mut() {
+            match receiver.try_next() {
+                Ok(val) => match val {
+                    Some(event) => {
+                        return (provider_id.clone(), event);
+                    }
+                    None => {}
+                },
+                Err(_) => {}
+            }
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+    }
+    panic!("timeout while waiting for a resource");
 }
 
 fn make_spawn_function_request(class_id: &str) -> SpawnFunctionRequest {
@@ -270,6 +289,13 @@ fn make_spawn_function_request(class_id: &str) -> SpawnFunctionRequest {
             state_id: uuid::Uuid::new_v4(),
             state_policy: StatePolicy::NodeLocal,
         },
+    }
+}
+
+fn make_start_resource_request(class_type: &str) -> StartResourceRequest {
+    StartResourceRequest {
+        class_type: class_type.to_string(),
+        configurations: std::collections::HashMap::new(),
     }
 }
 
@@ -292,7 +318,7 @@ async fn orc_single_node_function_start_stop() {
     assert!(instance_id.node_id.is_nil());
 
     let mut int_instance_id = None;
-    if let MockFunctionInstanceEvent::Start((new_instance_id, spawn_req_rcvd)) = wait_for_event(mock_node_receiver).await {
+    if let MockFunctionInstanceEvent::Start((new_instance_id, spawn_req_rcvd)) = wait_for_function_event(mock_node_receiver).await {
         assert!(int_instance_id.is_none());
         int_instance_id = Some(new_instance_id);
         assert_eq!(spawn_req, spawn_req_rcvd);
@@ -309,7 +335,7 @@ async fn orc_single_node_function_start_stop() {
         }
     }
 
-    if let MockFunctionInstanceEvent::Stop(instance_id_rcvd) = wait_for_event(mock_node_receiver).await {
+    if let MockFunctionInstanceEvent::Stop(instance_id_rcvd) = wait_for_function_event(mock_node_receiver).await {
         assert!(int_instance_id.is_some());
         assert_eq!(int_instance_id.unwrap(), instance_id_rcvd);
     } else {
@@ -323,11 +349,11 @@ async fn orc_single_node_function_start_stop() {
             panic!("{}", err);
         }
     }
-    no_event(mock_node_receiver).await;
+    no_function_event(mock_node_receiver).await;
 }
 
 #[tokio::test]
-async fn orc_multiple_nodes_function_start() {
+async fn orc_multiple_nodes_function_start_stop() {
     let (mut client, mut nodes, _) = test_setup(3, vec![]).await;
     assert_eq!(3, nodes.len());
 
@@ -344,7 +370,7 @@ async fn orc_multiple_nodes_function_start() {
         });
         assert!(ext_instance_ids.last().unwrap().node_id.is_nil());
 
-        if let (node_id, MockFunctionInstanceEvent::Start((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+        if let (node_id, MockFunctionInstanceEvent::Start((new_instance_id, spawn_req_rcvd))) = wait_for_function_event_multiple(&mut nodes).await {
             node_ids.push(node_id);
             int_instance_ids.push(new_instance_id);
             assert_eq!(spawn_req, spawn_req_rcvd);
@@ -374,11 +400,82 @@ async fn orc_multiple_nodes_function_start() {
             }
         }
 
-        if let (node_id, MockFunctionInstanceEvent::Stop(instance_id_rcvd)) = wait_for_event_multiple(&mut nodes).await {
+        if let (node_id, MockFunctionInstanceEvent::Stop(instance_id_rcvd)) = wait_for_function_event_multiple(&mut nodes).await {
             assert_eq!(node_ids[i], node_id);
             assert_eq!(int_instance_ids[i], instance_id_rcvd);
         } else {
             panic!("wrong event received");
+        }
+    }
+}
+
+#[tokio::test]
+async fn orc_multiple_resources_start_stop() {
+    let (mut client, nodes, mut providers) = test_setup(0, vec!["provider-1".to_string(), "provider-2".to_string(), "provider-3".to_string()]).await;
+    assert_eq!(0, nodes.len());
+    assert_eq!(3, providers.len());
+
+    // Start 100 resources.
+
+    let mut ext_instance_ids = vec![];
+    let mut int_instance_ids = vec![];
+    let mut provider_ids = vec![];
+    for _i in 0..100 {
+        let start_req = make_start_resource_request("rc-1");
+        ext_instance_ids.push(match client.start_resource(start_req.clone()).await.unwrap() {
+            StartComponentResponse::InstanceId(id) => id,
+            StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        });
+        assert!(ext_instance_ids.last().unwrap().node_id.is_nil());
+
+        if let (provider_id, MockResourceEvent::Start((new_instance_id, resource_instance_spec))) =
+            wait_for_resource_event_multiple(&mut providers).await
+        {
+            int_instance_ids.push(new_instance_id);
+            assert!(resource_instance_spec.configuration.is_empty());
+            assert_eq!(provider_id, resource_instance_spec.provider_id);
+            provider_ids.push(provider_id);
+        } else {
+            panic!("wrong event received");
+        }
+    }
+
+    // Check that all resource providers have been selected at least once.
+
+    let mut providers_selected = std::collections::HashSet::new();
+    for provider_id in provider_ids.iter() {
+        providers_selected.insert(provider_id);
+    }
+    assert_eq!(3, providers_selected.len());
+
+    // Stop the resources previously started.
+
+    assert_eq!(100, ext_instance_ids.len());
+    assert_eq!(100, int_instance_ids.len());
+    assert_eq!(100, provider_ids.len());
+    for i in 0..100 {
+        match client.stop_resource(ext_instance_ids[i]).await {
+            Ok(_) => {}
+            Err(err) => {
+                panic!("{}", err);
+            }
+        }
+
+        if let (provider_id, MockResourceEvent::Stop(instance_id_rcvd)) = wait_for_resource_event_multiple(&mut providers).await {
+            assert_eq!(provider_ids[i], provider_id);
+            assert_eq!(int_instance_ids[i], instance_id_rcvd);
+        } else {
+            panic!("wrong event received");
+        }
+    }
+
+    // Start a resource with unknown class type.
+    match client.start_resource(make_start_resource_request("rc-666")).await.unwrap() {
+        StartComponentResponse::InstanceId(_) => {
+            panic!("started a resource for a non-existing class type");
+        }
+        StartComponentResponse::ResponseError(err) => {
+            assert_eq!("class type not found".to_string(), err.summary);
         }
     }
 }
