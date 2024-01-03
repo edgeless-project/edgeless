@@ -2,8 +2,6 @@ use edgeless_api::function_instance::UpdatePeersRequest;
 use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
 use futures::{Future, SinkExt, StreamExt};
 
-use crate::runner_api;
-
 enum AgentRequest {
     SPAWN(edgeless_api::function_instance::SpawnFunctionRequest),
     STOP(edgeless_api::function_instance::InstanceId),
@@ -18,7 +16,7 @@ pub struct Agent {
 
 impl Agent {
     pub fn new(
-        runner: Box<dyn runner_api::RunnerAPI + Send>,
+        runner: Box<dyn crate::base_runtime::RuntimeAPI + Send>,
         node_settings: crate::EdgelessNodeSettings,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
@@ -33,7 +31,7 @@ impl Agent {
 
     async fn main_task(
         receiver: futures::channel::mpsc::UnboundedReceiver<AgentRequest>,
-        runner: Box<dyn runner_api::RunnerAPI + Send>,
+        runner: Box<dyn crate::base_runtime::RuntimeAPI + Send>,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     ) {
         let mut receiver = std::pin::pin!(receiver);
