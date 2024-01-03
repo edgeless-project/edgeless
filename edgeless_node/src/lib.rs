@@ -1,9 +1,7 @@
 use edgeless_api::{function_instance::ResourceProviderSpecification, orc::OrchestratorAPI};
-use futures::join;
-
 pub mod agent;
+pub mod base_runtime;
 pub mod resources;
-pub mod runner_api;
 pub mod state_management;
 pub mod wasm_runner;
 
@@ -146,7 +144,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         .expect(&format!("could not build the telemetry provider at URL {}", &settings.metrics_url));
 
     // Create the WebAssembly runner.
-    let (rust_runner_client, rust_runner_task) = wasm_runner::runner::Runner::new(
+    let (rust_runtime_client, mut rust_runtime_task_s) = base_runtime::runtime::create::<wasm_runner::function_instance::WASMFunctionInstance>(
         data_plane.clone(),
         state_manager.clone(),
         Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
@@ -154,9 +152,12 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
             ("NODE_ID".to_string(), settings.node_id.to_string()),
         ]))),
     );
+    let rust_runtime_task = tokio::spawn(async move {
+        rust_runtime_task_s.run().await;
+    });
 
     // Create the agent.
-    let (mut agent, agent_task) = agent::Agent::new(Box::new(rust_runner_client.clone()), settings.clone(), data_plane.clone());
+    let (mut agent, agent_task) = agent::Agent::new(Box::new(rust_runtime_client.clone()), settings.clone(), data_plane.clone());
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.agent_url.clone());
 
     // Create the resources.
@@ -169,8 +170,8 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     );
 
     // Wait for all the tasks to complete.
-    join!(
-        rust_runner_task,
+    let _ = futures::join!(
+        rust_runtime_task,
         agent_task,
         agent_api_server,
         resource_api_server,

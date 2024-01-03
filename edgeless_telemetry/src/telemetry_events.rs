@@ -28,13 +28,20 @@ pub fn telemetry_to_api(lvl: TelemetryLogLevel) -> String {
 }
 
 #[derive(Debug, PartialEq, Eq)]
+pub enum FunctionExitStatus {
+    Ok,
+    InternalError,
+    CodeError,
+}
+
+#[derive(Debug, PartialEq, Eq)]
 pub enum TelemetryEvent {
     FunctionInstantiate(std::time::Duration),
     FunctionInit(std::time::Duration),
     FunctionLogEntry(TelemetryLogLevel, String, String), // (_, target, msg)
     FunctionInvocationCompleted(std::time::Duration),
     FunctionStop(std::time::Duration),
-    FunctionExit,
+    FunctionExit(FunctionExitStatus),
 }
 
 #[derive(Clone)]

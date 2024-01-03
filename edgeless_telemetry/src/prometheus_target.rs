@@ -94,7 +94,7 @@ impl crate::telemetry_events::EventProcessor for PrometheusEventTarget {
                         .inc();
                 }
             }
-            crate::telemetry_events::TelemetryEvent::FunctionExit => {
+            crate::telemetry_events::TelemetryEvent::FunctionExit(_) => {
                 if let (Some(node_id), Some(function_type)) = (event_tags.get("NODE_ID"), event_tags.get("FUNCTION_TYPE")) {
                     self.function_count
                         .get_or_create(&RuntimeLabels {
