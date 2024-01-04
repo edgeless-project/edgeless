@@ -64,7 +64,10 @@ service FunctionInstanceNode {
     // Input: the updated mapping.
     // Output: none.
     rpc Patch (PatchRequest) returns (google.protobuf.Empty);
+}
 
+// API for per-node management functionality
+service NodeManagement {
     // Update the dataplane of a node by adding/removing peers.
     // Input: the node identifier and invocation URL (only for add operations).
     // Output: none.

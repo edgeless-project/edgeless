@@ -102,41 +102,6 @@ impl FunctonInstanceConverters {
         }
     }
 
-    pub fn parse_update_peers_request(
-        api_instance: &crate::grpc_impl::api::UpdatePeersRequest,
-    ) -> anyhow::Result<crate::function_instance::UpdatePeersRequest> {
-        match api_instance.request_type {
-            x if x == crate::grpc_impl::api::UpdatePeersRequestType::Add as i32 => {
-                if let (Some(node_id), Some(invocation_url)) = (&api_instance.node_id, &api_instance.invocation_url) {
-                    let node_id = uuid::Uuid::from_str(node_id.as_str());
-                    match node_id {
-                        Ok(node_id) => Ok(crate::function_instance::UpdatePeersRequest::Add(node_id, invocation_url.clone())),
-                        Err(_) => Err(anyhow::anyhow!("Ill-formed UpdatePeersRequest: invalid UUID as node_id")),
-                    }
-                } else {
-                    Err(anyhow::anyhow!(
-                        "Ill-formed UpdatePeersRequest message: node_id or invocation_url not specified with add peer"
-                    ))
-                }
-            }
-            x if x == crate::grpc_impl::api::UpdatePeersRequestType::Del as i32 => {
-                if let Some(node_id) = &api_instance.node_id {
-                    let node_id = uuid::Uuid::from_str(node_id.as_str());
-                    match node_id {
-                        Ok(node_id) => Ok(crate::function_instance::UpdatePeersRequest::Del(node_id)),
-                        Err(_) => Err(anyhow::anyhow!("Ill-formed UpdatePeersRequest: invalid UUID as node_id")),
-                    }
-                } else {
-                    Err(anyhow::anyhow!(
-                        "Ill-formed UpdatePeersRequest message: node_id not specified with del peer"
-                    ))
-                }
-            }
-            x if x == crate::grpc_impl::api::UpdatePeersRequestType::Clear as i32 => Ok(crate::function_instance::UpdatePeersRequest::Clear),
-            x => Err(anyhow::anyhow!("Ill-formed UpdatePeersRequest message: unknown type {}", x)),
-        }
-    }
-
     pub fn parse_state_specification(
         api_spec: &crate::grpc_impl::api::StateSpecification,
     ) -> anyhow::Result<crate::function_instance::StateSpecification> {
@@ -242,26 +207,6 @@ impl FunctonInstanceConverters {
                 }),
             },
             crate::function_instance::UpdateNodeResponse::Accepted => crate::grpc_impl::api::UpdateNodeResponse { response_error: None },
-        }
-    }
-
-    pub fn serialize_update_peers_request(req: &crate::function_instance::UpdatePeersRequest) -> crate::grpc_impl::api::UpdatePeersRequest {
-        match req {
-            crate::function_instance::UpdatePeersRequest::Add(node_id, invocation_url) => crate::grpc_impl::api::UpdatePeersRequest {
-                request_type: crate::grpc_impl::api::UpdatePeersRequestType::Add as i32,
-                node_id: Some(node_id.to_string()),
-                invocation_url: Some(invocation_url.clone()),
-            },
-            crate::function_instance::UpdatePeersRequest::Del(node_id) => crate::grpc_impl::api::UpdatePeersRequest {
-                request_type: crate::grpc_impl::api::UpdatePeersRequestType::Del as i32,
-                node_id: Some(node_id.to_string()),
-                invocation_url: None,
-            },
-            crate::function_instance::UpdatePeersRequest::Clear => crate::grpc_impl::api::UpdatePeersRequest {
-                request_type: crate::grpc_impl::api::UpdatePeersRequestType::Clear as i32,
-                node_id: None,
-                invocation_url: None,
-            },
         }
     }
 
@@ -609,28 +554,9 @@ impl crate::function_instance::FunctionInstanceNodeAPI for FunctionInstanceNodeA
             )),
         }
     }
-
-    async fn update_peers(&mut self, request: crate::function_instance::UpdatePeersRequest) -> anyhow::Result<()> {
-        match self
-            .client
-            .update_peers(tonic::Request::new(FunctonInstanceConverters::serialize_update_peers_request(&request)))
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while updating peers: {}", err.to_string())),
-        }
-    }
-
-    async fn keep_alive(&mut self) -> anyhow::Result<()> {
-        match self.client.keep_alive(tonic::Request::new(())).await {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Communication error during keep alive: {}", err.to_string())),
-        }
-    }
 }
-
 pub struct FunctionInstanceNodeAPIServer {
-    pub root_api: tokio::sync::Mutex<Box<dyn crate::function_instance::FunctionInstanceNodeAPI>>,
+    pub root_api: tokio::sync::Mutex<Box<dyn crate::function_instance::FunctionInstanceNodeAPI>>
 }
 
 #[async_trait::async_trait]
@@ -702,30 +628,6 @@ impl crate::grpc_impl::api::function_instance_node_server::FunctionInstanceNode 
             ))),
         }
     }
-
-    async fn update_peers(&self, request: tonic::Request<crate::grpc_impl::api::UpdatePeersRequest>) -> Result<tonic::Response<()>, tonic::Status> {
-        let parsed_request = match FunctonInstanceConverters::parse_update_peers_request(&request.into_inner()) {
-            Ok(parsed_request) => parsed_request,
-            Err(err) => {
-                log::error!("Parse UpdatePeersRequest Failed: {}", err);
-                return Err(tonic::Status::invalid_argument(format!(
-                    "Error when parsing an UpdatePeersRequest message: {}",
-                    err
-                )));
-            }
-        };
-        match self.root_api.lock().await.update_peers(parsed_request).await {
-            Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when updating peers: {}", err))),
-        }
-    }
-
-    async fn keep_alive(&self, _request: tonic::Request<()>) -> Result<tonic::Response<crate::grpc_impl::api::HealthStatus>, tonic::Status> {
-        match self.root_api.lock().await.keep_alive().await {
-            Ok(_) => Ok(tonic::Response::new(crate::grpc_impl::api::HealthStatus {})),
-            Err(err) => Err(tonic::Status::internal(format!("Error during keep alive: {}", err))),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -740,7 +642,6 @@ mod tests {
     use crate::function_instance::StateSpecification;
     use crate::function_instance::UpdateNodeRequest;
     use crate::function_instance::UpdateNodeResponse;
-    use crate::function_instance::UpdatePeersRequest;
     use edgeless_api_core::instance_id::InstanceId;
 
     #[test]
@@ -855,21 +756,6 @@ mod tests {
         ];
         for msg in messages {
             match FunctonInstanceConverters::parse_update_node_response(&FunctonInstanceConverters::serialize_update_node_response(&msg)) {
-                Ok(val) => assert_eq!(msg, val),
-                Err(err) => panic!("{}", err),
-            }
-        }
-    }
-
-    #[test]
-    fn serialize_deserialize_update_peers_request() {
-        let messages = vec![
-            UpdatePeersRequest::Add(uuid::Uuid::new_v4(), "http://127.0.0.10001".to_string()),
-            UpdatePeersRequest::Del(uuid::Uuid::new_v4()),
-            UpdatePeersRequest::Clear,
-        ];
-        for msg in messages {
-            match FunctonInstanceConverters::parse_update_peers_request(&FunctonInstanceConverters::serialize_update_peers_request(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }
