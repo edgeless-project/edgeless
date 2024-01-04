@@ -77,13 +77,6 @@ pub enum UpdateNodeResponse {
     Accepted,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum UpdatePeersRequest {
-    Add(uuid::Uuid, String), // node_id, invocation_url
-    Del(uuid::Uuid),         // node_id
-    Clear,
-}
-
 #[async_trait::async_trait]
 pub trait FunctionInstanceOrcAPI: FunctionInstanceOrcAPIClone + Sync + Send {
     async fn start_function(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse>;
@@ -99,8 +92,6 @@ pub trait FunctionInstanceNodeAPI: FunctionInstanceNodeAPIClone + Sync + Send {
     async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse>;
     async fn stop(&mut self, id: InstanceId) -> anyhow::Result<()>;
     async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()>;
-    async fn update_peers(&mut self, request: UpdatePeersRequest) -> anyhow::Result<()>;
-    async fn keep_alive(&mut self) -> anyhow::Result<()>;
 }
 
 // https://stackoverflow.com/a/30353928
