@@ -1,5 +1,6 @@
 use edgeless_api::common::{PatchRequest, StartComponentResponse};
-use edgeless_api::function_instance::{ComponentId, InstanceId, SpawnFunctionRequest, StartResourceRequest, UpdateNodeRequest, UpdatePeersRequest};
+use edgeless_api::function_instance::{ComponentId, InstanceId, SpawnFunctionRequest, StartResourceRequest, UpdateNodeRequest};
+use edgeless_api::node_managment::UpdatePeersRequest;
 use edgeless_api::resource_configuration::ResourceInstanceSpecification;
 use futures::{Future, SinkExt, StreamExt};
 use rand::seq::SliceRandom;
@@ -590,7 +591,7 @@ impl Orchestrator {
                         // was a deregister operation).
                         let mut num_failures: u32 = 0;
                         for (_node_id, client) in clients.iter_mut() {
-                            if let Err(_) = client.api.function_instance_api().update_peers(msg.clone()).await {
+                            if let Err(_) = client.api.node_management_api().update_peers(msg.clone()).await {
                                 num_failures += 1;
                             }
                         }
@@ -598,7 +599,7 @@ impl Orchestrator {
                         // Only with registration, we also update the new node
                         // by adding as peers all the existing nodes.
                         if let Some(this_node_id) = this_node_id {
-                            let mut new_node_client = clients.get_mut(&this_node_id).unwrap().api.function_instance_api();
+                            let mut new_node_client = clients.get_mut(&this_node_id).unwrap().api.node_management_api();
                             for (other_node_id, client_desc) in clients.iter_mut() {
                                 if other_node_id.eq(&this_node_id) {
                                     continue;
@@ -632,7 +633,7 @@ impl Orchestrator {
                     // because they failed to reply to a keep-alive.
                     let mut to_be_disconnected = HashSet::new();
                     for (node_id, client_desc) in &mut clients {
-                        if let Err(_) = client_desc.api.function_instance_api().keep_alive().await {
+                        if let Err(_) = client_desc.api.node_management_api().keep_alive().await {
                             to_be_disconnected.insert(*node_id);
                         }
                     }
@@ -661,7 +662,7 @@ impl Orchestrator {
                         for (_, client_desc) in clients.iter_mut() {
                             match client_desc
                                 .api
-                                .function_instance_api()
+                                .node_management_api()
                                 .update_peers(UpdatePeersRequest::Del(removed_node_id))
                                 .await
                             {
