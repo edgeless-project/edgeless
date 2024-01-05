@@ -38,12 +38,6 @@ service FunctionInstanceOrc {
     // Input: the update mapping.
     // Output: none.
     rpc Patch (PatchRequest) returns (google.protobuf.Empty);
-
-    // Register a new node on an orchestrator or deregister an existing node.
-    // Input: registration: identifier of the new node and agent/invocation URLs;
-    // deregistration: identifier of the existing node to be deregistered.
-    // Output: UpdateNodeResponse.
-    rpc UpdateNode (UpdateNodeRequest) returns (UpdateNodeResponse);
 }
 
 // API exposed by the nodes to manage the lifecycle of function instances (s07).
@@ -77,6 +71,15 @@ service NodeManagement {
     // Input: none.
     // Output: health status information.
     rpc KeepAlive (google.protobuf.Empty) returns (HealthStatus);
+}
+
+// API that allows nodes to register themselves with the orchestrator
+service NodeRegistration {
+    // Register a new node on an orchestrator or deregister an existing node.
+    // Input: registration: identifier of the new node and agent/invocation URLs;
+    // deregistration: identifier of the existing node to be deregistered.
+    // Output: UpdateNodeResponse.
+    rpc UpdateNode (UpdateNodeRequest) returns (UpdateNodeResponse);
 }
 
 // API to manage the lifecycle of workflow instances (s04).

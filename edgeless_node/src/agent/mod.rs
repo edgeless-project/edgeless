@@ -89,9 +89,7 @@ impl Agent {
                 sender: self.sender.clone(),
                 node_id: self.node_settings.node_id.clone(),
             }),
-            node_management_client: Box::new(NodeManagementClient {
-                sender: self.sender.clone()
-            }),
+            node_management_client: Box::new(NodeManagementClient { sender: self.sender.clone() }),
         })
     }
 }
@@ -104,13 +102,13 @@ pub struct FunctionInstanceNodeClient {
 
 #[derive(Clone)]
 pub struct NodeManagementClient {
-    sender: futures::channel::mpsc::UnboundedSender<AgentRequest>
+    sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
 }
 
 #[derive(Clone)]
 pub struct AgentClient {
     function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceNodeAPI>,
-    node_management_client: Box<dyn edgeless_api::node_managment::NodeManagementAPI>
+    node_management_client: Box<dyn edgeless_api::node_managment::NodeManagementAPI>,
 }
 
 #[async_trait::async_trait]
@@ -159,7 +157,6 @@ impl edgeless_api::function_instance::FunctionInstanceNodeAPI for FunctionInstan
 
 #[async_trait::async_trait]
 impl edgeless_api::node_managment::NodeManagementAPI for NodeManagementClient {
-
     async fn update_peers(&mut self, request: edgeless_api::node_managment::UpdatePeersRequest) -> anyhow::Result<()> {
         match self.sender.send(AgentRequest::UPDATEPEERS(request)).await {
             Ok(_) => Ok(()),
@@ -182,5 +179,5 @@ impl edgeless_api::agent::AgentAPI for AgentClient {
 
     fn node_management_api(&mut self) -> Box<dyn edgeless_api::node_managment::NodeManagementAPI> {
         self.node_management_client.clone()
-    } 
+    }
 }

@@ -20,7 +20,7 @@ enum MockFunctionInstanceEvent {
     ),
     StopResource(edgeless_api::function_instance::InstanceId),
     Patch(edgeless_api::common::PatchRequest),
-    UpdateNode(edgeless_api::function_instance::UpdateNodeRequest),
+    UpdateNode(edgeless_api::node_registration::UpdateNodeRequest),
 }
 
 struct MockOrchestrator {
@@ -30,16 +30,21 @@ struct MockOrchestrator {
 
 impl edgeless_api::orc::OrchestratorAPI for MockOrchestrator {
     fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI> {
-        Box::new(MockFunctionInstanceAPI {
-            _node_id: self._node_id.clone(),
-            sender: self.sender.clone(),
-        })
+        Box::new(MockFunctionInstanceAPI { sender: self.sender.clone() })
+    }
+
+    fn node_registration_api(&mut self) -> Box<dyn edgeless_api::node_registration::NodeRegistrationAPI> {
+        Box::new(MockNodeRegistrationAPI { sender: self.sender.clone() })
     }
 }
 
 #[derive(Clone)]
 struct MockFunctionInstanceAPI {
-    _node_id: uuid::Uuid,
+    sender: futures::channel::mpsc::UnboundedSender<MockFunctionInstanceEvent>,
+}
+
+#[derive(Clone)]
+struct MockNodeRegistrationAPI {
     sender: futures::channel::mpsc::UnboundedSender<MockFunctionInstanceEvent>,
 }
 
@@ -85,12 +90,16 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for MockFunctionIns
         self.sender.send(MockFunctionInstanceEvent::Patch(request)).await.unwrap();
         Ok(())
     }
+}
+
+#[async_trait::async_trait]
+impl edgeless_api::node_registration::NodeRegistrationAPI for MockNodeRegistrationAPI {
     async fn update_node(
         &mut self,
-        request: edgeless_api::function_instance::UpdateNodeRequest,
-    ) -> anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse> {
+        request: edgeless_api::node_registration::UpdateNodeRequest,
+    ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
         self.sender.send(MockFunctionInstanceEvent::UpdateNode(request)).await.unwrap();
-        Ok(edgeless_api::function_instance::UpdateNodeResponse::Accepted)
+        Ok(edgeless_api::node_registration::UpdateNodeResponse::Accepted)
     }
 }
 
