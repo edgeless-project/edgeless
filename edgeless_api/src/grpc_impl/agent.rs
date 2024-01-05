@@ -38,10 +38,10 @@ impl AgentAPIServer {
     pub fn run(agent_api: Box<dyn crate::agent::AgentAPI + Send>, agent_url: String) -> futures::future::BoxFuture<'static, ()> {
         let mut agent_api = agent_api;
         let function_api = FunctionInstanceNodeAPIServer {
-            root_api: tokio::sync::Mutex::new(agent_api.function_instance_api())
+            root_api: tokio::sync::Mutex::new(agent_api.function_instance_api()),
         };
         let node_management_api = node_management::NodeManagementAPIService {
-            node_management_api: tokio::sync::Mutex::new(agent_api.node_management_api())
+            node_management_api: tokio::sync::Mutex::new(agent_api.node_management_api()),
         };
         Box::pin(async move {
             let function_api = function_api;

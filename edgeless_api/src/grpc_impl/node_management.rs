@@ -6,7 +6,7 @@ pub struct NodeManagementClient {
 }
 
 pub struct NodeManagementAPIService {
-    pub node_management_api: tokio::sync::Mutex<Box<dyn crate::node_managment::NodeManagementAPI>>
+    pub node_management_api: tokio::sync::Mutex<Box<dyn crate::node_managment::NodeManagementAPI>>,
 }
 
 impl NodeManagementClient {
@@ -48,7 +48,6 @@ impl crate::node_managment::NodeManagementAPI for NodeManagementClient {
         }
     }
 }
-
 
 #[async_trait::async_trait]
 impl crate::grpc_impl::api::node_management_server::NodeManagement for NodeManagementAPIService {
@@ -150,5 +149,5 @@ mod test {
                 Err(err) => panic!("{}", err),
             }
         }
-    }   
+    }
 }

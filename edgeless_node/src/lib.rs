@@ -1,4 +1,4 @@
-use edgeless_api::{function_instance::ResourceProviderSpecification, orc::OrchestratorAPI};
+use edgeless_api::orc::OrchestratorAPI;
 pub mod agent;
 pub mod base_runtime;
 pub mod resources;
@@ -16,12 +16,15 @@ pub struct EdgelessNodeSettings {
     pub http_ingress_url: String,
 }
 
-async fn register_node(settings: &EdgelessNodeSettings, resource_provider_specifications: Vec<ResourceProviderSpecification>) {
+async fn register_node(
+    settings: &EdgelessNodeSettings,
+    resource_provider_specifications: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
+) {
     log::info!("Registering this node '{}' on e-ORC {}", &settings.node_id, &settings.orchestrator_url);
     match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&settings.orchestrator_url, None).await {
         Ok(mut orc_client) => match orc_client
-            .function_instance_api()
-            .update_node(edgeless_api::function_instance::UpdateNodeRequest::Registration(
+            .node_registration_api()
+            .update_node(edgeless_api::node_registration::UpdateNodeRequest::Registration(
                 settings.node_id.clone(),
                 settings.agent_url.clone(),
                 settings.invocation_url.clone(),
@@ -30,10 +33,10 @@ async fn register_node(settings: &EdgelessNodeSettings, resource_provider_specif
             .await
         {
             Ok(res) => match res {
-                edgeless_api::function_instance::UpdateNodeResponse::ResponseError(err) => {
+                edgeless_api::node_registration::UpdateNodeResponse::ResponseError(err) => {
                     panic!("could not register to e-ORC {}: {}", &settings.orchestrator_url, err)
                 }
-                edgeless_api::function_instance::UpdateNodeResponse::Accepted => {
+                edgeless_api::node_registration::UpdateNodeResponse::Accepted => {
                     log::info!("this node '{}' registered to e-ORC '{}'", &settings.node_id, &settings.orchestrator_url)
                 }
             },
@@ -46,7 +49,7 @@ async fn register_node(settings: &EdgelessNodeSettings, resource_provider_specif
 async fn fill_resources(
     data_plane: edgeless_dataplane::handle::DataplaneProvider,
     settings: &EdgelessNodeSettings,
-    provider_specifications: &mut Vec<ResourceProviderSpecification>,
+    provider_specifications: &mut Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
 ) -> std::collections::HashMap<String, Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI>> {
     let mut ret = std::collections::HashMap::<String, Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI>>::new();
 
@@ -62,7 +65,7 @@ async fn fill_resources(
                 )
                 .await,
             );
-            provider_specifications.push(ResourceProviderSpecification {
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                 provider_id: "http-ingress-1".to_string(),
                 class_type: "http-ingress".to_string(),
                 outputs: vec!["new_request".to_string()],
@@ -81,7 +84,7 @@ async fn fill_resources(
                 .await,
             ),
         );
-        provider_specifications.push(ResourceProviderSpecification {
+        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
             provider_id: "http-egress-1".to_string(),
             class_type: "http-egress".to_string(),
             outputs: vec![],
@@ -99,7 +102,7 @@ async fn fill_resources(
                 .await,
             ),
         );
-        provider_specifications.push(ResourceProviderSpecification {
+        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
             provider_id: "file-log-1".to_string(),
             class_type: "file-log".to_string(),
             outputs: vec![],
@@ -117,7 +120,7 @@ async fn fill_resources(
                 .await,
             ),
         );
-        provider_specifications.push(ResourceProviderSpecification {
+        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
             provider_id: "redis-1".to_string(),
             class_type: "redis".to_string(),
             outputs: vec![],

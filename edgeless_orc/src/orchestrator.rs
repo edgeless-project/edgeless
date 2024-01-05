@@ -1,5 +1,5 @@
 use edgeless_api::common::{PatchRequest, StartComponentResponse};
-use edgeless_api::function_instance::{ComponentId, InstanceId, SpawnFunctionRequest, StartResourceRequest, UpdateNodeRequest};
+use edgeless_api::function_instance::{ComponentId, InstanceId, SpawnFunctionRequest, StartResourceRequest};
 use edgeless_api::node_managment::UpdatePeersRequest;
 use edgeless_api::resource_configuration::ResourceInstanceSpecification;
 use futures::{Future, SinkExt, StreamExt};
@@ -24,8 +24,8 @@ enum OrchestratorRequest {
     STOPRESOURCE(edgeless_api::function_instance::InstanceId),
     PATCH(edgeless_api::common::PatchRequest),
     UPDATENODE(
-        edgeless_api::function_instance::UpdateNodeRequest,
-        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse>>,
+        edgeless_api::node_registration::UpdateNodeRequest,
+        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>,
     ),
     KEEPALIVE(),
 }
@@ -84,16 +84,26 @@ impl std::fmt::Display for ResourceProvider {
 
 pub struct OrchestratorClient {
     function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI>,
+    node_registration_client: Box<dyn edgeless_api::node_registration::NodeRegistrationAPI>,
 }
 
 impl edgeless_api::orc::OrchestratorAPI for OrchestratorClient {
     fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI> {
         self.function_instance_client.clone()
     }
+
+    fn node_registration_api(&mut self) -> Box<dyn edgeless_api::node_registration::NodeRegistrationAPI> {
+        self.node_registration_client.clone()
+    }
 }
 
 #[derive(Clone)]
 pub struct OrchestratorFunctionInstanceOrcClient {
+    sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
+}
+
+#[derive(Clone)]
+pub struct NodeRegistrationClient {
     sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
 }
 
@@ -500,7 +510,7 @@ impl Orchestrator {
                     // that an existing node left the system (Deregister).
                     let mut this_node_id = None;
                     let msg = match request {
-                        UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resources) => {
+                        edgeless_api::node_registration::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resources) => {
                             let mut dup_entry = false;
                             if let Some(client_desc) = clients.get(&node_id) {
                                 if client_desc.agent_url == agent_url && client_desc.invocation_url == invocation_url {
@@ -567,7 +577,7 @@ impl Orchestrator {
                                 Some(UpdatePeersRequest::Add(node_id, invocation_url))
                             }
                         }
-                        UpdateNodeRequest::Deregistration(node_id) => {
+                        edgeless_api::node_registration::UpdateNodeRequest::Deregistration(node_id) => {
                             if let None = clients.get(&node_id) {
                                 // There is no client with that node_id
                                 None
@@ -581,7 +591,7 @@ impl Orchestrator {
                     // If no operation was done (either a new node was already
                     // present with same agent/invocation URLs or a deregistering
                     // node did not exist) we accept the command.
-                    let mut response = edgeless_api::function_instance::UpdateNodeResponse::Accepted;
+                    let mut response = edgeless_api::node_registration::UpdateNodeResponse::Accepted;
 
                     if let Some(msg) = msg {
                         // Update the orchestration logic with the new set of nodes.
@@ -614,8 +624,8 @@ impl Orchestrator {
                         }
 
                         response = match num_failures {
-                            0 => edgeless_api::function_instance::UpdateNodeResponse::Accepted,
-                            _ => edgeless_api::function_instance::UpdateNodeResponse::ResponseError(edgeless_api::common::ResponseError {
+                            0 => edgeless_api::node_registration::UpdateNodeResponse::Accepted,
+                            _ => edgeless_api::node_registration::UpdateNodeResponse::ResponseError(edgeless_api::common::ResponseError {
                                 summary: "UpdatePeers() failed on some node when updating a node".to_string(),
                                 detail: None,
                             }),
@@ -681,6 +691,7 @@ impl Orchestrator {
     pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::orc::OrchestratorAPI + Send> {
         Box::new(OrchestratorClient {
             function_instance_client: Box::new(OrchestratorFunctionInstanceOrcClient { sender: self.sender.clone() }),
+            node_registration_client: Box::new(NodeRegistrationClient { sender: self.sender.clone() }),
         })
     }
 }
@@ -760,14 +771,17 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for OrchestratorFun
             )),
         }
     }
+}
 
+#[async_trait::async_trait]
+impl edgeless_api::node_registration::NodeRegistrationAPI for NodeRegistrationClient {
     async fn update_node(
         &mut self,
-        request: edgeless_api::function_instance::UpdateNodeRequest,
-    ) -> anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse> {
+        request: edgeless_api::node_registration::UpdateNodeRequest,
+    ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
         log::debug!("FunctionInstance::UpdateNode() {:?}", request);
         let request = request;
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::function_instance::UpdateNodeResponse>>();
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>();
         if let Err(err) = self.sender.send(OrchestratorRequest::UPDATENODE(request, reply_sender)).await {
             return Err(anyhow::anyhow!("Orchestrator channel error when updating a node: {}", err.to_string()));
         }

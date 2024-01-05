@@ -1,14 +1,19 @@
 pub struct OrchestratorAPIClient {
     function_instance_client: Box<dyn crate::function_instance::FunctionInstanceOrcAPI>,
+    node_registration_client: Box<dyn crate::node_registration::NodeRegistrationAPI>,
 }
 
 impl OrchestratorAPIClient {
     pub async fn new(api_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
-        match crate::grpc_impl::function_instance::FunctionInstanceOrcAPIClient::new(api_addr, retry_interval).await {
-            Ok(val) => Ok(Self {
-                function_instance_client: Box::new(val),
+        let function_instance_client = crate::grpc_impl::function_instance::FunctionInstanceOrcAPIClient::new(api_addr, retry_interval).await;
+        let node_registration_client = crate::grpc_impl::node_registration::NodeRegistrationClient::new(api_addr, retry_interval).await;
+
+        match (function_instance_client, node_registration_client) {
+            (Ok(function_instance_client), Ok(node_registration_client)) => Ok(Self {
+                function_instance_client: Box::new(function_instance_client),
+                node_registration_client: Box::new(node_registration_client),
             }),
-            Err(err) => Err(err),
+            _ => Err(anyhow::anyhow!("One of the orc connections failed")),
         }
     }
 }
@@ -16,6 +21,10 @@ impl OrchestratorAPIClient {
 impl crate::orc::OrchestratorAPI for OrchestratorAPIClient {
     fn function_instance_api(&mut self) -> Box<dyn crate::function_instance::FunctionInstanceOrcAPI> {
         self.function_instance_client.clone()
+    }
+
+    fn node_registration_api(&mut self) -> Box<dyn crate::node_registration::NodeRegistrationAPI> {
+        self.node_registration_client.clone()
     }
 }
 

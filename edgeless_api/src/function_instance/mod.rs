@@ -38,45 +38,6 @@ pub struct StartResourceRequest {
     pub configurations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ResourceProviderSpecification {
-    pub provider_id: String,
-    pub class_type: String,
-    pub outputs: Vec<String>,
-    pub configuration_url: String,
-}
-
-impl std::fmt::Display for ResourceProviderSpecification {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(
-            f,
-            "provider_id {}, class_type {}, outputs [{}], configuration_url {}",
-            self.provider_id,
-            self.class_type,
-            self.outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
-            self.configuration_url
-        )
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum UpdateNodeRequest {
-    // 0: node_id (cannot be nil)
-    // 1: agent_url (cannot be empty)
-    // 2: invocation_url (cannot be empty)
-    // 3: resource provider specifications (can be empty)
-    Registration(uuid::Uuid, String, String, Vec<ResourceProviderSpecification>),
-
-    // 0: node_id (cannot be empty)
-    Deregistration(uuid::Uuid),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum UpdateNodeResponse {
-    ResponseError(crate::common::ResponseError),
-    Accepted,
-}
-
 #[async_trait::async_trait]
 pub trait FunctionInstanceOrcAPI: FunctionInstanceOrcAPIClone + Sync + Send {
     async fn start_function(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse>;
@@ -84,7 +45,6 @@ pub trait FunctionInstanceOrcAPI: FunctionInstanceOrcAPIClone + Sync + Send {
     async fn start_resource(&mut self, spawn_request: StartResourceRequest) -> anyhow::Result<crate::common::StartComponentResponse>;
     async fn stop_resource(&mut self, id: InstanceId) -> anyhow::Result<()>;
     async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()>;
-    async fn update_node(&mut self, request: UpdateNodeRequest) -> anyhow::Result<UpdateNodeResponse>;
 }
 
 #[async_trait::async_trait]
