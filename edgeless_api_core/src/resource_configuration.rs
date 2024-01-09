@@ -1,13 +1,13 @@
 #[derive(Clone, PartialEq, Eq)]
 pub struct EncodedResourceInstanceSpecification<'a> {
-    pub provider_id: &'a str,
+    pub class_type: &'a str,
     pub output_mapping: [Option<(&'a str, crate::instance_id::InstanceId)>; 16],
     pub configuration: [Option<(&'a str, &'a str)>; 16],
 }
 
 impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
     fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
-        let mut e = e.str(self.provider_id)?;
+        let mut e = e.str(self.class_type)?;
         {
             let mut true_callbacks_size: u64 = 0;
             for i in self.output_mapping {
@@ -64,7 +64,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
         }
 
         Ok(EncodedResourceInstanceSpecification {
-            provider_id: id,
+            class_type: id,
             output_mapping: outputs,
             configuration: configuration,
         })
@@ -73,7 +73,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
 
 impl<C> minicbor::CborLen<C> for EncodedResourceInstanceSpecification<'_> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
-        let mut len: usize = self.provider_id.cbor_len(ctx);
+        let mut len: usize = self.class_type.cbor_len(ctx);
 
         let mut outputs: [(&str, crate::instance_id::InstanceId); 16] = [("" as &str, crate::instance_id::InstanceId::new(uuid::Uuid::new_v4())); 16];
         let mut outputs_i: usize = 0;
@@ -114,7 +114,7 @@ mod test {
         outputs[0] = Some(("foo", crate::instance_id::InstanceId::new(uuid::Uuid::new_v4())));
 
         let id = super::EncodedResourceInstanceSpecification {
-            provider_id: "prov-1",
+            class_type: "class-1",
             output_mapping: outputs,
             configuration: configuration,
         };

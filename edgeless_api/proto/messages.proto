@@ -10,6 +10,12 @@ message InstanceId {
     string function_id = 2;
 }
 
+// Function instance identifier used between clusters.
+message DomainManagedInstanceId {
+    // Unique identifier of the function.
+    string instance_id = 1;
+}
+
 // Consistency model of state.
 enum StatePolicy {
    TRANSIENT  = 0;
@@ -51,14 +57,14 @@ message SpawnFunctionRequest {
     StateSpecification state_specification = 4;
 }
 
-// Message to start a new resource instance.
-message StartResourceRequest {
-    // Resource type.
-    string class_type = 1;
-    // Configuration of the resource, which depends on the resource type.
-    map<string, string> configurations = 2;
+// Some APIs provide the same inteface for different id types (external vs internal)
+// This enables them to share a gRPC interface.
+message InstanceIdVariant {
+    oneof InstanceIdType {
+        InstanceId instance_id = 1;
+        DomainManagedInstanceId domain_managed_instance_id = 2;
+    }
 }
-
 
 // Response message to the creation a new function instance or the start of a
 // resource.
@@ -69,7 +75,7 @@ message StartComponentResponse {
 
     // The identifier of the newly-spawned function instance / newly-started
     // resource, if accepted. The node identifier may be all-zeroes.
-    optional InstanceId instance_id = 2;
+    optional InstanceIdVariant instance_id = 2;
 }
 
 // Possible message types of FunctionInstance::UpdateNode().
@@ -246,14 +252,12 @@ message ResourceProviderSpecification {
     string class_type        = 2;
     // List of callbacks that can be invoked.
     repeated string outputs  = 3;
-    // URL of the resource configuration API.
-    string configuration_url = 4;
 }
 
 // Resource instance specification.
 message ResourceInstanceSpecification {
     // Unique identifier of the resource provider.
-    string provider_id = 1;
+    string resource_class_type = 1;
     // Resource configuration (depends on the type).
     map<string, string> configuration = 2;
     // Mapping of the outputs to concrete function/resource instances.

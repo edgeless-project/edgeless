@@ -34,6 +34,7 @@ impl Edgefunction for RequestorFun {
     }
 
     fn handle_init(_payload: String, serialized_state: Option<String>) {
+        edgeless_function::init_logger();
         log::info!("HTTP_Requestor: 'Init' called");
         delayed_cast(5000, "self", "wakeup");
     }

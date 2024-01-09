@@ -1,6 +1,11 @@
 use edgeless_dataplane::core::Message;
 
+#[derive(Clone)]
 pub struct EgressResourceProvider {
+    inner: std::sync::Arc<tokio::sync::Mutex<EgressResourceProviderInner>>,
+}
+
+struct EgressResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     egress_instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, EgressResource>,
@@ -118,29 +123,33 @@ impl EgressResourceProvider {
         resource_provider_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {
-            resource_provider_id,
-            dataplane_provider,
-            egress_instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, EgressResource>::new(),
+            inner: std::sync::Arc::new(tokio::sync::Mutex::new(EgressResourceProviderInner {
+                resource_provider_id,
+                dataplane_provider,
+                egress_instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, EgressResource>::new(),
+            })),
         }
     }
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI for EgressResourceProvider {
+impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for EgressResourceProvider {
     async fn start(
         &mut self,
         _instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
-        let new_id = edgeless_api::function_instance::InstanceId::new(self.resource_provider_id.node_id);
-        let dataplane_handle = self.dataplane_provider.get_handle_for(new_id.clone()).await;
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
+        let mut lck = self.inner.lock().await;
 
-        self.egress_instances.insert(new_id.clone(), EgressResource::new(dataplane_handle).await);
+        let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
+        let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
+
+        lck.egress_instances.insert(new_id.clone(), EgressResource::new(dataplane_handle).await);
 
         Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
     }
 
     async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-        self.egress_instances.remove(&resource_id);
+        self.inner.lock().await.egress_instances.remove(&resource_id);
         Ok(())
     }
 
