@@ -88,22 +88,22 @@ impl FunctonInstanceConverters {
     }
 }
 
-//
-// orc
-//
-
 #[derive(Clone)]
-pub struct FunctionInstanceOrcAPIClient {
-    client: crate::grpc_impl::api::function_instance_orc_client::FunctionInstanceOrcClient<tonic::transport::Channel>,
+pub struct FunctionInstanceAPIClient<FunctionIdType> {
+    client: crate::grpc_impl::api::function_instance_client::FunctionInstanceClient<tonic::transport::Channel>,
+    _phantom: std::marker::PhantomData<FunctionIdType>,
 }
 
-impl FunctionInstanceOrcAPIClient {
+impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + Sync + 'static> FunctionInstanceAPIClient<FunctionIdType> {
     pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
         loop {
-            match crate::grpc_impl::api::function_instance_orc_client::FunctionInstanceOrcClient::connect(server_addr.to_string()).await {
+            match crate::grpc_impl::api::function_instance_client::FunctionInstanceClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    return Ok(Self { client });
+                    return Ok(Self {
+                        client,
+                        _phantom: std::marker::PhantomData,
+                    });
                 }
                 Err(err) => match retry_interval {
                     Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
@@ -117,175 +117,21 @@ impl FunctionInstanceOrcAPIClient {
 }
 
 #[async_trait::async_trait]
-impl crate::function_instance::FunctionInstanceOrcAPI for FunctionInstanceOrcAPIClient {
-    async fn start_function(
-        &mut self,
-        request: crate::function_instance::SpawnFunctionRequest,
-    ) -> anyhow::Result<crate::common::StartComponentResponse<crate::orc::DomainManagedInstanceId>> {
-        match self
-            .client
-            .start_function(tonic::Request::new(FunctonInstanceConverters::serialize_spawn_function_request(&request)))
-            .await
-        {
-            Ok(res) => CommonConverters::parse_start_component_response(&res.into_inner()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Communication error while starting a function instance: {}",
-                err.to_string()
-            )),
-        }
-    }
-
-    async fn stop_function(&mut self, id: crate::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
-        match self
-            .client
-            .stop_function(tonic::Request::new(
-                super::common::CommonConverters::serialize_domain_managed_instance_id(&id),
-            ))
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Communication error while stopping a function instance: {}",
-                err.to_string()
-            )),
-        }
-    }
-
-    async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()> {
-        match self
-            .client
-            .patch(tonic::Request::new(CommonConverters::serialize_patch_request(&update)))
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Communication error while updating the links of a function instance: {}",
-                err.to_string()
-            )),
-        }
-    }
-}
-
-pub struct FunctionInstanceOrcAPIServer {
-    pub root_api: tokio::sync::Mutex<Box<dyn crate::function_instance::FunctionInstanceOrcAPI>>,
-}
-
-#[async_trait::async_trait]
-impl crate::grpc_impl::api::function_instance_orc_server::FunctionInstanceOrc for FunctionInstanceOrcAPIServer {
-    async fn start_function(
-        &self,
-        request: tonic::Request<crate::grpc_impl::api::SpawnFunctionRequest>,
-    ) -> Result<tonic::Response<crate::grpc_impl::api::StartComponentResponse>, tonic::Status> {
-        let inner_request = request.into_inner();
-        let parsed_request = match FunctonInstanceConverters::parse_spawn_function_request(&inner_request) {
-            Ok(val) => val,
-            Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
-                    response_error: Some(crate::grpc_impl::api::ResponseError {
-                        summary: "Invalid function instance creation request".to_string(),
-                        detail: Some(err.to_string()),
-                    }),
-                    instance_id: None,
-                }))
-            }
-        };
-        match self.root_api.lock().await.start_function(parsed_request).await {
-            Ok(response) => Ok(tonic::Response::new(
-                crate::grpc_impl::common::CommonConverters::serialize_start_component_response(&response),
-            )),
-            Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
-                    response_error: Some(crate::grpc_impl::api::ResponseError {
-                        summary: "Function instance creation request rejected".to_string(),
-                        detail: Some(err.to_string()),
-                    }),
-                    instance_id: None,
-                }))
-            }
-        }
-    }
-
-    async fn stop_function(
-        &self,
-        request: tonic::Request<crate::grpc_impl::api::DomainManagedInstanceId>,
-    ) -> Result<tonic::Response<()>, tonic::Status> {
-        let stop_function_id = match CommonConverters::parse_domain_managed_instance_id(&request.into_inner()) {
-            Ok(parsed_update) => parsed_update,
-            Err(err) => {
-                log::error!("Error when stopping a function instance: {}", err);
-                return Err(tonic::Status::invalid_argument(format!(
-                    "Error when stopping a function instance: {}",
-                    err
-                )));
-            }
-        };
-        match self.root_api.lock().await.stop_function(stop_function_id).await {
-            Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Function instance stopping error: {}", err))),
-        }
-    }
-
-    async fn patch(&self, update: tonic::Request<crate::grpc_impl::api::PatchRequest>) -> Result<tonic::Response<()>, tonic::Status> {
-        let parsed_update = match CommonConverters::parse_patch_request(&update.into_inner()) {
-            Ok(parsed_update) => parsed_update,
-            Err(err) => {
-                log::error!("Parse UpdateFunctionLinks Failed: {}", err);
-                return Err(tonic::Status::invalid_argument(format!(
-                    "Error when updating the links of a function instance: {}",
-                    err
-                )));
-            }
-        };
-        match self.root_api.lock().await.patch(parsed_update).await {
-            Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!(
-                "Error when updating the links of a function instance: {}",
-                err
-            ))),
-        }
-    }
-}
-
-//
-// node
-//
-
-#[derive(Clone)]
-pub struct FunctionInstanceNodeAPIClient {
-    client: crate::grpc_impl::api::function_instance_node_client::FunctionInstanceNodeClient<tonic::transport::Channel>,
-}
-
-impl FunctionInstanceNodeAPIClient {
-    pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
-        loop {
-            match crate::grpc_impl::api::function_instance_node_client::FunctionInstanceNodeClient::connect(server_addr.to_string()).await {
-                Ok(client) => {
-                    let client = client.max_decoding_message_size(usize::MAX);
-                    return Ok(Self { client });
-                }
-                Err(err) => match retry_interval {
-                    Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
-                    None => {
-                        return Err(anyhow::anyhow!("Error when connecting to {}: {}", server_addr, err));
-                    }
-                },
-            }
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl crate::function_instance::FunctionInstanceNodeAPI for FunctionInstanceNodeAPIClient {
+impl<FunctionIdType: super::common::SerializeableId + Clone + Send + Sync + 'static> crate::function_instance::FunctionInstanceAPI<FunctionIdType>
+    for FunctionInstanceAPIClient<FunctionIdType>
+where
+    super::api::InstanceIdVariant: super::common::ParseableId<FunctionIdType>,
+{
     async fn start(
         &mut self,
         request: crate::function_instance::SpawnFunctionRequest,
-    ) -> anyhow::Result<crate::common::StartComponentResponse<edgeless_api_core::instance_id::InstanceId>> {
+    ) -> anyhow::Result<crate::common::StartComponentResponse<FunctionIdType>> {
         match self
             .client
             .start(tonic::Request::new(FunctonInstanceConverters::serialize_spawn_function_request(&request)))
             .await
         {
-            Ok(res) => CommonConverters::parse_start_component_response(&res.into_inner()),
+            Ok(res) => CommonConverters::parse_start_component_response::<FunctionIdType>(&res.into_inner()),
             Err(err) => Err(anyhow::anyhow!(
                 "Communication error while starting a function instance: {}",
                 err.to_string()
@@ -293,8 +139,12 @@ impl crate::function_instance::FunctionInstanceNodeAPI for FunctionInstanceNodeA
         }
     }
 
-    async fn stop(&mut self, id: crate::function_instance::InstanceId) -> anyhow::Result<()> {
-        match self.client.stop(tonic::Request::new(CommonConverters::serialize_instance_id(&id))).await {
+    async fn stop(&mut self, id: FunctionIdType) -> anyhow::Result<()> {
+        match self
+            .client
+            .stop(tonic::Request::new(super::common::SerializeableId::serialize(&id)))
+            .await
+        {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Communication error while stopping a function instance: {}",
@@ -317,12 +167,16 @@ impl crate::function_instance::FunctionInstanceNodeAPI for FunctionInstanceNodeA
         }
     }
 }
-pub struct FunctionInstanceNodeAPIServer {
-    pub root_api: tokio::sync::Mutex<Box<dyn crate::function_instance::FunctionInstanceNodeAPI>>,
+pub struct FunctionInstanceAPIServer<FunctionIdType> {
+    pub root_api: tokio::sync::Mutex<Box<dyn crate::function_instance::FunctionInstanceAPI<FunctionIdType>>>,
 }
 
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::function_instance_node_server::FunctionInstanceNode for FunctionInstanceNodeAPIServer {
+impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + 'static>
+    crate::grpc_impl::api::function_instance_server::FunctionInstance for FunctionInstanceAPIServer<FunctionIdType>
+where
+    crate::grpc_impl::api::InstanceIdVariant: crate::grpc_impl::common::ParseableId<FunctionIdType>,
+{
     async fn start(
         &self,
         request: tonic::Request<crate::grpc_impl::api::SpawnFunctionRequest>,
@@ -354,8 +208,8 @@ impl crate::grpc_impl::api::function_instance_node_server::FunctionInstanceNode 
         }
     }
 
-    async fn stop(&self, request: tonic::Request<crate::grpc_impl::api::InstanceId>) -> Result<tonic::Response<()>, tonic::Status> {
-        let stop_function_id = match CommonConverters::parse_instance_id(&request.into_inner()) {
+    async fn stop(&self, request: tonic::Request<super::api::InstanceIdVariant>) -> Result<tonic::Response<()>, tonic::Status> {
+        let stop_function_id = match crate::grpc_impl::common::ParseableId::<FunctionIdType>::parse(&request.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
                 log::error!("Error when stopping a function instance: {}", err);

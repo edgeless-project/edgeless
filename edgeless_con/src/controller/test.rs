@@ -29,7 +29,7 @@ struct MockOrchestrator {
 }
 
 impl edgeless_api::orc::OrchestratorAPI for MockOrchestrator {
-    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI> {
+    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId>> {
         Box::new(MockFunctionInstanceAPI { sender: self.sender.clone() })
     }
 
@@ -60,8 +60,8 @@ struct MockResourceConfigurationAPI {
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::function_instance::FunctionInstanceOrcAPI for MockFunctionInstanceAPI {
-    async fn start_function(
+impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId> for MockFunctionInstanceAPI {
+    async fn start(
         &mut self,
         spawn_request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
@@ -72,7 +72,7 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for MockFunctionIns
             .unwrap();
         Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
     }
-    async fn stop_function(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
+    async fn stop(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
         self.sender.send(MockFunctionInstanceEvent::StopFunction(id)).await.unwrap();
         Ok(())
     }

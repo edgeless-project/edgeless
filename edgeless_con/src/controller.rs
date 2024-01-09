@@ -137,7 +137,7 @@ impl Controller {
 
             log::debug!("stopping function/resource of workflow {}: {}", wf_id.to_string(), &component);
             match component.component_type {
-                ComponentType::Function => match fn_client.stop_function(component.fid.clone()).await {
+                ComponentType::Function => match fn_client.stop(component.fid.clone()).await {
                     Ok(_) => {}
                     Err(err) => {
                         log::error!("Unhandled: {}", err);
@@ -231,7 +231,7 @@ impl Controller {
                         // read from the function annotations.
                         log::warn!("state specifications currently forced to NodeLocal");
                         let response = fn_client
-                            .start_function(edgeless_api::function_instance::SpawnFunctionRequest {
+                            .start(edgeless_api::function_instance::SpawnFunctionRequest {
                                 instance_id: None,
                                 code: function.function_class_specification.clone(),
                                 annotations: function.annotations.clone(),

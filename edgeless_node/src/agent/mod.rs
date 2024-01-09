@@ -230,14 +230,14 @@ pub struct ResourceConfigurationClient {
 
 #[derive(Clone)]
 pub struct AgentClient {
-    function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceNodeAPI>,
+    function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::InstanceId>>,
     node_management_client: Box<dyn edgeless_api::node_managment::NodeManagementAPI>,
     resource_configuration_client:
         Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::function_instance::FunctionInstanceNodeAPI for FunctionInstanceNodeClient {
+impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::InstanceId> for FunctionInstanceNodeClient {
     async fn start(
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
@@ -339,7 +339,9 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 }
 
 impl edgeless_api::agent::AgentAPI for AgentClient {
-    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceNodeAPI> {
+    fn function_instance_api(
+        &mut self,
+    ) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::InstanceId>> {
         self.function_instance_client.clone()
     }
 
