@@ -3,6 +3,7 @@ use super::{function_instance::FunctionInstanceNodeAPIServer, node_management};
 pub struct AgentAPIClient {
     function_instance_client: Box<dyn crate::function_instance::FunctionInstanceNodeAPI>,
     node_management_client: Box<dyn crate::node_managment::NodeManagementAPI>,
+    resource_management_client: Box<dyn crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::instance_id::InstanceId>>,
 }
 
 impl AgentAPIClient {
@@ -18,6 +19,7 @@ impl AgentAPIClient {
                     .await
                     .unwrap(),
             ),
+            resource_management_client: Box::new(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(api_addr, false).await),
         }
     }
 }
@@ -29,6 +31,12 @@ impl crate::agent::AgentAPI for AgentAPIClient {
 
     fn node_management_api(&mut self) -> Box<dyn crate::node_managment::NodeManagementAPI> {
         self.node_management_client.clone()
+    }
+
+    fn resource_configuration_api(
+        &mut self,
+    ) -> Box<dyn crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::instance_id::InstanceId>> {
+        self.resource_management_client.clone()
     }
 }
 
@@ -43,6 +51,10 @@ impl AgentAPIServer {
         let node_management_api = node_management::NodeManagementAPIService {
             node_management_api: tokio::sync::Mutex::new(agent_api.node_management_api()),
         };
+        let resource_configuration_api =
+            crate::grpc_impl::resource_configuration::ResourceConfigurationServerHandler::<edgeless_api_core::instance_id::InstanceId> {
+                root_api: tokio::sync::Mutex::new(agent_api.resource_configuration_api()),
+            };
         Box::pin(async move {
             let function_api = function_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&agent_url) {
@@ -56,6 +68,10 @@ impl AgentAPIServer {
                         )
                         .add_service(
                             crate::grpc_impl::api::node_management_server::NodeManagementServer::new(node_management_api)
+                                .max_decoding_message_size(usize::MAX),
+                        )
+                        .add_service(
+                            crate::grpc_impl::api::resource_configuration_server::ResourceConfigurationServer::new(resource_configuration_api)
                                 .max_decoding_message_size(usize::MAX),
                         )
                         .serve(host)

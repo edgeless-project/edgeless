@@ -7,9 +7,9 @@ pub struct ResponseError {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum StartComponentResponse {
+pub enum StartComponentResponse<InstanceIdType> {
     ResponseError(crate::common::ResponseError),
-    InstanceId(crate::function_instance::InstanceId),
+    InstanceId(InstanceIdType),
 }
 
 #[derive(Debug, Clone, PartialEq)]

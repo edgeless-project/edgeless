@@ -76,7 +76,6 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         format!("http://127.0.0.1:{}", port)
     };
     let controller_url = next_url();
-    let resource_configuration_url = next_url();
 
     // At first generate endpoints for invocation_urls and orc_agent_urls
     let mut node_invocation_urls: HashMap<Uuid, String> = HashMap::new();
@@ -123,10 +122,6 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
             invocation_url: node_invocation_urls.get(node_id).expect("").clone(), // we are sure that it is there
             metrics_url: next_url(),
             orchestrator_url: orc_conf.orchestrator_url.clone(),
-            resource_configuration_url: match first_node {
-                true => resource_configuration_url.clone(),
-                false => "".to_string(),
-            },
             http_ingress_url: match first_node {
                 true => next_url(),
                 false => "".to_string(),

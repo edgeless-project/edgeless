@@ -18,7 +18,12 @@ pub struct CoapInvocationServer {
     root_api: Box<dyn crate::invocation::InvocationAPI>,
 }
 
+#[derive(Clone)]
 pub struct CoapClient {
+    inner: std::sync::Arc<tokio::sync::Mutex<CoapClientInner>>,
+}
+
+struct CoapClientInner {
     sock: tokio::net::UdpSocket,
     endpoint: std::net::SocketAddrV4,
     next_token: u8,
@@ -29,9 +34,11 @@ impl CoapClient {
         let sock = tokio::net::UdpSocket::bind("0.0.0.0:0").await.unwrap();
 
         CoapClient {
-            sock: sock,
-            endpoint: peer,
-            next_token: 0,
+            inner: std::sync::Arc::new(tokio::sync::Mutex::new(CoapClientInner {
+                sock: sock,
+                endpoint: peer,
+                next_token: 0,
+            })),
         }
     }
 }
@@ -52,28 +59,32 @@ impl crate::invocation::InvocationAPI for CoapClient {
             },
         };
 
+        let mut lck = self.inner.lock().await;
+
         let mut buffer = vec![0 as u8; 2000];
 
-        let token = self.next_token;
-        self.next_token = if self.next_token == u8::MAX { 0 } else { self.next_token + 1 };
+        let token = lck.next_token;
+        lck.next_token = if lck.next_token == u8::MAX { 0 } else { lck.next_token + 1 };
 
         let ((packet, addr), _tail) =
-            edgeless_api_core::coap_mapping::COAPEncoder::encode_invocation_event(self.endpoint, encoded_event, token, &mut buffer[..]);
-        self.sock.send_to(&packet, addr).await.unwrap();
+            edgeless_api_core::coap_mapping::COAPEncoder::encode_invocation_event(lck.endpoint, encoded_event, token, &mut buffer[..]);
+        lck.sock.send_to(&packet, addr).await.unwrap();
         Ok(crate::invocation::LinkProcessingResult::FINAL)
     }
 }
 
 #[async_trait::async_trait]
-impl crate::resource_configuration::ResourceConfigurationAPI for CoapClient {
+impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::instance_id::InstanceId> for CoapClient {
     async fn start(
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<crate::common::StartComponentResponse> {
+    ) -> anyhow::Result<crate::common::StartComponentResponse<edgeless_api_core::instance_id::InstanceId>> {
         let mut outputs: [Option<(&str, edgeless_api_core::instance_id::InstanceId)>; 16] = [None; 16];
         let mut outputs_i: usize = 0;
         let mut configuration: [Option<(&str, &str)>; 16] = [None; 16];
         let mut configuration_i: usize = 0;
+
+        let mut lck = self.inner.lock().await;
 
         for (key, val) in &instance_specification.output_mapping {
             outputs[outputs_i] = Some((key, val.clone()));
@@ -86,27 +97,27 @@ impl crate::resource_configuration::ResourceConfigurationAPI for CoapClient {
         }
 
         let encoded_resource_spec = edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification {
-            provider_id: &instance_specification.provider_id,
+            class_type: &instance_specification.class_type,
             output_mapping: outputs,
             configuration: configuration,
         };
 
         let mut buffer = vec![0 as u8; 5000];
 
-        let token = self.next_token;
-        self.next_token = self.next_token + 1;
+        let token = lck.next_token;
+        lck.next_token = lck.next_token + 1;
 
         loop {
             let ((packet, addr), _tail) = edgeless_api_core::coap_mapping::COAPEncoder::encode_start_resource(
-                self.endpoint,
+                lck.endpoint,
                 encoded_resource_spec.clone(),
                 token,
                 &mut buffer[..],
             );
-            self.sock.send_to(&packet, addr).await.unwrap();
+            lck.sock.send_to(&packet, addr).await.unwrap();
 
-            let (size, sender) = self.sock.recv_from(&mut buffer).await.unwrap();
-            if sender != std::net::SocketAddr::V4(self.endpoint) {
+            let (size, sender) = lck.sock.recv_from(&mut buffer).await.unwrap();
+            if sender != std::net::SocketAddr::V4(lck.endpoint) {
                 continue;
             }
             let (res, response_token) = edgeless_api_core::coap_mapping::CoapDecoder::decode(&buffer[..size]).unwrap();
@@ -136,15 +147,17 @@ impl crate::resource_configuration::ResourceConfigurationAPI for CoapClient {
     async fn stop(&mut self, resource_id: crate::function_instance::InstanceId) -> anyhow::Result<()> {
         let mut buffer = vec![0 as u8; 5000];
 
-        let token = self.next_token;
-        self.next_token = self.next_token + 1;
+        let mut lck = self.inner.lock().await;
+
+        let token = lck.next_token;
+        lck.next_token = lck.next_token + 1;
         loop {
             let ((packet, addr), _tail) =
-                edgeless_api_core::coap_mapping::COAPEncoder::encode_stop_resource(self.endpoint, resource_id, token, &mut buffer[..]);
-            self.sock.send_to(&packet, addr).await.unwrap();
+                edgeless_api_core::coap_mapping::COAPEncoder::encode_stop_resource(lck.endpoint, resource_id, token, &mut buffer[..]);
+            lck.sock.send_to(&packet, addr).await.unwrap();
 
-            let (size, sender) = self.sock.recv_from(&mut buffer).await.unwrap();
-            if sender != std::net::SocketAddr::V4(self.endpoint) {
+            let (size, sender) = lck.sock.recv_from(&mut buffer).await.unwrap();
+            if sender != std::net::SocketAddr::V4(lck.endpoint) {
                 continue;
             }
             let (res, response_token) = edgeless_api_core::coap_mapping::CoapDecoder::decode(&buffer[..size]).unwrap();

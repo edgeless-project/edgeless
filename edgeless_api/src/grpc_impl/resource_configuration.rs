@@ -1,4 +1,4 @@
-use super::common::CommonConverters;
+use super::common::{CommonConverters, ParseableId, SerializeableId};
 
 pub struct ResourceConfigurationConverters {}
 
@@ -7,7 +7,7 @@ impl ResourceConfigurationConverters {
         api_spec: &crate::grpc_impl::api::ResourceInstanceSpecification,
     ) -> anyhow::Result<crate::resource_configuration::ResourceInstanceSpecification> {
         Ok(crate::resource_configuration::ResourceInstanceSpecification {
-            provider_id: api_spec.provider_id.clone(),
+            class_type: api_spec.resource_class_type.clone(),
             configuration: api_spec.configuration.clone(),
             output_mapping: api_spec
                 .output_mapping
@@ -27,7 +27,7 @@ impl ResourceConfigurationConverters {
         crate_spec: &crate::resource_configuration::ResourceInstanceSpecification,
     ) -> crate::grpc_impl::api::ResourceInstanceSpecification {
         crate::grpc_impl::api::ResourceInstanceSpecification {
-            provider_id: crate_spec.provider_id.clone(),
+            resource_class_type: crate_spec.class_type.clone(),
             configuration: crate_spec.configuration.clone(),
             output_mapping: crate_spec
                 .output_mapping
@@ -38,21 +38,29 @@ impl ResourceConfigurationConverters {
     }
 }
 
-pub struct ResourceConfigurationClient {
+#[derive(Clone)]
+pub struct ResourceConfigurationClient<ResourceIdType> {
     client: Option<crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient<tonic::transport::Channel>>,
+    _phantom: std::marker::PhantomData<ResourceIdType>,
 }
 
-impl ResourceConfigurationClient {
+impl<ResourceIdType> ResourceConfigurationClient<ResourceIdType> {
     pub async fn new(server_addr: &str, no_retry: bool) -> Self {
         loop {
             match crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    return Self { client: Some(client) };
+                    return Self {
+                        client: Some(client),
+                        _phantom: std::marker::PhantomData {},
+                    };
                 }
                 Err(_) => {
                     if no_retry {
-                        return Self { client: None };
+                        return Self {
+                            client: None,
+                            _phantom: std::marker::PhantomData {},
+                        };
                     }
                     log::warn!("could not connect to {:?}, retrying", server_addr);
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -63,11 +71,15 @@ impl ResourceConfigurationClient {
 }
 
 #[async_trait::async_trait]
-impl crate::resource_configuration::ResourceConfigurationAPI for ResourceConfigurationClient {
+impl<ResourceIdType: SerializeableId + Clone + Send + Sync + 'static> crate::resource_configuration::ResourceConfigurationAPI<ResourceIdType>
+    for ResourceConfigurationClient<ResourceIdType>
+where
+    super::api::InstanceIdVariant: ParseableId<ResourceIdType>,
+{
     async fn start(
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<crate::common::StartComponentResponse> {
+    ) -> anyhow::Result<crate::common::StartComponentResponse<ResourceIdType>> {
         match &mut self.client {
             Some(client) => {
                 let serialized_request = ResourceConfigurationConverters::serialize_resource_instance_specification(&instance_specification);
@@ -82,10 +94,10 @@ impl crate::resource_configuration::ResourceConfigurationAPI for ResourceConfigu
         }
     }
 
-    async fn stop(&mut self, resource_id: crate::function_instance::InstanceId) -> anyhow::Result<()> {
+    async fn stop(&mut self, resource_id: ResourceIdType) -> anyhow::Result<()> {
         match &mut self.client {
             Some(client) => {
-                let encoded_id = CommonConverters::serialize_instance_id(&resource_id);
+                let encoded_id = SerializeableId::serialize(&resource_id);
                 match client.stop(encoded_id).await {
                     Ok(_) => Ok(()),
                     Err(err) => Err(anyhow::anyhow!("Resource stop request failed: {}", err)),
@@ -113,12 +125,17 @@ impl crate::resource_configuration::ResourceConfigurationAPI for ResourceConfigu
     }
 }
 
-pub struct ResourceConfigurationServerHandler {
-    pub root_api: tokio::sync::Mutex<Box<dyn crate::resource_configuration::ResourceConfigurationAPI>>,
+pub struct ResourceConfigurationServerHandler<ResourceIdType> {
+    pub root_api: tokio::sync::Mutex<Box<dyn crate::resource_configuration::ResourceConfigurationAPI<ResourceIdType>>>,
 }
 
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration for ResourceConfigurationServerHandler {
+impl<ResourceIdType: Clone + Send + 'static> crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
+    for ResourceConfigurationServerHandler<ResourceIdType>
+where
+    crate::grpc_impl::api::InstanceIdVariant: crate::grpc_impl::common::ParseableId<ResourceIdType>,
+    ResourceIdType: crate::grpc_impl::common::SerializeableId,
+{
     async fn start(
         &self,
         request: tonic::Request<crate::grpc_impl::api::ResourceInstanceSpecification>,
@@ -151,9 +168,9 @@ impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
         }
     }
 
-    async fn stop(&self, request: tonic::Request<crate::grpc_impl::api::InstanceId>) -> tonic::Result<tonic::Response<()>> {
-        let inner = request.into_inner();
-        let parsed_id = match CommonConverters::parse_instance_id(&inner) {
+    async fn stop(&self, request: tonic::Request<crate::grpc_impl::api::InstanceIdVariant>) -> tonic::Result<tonic::Response<()>> {
+        let inner: super::api::InstanceIdVariant = request.into_inner();
+        let parsed_id = match crate::grpc_impl::common::ParseableId::<ResourceIdType>::parse(&inner) {
             Ok(val) => val,
             Err(err) => {
                 return Err(tonic::Status::invalid_argument(format!("Error when deleting a resource: {}", err)));
@@ -177,43 +194,5 @@ impl crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
             Ok(_) => Ok(tonic::Response::new(())),
             Err(err) => Err(tonic::Status::internal(format!("Error when patching a resource: {}", err))),
         }
-    }
-}
-
-pub struct ResourceConfigurationServer {}
-
-impl ResourceConfigurationServer {
-    pub fn run(
-        root_api: Box<dyn crate::resource_configuration::ResourceConfigurationAPI>,
-        resource_configuration_url: String,
-    ) -> futures::future::BoxFuture<'static, ()> {
-        let function_api = crate::grpc_impl::resource_configuration::ResourceConfigurationServerHandler {
-            root_api: tokio::sync::Mutex::new(root_api),
-        };
-        Box::pin(async move {
-            let function_api = function_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&resource_configuration_url) {
-                if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start ResourceConfiguration GRPC Server at {}", resource_configuration_url);
-                    match tonic::transport::Server::builder()
-                        .add_service(
-                            crate::grpc_impl::api::resource_configuration_server::ResourceConfigurationServer::new(function_api)
-                                .max_decoding_message_size(usize::MAX),
-                        )
-                        .serve(host)
-                        .await
-                    {
-                        Ok(_) => {
-                            log::debug!("Clean Exit");
-                        }
-                        Err(_) => {
-                            log::error!("GRPC ResourceConfiguration Failure");
-                        }
-                    }
-                }
-            }
-
-            log::info!("Stop ResourceConfiguration GRPC Server");
-        })
     }
 }

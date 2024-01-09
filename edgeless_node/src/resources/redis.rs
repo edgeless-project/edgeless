@@ -2,7 +2,12 @@ use edgeless_dataplane::core::Message;
 extern crate redis;
 use redis::Commands;
 
+#[derive(Clone)]
 pub struct RedisResourceProvider {
+    inner: std::sync::Arc<tokio::sync::Mutex<RedisResourceProviderInner>>,
+}
+
+pub struct RedisResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, RedisResource>,
@@ -69,29 +74,32 @@ impl RedisResourceProvider {
         resource_provider_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {
-            resource_provider_id,
-            dataplane_provider,
-            instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, RedisResource>::new(),
+            inner: std::sync::Arc::new(tokio::sync::Mutex::new(RedisResourceProviderInner {
+                resource_provider_id,
+                dataplane_provider,
+                instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, RedisResource>::new(),
+            })),
         }
     }
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI for RedisResourceProvider {
+impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for RedisResourceProvider {
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
         if let (Some(url), Some(key)) = (
             instance_specification.configuration.get("url"),
             instance_specification.configuration.get("key"),
         ) {
-            let new_id = edgeless_api::function_instance::InstanceId::new(self.resource_provider_id.node_id);
-            let dataplane_handle = self.dataplane_provider.get_handle_for(new_id.clone()).await;
+            let mut lck = self.inner.lock().await;
+            let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
+            let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
 
             match RedisResource::new(dataplane_handle, url, key).await {
                 Ok(resource) => {
-                    self.instances.insert(new_id.clone(), resource);
+                    lck.instances.insert(new_id.clone(), resource);
                     return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
                 }
                 Err(err) => {
@@ -114,7 +122,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI for RedisRes
     }
 
     async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-        self.instances.remove(&resource_id);
+        self.inner.lock().await.instances.remove(&resource_id);
         Ok(())
     }
 
