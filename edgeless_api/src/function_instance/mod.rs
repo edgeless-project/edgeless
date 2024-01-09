@@ -33,56 +33,33 @@ pub struct SpawnFunctionRequest {
 }
 
 #[async_trait::async_trait]
-pub trait FunctionInstanceOrcAPI: FunctionInstanceOrcAPIClone + Sync + Send {
-    async fn start_function(
-        &mut self,
-        spawn_request: SpawnFunctionRequest,
-    ) -> anyhow::Result<crate::common::StartComponentResponse<super::orc::DomainManagedInstanceId>>;
-    async fn stop_function(&mut self, id: super::orc::DomainManagedInstanceId) -> anyhow::Result<()>;
-    async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()>;
-}
-
-#[async_trait::async_trait]
-pub trait FunctionInstanceNodeAPI: FunctionInstanceNodeAPIClone + Sync + Send {
-    async fn start(
-        &mut self,
-        spawn_request: SpawnFunctionRequest,
-    ) -> anyhow::Result<crate::common::StartComponentResponse<edgeless_api_core::instance_id::InstanceId>>;
-    async fn stop(&mut self, id: InstanceId) -> anyhow::Result<()>;
+pub trait FunctionInstanceAPI<FunctionIdType: Clone>: FunctionInstanceAPIClone<FunctionIdType> + Sync + Send {
+    async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse<FunctionIdType>>;
+    async fn stop(&mut self, id: FunctionIdType) -> anyhow::Result<()>;
     async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()>;
 }
 
 // https://stackoverflow.com/a/30353928
-pub trait FunctionInstanceOrcAPIClone {
-    fn clone_box(&self) -> Box<dyn FunctionInstanceOrcAPI>;
+pub trait FunctionInstanceAPIClone<FunctionIdType: Clone> {
+    fn clone_box(&self) -> Box<dyn FunctionInstanceAPI<FunctionIdType>>;
 }
-impl<T> FunctionInstanceOrcAPIClone for T
+impl<T, FunctionIdType: Clone> FunctionInstanceAPIClone<FunctionIdType> for T
 where
-    T: 'static + FunctionInstanceOrcAPI + Clone,
+    T: 'static + FunctionInstanceAPI<FunctionIdType> + Clone,
 {
-    fn clone_box(&self) -> Box<dyn FunctionInstanceOrcAPI> {
+    fn clone_box(&self) -> Box<dyn FunctionInstanceAPI<FunctionIdType>> {
         Box::new(self.clone())
     }
 }
-impl Clone for Box<dyn FunctionInstanceOrcAPI> {
-    fn clone(&self) -> Box<dyn FunctionInstanceOrcAPI> {
+
+impl Clone for Box<dyn FunctionInstanceAPI<crate::function_instance::InstanceId>> {
+    fn clone(&self) -> Box<dyn FunctionInstanceAPI<crate::function_instance::InstanceId>> {
         self.clone_box()
     }
 }
 
-pub trait FunctionInstanceNodeAPIClone {
-    fn clone_box(&self) -> Box<dyn FunctionInstanceNodeAPI>;
-}
-impl<T> FunctionInstanceNodeAPIClone for T
-where
-    T: 'static + FunctionInstanceNodeAPI + Clone,
-{
-    fn clone_box(&self) -> Box<dyn FunctionInstanceNodeAPI> {
-        Box::new(self.clone())
-    }
-}
-impl Clone for Box<dyn FunctionInstanceNodeAPI> {
-    fn clone(&self) -> Box<dyn FunctionInstanceNodeAPI> {
+impl Clone for Box<dyn FunctionInstanceAPI<crate::orc::DomainManagedInstanceId>> {
+    fn clone(&self) -> Box<dyn FunctionInstanceAPI<crate::orc::DomainManagedInstanceId>> {
         self.clone_box()
     }
 }
