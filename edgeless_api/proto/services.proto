@@ -17,19 +17,9 @@ service FunctionInstanceOrc {
     // Input: the identifier of the function instance to tear down. The node
     // idenfier is ignored (recommended to be all zeroes).
     // Output: none.
-    rpc StopFunction (InstanceId) returns (google.protobuf.Empty );
+    rpc StopFunction (DomainManagedInstanceId) returns (google.protobuf.Empty );
 
-    // Start a new resource.
-    // Input: request containing the description of the resource to start.
-    // Output: the function instance identifier assigned, if accepted.
-    // The node identifier is all zeroes.
-    rpc StartResource (StartResourceRequest) returns (StartComponentResponse);
-    
-    // Stop a resource.
-    // Input: the identifier of the resource instance to stop. The node
-    // idenfier is ignored (recommended to be all zeroes).
-    // Output: none.
-    rpc StopResource (InstanceId) returns (google.protobuf.Empty );
+
 
     // Patch functions/resources by updating for a given function/resource the
     // mapping from the channel to a list of functions/resources to which events
@@ -118,7 +108,7 @@ service ResourceConfiguration {
     // Terminate an existing resource.
     // Input: the identifier of the resource to be terminated.
     // Output: none.
-    rpc Stop (InstanceId) returns (google.protobuf.Empty);
+    rpc Stop (InstanceIdVariant) returns (google.protobuf.Empty);
 
     // Patch resources by updating for a given identifier the
     // mapping from the channel to a list of functions/resources to which events

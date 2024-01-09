@@ -1,17 +1,24 @@
 pub struct OrchestratorAPIClient {
     function_instance_client: Box<dyn crate::function_instance::FunctionInstanceOrcAPI>,
     node_registration_client: Box<dyn crate::node_registration::NodeRegistrationAPI>,
+    resource_configuration_client: Box<dyn crate::resource_configuration::ResourceConfigurationAPI<crate::orc::DomainManagedInstanceId>>,
 }
 
 impl OrchestratorAPIClient {
     pub async fn new(api_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
         let function_instance_client = crate::grpc_impl::function_instance::FunctionInstanceOrcAPIClient::new(api_addr, retry_interval).await;
         let node_registration_client = crate::grpc_impl::node_registration::NodeRegistrationClient::new(api_addr, retry_interval).await;
+        // TODO(raphaelhetzel) align this (error handling)
+        let resource_configuration_client: Result<
+            super::resource_configuration::ResourceConfigurationClient<crate::orc::DomainManagedInstanceId>,
+            anyhow::Error,
+        > = Ok(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(api_addr, false).await);
 
-        match (function_instance_client, node_registration_client) {
-            (Ok(function_instance_client), Ok(node_registration_client)) => Ok(Self {
+        match (function_instance_client, node_registration_client, resource_configuration_client) {
+            (Ok(function_instance_client), Ok(node_registration_client), Ok(resource_configuration_client)) => Ok(Self {
                 function_instance_client: Box::new(function_instance_client),
                 node_registration_client: Box::new(node_registration_client),
+                resource_configuration_client: Box::new(resource_configuration_client),
             }),
             _ => Err(anyhow::anyhow!("One of the orc connections failed")),
         }
@@ -26,6 +33,12 @@ impl crate::orc::OrchestratorAPI for OrchestratorAPIClient {
     fn node_registration_api(&mut self) -> Box<dyn crate::node_registration::NodeRegistrationAPI> {
         self.node_registration_client.clone()
     }
+
+    fn resource_configuration_api(
+        &mut self,
+    ) -> Box<dyn crate::resource_configuration::ResourceConfigurationAPI<crate::orc::DomainManagedInstanceId>> {
+        self.resource_configuration_client.clone()
+    }
 }
 
 pub struct OrchestratorAPIServer {}
@@ -39,6 +52,9 @@ impl OrchestratorAPIServer {
         let node_registration_api = crate::grpc_impl::node_registration::NodeRegistrationAPIService {
             node_registration_api: tokio::sync::Mutex::new(agent_api.node_registration_api()),
         };
+        let resource_configuration_api = crate::grpc_impl::resource_configuration::ResourceConfigurationServerHandler::<crate::orc::DomainManagedInstanceId> {
+            root_api: tokio::sync::Mutex::new(agent_api.resource_configuration_api()),
+        };
         Box::pin(async move {
             let function_api = function_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&orchestrator_url) {
@@ -51,6 +67,10 @@ impl OrchestratorAPIServer {
                         )
                         .add_service(
                             crate::grpc_impl::api::node_registration_server::NodeRegistrationServer::new(node_registration_api)
+                                .max_decoding_message_size(usize::MAX),
+                        )
+                        .add_service(
+                            crate::grpc_impl::api::resource_configuration_server::ResourceConfigurationServer::new(resource_configuration_api)
                                 .max_decoding_message_size(usize::MAX),
                         )
                         .serve(host)

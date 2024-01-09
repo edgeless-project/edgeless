@@ -164,16 +164,10 @@ fn parse_resource_provider_specification(
             "Ill-formed ResourceProviderSpecification message: class_type cannot be empty"
         ));
     }
-    if api_spec.configuration_url.is_empty() {
-        return Err(anyhow::anyhow!(
-            "Ill-formed ResourceProviderSpecification message: configuration_url cannot be empty"
-        ));
-    }
     Ok(crate::node_registration::ResourceProviderSpecification {
         provider_id: api_spec.provider_id.clone(),
         class_type: api_spec.class_type.clone(),
         outputs: api_spec.outputs.clone(),
-        configuration_url: api_spec.configuration_url.clone(),
     })
 }
 
@@ -184,7 +178,6 @@ fn serialize_resource_provider_specification(
         provider_id: crate_spec.provider_id.clone(),
         class_type: crate_spec.class_type.clone(),
         outputs: crate_spec.outputs.clone(),
-        configuration_url: crate_spec.configuration_url.clone(),
     }
 }
 
@@ -206,7 +199,6 @@ mod test {
                     provider_id: "provider-1".to_string(),
                     class_type: "class-type-1".to_string(),
                     outputs: vec!["out1".to_string(), "out2".to_string()],
-                    configuration_url: "http://127.0.0.1:10002".to_string(),
                 }],
             ),
             UpdateNodeRequest::Registration(

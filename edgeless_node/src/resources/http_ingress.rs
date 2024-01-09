@@ -13,6 +13,7 @@ struct IngressState {
     dataplane: edgeless_dataplane::handle::DataplaneHandle,
 }
 
+#[derive(Clone)]
 struct IngressService {
     listen_addr: String,
     interests: std::sync::Arc<tokio::sync::Mutex<IngressState>>,
@@ -102,7 +103,7 @@ pub async fn ingress_task(
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     ingress_id: edgeless_api::function_instance::InstanceId,
     ingress_url: String,
-) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI> {
+) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>> {
     let mut provider = dataplane_provider;
     let (_, host, port) = edgeless_api::util::parse_http_host(&ingress_url).unwrap();
     let addr = std::net::SocketAddr::from((std::net::IpAddr::from_str(&host).unwrap(), port));
@@ -154,17 +155,18 @@ pub async fn ingress_task(
     })
 }
 
+#[derive(Clone)]
 struct IngressResource {
     own_node_id: uuid::Uuid,
     configuration_state: std::sync::Arc<tokio::sync::Mutex<IngressState>>,
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI for IngressResource {
+impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for IngressResource {
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
         let mut lck = self.configuration_state.lock().await;
         if let (Some(host), Some(methods)) = (
             instance_specification.configuration.get("host"),

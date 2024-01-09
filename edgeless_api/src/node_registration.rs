@@ -3,7 +3,6 @@ pub struct ResourceProviderSpecification {
     pub provider_id: String,
     pub class_type: String,
     pub outputs: Vec<String>,
-    pub configuration_url: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -33,11 +32,10 @@ impl std::fmt::Display for ResourceProviderSpecification {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "provider_id {}, class_type {}, outputs [{}], configuration_url {}",
+            "provider_id {}, class_type {}, outputs [{}]",
             self.provider_id,
             self.class_type,
             self.outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
-            self.configuration_url
         )
     }
 }
