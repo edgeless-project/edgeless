@@ -82,14 +82,14 @@ impl std::fmt::Display for ResourceProvider {
 }
 
 pub struct OrchestratorClient {
-    function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI>,
+    function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId>>,
     node_registration_client: Box<dyn edgeless_api::node_registration::NodeRegistrationAPI>,
     resource_configuration_client:
         Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId>>,
 }
 
 impl edgeless_api::orc::OrchestratorAPI for OrchestratorClient {
-    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI> {
+    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId>> {
         self.function_instance_client.clone()
     }
 
@@ -677,8 +677,8 @@ impl Orchestrator {
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::function_instance::FunctionInstanceOrcAPI for OrchestratorFunctionInstanceOrcClient {
-    async fn start_function(
+impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId> for OrchestratorFunctionInstanceOrcClient {
+    async fn start(
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
@@ -701,7 +701,7 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for OrchestratorFun
         }
     }
 
-    async fn stop_function(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
+    async fn stop(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
         log::debug!("FunctionInstance::StopFunction() {:?}", id);
         match self.sender.send(OrchestratorRequest::STOPFUNCTION(id)).await {
             Ok(_) => Ok(()),
