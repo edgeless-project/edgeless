@@ -5,33 +5,8 @@ import "messages.proto";
 
 package edgeless_api;
 
-// API exposed by the e-ORC to manage the lifecycle of function instances (s07).
-service FunctionInstanceOrc {
-    // Start a new function instance.
-    // Input: request containing the description of the function to create.
-    // Output: the function instance identifier assigned, if accepted.
-    // The node identifier is all zeroes.
-    rpc StartFunction (SpawnFunctionRequest) returns (StartComponentResponse);
-    
-    // Stop a running function instance.
-    // Input: the identifier of the function instance to tear down. The node
-    // idenfier is ignored (recommended to be all zeroes).
-    // Output: none.
-    rpc StopFunction (DomainManagedInstanceId) returns (google.protobuf.Empty );
-
-
-
-    // Patch functions/resources by updating for a given function/resource the
-    // mapping from the channel to a list of functions/resources to which events
-    // should be directed. The node identifies are ignored and should be
-    // set to all zeroes.
-    // Input: the update mapping.
-    // Output: none.
-    rpc Patch (PatchRequest) returns (google.protobuf.Empty);
-}
-
-// API exposed by the nodes to manage the lifecycle of function instances (s07).
-service FunctionInstanceNode {
+// API exposed by the nodes / orchestrator to manage the lifecycle of function instances (s07).
+service FunctionInstance {
     // Start a new function instance.
     // Input: request containing the description of the function to create.
     // Output: the function instance identifier assigned, if accepted.
@@ -40,7 +15,7 @@ service FunctionInstanceNode {
     // Stop a running function instance.
     // Input: the identifier of the function instance to tear down.
     // Output: none.
-    rpc Stop (InstanceId) returns (google.protobuf.Empty );
+    rpc Stop (InstanceIdVariant) returns (google.protobuf.Empty );
 
     // Patch functions by updating for a given function identifier the
     // mapping from the channel to a list of functions/resources to which events
