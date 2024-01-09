@@ -36,6 +36,9 @@ impl OrchestratorAPIServer {
         let function_api = crate::grpc_impl::function_instance::FunctionInstanceOrcAPIServer {
             root_api: tokio::sync::Mutex::new(agent_api.function_instance_api()),
         };
+        let node_registration_api = crate::grpc_impl::node_registration::NodeRegistrationAPIService {
+            node_registration_api: tokio::sync::Mutex::new(agent_api.node_registration_api()),
+        };
         Box::pin(async move {
             let function_api = function_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&orchestrator_url) {
@@ -44,6 +47,10 @@ impl OrchestratorAPIServer {
                     match tonic::transport::Server::builder()
                         .add_service(
                             crate::grpc_impl::api::function_instance_orc_server::FunctionInstanceOrcServer::new(function_api)
+                                .max_decoding_message_size(usize::MAX),
+                        )
+                        .add_service(
+                            crate::grpc_impl::api::node_registration_server::NodeRegistrationServer::new(node_registration_api)
                                 .max_decoding_message_size(usize::MAX),
                         )
                         .serve(host)
