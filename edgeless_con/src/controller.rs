@@ -133,28 +133,17 @@ impl Controller {
                 Some(val) => val,
             };
             let mut fn_client = orc_api.function_instance_api();
+            let mut resource_client = orc_api.resource_configuration_api();
 
             log::debug!("stopping function/resource of workflow {}: {}", wf_id.to_string(), &component);
             match component.component_type {
-                ComponentType::Function => match fn_client
-                    .stop_function(InstanceId {
-                        node_id: uuid::Uuid::nil(),
-                        function_id: component.fid.clone(),
-                    })
-                    .await
-                {
+                ComponentType::Function => match fn_client.stop_function(component.fid.clone()).await {
                     Ok(_) => {}
                     Err(err) => {
                         log::error!("Unhandled: {}", err);
                     }
                 },
-                ComponentType::Resource => match fn_client
-                    .stop_resource(InstanceId {
-                        node_id: uuid::Uuid::nil(),
-                        function_id: component.fid.clone(),
-                    })
-                    .await
-                {
+                ComponentType::Resource => match resource_client.stop(component.fid.clone()).await {
                     Ok(_) => {}
                     Err(err) => {
                         log::error!("Unhandled: {}", err);
@@ -196,6 +185,8 @@ impl Controller {
         // which can then be used to start / stop / update functions on nodes in
         // its orchestration domain.
         let mut fn_client = orc_entry.1.function_instance_api();
+
+        let mut resource_client = orc_entry.1.resource_configuration_api();
 
         // This contains the set of active workflows.
         let mut active_workflows = std::collections::HashMap::new();
@@ -258,12 +249,7 @@ impl Controller {
                                     res = Err(format!("function instance creation rejected: {} ", error));
                                 }
                                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                                    log::info!(
-                                        "workflow {} function {} started with fid {}",
-                                        wf_id.to_string(),
-                                        function.name,
-                                        &id.function_id
-                                    );
+                                    log::info!("workflow {} function {} started with fid {}", wf_id.to_string(), function.name, &id);
                                     // id.node_id is unused
                                     workflow_function_mapping.push(edgeless_api::workflow_instance::WorkflowFunctionMapping {
                                         name: function.name.clone(),
@@ -273,7 +259,7 @@ impl Controller {
                                         component_type: ComponentType::Function,
                                         name: function.name.clone(),
                                         domain_id: orc_domain.clone(),
-                                        fid: id.function_id.clone(),
+                                        fid: id.clone(),
                                     });
                                 }
                             },
@@ -288,10 +274,11 @@ impl Controller {
                         if res.is_err() {
                             break;
                         }
-                        let response = fn_client
-                            .start_resource(edgeless_api::function_instance::StartResourceRequest {
+                        let response = resource_client
+                            .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
                                 class_type: resource.class_type.clone(),
-                                configurations: resource.configurations.clone(),
+                                configuration: resource.configurations.clone(),
+                                output_mapping: std::collections::HashMap::new(),
                             })
                             .await;
 
@@ -302,12 +289,7 @@ impl Controller {
                                     res = Err(format!("resource start rejected: {} ", error));
                                 }
                                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                                    log::info!(
-                                        "workflow {} resource {} started with fid {}",
-                                        wf_id.to_string(),
-                                        resource.name,
-                                        &id.function_id
-                                    );
+                                    log::info!("workflow {} resource {} started with fid {}", wf_id.to_string(), resource.name, &id);
                                     // id.node_id is unused
                                     workflow_function_mapping.push(edgeless_api::workflow_instance::WorkflowFunctionMapping {
                                         name: resource.name.clone(),
@@ -317,7 +299,7 @@ impl Controller {
                                         component_type: ComponentType::Resource,
                                         name: resource.name.clone(),
                                         domain_id: orc_domain.clone(),
-                                        fid: id.function_id.clone(),
+                                        fid: id.clone(),
                                     });
                                 }
                             },

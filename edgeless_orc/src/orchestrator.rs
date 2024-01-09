@@ -1,5 +1,5 @@
 use edgeless_api::common::{PatchRequest, StartComponentResponse};
-use edgeless_api::function_instance::{ComponentId, InstanceId, SpawnFunctionRequest, StartResourceRequest};
+use edgeless_api::function_instance::{ComponentId, InstanceId, SpawnFunctionRequest};
 use edgeless_api::node_managment::UpdatePeersRequest;
 use edgeless_api::resource_configuration::ResourceInstanceSpecification;
 use futures::{Future, SinkExt, StreamExt};
@@ -14,14 +14,14 @@ pub struct Orchestrator {
 enum OrchestratorRequest {
     STARTFUNCTION(
         edgeless_api::function_instance::SpawnFunctionRequest,
-        tokio::sync::oneshot::Sender<anyhow::Result<StartComponentResponse>>,
+        tokio::sync::oneshot::Sender<anyhow::Result<StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>>,
     ),
-    STOPFUNCTION(edgeless_api::function_instance::InstanceId),
+    STOPFUNCTION(edgeless_api::orc::DomainManagedInstanceId),
     STARTRESOURCE(
-        edgeless_api::function_instance::StartResourceRequest,
-        tokio::sync::oneshot::Sender<anyhow::Result<StartComponentResponse>>,
+        edgeless_api::resource_configuration::ResourceInstanceSpecification,
+        tokio::sync::oneshot::Sender<anyhow::Result<StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>>,
     ),
-    STOPRESOURCE(edgeless_api::function_instance::InstanceId),
+    STOPRESOURCE(edgeless_api::orc::DomainManagedInstanceId),
     PATCH(edgeless_api::common::PatchRequest),
     UPDATENODE(
         edgeless_api::node_registration::UpdateNodeRequest,
@@ -34,7 +34,6 @@ struct ResourceProvider {
     class_type: String,
     node_id: edgeless_api::function_instance::NodeId,
     outputs: Vec<String>,
-    config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send>,
 }
 
 #[derive(Clone)]
@@ -46,7 +45,7 @@ enum ActiveInstance {
     // 0: request
     // 1: node_id, int_fid
     // 2: provider_id
-    Resource(StartResourceRequest, InstanceId, String),
+    Resource(ResourceInstanceSpecification, InstanceId),
 }
 
 impl std::fmt::Display for ActiveInstance {
@@ -61,10 +60,10 @@ impl std::fmt::Display for ActiveInstance {
                     .collect::<Vec<String>>()
                     .join(",")
             ),
-            ActiveInstance::Resource(req, instance_id, provider_id) => write!(
+            ActiveInstance::Resource(req, instance_id) => write!(
                 f,
-                "resource provider_id {}, class type {}, node_id {}, function_id {}",
-                provider_id, req.class_type, instance_id.node_id, instance_id.function_id
+                "resource class type {}, node_id {}, function_id {}",
+                req.class_type, instance_id.node_id, instance_id.function_id
             ),
         }
     }
@@ -85,6 +84,8 @@ impl std::fmt::Display for ResourceProvider {
 pub struct OrchestratorClient {
     function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceOrcAPI>,
     node_registration_client: Box<dyn edgeless_api::node_registration::NodeRegistrationAPI>,
+    resource_configuration_client:
+        Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId>>,
 }
 
 impl edgeless_api::orc::OrchestratorAPI for OrchestratorClient {
@@ -95,6 +96,12 @@ impl edgeless_api::orc::OrchestratorAPI for OrchestratorClient {
     fn node_registration_api(&mut self) -> Box<dyn edgeless_api::node_registration::NodeRegistrationAPI> {
         self.node_registration_client.clone()
     }
+
+    fn resource_configuration_api(
+        &mut self,
+    ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId>> {
+        self.resource_configuration_client.clone()
+    }
 }
 
 #[derive(Clone)]
@@ -104,6 +111,11 @@ pub struct OrchestratorFunctionInstanceOrcClient {
 
 #[derive(Clone)]
 pub struct NodeRegistrationClient {
+    sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
+}
+
+#[derive(Clone)]
+pub struct ResourceConfigurationClient {
     sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
 }
 
@@ -119,8 +131,7 @@ enum IntFid {
     // 0: node_id, int_fid
     Function(InstanceId),
     // 0: node_id, int_fid
-    // 1: provider_id
-    Resource(InstanceId, String),
+    Resource(InstanceId),
 }
 
 impl Orchestrator {
@@ -149,14 +160,11 @@ impl Orchestrator {
                         })
                     })
                     .collect(),
-                ActiveInstance::Resource(_req, instance, provider_id) => {
-                    vec![IntFid::Resource(
-                        InstanceId {
-                            node_id: instance.node_id,
-                            function_id: instance.function_id,
-                        },
-                        provider_id.clone(),
-                    )]
+                ActiveInstance::Resource(_req, instance) => {
+                    vec![IntFid::Resource(InstanceId {
+                        node_id: instance.node_id,
+                        function_id: instance.function_id,
+                    })]
                 }
             },
             None => vec![],
@@ -173,7 +181,7 @@ impl Orchestrator {
         let mut clients = HashMap::<uuid::Uuid, ClientDesc>::new();
 
         // known resources providers as notified by nodes upon registration
-        // key: provider_id
+        // key: resource_class_type
         let mut resource_providers = std::collections::HashMap::<String, ResourceProvider>::new();
 
         // instances that the orchestrator promised to keep active
@@ -238,10 +246,7 @@ impl Orchestrator {
                                     id.function_id
                                 );
 
-                                Ok(StartComponentResponse::InstanceId(InstanceId {
-                                    node_id: selected_node_id.clone(),
-                                    function_id: ext_fid.clone(),
-                                }))
+                                Ok(StartComponentResponse::InstanceId(ext_fid.clone()))
                             }
                         },
                         Err(err) => {
@@ -256,7 +261,7 @@ impl Orchestrator {
                 OrchestratorRequest::STOPFUNCTION(instance_id) => {
                     log::debug!("Orchestrator StopFunction {:?}", instance_id);
 
-                    match active_instances.remove(&instance_id.function_id) {
+                    match active_instances.remove(&instance_id) {
                         Some(active_instance) => {
                             match active_instance {
                                 ActiveInstance::Function(_req, instances) => {
@@ -267,34 +272,34 @@ impl Orchestrator {
                                                 Ok(_) => {
                                                     log::info!(
                                                         "Stopped function ext_fid {}, node_id {}, int_fid {}",
-                                                        instance_id.function_id,
+                                                        instance_id,
                                                         instance.node_id,
                                                         instance.function_id
                                                     );
                                                 }
                                                 Err(err) => {
-                                                    log::error!("Unhandled stop function ext_fid {}: {}", instance_id.function_id, err);
+                                                    log::error!("Unhandled stop function ext_fid {}: {}", instance_id, err);
                                                 }
                                             },
                                             None => {
                                                 log::error!(
                                                     "This orchestrator does not manage the node where the function instance is located: {}",
-                                                    instance_id.function_id
+                                                    instance_id
                                                 );
                                             }
                                         }
                                     }
                                 }
-                                ActiveInstance::Resource(_, _, _) => {
+                                ActiveInstance::Resource(_, _) => {
                                     log::error!(
                                         "Request to stop a function but the ext_fid is associated with a resource: ext_fid {}",
-                                        instance_id.function_id
+                                        instance_id
                                     );
                                 }
                             }
                         }
                         None => {
-                            log::error!("Request to stop a function that is not known: ext_fid {}", instance_id.function_id);
+                            log::error!("Request to stop a function that is not known: ext_fid {}", instance_id);
                         }
                     }
                 }
@@ -316,15 +321,17 @@ impl Orchestrator {
 
                     // Select one provider at random.
                     let res = match matching_providers.choose(&mut rng) {
-                        Some(provider_id) => {
-                            match resource_providers.get_mut(provider_id) {
-                                Some(resource_provider) => match resource_provider
-                                    .config_api
+                        Some(class_type) => {
+                            let resource_provider = resource_providers.get_mut(class_type).unwrap();
+                            match clients.get_mut(&resource_provider.node_id) {
+                                Some(client) => match client
+                                    .api
+                                    .resource_configuration_api()
                                     .start(ResourceInstanceSpecification {
-                                        provider_id: provider_id.clone(),
+                                        class_type: class_type.clone(),
                                         // [TODO] Issue #94 remove output mapping
                                         output_mapping: std::collections::HashMap::new(),
-                                        configuration: start_req.configurations,
+                                        configuration: start_req.configuration,
                                     })
                                     .await
                                 {
@@ -340,20 +347,16 @@ impl Orchestrator {
                                                         node_id: resource_provider.node_id.clone(),
                                                         function_id: instance_id.function_id.clone(),
                                                     },
-                                                    provider_id.clone(),
                                                 ),
                                             );
                                             log::info!(
                                                 "Started resource provider_id {}, node_id {}, ext_fid {}, int_fid {}",
-                                                provider_id,
+                                                class_type,
                                                 resource_provider.node_id,
                                                 &ext_fid,
                                                 instance_id.function_id
                                             );
-                                            Ok(StartComponentResponse::InstanceId(InstanceId {
-                                                node_id: uuid::Uuid::nil(),
-                                                function_id: ext_fid,
-                                            }))
+                                            Ok(StartComponentResponse::InstanceId(ext_fid))
                                         }
                                         StartComponentResponse::ResponseError(err) => Ok(StartComponentResponse::ResponseError(err)),
                                     },
@@ -362,9 +365,7 @@ impl Orchestrator {
                                         detail: Some(err.to_string()),
                                     })),
                                 },
-                                None => {
-                                    panic!("the impossible happened: a resource provider just disappeared");
-                                }
+                                None => Err(anyhow::anyhow!("Resource Client Missing")),
                             }
                         }
                         None => Ok(StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
@@ -379,40 +380,35 @@ impl Orchestrator {
                 }
                 OrchestratorRequest::STOPRESOURCE(instance_id) => {
                     log::debug!("Orchestrator StopResource {:?}", instance_id);
-                    match active_instances.remove(&instance_id.function_id) {
+                    match active_instances.remove(&instance_id) {
                         Some(active_instance) => {
                             match active_instance {
                                 ActiveInstance::Function(_, _) => {
                                     log::error!(
                                         "Request to stop a resource but the ext_fid is associated with a function: ext_fid {}",
-                                        instance_id.function_id
+                                        instance_id
                                     );
                                 }
-                                ActiveInstance::Resource(_req, instance, provider_id) => {
+                                ActiveInstance::Resource(_req, instance) => {
                                     // Stop the instance of this resource.
-                                    match resource_providers.get_mut(&provider_id) {
-                                        Some(resource_provider) => {
-                                            assert!(resource_provider.node_id == instance.node_id);
-                                            match resource_provider.config_api.stop(instance).await {
-                                                Ok(_) => {
-                                                    log::info!(
-                                                        "Stopped resource provider_id {}, ext_fid {}, node_id {}, int_fid {}",
-                                                        provider_id,
-                                                        instance_id.function_id,
-                                                        instance.node_id,
-                                                        instance.function_id
-                                                    );
-                                                }
-                                                Err(err) => {
-                                                    log::error!("Unhandled stop resource ext_fid {}: {}", instance_id.function_id, err);
-                                                }
+                                    match clients.get_mut(&instance.node_id) {
+                                        Some(node_client) => match node_client.api.resource_configuration_api().stop(instance).await {
+                                            Ok(_) => {
+                                                log::info!(
+                                                    "Stopped resource, ext_fid {}, node_id {}, int_fid {}",
+                                                    instance_id,
+                                                    instance.node_id,
+                                                    instance.function_id
+                                                );
                                             }
-                                        }
+                                            Err(err) => {
+                                                log::error!("Unhandled stop resource ext_fid {}: {}", instance_id, err);
+                                            }
+                                        },
                                         None => {
                                             log::error!(
-                                                "Request to stop a resource at provider_id {} but the provider does not exist anymore, ext_fid {}",
-                                                provider_id,
-                                                instance_id.function_id
+                                                "Request to stop a resource but the provider does not exist anymore, ext_fid {}",
+                                                instance_id
                                             );
                                         }
                                     }
@@ -420,7 +416,7 @@ impl Orchestrator {
                             }
                         }
                         None => {
-                            log::error!("Request to stop a resource that is not known: ext_fid {}", instance_id.function_id);
+                            log::error!("Request to stop a resource that is not known: ext_fid {}", instance_id);
                         }
                     }
                 }
@@ -441,7 +437,7 @@ impl Orchestrator {
                                 // overwriting the same entry.
                                 let target_instance_id = match target {
                                     IntFid::Function(instance_id) => instance_id,
-                                    IntFid::Resource(instance_id, _) => instance_id,
+                                    IntFid::Resource(instance_id) => instance_id,
                                 };
                                 output_mapping.insert(channel.clone(), target_instance_id);
                             }
@@ -475,9 +471,10 @@ impl Orchestrator {
                                     log::error!("Cannot patch unknown node_id {}", instance_id.node_id);
                                 }
                             },
-                            IntFid::Resource(instance_id, provider_id) => match resource_providers.get_mut(&provider_id) {
+                            IntFid::Resource(instance_id) => match clients.get_mut(&instance_id.node_id) {
                                 Some(client_desc) => match client_desc
-                                    .config_api
+                                    .api
+                                    .resource_configuration_api()
                                     .patch(PatchRequest {
                                         function_id: instance_id.function_id.clone(),
                                         output_mapping,
@@ -485,19 +482,19 @@ impl Orchestrator {
                                     .await
                                 {
                                     Ok(_) => {
-                                        log::info!("Patched provider_id {} int_fid {}", provider_id, instance_id.function_id);
+                                        log::info!("Patched provider node_id {} int_fid {}", instance_id.node_id, instance_id.function_id);
                                     }
                                     Err(err) => {
                                         log::error!(
-                                            "Error when patching provider_id {} int_fid {}: {}",
-                                            provider_id,
+                                            "Error when patching provider node_id {} int_fid {}: {}",
+                                            instance_id.node_id,
                                             instance_id.function_id,
                                             err
                                         );
                                     }
                                 },
                                 None => {
-                                    log::error!("Cannot patch unknown provider_id {}", provider_id);
+                                    log::error!("Cannot patch unknown provider node_id {}", instance_id.node_id);
                                 }
                             },
                         };
@@ -534,23 +531,6 @@ impl Orchestrator {
                                             resource.provider_id
                                         )
                                     } else {
-                                        let (proto, url, port) = edgeless_api::util::parse_http_host(&resource.configuration_url).unwrap();
-                                        let config_api: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI + Send> = match proto {
-                                            edgeless_api::util::Proto::COAP => {
-                                                log::info!("coap called");
-                                                Box::new(
-                                                    edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port))
-                                                        .await,
-                                                )
-                                            }
-                                            _ => Box::new(
-                                                edgeless_api::grpc_impl::resource_configuration::ResourceConfigurationClient::new(
-                                                    &resource.configuration_url,
-                                                    true,
-                                                )
-                                                .await,
-                                            ),
-                                        };
                                         assert!(this_node_id.is_some());
 
                                         resource_providers.insert(
@@ -559,7 +539,6 @@ impl Orchestrator {
                                                 class_type: resource.class_type.clone(),
                                                 node_id: this_node_id.unwrap().clone(),
                                                 outputs: resource.outputs.clone(),
-                                                config_api,
                                             },
                                         );
                                     }
@@ -692,16 +671,21 @@ impl Orchestrator {
         Box::new(OrchestratorClient {
             function_instance_client: Box::new(OrchestratorFunctionInstanceOrcClient { sender: self.sender.clone() }),
             node_registration_client: Box::new(NodeRegistrationClient { sender: self.sender.clone() }),
+            resource_configuration_client: Box::new(ResourceConfigurationClient { sender: self.sender.clone() }),
         })
     }
 }
 
 #[async_trait::async_trait]
 impl edgeless_api::function_instance::FunctionInstanceOrcAPI for OrchestratorFunctionInstanceOrcClient {
-    async fn start_function(&mut self, request: edgeless_api::function_instance::SpawnFunctionRequest) -> anyhow::Result<StartComponentResponse> {
+    async fn start_function(
+        &mut self,
+        request: edgeless_api::function_instance::SpawnFunctionRequest,
+    ) -> anyhow::Result<StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
         log::debug!("FunctionInstance::StartFunction() {:?}", request);
         let request = request;
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<StartComponentResponse>>();
+        let (reply_sender, reply_receiver) =
+            tokio::sync::oneshot::channel::<anyhow::Result<StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>>();
         if let Err(err) = self.sender.send(OrchestratorRequest::STARTFUNCTION(request, reply_sender)).await {
             return Err(anyhow::anyhow!(
                 "Orchestrator channel error when creating a function instance: {}",
@@ -717,45 +701,12 @@ impl edgeless_api::function_instance::FunctionInstanceOrcAPI for OrchestratorFun
         }
     }
 
-    async fn stop_function(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+    async fn stop_function(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
         log::debug!("FunctionInstance::StopFunction() {:?}", id);
         match self.sender.send(OrchestratorRequest::STOPFUNCTION(id)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Orchestrator channel error when stopping a function instance: {}",
-                err.to_string()
-            )),
-        }
-    }
-
-    async fn start_resource(
-        &mut self,
-        request: edgeless_api::function_instance::StartResourceRequest,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse> {
-        log::debug!("FunctionInstance::StartResource() {:?}", request);
-        let request = request;
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::common::StartComponentResponse>>();
-        if let Err(err) = self.sender.send(OrchestratorRequest::STARTRESOURCE(request, reply_sender)).await {
-            return Err(anyhow::anyhow!(
-                "Orchestrator channel error when starting a resource: {}",
-                err.to_string()
-            ));
-        }
-        match reply_receiver.await {
-            Ok(f_id) => f_id,
-            Err(err) => Err(anyhow::anyhow!(
-                "Orchestrator channel error when starting a resource: {}",
-                err.to_string()
-            )),
-        }
-    }
-
-    async fn stop_resource(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-        log::debug!("FunctionInstance::StopResource() {:?}", id);
-        match self.sender.send(OrchestratorRequest::STOPRESOURCE(id)).await {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Orchestrator channel error when stopping a resource: {}",
                 err.to_string()
             )),
         }
@@ -788,6 +739,55 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for NodeRegistrationCl
         match reply_receiver.await {
             Ok(res) => res,
             Err(err) => Err(anyhow::anyhow!("Orchestrator channel error  when updating a node: {}", err.to_string())),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId> for ResourceConfigurationClient {
+    async fn start(
+        &mut self,
+        request: edgeless_api::resource_configuration::ResourceInstanceSpecification,
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
+        log::debug!("FunctionInstance::StartResource() {:?}", request);
+        let request = request;
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
+            anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>,
+        >();
+        if let Err(err) = self.sender.send(OrchestratorRequest::STARTRESOURCE(request, reply_sender)).await {
+            return Err(anyhow::anyhow!(
+                "Orchestrator channel error when starting a resource: {}",
+                err.to_string()
+            ));
+        }
+        match reply_receiver.await {
+            Ok(f_id) => f_id,
+            Err(err) => Err(anyhow::anyhow!(
+                "Orchestrator channel error when starting a resource: {}",
+                err.to_string()
+            )),
+        }
+    }
+
+    async fn stop(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
+        log::debug!("FunctionInstance::StopResource() {:?}", id);
+        match self.sender.send(OrchestratorRequest::STOPRESOURCE(id)).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(
+                "Orchestrator channel error when stopping a resource: {}",
+                err.to_string()
+            )),
+        }
+    }
+
+    async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
+        log::debug!("FunctionInstance::Patch() {:?}", update);
+        match self.sender.send(OrchestratorRequest::PATCH(update)).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(
+                "Orchestrator channel error when updating the links of a function instance: {}",
+                err.to_string()
+            )),
         }
     }
 }

@@ -32,24 +32,22 @@ pub struct SpawnFunctionRequest {
     pub state_specification: StateSpecification,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct StartResourceRequest {
-    pub class_type: String,
-    pub configurations: std::collections::HashMap<String, String>,
-}
-
 #[async_trait::async_trait]
 pub trait FunctionInstanceOrcAPI: FunctionInstanceOrcAPIClone + Sync + Send {
-    async fn start_function(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse>;
-    async fn stop_function(&mut self, id: InstanceId) -> anyhow::Result<()>;
-    async fn start_resource(&mut self, spawn_request: StartResourceRequest) -> anyhow::Result<crate::common::StartComponentResponse>;
-    async fn stop_resource(&mut self, id: InstanceId) -> anyhow::Result<()>;
+    async fn start_function(
+        &mut self,
+        spawn_request: SpawnFunctionRequest,
+    ) -> anyhow::Result<crate::common::StartComponentResponse<super::orc::DomainManagedInstanceId>>;
+    async fn stop_function(&mut self, id: super::orc::DomainManagedInstanceId) -> anyhow::Result<()>;
     async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()>;
 }
 
 #[async_trait::async_trait]
 pub trait FunctionInstanceNodeAPI: FunctionInstanceNodeAPIClone + Sync + Send {
-    async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse>;
+    async fn start(
+        &mut self,
+        spawn_request: SpawnFunctionRequest,
+    ) -> anyhow::Result<crate::common::StartComponentResponse<edgeless_api_core::instance_id::InstanceId>>;
     async fn stop(&mut self, id: InstanceId) -> anyhow::Result<()>;
     async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()>;
 }

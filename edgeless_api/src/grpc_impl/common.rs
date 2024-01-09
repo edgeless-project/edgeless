@@ -1,5 +1,52 @@
 pub struct CommonConverters {}
 
+pub trait ParseableId<IdType> {
+    fn parse(api_id_variant: &Self) -> anyhow::Result<IdType>;
+}
+pub trait SerializeableId {
+    fn serialize(id: &Self) -> crate::grpc_impl::api::InstanceIdVariant;
+}
+
+impl ParseableId<edgeless_api_core::instance_id::InstanceId> for crate::grpc_impl::api::InstanceIdVariant {
+    fn parse(api_id_variant: &Self) -> anyhow::Result<crate::function_instance::InstanceId> {
+        match api_id_variant.clone().instance_id_type.ok_or(anyhow::anyhow!("Missing Id"))? {
+            crate::grpc_impl::api::instance_id_variant::InstanceIdType::InstanceId(instance_id) => CommonConverters::parse_instance_id(&instance_id),
+            _ => Err(anyhow::anyhow!("Wrong Type")),
+        }
+    }
+}
+
+impl ParseableId<crate::orc::DomainManagedInstanceId> for crate::grpc_impl::api::InstanceIdVariant {
+    fn parse(api_id_variant: &Self) -> anyhow::Result<crate::orc::DomainManagedInstanceId> {
+        match api_id_variant.clone().instance_id_type.ok_or(anyhow::anyhow!("Missing Id"))? {
+            crate::grpc_impl::api::instance_id_variant::InstanceIdType::DomainManagedInstanceId(instance_id) => {
+                CommonConverters::parse_domain_managed_instance_id(&instance_id)
+            }
+            _ => Err(anyhow::anyhow!("Wrong Type")),
+        }
+    }
+}
+
+impl SerializeableId for edgeless_api_core::instance_id::InstanceId {
+    fn serialize(id: &Self) -> crate::grpc_impl::api::InstanceIdVariant {
+        crate::grpc_impl::api::InstanceIdVariant {
+            instance_id_type: Some(crate::grpc_impl::api::instance_id_variant::InstanceIdType::InstanceId(
+                CommonConverters::serialize_instance_id(id),
+            )),
+        }
+    }
+}
+
+impl SerializeableId for crate::orc::DomainManagedInstanceId {
+    fn serialize(id: &Self) -> crate::grpc_impl::api::InstanceIdVariant {
+        crate::grpc_impl::api::InstanceIdVariant {
+            instance_id_type: Some(crate::grpc_impl::api::instance_id_variant::InstanceIdType::DomainManagedInstanceId(
+                CommonConverters::serialize_domain_managed_instance_id(id),
+            )),
+        }
+    }
+}
+
 impl CommonConverters {
     pub fn parse_response_error(api_request: &crate::grpc_impl::api::ResponseError) -> anyhow::Result<crate::common::ResponseError> {
         Ok(crate::common::ResponseError {
@@ -15,11 +62,20 @@ impl CommonConverters {
         })
     }
 
-    pub fn parse_start_component_response(
+    pub fn parse_domain_managed_instance_id(
+        api_id: &crate::grpc_impl::api::DomainManagedInstanceId,
+    ) -> anyhow::Result<crate::orc::DomainManagedInstanceId> {
+        Ok(uuid::Uuid::parse_str(&api_id.instance_id)?)
+    }
+
+    pub fn parse_start_component_response<ResourceIdType>(
         api_instance: &crate::grpc_impl::api::StartComponentResponse,
-    ) -> anyhow::Result<crate::common::StartComponentResponse> {
+    ) -> anyhow::Result<crate::common::StartComponentResponse<ResourceIdType>>
+    where
+        super::api::InstanceIdVariant: ParseableId<ResourceIdType>,
+    {
         match api_instance.instance_id.as_ref() {
-            Some(val) => match CommonConverters::parse_instance_id(val) {
+            Some(val) => match ParseableId::<ResourceIdType>::parse(val) {
                 Ok(val) => Ok(crate::common::StartComponentResponse::InstanceId(val)),
                 Err(err) => Err(anyhow::anyhow!(err.to_string())),
             },
@@ -67,7 +123,15 @@ impl CommonConverters {
         }
     }
 
-    pub fn serialize_start_component_response(req: &crate::common::StartComponentResponse) -> crate::grpc_impl::api::StartComponentResponse {
+    pub fn serialize_domain_managed_instance_id(instance_id: &crate::orc::DomainManagedInstanceId) -> crate::grpc_impl::api::DomainManagedInstanceId {
+        crate::grpc_impl::api::DomainManagedInstanceId {
+            instance_id: instance_id.to_string(),
+        }
+    }
+
+    pub fn serialize_start_component_response<ComponentIdType: SerializeableId>(
+        req: &crate::common::StartComponentResponse<ComponentIdType>,
+    ) -> crate::grpc_impl::api::StartComponentResponse {
         match req {
             crate::common::StartComponentResponse::ResponseError(err) => crate::grpc_impl::api::StartComponentResponse {
                 response_error: Some(CommonConverters::serialize_response_error(&err)),
@@ -75,7 +139,7 @@ impl CommonConverters {
             },
             crate::common::StartComponentResponse::InstanceId(id) => crate::grpc_impl::api::StartComponentResponse {
                 response_error: None,
-                instance_id: Some(CommonConverters::serialize_instance_id(&id)),
+                instance_id: Some(SerializeableId::serialize(id)),
             },
         }
     }
