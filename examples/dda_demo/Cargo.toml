@@ -1,0 +1,2 @@
+[workspace]
+members = ["0_move_arm", "1_test_function"]

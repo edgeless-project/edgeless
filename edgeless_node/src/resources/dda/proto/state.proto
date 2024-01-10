@@ -1,0 +1,12 @@
+// SPDX-FileCopyrightText: © 2023 Siemens AG
+// SPDX-License-Identifier: MIT
+
+// Service definition of DDA distributed state management API.
+
+syntax = "proto3";
+
+package dda.state.v1;
+
+option java_package = "io.dda.state.v1";
+option java_multiple_files = true;
+option java_outer_classname = "DdaStateProto";

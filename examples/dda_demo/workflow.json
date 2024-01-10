@@ -1,0 +1,31 @@
+{
+    "functions": [
+        {
+            "name": "move_arm",
+            "class_specification": {
+                "id": "move_arm",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./0_move_arm/move_arm.wasm",
+                "outputs": [
+                    "dda"
+                ]
+            },
+            "output_mapping": {
+                "dda": "dda"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "dda",
+            "class_type": "dda",
+            "output_mapping": {},
+            "configurations": {
+                "sidecar_url": "http://localhost:10000"
+            }
+        }
+    ],
+    "annotations": {}
+}

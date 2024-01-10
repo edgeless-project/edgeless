@@ -1,0 +1,19 @@
+[profile.release]
+lto = true
+opt-level = "s"
+
+[package]
+name = "move_arm"
+version = "0.1.0"
+authors = ["Lukasz Zalewski <zalewski.lukasz@siemens.com>"]
+edition = "2021"
+
+[lib]
+name = "0_dda_arm"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { path = "../../../edgeless_function" }
+edgeless_http = { path = "../../../edgeless_http" }
+log = "0.4"

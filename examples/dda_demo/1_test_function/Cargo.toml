@@ -1,0 +1,19 @@
+[profile.release]
+lto = true
+opt-level = "s"
+
+[package]
+name = "test_function"
+version = "0.1.0"
+authors = ["Lukasz Zalewski <zalewski.lukasz@siemens.com>"]
+edition = "2021"
+
+[lib]
+name = "1_test_function"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { path = "../../../edgeless_function" }
+edgeless_http = { path = "../../../edgeless_http" }
+log = "0.4"

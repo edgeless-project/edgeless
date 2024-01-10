@@ -48,3 +48,9 @@ redis = "*"
 openssl = { version = "0.10", features = ["vendored"] }
 sysinfo = "0.15"
 wasmi = {version = "0.31", default-features = false , optional = true}
+tonic = "0.10.2"
+prost = "0.12"
+base64 = "0.21.5"
+
+[build-dependencies]
+tonic-build = "0.10"
