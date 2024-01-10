@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-License-Identifier: MIT
 // TODO(raphaelhetzel) These should be actual types in the future to allow for type-safety.
 pub type NodeId = uuid::Uuid;
 pub type ComponentId = uuid::Uuid;

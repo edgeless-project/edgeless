@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2024 TUM
+// SPDX-License-Identifier: MIT
 pub mod alias_mapping;
 pub mod function_instance_runner;
 pub mod guest_api;

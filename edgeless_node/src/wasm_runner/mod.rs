@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-License-Identifier: MIT
 /// Generated host-side of the WASM Component Model.
 pub mod wit_binding {
     wasmtime::component::bindgen!({path: "../edgeless_function/wit/edgefunction.wit", async: true});

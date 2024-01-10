@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-License-Identifier: MIT
 pub type DomainManagedInstanceId = uuid::Uuid;
 
 pub trait OrchestratorAPI: Send {

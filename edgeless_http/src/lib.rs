@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-License-Identifier: MIT
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum EdgelessHTTPMethod {
     Get,

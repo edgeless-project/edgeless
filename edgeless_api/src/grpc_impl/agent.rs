@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-License-Identifier: MIT
 pub struct AgentAPIClient {
     function_instance_client: Box<dyn crate::function_instance::FunctionInstanceAPI<edgeless_api_core::instance_id::InstanceId>>,
     node_management_client: Box<dyn crate::node_managment::NodeManagementAPI>,

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-License-Identifier: MIT
 pub mod api {
     wit_bindgen::generate!({world: "edgefunction", macro_export, export_macro_name: "export"});
 }

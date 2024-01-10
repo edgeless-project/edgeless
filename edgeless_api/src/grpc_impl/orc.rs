@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-License-Identifier: MIT
 pub struct OrchestratorAPIClient {
     function_instance_client: Box<dyn crate::function_instance::FunctionInstanceAPI<crate::orc::DomainManagedInstanceId>>,
     node_registration_client: Box<dyn crate::node_registration::NodeRegistrationAPI>,

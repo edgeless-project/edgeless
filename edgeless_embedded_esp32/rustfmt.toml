@@ -1,2 +1,4 @@
+# SPDX-FileCopyrightText: © 2023 TUM
+# SPDX-License-Identifier: MIT
 edition = "2021"
 max_width = 150

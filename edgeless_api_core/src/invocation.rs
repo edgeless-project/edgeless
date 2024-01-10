@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-License-Identifier: MIT
 #[derive(Clone, minicbor::Decode, minicbor::Encode, minicbor::CborLen)]
 pub enum EventData<T> {
     #[n(0)]

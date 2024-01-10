@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-License-Identifier: MIT
 pub struct MockDisplayInstanceConfiguration {}
 
 pub struct MockDisplay {

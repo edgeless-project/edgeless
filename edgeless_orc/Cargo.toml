@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2023 TUM
+# SPDX-FileCopyrightText: © 2023 Siemens AG
+# SPDX-License-Identifier: MIT
 [package]
 name = "edgeless_orc"
 version = "0.1.0"

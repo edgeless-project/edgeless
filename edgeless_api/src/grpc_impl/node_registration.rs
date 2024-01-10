@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2024 TUM
+// SPDX-License-Identifier: MIT
 use std::str::FromStr;
 
 #[derive(Clone)]

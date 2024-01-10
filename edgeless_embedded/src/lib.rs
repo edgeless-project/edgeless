@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-License-Identifier: MIT
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]

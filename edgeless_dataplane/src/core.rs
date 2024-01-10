@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
+// SPDX-License-Identifier: MIT
 pub use edgeless_api::invocation::LinkProcessingResult;
 
 /// Trait that needs to be implemented by each link that is added to a dataplane chain.

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-License-Identifier: MIT
 use alloc::vec;
 use coap_lite::{MessageClass, MessageType, ResponseType};
 

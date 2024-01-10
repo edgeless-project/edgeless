@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
+// SPDX-License-Identifier: MIT
 use edgeless_api::orc::OrchestratorAPI;
 pub mod agent;
 pub mod base_runtime;

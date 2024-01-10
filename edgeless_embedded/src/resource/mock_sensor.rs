@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-License-Identifier: MIT
 pub struct MockSensorInner {
     pub instance_id: Option<edgeless_api_core::instance_id::InstanceId>,
     pub data_out_id: Option<edgeless_api_core::instance_id::InstanceId>,

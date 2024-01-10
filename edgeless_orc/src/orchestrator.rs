@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
+// SPDX-License-Identifier: MIT
 use edgeless_api::common::{PatchRequest, StartComponentResponse};
 use edgeless_api::function_instance::{ComponentId, InstanceId, SpawnFunctionRequest};
 use edgeless_api::node_managment::UpdatePeersRequest;

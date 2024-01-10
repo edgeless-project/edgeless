@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-License-Identifier: MIT
 pub mod epaper_display;
 pub mod mock_display;
 pub mod mock_sensor;

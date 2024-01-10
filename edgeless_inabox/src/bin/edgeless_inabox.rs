@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
+// SPDX-License-Identifier: MIT
 use std::{collections::HashMap, path::Path};
 
 use anyhow::anyhow;

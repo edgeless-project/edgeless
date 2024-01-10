@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-License-Identifier: MIT
 pub struct ControllerAPIClient {
     workflow_instance_client: Box<dyn crate::workflow_instance::WorkflowInstanceAPI>,
 }

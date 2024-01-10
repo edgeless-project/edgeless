@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2024 TUM
+// SPDX-License-Identifier: MIT
 /// Each function instance can import a set of functions that need to be implemented on the host-side.
 /// This provides the generic host-side implementation of these functions.
 /// Those need to be made available to the guest using a virtualization-specific interface/binding.

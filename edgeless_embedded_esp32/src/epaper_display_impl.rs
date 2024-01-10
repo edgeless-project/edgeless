@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-License-Identifier: MIT
 use edgeless_embedded::resource::epaper_display::EPaper;
 use embedded_graphics::prelude::*;
 use epd_waveshare::prelude::WaveshareDisplay;

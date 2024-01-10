@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2024 TUM
+// SPDX-License-Identifier: MIT
 #[derive(Debug, Clone, PartialEq)]
 pub enum UpdatePeersRequest {
     Add(uuid::Uuid, String), // node_id, invocation_url

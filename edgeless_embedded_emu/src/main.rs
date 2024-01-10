@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-License-Identifier: MIT
 #![feature(type_alias_impl_trait)]
 
 use embassy_net::{Ipv4Address, Ipv4Cidr};

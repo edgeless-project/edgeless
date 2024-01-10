@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-License-Identifier: MIT
 #[derive(Clone)]
 pub struct StateManager {
     handlers: std::sync::Arc<tokio::sync::Mutex<StateProviders>>,
