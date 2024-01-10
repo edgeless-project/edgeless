@@ -5,7 +5,10 @@ use edgeless_api::resource_configuration::ResourceInstanceSpecification;
 use futures::{Future, SinkExt, StreamExt};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
+
+#[cfg(test)]
+pub mod test;
 
 pub struct Orchestrator {
     sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
@@ -30,7 +33,7 @@ enum OrchestratorRequest {
     KEEPALIVE(),
 }
 
-struct ResourceProvider {
+pub struct ResourceProvider {
     class_type: String,
     node_id: edgeless_api::function_instance::NodeId,
     outputs: Vec<String>,
@@ -138,7 +141,21 @@ impl Orchestrator {
     pub async fn new(settings: crate::EdgelessOrcSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, settings).await;
+            Self::main_task(receiver, settings, std::collections::HashMap::new(), std::collections::HashMap::new()).await;
+        });
+
+        (Orchestrator { sender }, main_task)
+    }
+
+    #[cfg(test)]
+    pub async fn new_with_clients(
+        settings: crate::EdgelessOrcSettings,
+        clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        resource_providers: std::collections::HashMap<String, ResourceProvider>,
+    ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
+        let (sender, receiver) = futures::channel::mpsc::unbounded();
+        let main_task = Box::pin(async move {
+            Self::main_task(receiver, settings, clients, resource_providers).await;
         });
 
         (Orchestrator { sender }, main_task)
@@ -171,18 +188,41 @@ impl Orchestrator {
         }
     }
 
-    async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>, orchestrator_settings: crate::EdgelessOrcSettings) {
+    async fn main_task(
+        receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>,
+        orchestrator_settings: crate::EdgelessOrcSettings,
+        clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        resource_providers: std::collections::HashMap<String, ResourceProvider>,
+    ) {
         let mut receiver = receiver;
         let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy);
         let mut rng = rand::rngs::StdRng::from_entropy();
 
         // known agents
         // key: node_id
-        let mut clients = HashMap::<uuid::Uuid, ClientDesc>::new();
+        let mut clients = clients;
+        orchestration_logic.update_nodes(clients.keys().cloned().collect());
+        for (node_id, client_desc) in &clients {
+            log::info!(
+                "added function instance client: node_id {}, agent URL {}, invocation URL {}",
+                node_id,
+                client_desc.agent_url,
+                client_desc.invocation_url
+            );
+        }
 
         // known resources providers as notified by nodes upon registration
-        // key: resource_class_type
-        let mut resource_providers = std::collections::HashMap::<String, ResourceProvider>::new();
+        // key: provider_id
+        let mut resource_providers = resource_providers;
+        for (provider, resource_provider) in &resource_providers {
+            log::info!(
+                "added resource: provider {}, class_type {}, node_id {}, outputs [{}]",
+                provider,
+                resource_provider.class_type,
+                resource_provider.node_id,
+                resource_provider.outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+            );
+        }
 
         // instances that the orchestrator promised to keep active
         // key: ext_fid
