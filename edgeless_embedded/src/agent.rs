@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 #[derive(Clone)]
 pub struct EmbeddedAgent {
     own_node_id: edgeless_api_core::instance_id::NodeId,

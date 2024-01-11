@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 use alloc::vec;
 use coap_lite::{MessageClass, MessageType, ResponseType};
 

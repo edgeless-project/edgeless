@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 pub struct SCD30SensorWrapper<Conn: sensor_scd30::base::Base<Err, Delay>, Delay: embedded_hal::delay::DelayUs, Err: core::fmt::Debug> {
     pub sensor: sensor_scd30::Scd30<Conn, Delay, Err>,
 }

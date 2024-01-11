@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 /// Generic function runtime hosting a set of runners of one type (e.g. WASM/Docker)
 /// Split into the active component `RuntimeTask` and the cloneable `RuntimeClient` allowing to interact with the runtime.
 use futures::{SinkExt, StreamExt};

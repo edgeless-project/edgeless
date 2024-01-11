@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 use edgeless_embedded::resource::epaper_display::EPaper;
 use embedded_graphics::prelude::*;
 use epd_waveshare::prelude::WaveshareDisplay;

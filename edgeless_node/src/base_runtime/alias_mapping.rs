@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 /// Struct representing the updatable callbacks/aliases of a function instance.
 /// Shared between a function instance's host and guest.
 #[derive(Clone)]
