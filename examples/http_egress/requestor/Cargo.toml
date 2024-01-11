@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: © 2023 TUM
+# SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 # SPDX-License-Identifier: MIT
 [workspace]
 
@@ -9,7 +9,7 @@ opt-level = "s"
 [package]
 name = "edgeless_sample_http_processor"
 version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de"]
+authors = ["Raphael Hetzel <hetzel@in.Technical University of Munich, Chair of Connected Mobility.de"]
 edition = "2021"
 
 [lib]

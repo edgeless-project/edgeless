@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: © 2024 TUM
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 /// Each function instance can import a set of functions that need to be implemented on the host-side.
 /// This provides the generic host-side implementation of these functions.

@@ -47,7 +47,7 @@ find $1 -type f | while read -r file; do
 
         # if contains Raphael string - keep it on the top
         if [[ $authors =~ "Raphael" ]]; then
-            gsed -i "1i $prefix SPDX-FileCopyrightText: © $date TUM" $file
+            gsed -i "1i $prefix SPDX-FileCopyrightText: © $date Technical University of Munich, Chair of Connected Mobility" $file
         fi
 
     else

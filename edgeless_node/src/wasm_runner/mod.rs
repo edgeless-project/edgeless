@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 /// Generated host-side of the WASM Component Model.
 pub mod wit_binding {

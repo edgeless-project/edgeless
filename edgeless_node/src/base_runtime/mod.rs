@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: © 2024 TUM
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 pub mod alias_mapping;
 pub mod function_instance_runner;

@@ -1,4 +1,4 @@
-# SPDX-FileCopyrightText: © 2023 TUM
+# SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 # SPDX-License-Identifier: MIT
 edition = "2021"
 max_width = 150

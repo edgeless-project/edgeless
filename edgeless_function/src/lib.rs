@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 pub mod api {
     wit_bindgen::generate!({world: "edgefunction", macro_export, export_macro_name: "export"});

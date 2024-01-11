@@ -1,11 +1,11 @@
-# SPDX-FileCopyrightText: © 2023 TUM
+# SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 # SPDX-License-Identifier: MIT
 [workspace]
 
 [package]
 name = "edgeless-embedded-emu"
 version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+authors = ["Raphael Hetzel <hetzel@in.Technical University of Munich, Chair of Connected Mobility.de>"]
 edition = "2021"
 resolver = "2"
 

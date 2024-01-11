@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: © 2023 TUM
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 // Based on https://github.com/esp-rs/esp-wifi/blob/main/examples-esp32/examples/embassy_dhcp.rs
 use embedded_svc::wifi::Wifi;
