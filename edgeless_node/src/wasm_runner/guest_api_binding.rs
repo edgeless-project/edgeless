@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::CallRet;
 
 /// Binds the WASM component's imports to the function's GuestAPIHost.

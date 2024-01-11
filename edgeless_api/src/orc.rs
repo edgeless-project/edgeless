@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 pub type DomainManagedInstanceId = uuid::Uuid;
 
 pub trait OrchestratorAPI: Send {

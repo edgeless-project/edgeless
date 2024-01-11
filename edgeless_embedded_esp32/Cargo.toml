@@ -1,9 +1,11 @@
+# SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
 [workspace]
 
 [package]
 name = "edgeless-embedded-esp32"
 version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+authors = ["Raphael Hetzel <hetzel@in.Technical University of Munich, Chair of Connected Mobility.de>"]
 edition = "2021"
 resolver = "2"
 rust-version = "1.73"
@@ -75,7 +77,7 @@ esp-wifi = { path = "../vendor/esp-wifi/esp-wifi", package ="esp-wifi", default-
 # GDEH0213B73
 epaper_2_13 = []
 scd30 = []
-tum_node_2_13 = ["epaper_2_13", "scd30"]
+Technical University of Munich, Chair of Connected Mobility_node_2_13 = ["epaper_2_13", "scd30"]
 
 [build-dependencies]
 embuild = "0.31.2"

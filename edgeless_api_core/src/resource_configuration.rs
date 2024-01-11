@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-License-Identifier: MIT
 #[derive(Clone, PartialEq, Eq)]
 pub struct EncodedResourceInstanceSpecification<'a> {
     pub class_type: &'a str,

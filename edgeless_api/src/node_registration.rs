@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResourceProviderSpecification {
     pub provider_id: String,

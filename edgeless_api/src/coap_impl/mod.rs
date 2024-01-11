@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-License-Identifier: MIT
 #[async_trait::async_trait]
 pub trait InvocationAPI {
     async fn handle(&mut self, event: edgeless_api_core::invocation::Event<&[u8]>)

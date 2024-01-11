@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-License-Identifier: MIT
 mod workflow_spec;
 
 use anyhow::anyhow;

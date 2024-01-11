@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-License-Identifier: MIT
 use crate::core::*;
 use crate::node_local::NodeLocalRouter;
 use edgeless_api::function_instance::{ComponentId, NodeId};

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum EdgelessHTTPMethod {
     Get,

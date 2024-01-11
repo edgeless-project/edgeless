@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 #[derive(Clone)]
 pub struct StateManager {
     handlers: std::sync::Arc<tokio::sync::Mutex<StateProviders>>,

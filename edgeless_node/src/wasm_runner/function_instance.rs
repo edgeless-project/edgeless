@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-License-Identifier: MIT
 /// FunctionInstance implementation allowing to execute functions defined as WASM components.
 /// Note that this only contains the WASM specific bindings, while the base_runtime provides the generic runtime functionality.
 pub struct WASMFunctionInstance {
