@@ -15,7 +15,7 @@ impl OrchestratorAPIClient {
         let resource_configuration_client: Result<
             super::resource_configuration::ResourceConfigurationClient<crate::orc::DomainManagedInstanceId>,
             anyhow::Error,
-        > = Ok(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(api_addr, false).await);
+        > = Ok(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(api_addr, retry_interval).await);
 
         match (function_instance_client, node_registration_client, resource_configuration_client) {
             (Ok(function_instance_client), Ok(node_registration_client), Ok(resource_configuration_client)) => Ok(Self {
