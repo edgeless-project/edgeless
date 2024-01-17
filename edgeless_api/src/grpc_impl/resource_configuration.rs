@@ -48,7 +48,7 @@ pub struct ResourceConfigurationClient<ResourceIdType> {
 }
 
 impl<ResourceIdType> ResourceConfigurationClient<ResourceIdType> {
-    pub async fn new(server_addr: &str, no_retry: bool) -> Self {
+    pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> Self {
         loop {
             match crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
@@ -58,16 +58,16 @@ impl<ResourceIdType> ResourceConfigurationClient<ResourceIdType> {
                         _phantom: std::marker::PhantomData {},
                     };
                 }
-                Err(_) => {
-                    if no_retry {
+                Err(err) => match retry_interval {
+                    Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
+                    None => {
+                        log::warn!("Error when connecting to {}: {}", server_addr, err);
                         return Self {
                             client: None,
                             _phantom: std::marker::PhantomData {},
                         };
                     }
-                    log::warn!("could not connect to {:?}, retrying", server_addr);
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                }
+                },
             }
         }
     }
