@@ -19,6 +19,10 @@ pub struct EdgelessNodeSettings {
     pub metrics_url: String,
     pub orchestrator_url: String,
     pub http_ingress_url: String,
+    pub http_ingress_provider: String,
+    pub http_egress_provider: String,
+    pub file_log_provider: String,
+    pub redis_provider: String,
 }
 
 fn get_capabilities() -> NodeCapabilities {
@@ -102,10 +106,10 @@ async fn fill_resources(
         Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
     >::new();
 
-    if !settings.http_ingress_url.is_empty() {
+    if !settings.http_ingress_url.is_empty() && !settings.http_ingress_provider.is_empty() {
         log::info!("Creating resource 'http-ingress-1' at {}", &settings.http_ingress_url);
         ret.insert(
-            "http-ingress-1".to_string(),
+            settings.http_ingress_provider.clone(),
             resources::http_ingress::ingress_task(
                 data_plane.clone(),
                 edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
@@ -114,62 +118,68 @@ async fn fill_resources(
             .await,
         );
         provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-            provider_id: "http-ingress-1".to_string(),
+            provider_id: settings.http_ingress_provider.clone(),
             class_type: "http-ingress".to_string(),
             outputs: vec!["new_request".to_string()],
         });
     }
 
-    log::info!("Creating resource 'http-egress-1'");
-    ret.insert(
-        "http-egress-1".to_string(),
-        Box::new(
-            resources::http_egress::EgressResourceProvider::new(
-                data_plane.clone(),
-                edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
-            )
-            .await,
-        ),
-    );
-    provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-        provider_id: "http-egress-1".to_string(),
-        class_type: "http-egress".to_string(),
-        outputs: vec![],
-    });
+    if !settings.http_egress_provider.is_empty() {
+        log::info!("Creating resource 'http-egress-1'");
+        ret.insert(
+            settings.http_egress_provider.clone(),
+            Box::new(
+                resources::http_egress::EgressResourceProvider::new(
+                    data_plane.clone(),
+                    edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+                )
+                .await,
+            ),
+        );
+        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+            provider_id: settings.http_egress_provider.clone(),
+            class_type: "http-egress".to_string(),
+            outputs: vec![],
+        });
+    }
 
-    log::info!("Creating resource 'file-log-1'");
-    ret.insert(
-        "file-log-1".to_string(),
-        Box::new(
-            resources::file_log::FileLogResourceProvider::new(
-                data_plane.clone(),
-                edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
-            )
-            .await,
-        ),
-    );
-    provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-        provider_id: "file-log-1".to_string(),
-        class_type: "file-log".to_string(),
-        outputs: vec![],
-    });
+    if !settings.file_log_provider.is_empty() {
+        log::info!("Creating resource 'file-log-1'");
+        ret.insert(
+            settings.file_log_provider.clone(),
+            Box::new(
+                resources::file_log::FileLogResourceProvider::new(
+                    data_plane.clone(),
+                    edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+                )
+                .await,
+            ),
+        );
+        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+            provider_id: settings.file_log_provider.clone(),
+            class_type: "file-log".to_string(),
+            outputs: vec![],
+        });
+    }
 
-    log::info!("Creating resource 'redis-1'");
-    ret.insert(
-        "redis-1".to_string(),
-        Box::new(
-            resources::redis::RedisResourceProvider::new(
-                data_plane.clone(),
-                edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
-            )
-            .await,
-        ),
-    );
-    provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-        provider_id: "redis-1".to_string(),
-        class_type: "redis".to_string(),
-        outputs: vec![],
-    });
+    if !settings.redis_provider.is_empty() {
+        log::info!("Creating resource 'redis-1'");
+        ret.insert(
+            settings.redis_provider.clone(),
+            Box::new(
+                resources::redis::RedisResourceProvider::new(
+                    data_plane.clone(),
+                    edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+                )
+                .await,
+            ),
+        );
+        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+            provider_id: settings.redis_provider.clone(),
+            class_type: "redis".to_string(),
+            outputs: vec![],
+        });
+    }
 
     ret
 }
@@ -228,6 +238,10 @@ metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://127.0.0.1:7011"
 resource_configuration_url = "http://127.0.0.1:7033"
 http_ingress_url = "http://127.0.0.1:7035"
+http_ingress_provider = "http-ingress-1"
+http_egress_provider = "http-egress-1"
+file_log_provider = "file-log-1"
+redis_provider = "redis-1"
 "##,
     )
 }

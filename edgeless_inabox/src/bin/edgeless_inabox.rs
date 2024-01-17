@@ -129,6 +129,22 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 true => next_url(),
                 false => "".to_string(),
             },
+            http_ingress_provider: match first_node {
+                true => "http-ingress-1".to_string(),
+                false => "".to_string(),
+            },
+            http_egress_provider: match first_node {
+                true => "http-egress-1".to_string(),
+                false => "".to_string(),
+            },
+            file_log_provider: match first_node {
+                true => "file-log-1".to_string(),
+                false => "".to_string(),
+            },
+            redis_provider: match first_node {
+                true => "redis-1".to_string(),
+                false => "".to_string(),
+            },
         });
         first_node = false;
     }
