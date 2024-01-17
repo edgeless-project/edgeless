@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResourceProviderSpecification {
     pub provider_id: String,
@@ -8,12 +9,49 @@ pub struct ResourceProviderSpecification {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct NodeCapabilities {
+    // Number of (actual or virtual) CPUs associated with the edge node.
+    pub num_cpus: u32,
+    // Name of the CPU model.
+    pub model_name_cpu: String,
+    // Clock frequency of the CPU, in BogoMIPS.
+    pub clock_freq_cpu: f32,
+    // Number of cores for each CPU.
+    pub num_cores: u32,
+    // Size of memory available to applications running on the edge node, in MB.
+    pub mem_size: u32,
+}
+
+impl NodeCapabilities {
+    pub fn default() -> Self {
+        Self {
+            num_cpus: 0,
+            model_name_cpu: "".to_string(),
+            clock_freq_cpu: 0.0,
+            num_cores: 0,
+            mem_size: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for NodeCapabilities {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{} {} CPU(s) at {} BogoMIPS, {} core(s), {} MB memory",
+            self.num_cpus, self.model_name_cpu, self.clock_freq_cpu, self.num_cores, self.mem_size,
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum UpdateNodeRequest {
     // 0: node_id (cannot be nil)
     // 1: agent_url (cannot be empty)
     // 2: invocation_url (cannot be empty)
     // 3: resource provider specifications (can be empty)
-    Registration(uuid::Uuid, String, String, Vec<ResourceProviderSpecification>),
+    // 4: node capabilities
+    Registration(uuid::Uuid, String, String, Vec<ResourceProviderSpecification>, NodeCapabilities),
 
     // 0: node_id (cannot be empty)
     Deregistration(uuid::Uuid),

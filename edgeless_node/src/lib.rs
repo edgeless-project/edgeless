@@ -2,12 +2,14 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-use edgeless_api::orc::OrchestratorAPI;
+
+use edgeless_api::{node_registration::NodeCapabilities, orc::OrchestratorAPI};
 pub mod agent;
 pub mod base_runtime;
 pub mod resources;
 pub mod state_management;
 pub mod wasm_runner;
+use sysinfo::{ProcessorExt, System, SystemExt};
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
@@ -19,11 +21,48 @@ pub struct EdgelessNodeSettings {
     pub http_ingress_url: String,
 }
 
+fn get_capabilities() -> NodeCapabilities {
+    let s = System::new();
+    let mut model_name_set = std::collections::HashSet::new();
+    let mut clock_freq_cpu_set = std::collections::HashSet::new();
+    for processor in s.get_processors() {
+        model_name_set.insert(processor.get_brand().clone());
+        clock_freq_cpu_set.insert(processor.get_frequency());
+    }
+    let model_name_cpu = match model_name_set.iter().next() {
+        Some(val) => val.to_string(),
+        None => "".to_string(),
+    };
+    if model_name_set.len() > 1 {
+        log::warn!("CPUs have different models, using: {}", model_name_cpu);
+    }
+    let clock_freq_cpu = match clock_freq_cpu_set.iter().next() {
+        Some(val) => *val as f32,
+        None => 0.0,
+    };
+    if clock_freq_cpu_set.len() > 1 {
+        log::warn!("CPUs have different frequencies, using: {}", clock_freq_cpu);
+    }
+    NodeCapabilities {
+        num_cpus: s.get_processors().len() as u32,
+        model_name_cpu,
+        clock_freq_cpu,
+        num_cores: 1,
+        mem_size: s.get_total_memory() as u32 / 1024,
+    }
+}
+
 async fn register_node(
     settings: &EdgelessNodeSettings,
     resource_provider_specifications: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
 ) {
-    log::info!("Registering this node '{}' on e-ORC {}", &settings.node_id, &settings.orchestrator_url);
+    let capabilities = get_capabilities();
+    log::info!(
+        "Registering this node '{}' on e-ORC {}, capabilities: {}",
+        &settings.node_id,
+        &settings.orchestrator_url,
+        capabilities
+    );
     match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&settings.orchestrator_url, None).await {
         Ok(mut orc_client) => match orc_client
             .node_registration_api()
@@ -32,6 +71,7 @@ async fn register_node(
                 settings.agent_url.clone(),
                 settings.invocation_url.clone(),
                 resource_provider_specifications,
+                capabilities,
             ))
             .await
         {
