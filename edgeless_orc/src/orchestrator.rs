@@ -5,6 +5,7 @@
 use edgeless_api::common::{PatchRequest, StartComponentResponse};
 use edgeless_api::function_instance::{ComponentId, InstanceId, SpawnFunctionRequest};
 use edgeless_api::node_managment::UpdatePeersRequest;
+use edgeless_api::node_registration::NodeCapabilities;
 use edgeless_api::resource_configuration::ResourceInstanceSpecification;
 use futures::{Future, SinkExt, StreamExt};
 use rand::seq::SliceRandom;
@@ -129,9 +130,10 @@ pub struct ResourceConfigurationClient {
 impl OrchestratorFunctionInstanceOrcClient {}
 
 pub struct ClientDesc {
-    agent_url: String,
-    invocation_url: String,
-    api: Box<dyn edgeless_api::agent::AgentAPI + Send>,
+    pub agent_url: String,
+    pub invocation_url: String,
+    pub api: Box<dyn edgeless_api::agent::AgentAPI + Send>,
+    pub capabilities: NodeCapabilities,
 }
 
 enum IntFid {
@@ -205,13 +207,14 @@ impl Orchestrator {
         // known agents
         // key: node_id
         let mut clients = clients;
-        orchestration_logic.update_nodes(clients.keys().cloned().collect());
+        orchestration_logic.update_nodes(&clients);
         for (node_id, client_desc) in &clients {
             log::info!(
-                "added function instance client: node_id {}, agent URL {}, invocation URL {}",
+                "added function instance client: node_id {}, agent URL {}, invocation URL {}, capabilities {}",
                 node_id,
                 client_desc.agent_url,
-                client_desc.invocation_url
+                client_desc.invocation_url,
+                client_desc.capabilities
             );
         }
 
@@ -551,7 +554,13 @@ impl Orchestrator {
                     // that an existing node left the system (Deregister).
                     let mut this_node_id = None;
                     let msg = match request {
-                        edgeless_api::node_registration::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resources) => {
+                        edgeless_api::node_registration::UpdateNodeRequest::Registration(
+                            node_id,
+                            agent_url,
+                            invocation_url,
+                            resources,
+                            capabilities,
+                        ) => {
                             let mut dup_entry = false;
                             if let Some(client_desc) = clients.get(&node_id) {
                                 if client_desc.agent_url == agent_url && client_desc.invocation_url == invocation_url {
@@ -589,12 +598,20 @@ impl Orchestrator {
                                 }
 
                                 // Create the agent API.
+                                log::info!(
+                                    "added function instance client: node_id {}, agent URL {}, invocation URL {}, capabilities {}",
+                                    node_id,
+                                    agent_url,
+                                    invocation_url,
+                                    capabilities
+                                );
                                 clients.insert(
                                     node_id,
                                     ClientDesc {
                                         agent_url: agent_url.clone(),
                                         invocation_url: invocation_url.clone(),
                                         api: Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&agent_url).await),
+                                        capabilities,
                                     },
                                 );
                                 Some(UpdatePeersRequest::Add(node_id, invocation_url))
@@ -618,7 +635,7 @@ impl Orchestrator {
 
                     if let Some(msg) = msg {
                         // Update the orchestration logic with the new set of nodes.
-                        orchestration_logic.update_nodes(clients.keys().cloned().collect());
+                        orchestration_logic.update_nodes(&clients);
 
                         // Update all the peers (including the node, unless it
                         // was a deregister operation).
