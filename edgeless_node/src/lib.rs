@@ -26,7 +26,7 @@ fn get_capabilities() -> NodeCapabilities {
     let mut model_name_set = std::collections::HashSet::new();
     let mut clock_freq_cpu_set = std::collections::HashSet::new();
     for processor in s.get_processors() {
-        model_name_set.insert(processor.get_brand().clone());
+        model_name_set.insert(processor.get_brand());
         clock_freq_cpu_set.insert(processor.get_frequency());
     }
     let model_name_cpu = match model_name_set.iter().next() {
