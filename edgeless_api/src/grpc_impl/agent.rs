@@ -20,7 +20,7 @@ impl AgentAPIClient {
                     .await
                     .unwrap(),
             ),
-            resource_management_client: Box::new(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(api_addr, false).await),
+            resource_management_client: Box::new(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(api_addr, Some(1)).await),
         }
     }
 }
