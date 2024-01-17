@@ -98,8 +98,24 @@ message UpdateNodeRequest {
     optional string agent_url                                 = 3;
     // URL of the node's invocation server. Always present if REGISTER type.
     optional string invocation_url                            = 4;
-    // Resources offered by this node.
+    // Resources offered by this node. May be only present if REGISTER type.
     repeated ResourceProviderSpecification resource_providers = 5;
+    // Node capabilities. May be only present if REGISTER type.
+    NodeCapabilities capabilities                             = 6;
+}
+
+// Node capabilities exposed to the orchestrator.
+message NodeCapabilities {
+    // Number of (actual or virtual) CPUs associated with the edge node.
+    uint32 num_cpus       = 10;
+    // Name of the CPU model.
+    string model_name_cpu = 11;
+    // Clock frequency of the CPU, in BogoMIPS.
+    float clock_freq_cpu  = 12;
+    // Number of cores for each CPU.
+    uint32 num_cores      = 13;
+    // Size of memory available to applications running on the edge node, in MB.
+    uint32 mem_size       = 14;
 }
 
 // Response message of FunctionInstance::UpdateNode().

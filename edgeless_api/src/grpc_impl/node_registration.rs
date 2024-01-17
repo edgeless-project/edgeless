@@ -70,6 +70,26 @@ impl crate::grpc_impl::api::node_registration_server::NodeRegistration for NodeR
     }
 }
 
+fn parse_node_capabilities(api_instance: &crate::grpc_impl::api::NodeCapabilities) -> crate::node_registration::NodeCapabilities {
+    crate::node_registration::NodeCapabilities {
+        num_cpus: api_instance.num_cpus,
+        model_name_cpu: api_instance.model_name_cpu.clone(),
+        clock_freq_cpu: api_instance.clock_freq_cpu,
+        num_cores: api_instance.num_cores,
+        mem_size: api_instance.mem_size,
+    }
+}
+
+fn serialize_node_capabilities(req: &crate::node_registration::NodeCapabilities) -> crate::grpc_impl::api::NodeCapabilities {
+    crate::grpc_impl::api::NodeCapabilities {
+        num_cpus: req.num_cpus,
+        model_name_cpu: req.model_name_cpu.clone(),
+        clock_freq_cpu: req.clock_freq_cpu,
+        num_cores: req.num_cores,
+        mem_size: req.mem_size,
+    }
+}
+
 fn parse_update_node_request(api_instance: &crate::grpc_impl::api::UpdateNodeRequest) -> anyhow::Result<crate::node_registration::UpdateNodeRequest> {
     let node_id = uuid::Uuid::from_str(api_instance.node_id.as_str());
     if let Err(err) = node_id {
@@ -92,6 +112,10 @@ fn parse_update_node_request(api_instance: &crate::grpc_impl::api::UpdateNodeReq
                     agent_url.to_string(),
                     invocation_url.to_string(),
                     resource_providers,
+                    match &api_instance.capabilities {
+                        Some(val) => parse_node_capabilities(&val),
+                        None => crate::node_registration::NodeCapabilities::default(),
+                    },
                 ))
             } else {
                 return Err(anyhow::anyhow!(
@@ -134,13 +158,14 @@ fn parse_update_node_response(
 
 fn serialize_update_node_request(req: &crate::node_registration::UpdateNodeRequest) -> crate::grpc_impl::api::UpdateNodeRequest {
     match req {
-        crate::node_registration::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resource_providers) => {
+        crate::node_registration::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resource_providers, capabilities) => {
             crate::grpc_impl::api::UpdateNodeRequest {
                 request_type: crate::grpc_impl::api::UpdateNodeRequestType::Register as i32,
                 node_id: node_id.to_string(),
                 agent_url: Some(agent_url.to_string()),
                 invocation_url: Some(invocation_url.to_string()),
                 resource_providers: resource_providers.iter().map(|x| serialize_resource_provider_specification(x)).collect(),
+                capabilities: Some(serialize_node_capabilities(capabilities)),
             }
         }
         crate::node_registration::UpdateNodeRequest::Deregistration(node_id) => crate::grpc_impl::api::UpdateNodeRequest {
@@ -149,6 +174,7 @@ fn serialize_update_node_request(req: &crate::node_registration::UpdateNodeReque
             agent_url: None,
             invocation_url: None,
             resource_providers: vec![],
+            capabilities: None,
         },
     }
 }
@@ -186,6 +212,7 @@ fn serialize_resource_provider_specification(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::node_registration::NodeCapabilities;
     use crate::node_registration::ResourceProviderSpecification;
     use crate::node_registration::UpdateNodeRequest;
     use crate::node_registration::UpdateNodeResponse;
@@ -202,12 +229,20 @@ mod test {
                     class_type: "class-type-1".to_string(),
                     outputs: vec!["out1".to_string(), "out2".to_string()],
                 }],
+                NodeCapabilities {
+                    num_cpus: 4,
+                    model_name_cpu: "ARMv8 Processor rev 0 (v8l)".to_string(),
+                    clock_freq_cpu: 62.50,
+                    num_cores: 20,
+                    mem_size: 15827,
+                },
             ),
             UpdateNodeRequest::Registration(
                 uuid::Uuid::new_v4(),
                 "http://127.0.0.1:10000".to_string(),
                 "http://127.0.0.1:10001".to_string(),
                 vec![],
+                NodeCapabilities::default(),
             ),
             UpdateNodeRequest::Deregistration(uuid::Uuid::new_v4()),
         ];

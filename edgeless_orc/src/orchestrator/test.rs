@@ -147,6 +147,7 @@ async fn test_setup(
                     node_id: node_id.clone(),
                     sender: mock_node_sender,
                 }) as Box<dyn edgeless_api::agent::AgentAPI + Send>,
+                capabilities: NodeCapabilities::default(),
             },
         );
         for provider_i in 0..num_resources_per_node {
