@@ -71,7 +71,9 @@ impl edgeless_api::invocation::InvocationAPI for InvocationEventHandler {
 impl edgeless_api::invocation::InvocationAPI for RemoteRouter {
     async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
         if let Some(node_client) = self.receivers.get_mut(&event.target.node_id) {
-            node_client.handle(event).await.unwrap();
+            if let Err(err) = node_client.handle(event).await {
+                log::warn!("Error in handling event: {}", err);
+            }
             Ok(edgeless_api::invocation::LinkProcessingResult::FINAL)
         } else {
             Ok(edgeless_api::invocation::LinkProcessingResult::PASSED)
