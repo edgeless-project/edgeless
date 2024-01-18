@@ -3,13 +3,14 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::{node_registration::NodeCapabilities, orc::OrchestratorAPI};
+use edgeless_api::orc::OrchestratorAPI;
+use sysinfo::{ProcessorExt, SystemExt};
+
 pub mod agent;
 pub mod base_runtime;
 pub mod resources;
 pub mod state_management;
 pub mod wasm_runner;
-use sysinfo::{ProcessorExt, System, SystemExt};
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
@@ -25,8 +26,8 @@ pub struct EdgelessNodeSettings {
     pub redis_provider: String,
 }
 
-fn get_capabilities() -> NodeCapabilities {
-    let s = System::new();
+fn get_capabilities() -> edgeless_api::node_registration::NodeCapabilities {
+    let s = sysinfo::System::new();
     let mut model_name_set = std::collections::HashSet::new();
     let mut clock_freq_cpu_set = std::collections::HashSet::new();
     for processor in s.get_processors() {
@@ -47,7 +48,7 @@ fn get_capabilities() -> NodeCapabilities {
     if clock_freq_cpu_set.len() > 1 {
         log::warn!("CPUs have different frequencies, using: {}", clock_freq_cpu);
     }
-    NodeCapabilities {
+    edgeless_api::node_registration::NodeCapabilities {
         num_cpus: s.get_processors().len() as u32,
         model_name_cpu,
         clock_freq_cpu,
