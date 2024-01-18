@@ -24,6 +24,6 @@ pub mod orc;
 
 pub mod util;
 
-pub mod node_managment;
+pub mod node_management;
 
 pub mod node_registration;

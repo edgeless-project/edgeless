@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 pub struct AgentAPIClient {
     function_instance_client: Box<dyn crate::function_instance::FunctionInstanceAPI<edgeless_api_core::instance_id::InstanceId>>,
-    node_management_client: Box<dyn crate::node_managment::NodeManagementAPI>,
+    node_management_client: Box<dyn crate::node_management::NodeManagementAPI>,
     resource_management_client: Box<dyn crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::instance_id::InstanceId>>,
 }
 
@@ -30,7 +30,7 @@ impl crate::agent::AgentAPI for AgentAPIClient {
         self.function_instance_client.clone()
     }
 
-    fn node_management_api(&mut self) -> Box<dyn crate::node_managment::NodeManagementAPI> {
+    fn node_management_api(&mut self) -> Box<dyn crate::node_management::NodeManagementAPI> {
         self.node_management_client.clone()
     }
 

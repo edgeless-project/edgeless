@@ -8,7 +8,7 @@ pub struct NodeManagementClient {
 }
 
 pub struct NodeManagementAPIService {
-    pub node_management_api: tokio::sync::Mutex<Box<dyn crate::node_managment::NodeManagementAPI>>,
+    pub node_management_api: tokio::sync::Mutex<Box<dyn crate::node_management::NodeManagementAPI>>,
 }
 
 impl NodeManagementClient {
@@ -31,8 +31,8 @@ impl NodeManagementClient {
 }
 
 #[async_trait::async_trait]
-impl crate::node_managment::NodeManagementAPI for NodeManagementClient {
-    async fn update_peers(&mut self, request: crate::node_managment::UpdatePeersRequest) -> anyhow::Result<()> {
+impl crate::node_management::NodeManagementAPI for NodeManagementClient {
+    async fn update_peers(&mut self, request: crate::node_management::UpdatePeersRequest) -> anyhow::Result<()> {
         match self
             .client
             .update_peers(tonic::Request::new(serialize_update_peers_request(&request)))
@@ -80,13 +80,13 @@ impl crate::grpc_impl::api::node_management_server::NodeManagement for NodeManag
 
 pub fn parse_update_peers_request(
     api_instance: &crate::grpc_impl::api::UpdatePeersRequest,
-) -> anyhow::Result<crate::node_managment::UpdatePeersRequest> {
+) -> anyhow::Result<crate::node_management::UpdatePeersRequest> {
     match api_instance.request_type {
         x if x == crate::grpc_impl::api::UpdatePeersRequestType::Add as i32 => {
             if let (Some(node_id), Some(invocation_url)) = (&api_instance.node_id, &api_instance.invocation_url) {
                 let node_id = uuid::Uuid::from_str(node_id.as_str());
                 match node_id {
-                    Ok(node_id) => Ok(crate::node_managment::UpdatePeersRequest::Add(node_id, invocation_url.clone())),
+                    Ok(node_id) => Ok(crate::node_management::UpdatePeersRequest::Add(node_id, invocation_url.clone())),
                     Err(_) => Err(anyhow::anyhow!("Ill-formed UpdatePeersRequest: invalid UUID as node_id")),
                 }
             } else {
@@ -99,7 +99,7 @@ pub fn parse_update_peers_request(
             if let Some(node_id) = &api_instance.node_id {
                 let node_id = uuid::Uuid::from_str(node_id.as_str());
                 match node_id {
-                    Ok(node_id) => Ok(crate::node_managment::UpdatePeersRequest::Del(node_id)),
+                    Ok(node_id) => Ok(crate::node_management::UpdatePeersRequest::Del(node_id)),
                     Err(_) => Err(anyhow::anyhow!("Ill-formed UpdatePeersRequest: invalid UUID as node_id")),
                 }
             } else {
@@ -108,24 +108,24 @@ pub fn parse_update_peers_request(
                 ))
             }
         }
-        x if x == crate::grpc_impl::api::UpdatePeersRequestType::Clear as i32 => Ok(crate::node_managment::UpdatePeersRequest::Clear),
+        x if x == crate::grpc_impl::api::UpdatePeersRequestType::Clear as i32 => Ok(crate::node_management::UpdatePeersRequest::Clear),
         x => Err(anyhow::anyhow!("Ill-formed UpdatePeersRequest message: unknown type {}", x)),
     }
 }
 
-fn serialize_update_peers_request(req: &crate::node_managment::UpdatePeersRequest) -> crate::grpc_impl::api::UpdatePeersRequest {
+fn serialize_update_peers_request(req: &crate::node_management::UpdatePeersRequest) -> crate::grpc_impl::api::UpdatePeersRequest {
     match req {
-        crate::node_managment::UpdatePeersRequest::Add(node_id, invocation_url) => crate::grpc_impl::api::UpdatePeersRequest {
+        crate::node_management::UpdatePeersRequest::Add(node_id, invocation_url) => crate::grpc_impl::api::UpdatePeersRequest {
             request_type: crate::grpc_impl::api::UpdatePeersRequestType::Add as i32,
             node_id: Some(node_id.to_string()),
             invocation_url: Some(invocation_url.clone()),
         },
-        crate::node_managment::UpdatePeersRequest::Del(node_id) => crate::grpc_impl::api::UpdatePeersRequest {
+        crate::node_management::UpdatePeersRequest::Del(node_id) => crate::grpc_impl::api::UpdatePeersRequest {
             request_type: crate::grpc_impl::api::UpdatePeersRequestType::Del as i32,
             node_id: Some(node_id.to_string()),
             invocation_url: None,
         },
-        crate::node_managment::UpdatePeersRequest::Clear => crate::grpc_impl::api::UpdatePeersRequest {
+        crate::node_management::UpdatePeersRequest::Clear => crate::grpc_impl::api::UpdatePeersRequest {
             request_type: crate::grpc_impl::api::UpdatePeersRequestType::Clear as i32,
             node_id: None,
             invocation_url: None,
@@ -136,7 +136,7 @@ fn serialize_update_peers_request(req: &crate::node_managment::UpdatePeersReques
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::node_managment::UpdatePeersRequest;
+    use crate::node_management::UpdatePeersRequest;
 
     #[test]
     fn serialize_deserialize_update_peers_request() {

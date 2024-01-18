@@ -5,7 +5,7 @@
 [package]
 name = "edgeless-embedded-esp32"
 version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.Technical University of Munich, Chair of Connected Mobility.de>"]
+authors = ["Raphael Hetzel <hetzel@in.tum.de>>"]
 edition = "2021"
 resolver = "2"
 rust-version = "1.73"
