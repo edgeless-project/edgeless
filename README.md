@@ -165,29 +165,7 @@ Please refer to the following specific docs:
 
 We love the open source community of developers ❤️ and we welcome contributions to EDGELESS.
 
-However, since the codebase is growing fast, you are encouraged to disclose your potential contribution beforehand on GitHub by [creating a new discussion item](https://github.com/edgeless-project/edgeless/discussions/new/choose).
-
-This section contains some rules you should adhere to when contributing to this repository.
-
-* Run the rust formatter before committing - `cargo fmt`. This ensures we
-  minimize the noise coming from, e.g., whitespace changes.
-* Try to limit the number of warnings (ideally, there should not be any
-  warnings). A good way to do this is to run `cargo fix` before running the
-  formatter.
-    *  Suggested workflow: `cargo fix --allow-staged --allow-dirty && cargo fmt
-       && git commit`
-* When working on a new feature / issue, create a branch from the GitHub issue
-  and add your changes there. To merge the changes into the main, create a pull
-  request and assign someone as a reviewer. The reviewer should then reject or
-  accept the changes / leave some comments. After the changes are accepted by
-  the reviewer, he should take care to merge them and remove the dangling
-  feature branch.
-* Do not introduce merge commits on the main branch. Merges to the main branch
-  must be fast-forwarded. A good practice is also to squash the commits on the
-  feature branch (this can be done while merging on GitHub).
-* Add yourself to the list of contributors & adhere to the license.
-    * Do not taint this repository with incompatible licenses.
-    * Everything not MIT-licensed must be kept external to this repository.
+The [contributing guide](CONTRIBUTING_GUIDE.md) contains some rules you should adhere to when contributing to this repository.
 
 ## License
 
