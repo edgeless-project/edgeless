@@ -2,15 +2,12 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-use edgeless_api::common::{PatchRequest, StartComponentResponse};
-use edgeless_api::function_instance::{ComponentId, InstanceId, SpawnFunctionRequest};
-use edgeless_api::node_managment::UpdatePeersRequest;
-use edgeless_api::node_registration::NodeCapabilities;
-use edgeless_api::resource_configuration::ResourceInstanceSpecification;
+
+use edgeless_api::function_instance::{ComponentId, InstanceId};
+
 use futures::{Future, SinkExt, StreamExt};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
-use std::collections::HashSet;
 
 #[cfg(test)]
 pub mod test;
@@ -22,12 +19,12 @@ pub struct Orchestrator {
 enum OrchestratorRequest {
     STARTFUNCTION(
         edgeless_api::function_instance::SpawnFunctionRequest,
-        tokio::sync::oneshot::Sender<anyhow::Result<StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>>,
+        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>>,
     ),
     STOPFUNCTION(edgeless_api::orc::DomainManagedInstanceId),
     STARTRESOURCE(
         edgeless_api::resource_configuration::ResourceInstanceSpecification,
-        tokio::sync::oneshot::Sender<anyhow::Result<StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>>,
+        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>>,
     ),
     STOPRESOURCE(edgeless_api::orc::DomainManagedInstanceId),
     PATCH(edgeless_api::common::PatchRequest),
@@ -48,12 +45,12 @@ pub struct ResourceProvider {
 enum ActiveInstance {
     // 0: request
     // 1: [ (node_id, int_fid) ]
-    Function(SpawnFunctionRequest, Vec<InstanceId>),
+    Function(edgeless_api::function_instance::SpawnFunctionRequest, Vec<InstanceId>),
 
     // 0: request
     // 1: node_id, int_fid
     // 2: provider_id
-    Resource(ResourceInstanceSpecification, InstanceId),
+    Resource(edgeless_api::resource_configuration::ResourceInstanceSpecification, InstanceId),
 }
 
 impl std::fmt::Display for ActiveInstance {
@@ -133,7 +130,7 @@ pub struct ClientDesc {
     pub agent_url: String,
     pub invocation_url: String,
     pub api: Box<dyn edgeless_api::agent::AgentAPI + Send>,
-    pub capabilities: NodeCapabilities,
+    pub capabilities: edgeless_api::node_registration::NodeCapabilities,
 }
 
 enum IntFid {
@@ -272,8 +269,10 @@ impl Orchestrator {
                     let spawn_req_copy = spawn_req.clone();
                     let res = match fn_client.start(spawn_req).await {
                         Ok(res) => match res {
-                            StartComponentResponse::ResponseError(err) => Err(anyhow::anyhow!("Orchestrator->Node Spawn Request failed: {}", &err)),
-                            StartComponentResponse::InstanceId(id) => {
+                            edgeless_api::common::StartComponentResponse::ResponseError(err) => {
+                                Err(anyhow::anyhow!("Orchestrator->Node Spawn Request failed: {}", &err))
+                            }
+                            edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                                 assert!(selected_node_id == id.node_id);
                                 let ext_fid = uuid::Uuid::new_v4();
                                 active_instances.insert(
@@ -293,7 +292,7 @@ impl Orchestrator {
                                     id.function_id
                                 );
 
-                                Ok(StartComponentResponse::InstanceId(ext_fid.clone()))
+                                Ok(edgeless_api::common::StartComponentResponse::InstanceId(ext_fid.clone()))
                             }
                         },
                         Err(err) => {
@@ -374,7 +373,7 @@ impl Orchestrator {
                                 Some(client) => match client
                                     .api
                                     .resource_configuration_api()
-                                    .start(ResourceInstanceSpecification {
+                                    .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
                                         class_type: class_type.clone(),
                                         // [TODO] Issue #94 remove output mapping
                                         output_mapping: std::collections::HashMap::new(),
@@ -383,7 +382,7 @@ impl Orchestrator {
                                     .await
                                 {
                                     Ok(start_response) => match start_response {
-                                        StartComponentResponse::InstanceId(instance_id) => {
+                                        edgeless_api::common::StartComponentResponse::InstanceId(instance_id) => {
                                             assert!(resource_provider.node_id == instance_id.node_id);
                                             let ext_fid = uuid::Uuid::new_v4();
                                             active_instances.insert(
@@ -403,22 +402,28 @@ impl Orchestrator {
                                                 &ext_fid,
                                                 instance_id.function_id
                                             );
-                                            Ok(StartComponentResponse::InstanceId(ext_fid))
+                                            Ok(edgeless_api::common::StartComponentResponse::InstanceId(ext_fid))
                                         }
-                                        StartComponentResponse::ResponseError(err) => Ok(StartComponentResponse::ResponseError(err)),
+                                        edgeless_api::common::StartComponentResponse::ResponseError(err) => {
+                                            Ok(edgeless_api::common::StartComponentResponse::ResponseError(err))
+                                        }
                                     },
-                                    Err(err) => Ok(StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
-                                        summary: "could not start resource".to_string(),
-                                        detail: Some(err.to_string()),
-                                    })),
+                                    Err(err) => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
+                                        edgeless_api::common::ResponseError {
+                                            summary: "could not start resource".to_string(),
+                                            detail: Some(err.to_string()),
+                                        },
+                                    )),
                                 },
                                 None => Err(anyhow::anyhow!("Resource Client Missing")),
                             }
                         }
-                        None => Ok(StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
-                            summary: "class type not found".to_string(),
-                            detail: Some(format!("class_type: {}", start_req.class_type)),
-                        })),
+                        None => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
+                            edgeless_api::common::ResponseError {
+                                summary: "class type not found".to_string(),
+                                detail: Some(format!("class_type: {}", start_req.class_type)),
+                            },
+                        )),
                     };
 
                     if let Err(err) = reply_channel.send(res) {
@@ -496,7 +501,7 @@ impl Orchestrator {
                                 Some(client_desc) => match client_desc
                                     .api
                                     .function_instance_api()
-                                    .patch(PatchRequest {
+                                    .patch(edgeless_api::common::PatchRequest {
                                         function_id: instance_id.function_id.clone(),
                                         output_mapping,
                                     })
@@ -522,7 +527,7 @@ impl Orchestrator {
                                 Some(client_desc) => match client_desc
                                     .api
                                     .resource_configuration_api()
-                                    .patch(PatchRequest {
+                                    .patch(edgeless_api::common::PatchRequest {
                                         function_id: instance_id.function_id.clone(),
                                         output_mapping,
                                     })
@@ -549,7 +554,7 @@ impl Orchestrator {
                 }
                 OrchestratorRequest::UPDATENODE(request, reply_channel) => {
                     // Update the map of clients and, at the same time, prepare
-                    // the UpdatePeersRequest message to be sent to all the
+                    // the edgeless_api::node_managment::UpdatePeersRequest message to be sent to all the
                     // clients to notify that a new node exists (Register) or
                     // that an existing node left the system (Deregister).
                     let mut this_node_id = None;
@@ -614,7 +619,7 @@ impl Orchestrator {
                                         capabilities,
                                     },
                                 );
-                                Some(UpdatePeersRequest::Add(node_id, invocation_url))
+                                Some(edgeless_api::node_managment::UpdatePeersRequest::Add(node_id, invocation_url))
                             }
                         }
                         edgeless_api::node_registration::UpdateNodeRequest::Deregistration(node_id) => {
@@ -623,7 +628,7 @@ impl Orchestrator {
                                 None
                             } else {
                                 clients.remove(&node_id);
-                                Some(UpdatePeersRequest::Del(node_id))
+                                Some(edgeless_api::node_managment::UpdatePeersRequest::Del(node_id))
                             }
                         }
                     };
@@ -655,7 +660,10 @@ impl Orchestrator {
                                     continue;
                                 }
                                 if let Err(_) = new_node_client
-                                    .update_peers(UpdatePeersRequest::Add(*other_node_id, client_desc.invocation_url.clone()))
+                                    .update_peers(edgeless_api::node_managment::UpdatePeersRequest::Add(
+                                        *other_node_id,
+                                        client_desc.invocation_url.clone(),
+                                    ))
                                     .await
                                 {
                                     num_failures += 1;
@@ -681,7 +689,7 @@ impl Orchestrator {
 
                     // First check if there nodes that must be disconnected
                     // because they failed to reply to a keep-alive.
-                    let mut to_be_disconnected = HashSet::new();
+                    let mut to_be_disconnected = std::collections::HashSet::new();
                     for (node_id, client_desc) in &mut clients {
                         if let Err(_) = client_desc.api.node_management_api().keep_alive().await {
                             to_be_disconnected.insert(*node_id);
@@ -713,7 +721,7 @@ impl Orchestrator {
                             match client_desc
                                 .api
                                 .node_management_api()
-                                .update_peers(UpdatePeersRequest::Del(removed_node_id))
+                                .update_peers(edgeless_api::node_managment::UpdatePeersRequest::Del(removed_node_id))
                                 .await
                             {
                                 Ok(_) => {}
@@ -742,11 +750,12 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::Dom
     async fn start(
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
-    ) -> anyhow::Result<StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
         log::debug!("FunctionInstance::StartFunction() {:?}", request);
         let request = request;
-        let (reply_sender, reply_receiver) =
-            tokio::sync::oneshot::channel::<anyhow::Result<StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>>();
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
+            anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>,
+        >();
         if let Err(err) = self.sender.send(OrchestratorRequest::STARTFUNCTION(request, reply_sender)).await {
             return Err(anyhow::anyhow!(
                 "Orchestrator channel error when creating a function instance: {}",

@@ -14,7 +14,7 @@ enum MockAgentEvent {
     ),
     StopFunction(edgeless_api::function_instance::InstanceId),
     PatchFunction(edgeless_api::common::PatchRequest),
-    UpdatePeers(UpdatePeersRequest),
+    UpdatePeers(edgeless_api::node_managment::UpdatePeersRequest),
     KeepAlive(),
     StartResource(
         (
@@ -147,7 +147,7 @@ async fn test_setup(
                     node_id: node_id.clone(),
                     sender: mock_node_sender,
                 }) as Box<dyn edgeless_api::agent::AgentAPI + Send>,
-                capabilities: NodeCapabilities::default(),
+                capabilities: edgeless_api::node_registration::NodeCapabilities::default(),
             },
         );
         for provider_i in 0..num_resources_per_node {
@@ -257,8 +257,8 @@ async fn no_function_event(receiver: &mut futures::channel::mpsc::UnboundedRecei
     }
 }
 
-fn make_spawn_function_request(class_id: &str) -> SpawnFunctionRequest {
-    SpawnFunctionRequest {
+fn make_spawn_function_request(class_id: &str) -> edgeless_api::function_instance::SpawnFunctionRequest {
+    edgeless_api::function_instance::SpawnFunctionRequest {
         instance_id: None,
         code: FunctionClassSpecification {
             function_class_id: class_id.to_string(),
@@ -275,8 +275,8 @@ fn make_spawn_function_request(class_id: &str) -> SpawnFunctionRequest {
     }
 }
 
-fn make_start_resource_request(class_type: &str) -> ResourceInstanceSpecification {
-    ResourceInstanceSpecification {
+fn make_start_resource_request(class_type: &str) -> edgeless_api::resource_configuration::ResourceInstanceSpecification {
+    edgeless_api::resource_configuration::ResourceInstanceSpecification {
         class_type: class_type.to_string(),
         output_mapping: std::collections::HashMap::new(),
         configuration: std::collections::HashMap::new(),
@@ -296,8 +296,8 @@ async fn orc_single_node_function_start_stop() {
 
     let spawn_req = make_spawn_function_request("fc-1");
     let instance_id = match fun_client.start(spawn_req.clone()).await.unwrap() {
-        StartComponentResponse::InstanceId(id) => id,
-        StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+        edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
 
     let mut int_instance_id = None;
@@ -348,8 +348,8 @@ async fn orc_multiple_nodes_function_start_stop() {
     for i in 0..100 {
         let spawn_req = make_spawn_function_request(format!("fc-{}", i).as_str());
         ext_instance_ids.push(match fun_client.start(spawn_req.clone()).await.unwrap() {
-            StartComponentResponse::InstanceId(id) => id,
-            StartComponentResponse::ResponseError(err) => panic!("{}", err),
+            edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+            edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         });
 
         if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
@@ -404,8 +404,8 @@ async fn orc_multiple_resources_start_stop() {
     for _i in 0..100 {
         let start_req = make_start_resource_request("rc-1");
         ext_instance_ids.push(match res_client.start(start_req.clone()).await.unwrap() {
-            StartComponentResponse::InstanceId(id) => id,
-            StartComponentResponse::ResponseError(err) => panic!("{}", err),
+            edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+            edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         });
 
         if let (node_id, MockAgentEvent::StartResource((int_instance_id, resource_instance_spec))) = wait_for_event_multiple(&mut nodes).await {
@@ -450,10 +450,10 @@ async fn orc_multiple_resources_start_stop() {
 
     // Start a resource with unknown class type.
     match res_client.start(make_start_resource_request("rc-666")).await.unwrap() {
-        StartComponentResponse::InstanceId(_) => {
+        edgeless_api::common::StartComponentResponse::InstanceId(_) => {
             panic!("started a resource for a non-existing class type");
         }
-        StartComponentResponse::ResponseError(err) => {
+        edgeless_api::common::StartComponentResponse::ResponseError(err) => {
             assert_eq!("class type not found".to_string(), err.summary);
         }
     }
@@ -469,8 +469,8 @@ async fn orc_patch() {
 
     let spawn_req = make_spawn_function_request("fc-1");
     let ext_function_id = match fun_client.start(spawn_req.clone()).await.unwrap() {
-        StartComponentResponse::InstanceId(id) => id,
-        StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+        edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
 
     let mut int_function_id = None;
@@ -488,8 +488,8 @@ async fn orc_patch() {
 
     let start_req = make_start_resource_request("rc-1");
     let ext_resource_id = match res_client.start(start_req.clone()).await.unwrap() {
-        StartComponentResponse::InstanceId(id) => id,
-        StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+        edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
 
     let mut int_resource_id = None;
@@ -506,7 +506,7 @@ async fn orc_patch() {
     // Gotta patch 'em all.
 
     match fun_client
-        .patch(PatchRequest {
+        .patch(edgeless_api::common::PatchRequest {
             function_id: ext_function_id.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out-1".to_string(),
@@ -536,7 +536,7 @@ async fn orc_patch() {
     }
 
     match res_client
-        .patch(PatchRequest {
+        .patch(edgeless_api::common::PatchRequest {
             function_id: ext_resource_id.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out-2".to_string(),
