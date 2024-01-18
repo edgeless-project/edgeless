@@ -114,7 +114,7 @@ opt-level = "s"
 [package]
 name = "edgeless_sample_function"
 version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.Technical University of Munich, Chair of Connected Mobility.de"]
+authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
 
 [lib]

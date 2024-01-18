@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use edgeless_api::node_managment::UpdatePeersRequest;
+use edgeless_api::node_management::UpdatePeersRequest;
 use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
 use futures::{Future, SinkExt, StreamExt};
 
@@ -18,7 +18,7 @@ enum AgentRequest {
     ),
     Patch(edgeless_api::common::PatchRequest),
     PatchResource(edgeless_api::common::PatchRequest, futures::channel::oneshot::Sender<anyhow::Result<()>>),
-    UPDATEPEERS(edgeless_api::node_managment::UpdatePeersRequest),
+    UPDATEPEERS(edgeless_api::node_management::UpdatePeersRequest),
 }
 
 pub struct Agent {
@@ -234,7 +234,7 @@ pub struct ResourceConfigurationClient {
 #[derive(Clone)]
 pub struct AgentClient {
     function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::InstanceId>>,
-    node_management_client: Box<dyn edgeless_api::node_managment::NodeManagementAPI>,
+    node_management_client: Box<dyn edgeless_api::node_management::NodeManagementAPI>,
     resource_configuration_client:
         Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
 }
@@ -284,8 +284,8 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::node_managment::NodeManagementAPI for NodeManagementClient {
-    async fn update_peers(&mut self, request: edgeless_api::node_managment::UpdatePeersRequest) -> anyhow::Result<()> {
+impl edgeless_api::node_management::NodeManagementAPI for NodeManagementClient {
+    async fn update_peers(&mut self, request: edgeless_api::node_management::UpdatePeersRequest) -> anyhow::Result<()> {
         match self.sender.send(AgentRequest::UPDATEPEERS(request)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
@@ -348,7 +348,7 @@ impl edgeless_api::agent::AgentAPI for AgentClient {
         self.function_instance_client.clone()
     }
 
-    fn node_management_api(&mut self) -> Box<dyn edgeless_api::node_managment::NodeManagementAPI> {
+    fn node_management_api(&mut self) -> Box<dyn edgeless_api::node_management::NodeManagementAPI> {
         self.node_management_client.clone()
     }
 
