@@ -554,7 +554,7 @@ impl Orchestrator {
                 }
                 OrchestratorRequest::UPDATENODE(request, reply_channel) => {
                     // Update the map of clients and, at the same time, prepare
-                    // the edgeless_api::node_managment::UpdatePeersRequest message to be sent to all the
+                    // the edgeless_api::node_management::UpdatePeersRequest message to be sent to all the
                     // clients to notify that a new node exists (Register) or
                     // that an existing node left the system (Deregister).
                     let mut this_node_id = None;
@@ -619,7 +619,7 @@ impl Orchestrator {
                                         capabilities,
                                     },
                                 );
-                                Some(edgeless_api::node_managment::UpdatePeersRequest::Add(node_id, invocation_url))
+                                Some(edgeless_api::node_management::UpdatePeersRequest::Add(node_id, invocation_url))
                             }
                         }
                         edgeless_api::node_registration::UpdateNodeRequest::Deregistration(node_id) => {
@@ -628,7 +628,7 @@ impl Orchestrator {
                                 None
                             } else {
                                 clients.remove(&node_id);
-                                Some(edgeless_api::node_managment::UpdatePeersRequest::Del(node_id))
+                                Some(edgeless_api::node_management::UpdatePeersRequest::Del(node_id))
                             }
                         }
                     };
@@ -660,7 +660,7 @@ impl Orchestrator {
                                     continue;
                                 }
                                 if let Err(_) = new_node_client
-                                    .update_peers(edgeless_api::node_managment::UpdatePeersRequest::Add(
+                                    .update_peers(edgeless_api::node_management::UpdatePeersRequest::Add(
                                         *other_node_id,
                                         client_desc.invocation_url.clone(),
                                     ))
@@ -721,7 +721,7 @@ impl Orchestrator {
                             match client_desc
                                 .api
                                 .node_management_api()
-                                .update_peers(edgeless_api::node_managment::UpdatePeersRequest::Del(removed_node_id))
+                                .update_peers(edgeless_api::node_management::UpdatePeersRequest::Del(removed_node_id))
                                 .await
                             {
                                 Ok(_) => {}

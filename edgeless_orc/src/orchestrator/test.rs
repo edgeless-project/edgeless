@@ -14,7 +14,7 @@ enum MockAgentEvent {
     ),
     StopFunction(edgeless_api::function_instance::InstanceId),
     PatchFunction(edgeless_api::common::PatchRequest),
-    UpdatePeers(edgeless_api::node_managment::UpdatePeersRequest),
+    UpdatePeers(edgeless_api::node_management::UpdatePeersRequest),
     KeepAlive(),
     StartResource(
         (
@@ -40,7 +40,7 @@ impl edgeless_api::agent::AgentAPI for MockNode {
             sender: self.sender.clone(),
         })
     }
-    fn node_management_api(&mut self) -> Box<dyn edgeless_api::node_managment::NodeManagementAPI> {
+    fn node_management_api(&mut self) -> Box<dyn edgeless_api::node_management::NodeManagementAPI> {
         Box::new(MockAgentAPI {
             node_id: self.node_id.clone(),
             sender: self.sender.clone(),
@@ -86,8 +86,8 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::node_managment::NodeManagementAPI for MockAgentAPI {
-    async fn update_peers(&mut self, request: edgeless_api::node_managment::UpdatePeersRequest) -> anyhow::Result<()> {
+impl edgeless_api::node_management::NodeManagementAPI for MockAgentAPI {
+    async fn update_peers(&mut self, request: edgeless_api::node_management::UpdatePeersRequest) -> anyhow::Result<()> {
         self.sender.send(MockAgentEvent::UpdatePeers(request)).await.unwrap();
         Ok(())
     }
