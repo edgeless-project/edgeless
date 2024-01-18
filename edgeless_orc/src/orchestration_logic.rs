@@ -2,9 +2,8 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use rand::distributions::{Distribution, Uniform};
-use rand::{rngs::StdRng, SeedableRng};
-use uuid::Uuid;
+use rand::distributions::Distribution;
+use rand::SeedableRng;
 
 use crate::orchestrator::ClientDesc;
 use crate::OrchestrationStrategy;
@@ -15,10 +14,10 @@ use crate::OrchestrationStrategy;
 pub struct OrchestrationLogic {
     orchestration_strategy: OrchestrationStrategy,
     round_robin_current_index: usize,
-    rng: StdRng,
-    nodes: Vec<Uuid>,
+    rng: rand::rngs::StdRng,
+    nodes: Vec<uuid::Uuid>,
     weights: Vec<f32>,
-    weight_dist: Uniform<f32>,
+    weight_dist: rand::distributions::Uniform<f32>,
 }
 
 impl OrchestrationLogic {
@@ -31,10 +30,10 @@ impl OrchestrationLogic {
         Self {
             orchestration_strategy,
             round_robin_current_index: 0,
-            rng: StdRng::from_entropy(),
+            rng: rand::rngs::StdRng::from_entropy(),
             nodes: vec![],
             weights: vec![],
-            weight_dist: Uniform::new(0.0, 1.0),
+            weight_dist: rand::distributions::Uniform::new(0.0, 1.0),
         }
     }
 
@@ -56,7 +55,7 @@ impl OrchestrationLogic {
             true => 1.0,
             false => self.weights.iter().sum::<f32>(),
         };
-        self.weight_dist = Uniform::new(0.0, high);
+        self.weight_dist = rand::distributions::Uniform::new(0.0, high);
     }
 }
 
@@ -64,7 +63,7 @@ impl OrchestrationLogic {
 /// instance should be spawned, based on a general orchestration strategy as
 /// defined in the settings.
 impl Iterator for OrchestrationLogic {
-    type Item = Uuid;
+    type Item = uuid::Uuid;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.nodes.is_empty() {
