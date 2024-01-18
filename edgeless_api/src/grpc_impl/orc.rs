@@ -11,7 +11,6 @@ impl OrchestratorAPIClient {
     pub async fn new(api_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
         let function_instance_client = crate::grpc_impl::function_instance::FunctionInstanceAPIClient::new(api_addr, retry_interval).await;
         let node_registration_client = crate::grpc_impl::node_registration::NodeRegistrationClient::new(api_addr, retry_interval).await;
-        // TODO(raphaelhetzel) align this (error handling)
         let resource_configuration_client: Result<
             super::resource_configuration::ResourceConfigurationClient<crate::orc::DomainManagedInstanceId>,
             anyhow::Error,
