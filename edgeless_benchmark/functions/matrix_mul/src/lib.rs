@@ -42,6 +42,7 @@ struct Conf {
     is_last: bool,
     wf_name: String,
     fun_name: String,
+    outputs: std::collections::HashSet<String>,
 }
 struct State {
     next_id: usize,
@@ -123,7 +124,9 @@ impl Edgefunction for MatrixMulFunction {
         );
 
         // Call outputs
-        // XXX
+        for output in &conf.outputs {
+            cast(output, format!("{}", id).as_str());
+        }
 
         // Schedule next event.
         if conf.is_first {
@@ -143,6 +146,8 @@ impl Edgefunction for MatrixMulFunction {
         CallRet::Noreply
     }
 
+    // example of payload:
+    // seed=42,inter_arrival=5.0,is_first=true,is_last=false,wf_name=my_workflow,fun_name=my_function,matrix_size=1000,outputs=0:2:19
     fn handle_init(payload: String, _serialized_state: Option<String>) {
         edgeless_function::init_logger();
         log::info!("MatrixMul initialized, payload: {}", payload);
@@ -162,6 +167,12 @@ impl Edgefunction for MatrixMulFunction {
             log::warn!("workflow name not specified, using: no-fun-name");
         }
         let matrix_size = arguments.get("matrix_size").unwrap_or(&"100").parse::<usize>().unwrap_or(100);
+        let output_value = arguments.get("outputs").unwrap_or(&"0").to_string();
+        let output_tokens = output_value.split(":");
+        let mut outputs = std::collections::HashSet::new();
+        for n in output_tokens.into_iter().map(|x| x.parse::<usize>().unwrap_or(0)).collect::<Vec<usize>>() {
+            outputs.insert(format!("out-{}", n));
+        }
 
         let _ = CONF.set(Conf {
             inter_arrival,
@@ -169,6 +180,7 @@ impl Edgefunction for MatrixMulFunction {
             is_last,
             wf_name,
             fun_name,
+            outputs,
         });
 
         let mut lcg = Lcg::new(seed);
