@@ -8,9 +8,7 @@ use edgeless_function::api::*;
 // Right now it's all hard-coded in the dda resource definition!!!!
 
 // TODO: import macros / library for dda binding - like in http_ingress / egress
-// examples; allow
-
-// TODO: maybe generate the rust code from protobufs?
+// examples; allow to call dda resource directly from the edgeless function
 
 struct MoveArmFun;
 
@@ -40,10 +38,10 @@ impl Edgefunction for MoveArmFun {
         // get a stream of responses from the dda resource (scenario: call
         // subscribeEvent on the DDA resource and receive 5 responses and then
         // proceed with WASM function execution)? -> I think it's not possible
-        let res = call(&"dda", &"test");
+        let res = call(&"dda", &"move_arm");
 
         if let edgeless_function::api::CallRet::Reply(response) = res {
-            log::info!("moved arm with response {}", response);
+            log::info!("moved arm over DDA with the following response {}", response);
         }
         CallRet::Noreply
     }

@@ -10,13 +10,16 @@ pub struct ResourceInstanceSpecification {
     pub configuration: std::collections::HashMap<String, String>,
 }
 
+/// Needs to be implemented by all resources
 #[async_trait::async_trait]
 pub trait ResourceConfigurationAPI<ResourceIdType: Clone>: ResourceConfigurationAPIClone<ResourceIdType> + Sync + Send {
     async fn start(
         &mut self,
         instance_specification: ResourceInstanceSpecification,
     ) -> anyhow::Result<crate::common::StartComponentResponse<ResourceIdType>>;
+
     async fn stop(&mut self, resource_id: ResourceIdType) -> anyhow::Result<()>;
+
     async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()>;
 }
 

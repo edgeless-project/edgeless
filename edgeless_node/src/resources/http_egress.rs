@@ -5,12 +5,16 @@ use edgeless_dataplane::core::Message;
 
 #[derive(Clone)]
 pub struct EgressResourceProvider {
+    // TODO: (docs) I think the reason for having it as an inner is to
+    // synchronize accesses to it, right?
     inner: std::sync::Arc<tokio::sync::Mutex<EgressResourceProviderInner>>,
 }
 
 struct EgressResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+
+    /// there can be multiple egress resources registered on the same node
     egress_instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, EgressResource>,
 }
 
@@ -28,6 +32,8 @@ impl EgressResource {
     async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle) -> Self {
         let mut dataplane_handle = dataplane_handle;
 
+        // start handling dataplane events for this egress concurrently in an
+        // asynchronous loop
         let handle = tokio::spawn(async move {
             loop {
                 let edgeless_dataplane::core::DataplaneEvent {
@@ -52,6 +58,8 @@ impl EgressResource {
                     }
                 };
                 let mut cloned_dataplane = dataplane_handle.clone();
+
+                // egress spawns a new task to handle the request asynchronously
                 tokio::spawn(async move {
                     match Self::perform_request(req).await {
                         Ok(resp) => {

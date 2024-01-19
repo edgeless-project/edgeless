@@ -37,6 +37,7 @@ pub struct EdgelessNodeSettings {
     /// If `http_ingress_provider` is not empty, this is the URL of the
     /// HTTP web server exposed by the http-ingress resource for this node.
     pub http_ingress_url: String,
+    pub dda_sidecar_url: String,
     /// If not empty, a http-ingress resource with the given name is created.
     pub http_ingress_provider: String,
     /// If not empty, a http-egress resource with the given name is created.
@@ -147,6 +148,8 @@ pub async fn register_node(
     }
 }
 
+/// TODO: (docs) this actually just creates the resource providers, maybe rename
+/// creates resource providers, but does not call ::start on the resources?
 async fn fill_resources(
     data_plane: edgeless_dataplane::handle::DataplaneProvider,
     settings: &EdgelessNodeSettings,
@@ -155,15 +158,20 @@ async fn fill_resources(
     String,
     Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
 > {
+    // empty hashmap for resources
     let mut ret = std::collections::HashMap::<
         String,
         Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
     >::new();
 
+    // http_ingress is only started if it's configured in the settings
+    // there is one global task per node for all http ingress events! - they are
+    // then forwarded to concrete instances of ingress resource
     if !settings.http_ingress_url.is_empty() && !settings.http_ingress_provider.is_empty() {
         log::info!("Creating resource 'http-ingress-1' at {}", &settings.http_ingress_url);
         ret.insert(
             settings.http_ingress_provider.clone(),
+            // The global singleton task is started here
             resources::http_ingress::ingress_task(
                 data_plane.clone(),
                 edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
@@ -174,6 +182,10 @@ async fn fill_resources(
         provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
             provider_id: settings.http_ingress_provider.clone(),
             class_type: "http-ingress".to_string(),
+            // TODO: (docs) what is the meaning of this?
+            // in http_ingress example it is used to specify which function
+            // should handle the new_request event to the ingress in a workflow
+            // (entry point of http to the workflow)
             outputs: vec!["new_request".to_string()],
         });
     }
@@ -216,25 +228,43 @@ async fn fill_resources(
         });
     }
 
-    if !settings.redis_provider.is_empty() {
-        log::info!("Creating resource 'redis-1'");
-        ret.insert(
-            settings.redis_provider.clone(),
-            Box::new(
-                resources::redis::RedisResourceProvider::new(
-                    data_plane.clone(),
-                    edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
-                )
-                .await,
-            ),
-        );
-        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-            provider_id: settings.redis_provider.clone(),
-            class_type: "redis".to_string(),
-            outputs: vec![],
-        });
-    }
+    log::info!("Creating resource 'redis-1'");
+    ret.insert(
+        "redis-1".to_string(),
+        Box::new(
+            resources::redis::RedisResourceProvider::new(
+                data_plane.clone(),
+                edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+            )
+            .await,
+        ),
+    );
+    provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+        provider_id: "redis-1".to_string(),
+        class_type: "redis".to_string(),
+        outputs: vec![],
+    });
 
+    // Bootstrap the DDA resource if configured - it's a singleton, one per node
+    log::info!("Creating resource 'dda'");
+    if !settings.dda_sidecar_url.is_empty() {
+        log::info!("Creating resource 'dda' which connects to the sidecar at {}", &settings.dda_sidecar_url);
+        ret.insert(
+            "dda".to_string(),
+            resources::dda::start_dda_task(
+                data_plane.clone(),
+                edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+                settings.dda_sidecar_url.clone(),
+            )
+            .await,
+        );
+
+        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+            provider_id: "dda".to_string(),
+            class_type: "dda".to_string(),
+            outputs: vec![],
+        })
+    }
     ret
 }
 
@@ -325,6 +355,7 @@ http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"
 file_log_provider = "file-log-1"
 redis_provider = "redis-1"
+dda_sidecar_url = "http://127.0.0.1:10000"
 "##,
     )
 }

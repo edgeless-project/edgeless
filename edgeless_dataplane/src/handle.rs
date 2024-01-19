@@ -163,6 +163,7 @@ struct TemporaryReceivers {
 
 #[derive(Clone)]
 pub struct DataplaneProvider {
+    /// hidden behind a mutex, allows to create dataplane handles on the local node
     local_provider: std::sync::Arc<tokio::sync::Mutex<NodeLocalLinkProvider>>,
     remote_provider: std::sync::Arc<tokio::sync::Mutex<RemoteLinkProvider>>,
 }

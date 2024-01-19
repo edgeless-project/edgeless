@@ -1,9 +1,11 @@
 {
-    "id": "test_function",
+    "id": "check_temperature",
     "function_type": "RUST_WASM",
     "version": "0.1",
     "build": "Cargo.toml",
     "outputs": [
-        "dda"
+        "output",
+        "temperature_too_high",
+        "log_output"
     ]
 }

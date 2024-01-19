@@ -3,13 +3,13 @@ lto = true
 opt-level = "s"
 
 [package]
-name = "move_arm"
+name = "check_temperature"
 version = "0.1.0"
 authors = ["Lukasz Zalewski <zalewski.lukasz@siemens.com>"]
 edition = "2021"
 
 [lib]
-name = "0_dda_arm"
+name = "check_temperature"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 

@@ -3,13 +3,13 @@ lto = true
 opt-level = "s"
 
 [package]
-name = "test_function"
+name = "move_arm"
 version = "0.1.0"
 authors = ["Lukasz Zalewski <zalewski.lukasz@siemens.com>"]
 edition = "2021"
 
 [lib]
-name = "1_test_function"
+name = "move_arm"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 

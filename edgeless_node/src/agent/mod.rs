@@ -184,8 +184,11 @@ impl Agent {
                     };
                 }
                 AgentRequest::SpawnResource(instance_specification, responder) => {
+                    // find the resource provider for this type of resource
                     if let Some(resource) = resource_providers.get_mut(&instance_specification.class_type) {
                         let resource_class = instance_specification.class_type.clone();
+
+                        // TODO: (docs) Starts a new resource instance on that provider
                         let res = match resource.start(instance_specification).await {
                             Ok(val) => val,
                             Err(err) => {

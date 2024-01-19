@@ -16,4 +16,6 @@ members = [
     "edgeless_systemtests",
     "edgeless_telemetry",
     # "edgeless_embedded"
+    "examples/dda_demo/check_temperature",
+    # "examples/dda_demo/move_arm"
 ]

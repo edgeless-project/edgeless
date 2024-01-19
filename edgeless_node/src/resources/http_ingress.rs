@@ -5,6 +5,7 @@ use edgeless_api::function_instance::{ComponentId, InstanceId};
 use http_body_util::BodyExt;
 use std::str::FromStr;
 
+/// TODO: (docs) confusing naming
 struct ResourceDesc {
     host: String,
     allow: std::collections::HashSet<edgeless_http::EdgelessHTTPMethod>,
@@ -29,6 +30,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
 
     type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
+    /// Called each time a new http event appears at the global ingress
     fn call(&self, req: hyper::Request<hyper::body::Incoming>) -> Self::Future {
         let cloned = self.interests.clone();
         let cloned_addr = self.listen_addr.clone();
@@ -102,6 +104,9 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
     }
 }
 
+/// TODO: (docs) the implementation of the http_ingress differs from other
+/// resources, why?
+/// called once by fill_resources to create a task for ingress events
 pub async fn ingress_task(
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     ingress_id: edgeless_api::function_instance::InstanceId,
@@ -121,6 +126,7 @@ pub async fn ingress_task(
 
     let cloned_interests = ingress_state.clone();
 
+    // listens on the specified address for http events
     let _web_task: tokio::task::JoinHandle<anyhow::Result<()>> = tokio::spawn(async move {
         let listener = tokio::net::TcpListener::bind(addr).await?;
         loop {
@@ -135,6 +141,8 @@ pub async fn ingress_task(
             let cloned_interests = cloned_interests.clone();
             let cloned_host = host.clone();
             let cloned_port = port.clone();
+
+            // serve the ingress connection
             tokio::task::spawn(async move {
                 if let Err(err) = hyper::server::conn::http1::Builder::new()
                     .serve_connection(
@@ -161,9 +169,13 @@ pub async fn ingress_task(
 #[derive(Clone)]
 struct IngressResource {
     own_node_id: uuid::Uuid,
+    /// Only one IngressState per IngressResource
     configuration_state: std::sync::Arc<tokio::sync::Mutex<IngressState>>,
 }
 
+/// TODO: (docs) ResourceConfigurationAPI is normally implemented for an IngressResourceProvider
+/// In this case, start() just registers an interest for certain http events
+/// with the global ingress object
 #[async_trait::async_trait]
 impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for IngressResource {
     async fn start(
@@ -177,6 +189,8 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         ) {
             // Assign a new component identifier to the newly-created  resource.
             let resource_id = edgeless_api::function_instance::InstanceId::new(self.own_node_id.clone());
+            // Creates a new concrete IngressResource for the newly-created
+            // resource as specified by the workflow
             lck.active_resources.insert(
                 resource_id.function_id.clone(),
                 ResourceDesc {
@@ -216,6 +230,8 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                 return Err(anyhow::anyhow!("Missing mapping of channel: new_request"));
             }
         };
+        // TODO: (docs) does a lookup in the active_resources and tries to patch
+        // the paths?
         let mut lck = self.configuration_state.lock().await;
         let (host, allow) = match lck.active_resources.get(&update.function_id) {
             Some(val) => (val.host.clone(), val.allow.clone()),
