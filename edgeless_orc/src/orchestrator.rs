@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use edgeless_api::common::StartComponentResponse;
 use edgeless_api::function_instance::{ComponentId, InstanceId};
 
 use futures::{Future, SinkExt, StreamExt};
