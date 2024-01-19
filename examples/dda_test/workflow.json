@@ -1,0 +1,41 @@
+{
+    "functions": [
+        {
+            "name": "hello_dda",
+            "class_specification": {
+                "id": "hello_dda",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./hello_dda/hello_dda.wasm",
+                "outputs": [
+                    "dda_output",
+                    "file_log_output"
+                ]
+            },
+            "output_mapping": {
+                "dda_output": "dda-1",
+                "file_log_output": "my-log"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "dda-1",
+            "class_type": "dda",
+            "output_mapping": {},
+            "configurations": {
+                "dda_sidecar_url": "http://127.0.0.1:12000"
+            }
+        },
+        {
+            "name": "my-log",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "dda_test.log"
+            }
+        }
+    ],
+    "annotations": {}
+}

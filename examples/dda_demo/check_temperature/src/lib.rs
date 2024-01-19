@@ -11,7 +11,7 @@ impl Edgefunction for CheckTemperatureFun {
             // by the dda singleton - something is wrong in the configuration?
             // -> write a simple workflow with just one call to the dda, compare
             // dda configuration to http_ingress configuration
-            let temperature_readings = call("output", "read_temperature"); // TODO: how do we pass a parameter to the read_temperature action?
+            let temperature_readings = call("dda", "read_temperature"); // TODO: how do we pass a parameter to the read_temperature action?
             match temperature_readings {
                 CallRet::Reply(msg) => log::info!("returned {}", msg),
                 CallRet::Noreply => log::info!("dda noreply"),

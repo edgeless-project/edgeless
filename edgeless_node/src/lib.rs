@@ -245,26 +245,23 @@ async fn fill_resources(
         outputs: vec![],
     });
 
-    // Bootstrap the DDA resource if configured - it's a singleton, one per node
-    log::info!("Creating resource 'dda'");
-    if !settings.dda_sidecar_url.is_empty() {
-        log::info!("Creating resource 'dda' which connects to the sidecar at {}", &settings.dda_sidecar_url);
-        ret.insert(
-            "dda".to_string(),
-            resources::dda::start_dda_task(
+    log::info!("Creating resource 'dda-1'");
+    ret.insert(
+        "dda-1".to_string(),
+        Box::new(
+            resources::dda::DDAResourceProvider::new(
                 data_plane.clone(),
                 edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
-                settings.dda_sidecar_url.clone(),
             )
             .await,
-        );
+        ),
+    );
+    provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+        provider_id: "dda-1".to_string(),
+        class_type: "dda".to_string(),
+        outputs: vec![],
+    });
 
-        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-            provider_id: "dda".to_string(),
-            class_type: "dda".to_string(),
-            outputs: vec![],
-        })
-    }
     ret
 }
 

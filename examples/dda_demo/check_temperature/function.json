@@ -4,8 +4,8 @@
     "version": "0.1",
     "build": "Cargo.toml",
     "outputs": [
-        "output",
-        "temperature_too_high",
+        "dda",
+        "move_arm",
         "log_output"
     ]
 }

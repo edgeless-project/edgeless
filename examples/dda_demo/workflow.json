@@ -8,14 +8,14 @@
                 "version": "0.1",
                 "include_code_file": "./check_temperature/check_temperature.wasm",
                 "outputs": [
-                    "output",
-                    "temperature_too_high",
+                    "dda",
+                    "move_arm",
                     "log_output"
                 ]
             },
             "output_mapping": {
-                "output": "dda-1",
-                "temperature_too_high": "move_arm",
+                "dda": "dda-1",
+                "move_arm": "move_arm",
                 "log_output": "my-log"
             },
             "annotations": {}
@@ -28,11 +28,13 @@
                 "version": "0.1",
                 "include_code_file": "./move_arm/move_arm.wasm",
                 "outputs": [
-                    "dda"
+                    "dda",
+                    "log_output"
                 ]
             },
             "output_mapping": {
-                "dda": "dda"
+                "dda": "dda-1",
+                "log_output": "my-log"
             },
             "annotations": {}
         }
@@ -42,7 +44,9 @@
             "name": "dda-1",
             "class_type": "dda",
             "output_mapping": {},
-            "configurations": {}
+            "configurations": {
+                "dda_sidecar_url": "http://127.0.0.1:12000"
+            }
         },
         {
             "name": "my-log",

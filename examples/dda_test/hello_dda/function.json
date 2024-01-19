@@ -1,10 +1,10 @@
 {
-    "id": "move_arm",
+    "id": "hello_dda",
     "function_type": "RUST_WASM",
     "version": "0.1",
     "build": "Cargo.toml",
     "outputs": [
-        "dda",
-        "log_output"
+        "dda_output",
+        "file_log_output"
     ]
 }
