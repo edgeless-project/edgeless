@@ -30,7 +30,7 @@ Install the dependencies:
 
 ```bash
 source "$HOME/.cargo/env"
-sudo apt update && sudo apt install gcc libssl-dev pkg-config protobuf-compiler -y
+sudo apt update && sudo apt install gcc libssl-dev pkg-config protobuf-compiler make -y
 rustup target add wasm32-unknown-unknown
 cargo install wasm-tools
 ```
@@ -104,7 +104,7 @@ Install the dependencies and target architectures:
 
 ```bash
 source "$HOME/.cargo/env"
-sudo apt update && sudo apt install gcc libssl-dev pkg-config unzip gcc-aarch64-linux-gnu -y
+sudo apt update && sudo apt install gcc libssl-dev pkg-config unzip gcc-aarch64-linux-gnu make -y
 rustup target add wasm32-unknown-unknown
 rustup target add aarch64-unknown-linux-gnu
 cargo install wasm-tools
