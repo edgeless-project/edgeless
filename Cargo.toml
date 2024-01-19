@@ -15,8 +15,8 @@ members = [
     "edgeless_orc",
     "edgeless_systemtests",
     "edgeless_telemetry",
-    # "edgeless_embedded"
+    # "edgeless_embedded",
     # "examples/dda_demo/check_temperature",
-    # "examples/dda_demo/move_arm"
-    # "examples/dda_test/hello_dda"
+    # "examples/dda_demo/move_arm",
+    # "examples/dda_test/hello_dda",
 ]
