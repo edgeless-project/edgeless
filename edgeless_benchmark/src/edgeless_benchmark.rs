@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-mod workflow_spec;
 
 use anyhow::anyhow;
 use clap::Parser;
@@ -82,7 +81,7 @@ impl ClientInterface {
 
         match &self.wf_type {
             WorkflowType::Single(path_json, path_wasm) => {
-                let func_spec: workflow_spec::WorkflowSpecFunctionClass =
+                let func_spec: edgeless_cli::workflow_spec::WorkflowSpecFunctionClass =
                     serde_json::from_str(&std::fs::read_to_string(path_json.clone()).unwrap()).unwrap();
 
                 functions.push(WorkflowFunction {

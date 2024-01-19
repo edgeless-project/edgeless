@@ -968,6 +968,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "edgeless_benchmark"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "cargo",
+ "clap",
+ "edgeless_api",
+ "edgeless_cli",
+ "env_logger",
+ "futures",
+ "log",
+ "openssl",
+ "rand",
+ "rand_distr",
+ "rand_pcg",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml 0.7.6",
+ "uuid",
+]
+
+[[package]]
 name = "edgeless_cli"
 version = "0.1.0"
 dependencies = [
