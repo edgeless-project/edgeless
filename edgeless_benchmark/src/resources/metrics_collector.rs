@@ -54,7 +54,7 @@ impl MetricsCollectorResource {
                     }
                 };
 
-                log::debug!("{}", &message_data);
+                log::info!("XXX {}", &message_data);
 
                 // if let Err(e) = connection.set::<&str, &str, std::string::String>(&redis_key, &message_data) {
                 //     log::error!("Could not set key '{}' to value '{}': {}", redis_key, &message_data, e);

@@ -34,7 +34,9 @@
             "output_mapping": {
                 "metric": "metrics-collector"
             },
-            "annotations": {}
+            "annotations": {
+                "init-payload": "seed=42,inter_arrival=2000,is_first=true,is_last=true,wf_name=my_workflow,fun_name=my_function,matrix_size=1000,outputs="
+            }
         }
     ],
     "resources": [
