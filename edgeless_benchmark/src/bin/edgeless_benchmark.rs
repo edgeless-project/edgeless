@@ -56,12 +56,15 @@ fn to_microseconds(s: f64) -> u64 {
 }
 
 enum WorkflowType {
+    None,
     Single(String, String),
 }
 
 fn workflow_type(wf_type: &str) -> anyhow::Result<WorkflowType> {
     let tokens: Vec<&str> = wf_type.split(";").collect();
-    if !tokens.is_empty() && tokens[0] == "single" && tokens.len() == 3 {
+    if !tokens.is_empty() && tokens[0] == "none" {
+        return Ok(WorkflowType::None);
+    } else if !tokens.is_empty() && tokens[0] == "single" && tokens.len() == 3 {
         return Ok(WorkflowType::Single(tokens[1].to_string(), tokens[2].to_string()));
     }
     Err(anyhow!("unknown workflow type: {}", wf_type))
@@ -86,6 +89,7 @@ impl ClientInterface {
         let mut functions: Vec<WorkflowFunction> = vec![];
 
         match &self.wf_type {
+            WorkflowType::None => {}
             WorkflowType::Single(path_json, path_wasm) => {
                 let func_spec: edgeless_cli::workflow_spec::WorkflowSpecFunctionClass =
                     serde_json::from_str(&std::fs::read_to_string(path_json.clone()).unwrap()).unwrap();
@@ -103,6 +107,10 @@ impl ClientInterface {
                     annotations: std::collections::HashMap::new(),
                 });
             }
+        }
+
+        if functions.is_empty() {
+            return Ok("".to_string());
         }
 
         let res = self
@@ -194,10 +202,12 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Event::WfEnd(uuid) => {
                     log::info!("{} wf terminated  '{}'", to_seconds(now), &uuid);
-                    match client_interface.stop_workflow(&uuid).await {
-                        Ok(_) => {}
-                        Err(err) => {
-                            panic!("error when stopping a workflow: {}", err);
+                    if !uuid.is_empty() {
+                        match client_interface.stop_workflow(&uuid).await {
+                            Ok(_) => {}
+                            Err(err) => {
+                                panic!("error when stopping a workflow: {}", err);
+                            }
                         }
                     }
                 }
@@ -208,10 +218,12 @@ async fn main() -> anyhow::Result<()> {
     // terminate all workflows that are still active
     for (_, event_type) in &events {
         if let Event::WfEnd(uuid) = event_type {
-            match client_interface.stop_workflow(&uuid).await {
-                Ok(_) => {}
-                Err(err) => {
-                    panic!("error when stopping a workflow: {}", err);
+            if !uuid.is_empty() {
+                match client_interface.stop_workflow(&uuid).await {
+                    Ok(_) => {}
+                    Err(err) => {
+                        panic!("error when stopping a workflow: {}", err);
+                    }
                 }
             }
         }
