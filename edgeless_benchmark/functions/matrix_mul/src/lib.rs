@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use edgeless_function::api::*;
-use log;
 use std::num::Wrapping;
-use std::time::{Duration, Instant};
 
 struct MatrixMulFunction;
 
@@ -37,7 +35,7 @@ fn make_new_matrix(lcg: &mut Lcg, size: usize) -> Vec<f32> {
 }
 
 struct Conf {
-    inter_arrival: f32,
+    inter_arrival: std::time::Duration,
     is_first: bool,
     is_last: bool,
     wf_name: String,
@@ -46,7 +44,7 @@ struct Conf {
 }
 struct State {
     next_id: usize,
-    next_arrival: Instant,
+    next_arrival: std::time::Instant,
     lcg: Lcg,
     matrix: Vec<f32>,
 }
@@ -58,7 +56,7 @@ fn parse_init(payload: &str) -> std::collections::HashMap<&str, &str> {
     let tokens = payload.split(',');
     let mut arguments = std::collections::HashMap::new();
     for token in tokens {
-        let mut inner_tokens = token.split("=");
+        let mut inner_tokens = token.split('=');
         if let Some(key) = inner_tokens.next() {
             if let Some(value) = inner_tokens.next() {
                 arguments.insert(key, value);
@@ -74,7 +72,7 @@ fn parse_init(payload: &str) -> std::collections::HashMap<&str, &str> {
 
 impl Edgefunction for MatrixMulFunction {
     fn handle_cast(_src: InstanceId, encoded_message: String) {
-        let ts_start = Instant::now();
+        let ts_start = std::time::Instant::now();
 
         let conf = CONF.get().unwrap();
         log::info!("MatrixMul casted, wf {}, fun {}, MSG: {}", conf.wf_name, conf.fun_name, encoded_message);
@@ -91,7 +89,7 @@ impl Edgefunction for MatrixMulFunction {
             // output row
             for j in 0..n {
                 // output col
-                let mut sum = 0.0 as f32;
+                let mut sum = 0.0_f32;
                 for k in 0..n {
                     sum += state.matrix[i * n + k] * random_matrix[k * n + j];
                 }
@@ -99,7 +97,7 @@ impl Edgefunction for MatrixMulFunction {
             }
         }
         state.matrix = output_matrix;
-        let ts_end = Instant::now();
+        let ts_end = std::time::Instant::now();
         let id = match conf.is_first {
             true => state.next_id,
             false => encoded_message.parse::<usize>().unwrap_or(0),
@@ -133,11 +131,11 @@ impl Edgefunction for MatrixMulFunction {
             state.next_id += 1;
             if state.next_arrival > ts_end {
                 let time_until_next_arrival = state.next_arrival - ts_end;
-                delayed_cast(time_until_next_arrival.as_millis() as u64, "self", &"");
+                delayed_cast(time_until_next_arrival.as_millis() as u64, "self", "");
             } else {
-                cast("self", &"");
+                cast("self", "");
             }
-            state.next_arrival += Duration::from_secs_f32(conf.inter_arrival);
+            state.next_arrival += conf.inter_arrival;
         }
     }
 
@@ -155,7 +153,7 @@ impl Edgefunction for MatrixMulFunction {
 
         let seed = arguments.get("seed").unwrap_or(&"0").parse::<u32>().unwrap_or(0);
 
-        let inter_arrival = arguments.get("inter_arrival").unwrap_or(&"1.0").parse::<f32>().unwrap_or(1.0);
+        let inter_arrival = std::time::Duration::from_secs_f32(arguments.get("inter_arrival").unwrap_or(&"1.0").parse::<f32>().unwrap_or(1.0));
         let is_first = arguments.get("is_first").unwrap_or(&"false").to_lowercase() == "true";
         let is_last = arguments.get("is_last").unwrap_or(&"false").to_lowercase() == "true";
         let wf_name = arguments.get("wf_name").unwrap_or(&"no-wf-name").to_string();
@@ -168,7 +166,7 @@ impl Edgefunction for MatrixMulFunction {
         }
         let matrix_size = arguments.get("matrix_size").unwrap_or(&"100").parse::<usize>().unwrap_or(100);
         let output_value = arguments.get("outputs").unwrap_or(&"0").to_string();
-        let output_tokens = output_value.split(":");
+        let output_tokens = output_value.split(':');
         let mut outputs = std::collections::HashSet::new();
         for n in output_tokens.into_iter().map(|x| x.parse::<usize>().unwrap_or(0)).collect::<Vec<usize>>() {
             outputs.insert(format!("out-{}", n));
@@ -186,15 +184,21 @@ impl Edgefunction for MatrixMulFunction {
         let mut lcg = Lcg::new(seed);
         let matrix = make_new_matrix(&mut lcg, matrix_size);
 
+        log::info!("XXX");
+        let t = std::time::Instant::now();
+        log::info!("XXX {:?}", t);
+        let next_arrival = t + inter_arrival;
+        log::info!("XXX {:?}", t);
+
         let _ = STATE.set(std::sync::Mutex::new(State {
             next_id: 0,
-            next_arrival: Instant::now() + Duration::from_secs_f32(inter_arrival),
+            next_arrival,
             lcg,
             matrix,
         }));
 
         if is_first {
-            cast("self", &"");
+            cast("self", "");
         }
     }
 
