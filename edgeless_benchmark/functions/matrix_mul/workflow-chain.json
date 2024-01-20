@@ -1,0 +1,131 @@
+{
+    "functions": [
+        {
+            "name": "f1",
+            "class_specification": {
+                "id": "matrix_mul",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./matrix_mul.wasm",
+                "outputs": [
+                    "metric",
+                    "out-0",
+                    "out-1",
+                    "out-2",
+                    "out-3",
+                    "out-4",
+                    "out-5",
+                    "out-6",
+                    "out-7",
+                    "out-8",
+                    "out-9",
+                    "out-10",
+                    "out-11",
+                    "out-12",
+                    "out-13",
+                    "out-14",
+                    "out-15",
+                    "out-16",
+                    "out-17",
+                    "out-18",
+                    "out-19"
+                ]
+            },
+            "output_mapping": {
+                "metric": "metrics-collector",
+                "out-0": "f2"
+            },
+            "annotations": {
+                "init-payload": "seed=42,inter_arrival=2000,is_first=true,is_last=false,wf_name=wf0,fun_name=f1,matrix_size=1000,outputs=0"
+            }
+        },
+        {
+            "name": "f2",
+            "class_specification": {
+                "id": "matrix_mul",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./matrix_mul.wasm",
+                "outputs": [
+                    "metric",
+                    "out-0",
+                    "out-1",
+                    "out-2",
+                    "out-3",
+                    "out-4",
+                    "out-5",
+                    "out-6",
+                    "out-7",
+                    "out-8",
+                    "out-9",
+                    "out-10",
+                    "out-11",
+                    "out-12",
+                    "out-13",
+                    "out-14",
+                    "out-15",
+                    "out-16",
+                    "out-17",
+                    "out-18",
+                    "out-19"
+                ]
+            },
+            "output_mapping": {
+                "metric": "metrics-collector",
+                "out-0": "f3"
+            },
+            "annotations": {
+                "init-payload": "seed=42,inter_arrival=2000,is_first=false,is_last=false,wf_name=wf0,fun_name=f2,matrix_size=1000,outputs=0"
+            }
+        },
+        {
+            "name": "f3",
+            "class_specification": {
+                "id": "matrix_mul",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./matrix_mul.wasm",
+                "outputs": [
+                    "metric",
+                    "out-0",
+                    "out-1",
+                    "out-2",
+                    "out-3",
+                    "out-4",
+                    "out-5",
+                    "out-6",
+                    "out-7",
+                    "out-8",
+                    "out-9",
+                    "out-10",
+                    "out-11",
+                    "out-12",
+                    "out-13",
+                    "out-14",
+                    "out-15",
+                    "out-16",
+                    "out-17",
+                    "out-18",
+                    "out-19"
+                ]
+            },
+            "output_mapping": {
+                "metric": "metrics-collector"
+            },
+            "annotations": {
+                "init-payload": "seed=42,inter_arrival=2000,is_first=false,is_last=true,wf_name=wf0,fun_name=f3,matrix_size=1000,outputs=0"
+            }
+        }
+    ],
+    "resources": [
+        {
+            "name": "metrics-collector",
+            "class_type": "metrics-collector",
+            "output_mapping": {},
+            "configurations": {
+                "url": "redis://127.0.0.1:6379/"
+            }
+        }
+    ],
+    "annotations": {}
+}
