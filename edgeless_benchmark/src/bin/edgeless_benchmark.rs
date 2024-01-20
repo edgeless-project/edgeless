@@ -17,6 +17,12 @@ struct Args {
     /// URL of the controller
     #[arg(short, long, default_value_t = String::from("http://127.0.0.1:7001"))]
     controller_url: String,
+    /// URL of the orchestrator
+    #[arg(short, long, default_value_t = String::from("http://127.0.0.1:7011"))]
+    orchestrator_url: String,
+    /// Address to use to bind servers
+    #[arg(short, long, default_value_t = String::from("127.0.0.1"))]
+    bind_address: String,
     /// Duration of the benchmarking experiment, in s
     #[arg(short, long, default_value_t = 30.0)]
     duration: f64,
@@ -132,12 +138,30 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let args = Args::parse();
-
     let mut rng = Pcg64::seed_from_u64(args.seed);
-
     let lifetime_rv = Exp::new(1.0 / args.lifetime).unwrap();
     let interarrival_rv = Exp::new(1.0 / args.interarrival).unwrap();
 
+    // Start the metrics collector node
+    let async_runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(8).enable_all().build()?;
+    let mut async_tasks = vec![];
+    async_tasks.push(async_runtime.spawn(edgeless_benchmark::edgeless_metrics_collector_node_main(
+        edgeless_node::EdgelessNodeSettings {
+            node_id: uuid::Uuid::new_v4(),
+            agent_url: format!("http://{}:7121/", args.bind_address),
+            invocation_url: format!("http://{}:7102/", args.bind_address),
+            metrics_url: format!("http://{}:7103/", args.bind_address),
+            orchestrator_url: args.orchestrator_url,
+            http_ingress_url: "".to_string(),
+            http_ingress_provider: "".to_string(),
+            http_egress_provider: "".to_string(),
+            file_log_provider: "".to_string(),
+            redis_provider: "".to_string(),
+        },
+    )));
+    // async_runtime.block_on(async { futures::future::join_all(async_tasks).await });
+
+    // Create an e-ORC client
     let mut client_interface = ClientInterface::new(&args.controller_url, workflow_type(&args.wf_type)?).await;
 
     // event queue, the first event is always a new workflow arriving at time 0

@@ -57,11 +57,11 @@ fn get_capabilities() -> edgeless_api::node_registration::NodeCapabilities {
     }
 }
 
-async fn register_node(
+pub async fn register_node(
     settings: &EdgelessNodeSettings,
+    capabilities: edgeless_api::node_registration::NodeCapabilities,
     resource_provider_specifications: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
 ) {
-    let capabilities = get_capabilities();
     log::info!(
         "Registering this node '{}' on e-ORC {}, capabilities: {}",
         &settings.node_id,
@@ -226,7 +226,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         rust_runtime_task,
         agent_task,
         agent_api_server,
-        register_node(&settings, resource_provider_specifications)
+        register_node(&settings, get_capabilities(), resource_provider_specifications)
     );
 }
 

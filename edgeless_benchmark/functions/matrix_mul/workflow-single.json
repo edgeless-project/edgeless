@@ -1,0 +1,51 @@
+{
+    "functions": [
+        {
+            "name": "matrix_mul",
+            "class_specification": {
+                "id": "matrix_mul",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./matrix_mul.wasm",
+                "outputs": [
+                    "metric",
+                    "out-0",
+                    "out-1",
+                    "out-2",
+                    "out-3",
+                    "out-4",
+                    "out-5",
+                    "out-6",
+                    "out-7",
+                    "out-8",
+                    "out-9",
+                    "out-10",
+                    "out-11",
+                    "out-12",
+                    "out-13",
+                    "out-14",
+                    "out-15",
+                    "out-16",
+                    "out-17",
+                    "out-18",
+                    "out-19"
+                ]
+            },
+            "output_mapping": {
+                "metric": "metrics-collector"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "metrics-collector",
+            "class_type": "metrics-collector",
+            "output_mapping": {},
+            "configurations": {
+                "url": "redis://127.0.0.1:6379/"
+            }
+        }
+    ],
+    "annotations": {}
+}
