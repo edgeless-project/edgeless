@@ -1,0 +1,593 @@
+[2024-01-20T11:37:46Z WARN  cargo::util::rustc] failed to update rustc info cache: failed to write `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/.rustc_info.json`
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for edgeless_sample_function v0.1.0 (/var/home/claudio/Repo/edgeless_mvp/edgeless_benchmark/functions/matrix_mul)/Build/TargetInner { ..: lib_target("edgeless_sample_function", ["cdylib"], "/var/home/claudio/Repo/edgeless_mvp/edgeless_benchmark/functions/matrix_mul/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/edgeless_sample_function-51e9f5c6c40109d8/lib-edgeless_sample_function`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for chrono v0.4.31/Build/TargetInner { ..: lib_target("chrono", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/chrono-0.4.31/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/chrono-57b7362ff10edae5/lib-chrono`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for js-sys v0.3.67/Build/TargetInner { tested: false, doctest: false, ..: lib_target("js-sys", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/js-sys-0.3.67/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/js-sys-70808e4cabddaafc/lib-js-sys`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wasm-bindgen v0.2.90/Build/TargetInner { tested: false, ..: lib_target("wasm-bindgen", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-0.2.90/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/wasm-bindgen-73d9c257dad8154f/lib-wasm-bindgen`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for cfg-if v1.0.0/Build/TargetInner { ..: lib_target("cfg-if", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cfg-if-1.0.0/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/cfg-if-4f9846caff4b8acd/lib-cfg-if`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wasm-bindgen v0.2.90/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-0.2.90/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/wasm-bindgen-8eafffa3cd46415d/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wasm-bindgen v0.2.90/Build/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-0.2.90/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wasm-bindgen-abed3a9052c68cff/build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wasm-bindgen-macro v0.2.90/Build/TargetInner { for_host: true, proc_macro: true, ..: lib_target("wasm-bindgen-macro", ["proc-macro"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-macro-0.2.90/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wasm-bindgen-macro-84d9d587072567ce/lib-wasm-bindgen-macro`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for quote v1.0.35/Build/TargetInner { doc_scrape_examples: Disabled, ..: lib_target("quote", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-1.0.35/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/quote-d76259c4d6d37ee8/lib-quote`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for proc-macro2 v1.0.76/Build/TargetInner { doc_scrape_examples: Disabled, ..: lib_target("proc-macro2", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/proc-macro2-1.0.76/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/proc-macro2-aad2d3e135a136b8/lib-proc-macro2`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for proc-macro2 v1.0.76/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/proc-macro2-1.0.76/build.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/proc-macro2-50d9ca2725df2837/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for proc-macro2 v1.0.76/Build/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/proc-macro2-1.0.76/build.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/proc-macro2-e4faa7f48d743a33/build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for unicode-ident v1.0.12/Build/TargetInner { doc_scrape_examples: Disabled, ..: lib_target("unicode-ident", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-ident-1.0.12/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/unicode-ident-db9e303675df603f/lib-unicode-ident`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wasm-bindgen-macro-support v0.2.90/Build/TargetInner { ..: lib_target("wasm-bindgen-macro-support", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-macro-support-0.2.90/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wasm-bindgen-macro-support-0b2fe477de554442/lib-wasm-bindgen-macro-support`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for syn v2.0.48/Build/TargetInner { doc_scrape_examples: Disabled, ..: lib_target("syn", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/syn-2.0.48/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/syn-51c0991cfbb59b90/lib-syn`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wasm-bindgen-backend v0.2.90/Build/TargetInner { ..: lib_target("wasm-bindgen-backend", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-backend-0.2.90/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wasm-bindgen-backend-a7c970424b5a2a92/lib-wasm-bindgen-backend`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for bumpalo v3.14.0/Build/TargetInner { benched: false, ..: lib_target("bumpalo", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bumpalo-3.14.0/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/bumpalo-5623fb3c3e8202f3/lib-bumpalo`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for log v0.4.20/Build/TargetInner { ..: lib_target("log", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.20/src/lib.rs", Edition2015) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/log-aae2ac94d7b0e56c/lib-log`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for once_cell v1.19.0/Build/TargetInner { ..: lib_target("once_cell", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/once_cell-1.19.0/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/once_cell-7940841908f2d3ac/lib-once_cell`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wasm-bindgen-shared v0.2.90/Build/TargetInner { ..: lib_target("wasm-bindgen-shared", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-shared-0.2.90/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wasm-bindgen-shared-855c65d3fa930632/lib-wasm-bindgen-shared`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wasm-bindgen-shared v0.2.90/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-shared-0.2.90/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wasm-bindgen-shared-fbad983b69ad904a/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wasm-bindgen-shared v0.2.90/Build/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-shared-0.2.90/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wasm-bindgen-shared-bd8e3c34d19ec4cf/build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for num-traits v0.2.17/Build/TargetInner { ..: lib_target("num-traits", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/num-traits-0.2.17/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/num-traits-8d835e6449e33278/lib-num-traits`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for num-traits v0.2.17/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/num-traits-0.2.17/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/num-traits-79d01dadec8c94f0/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for num-traits v0.2.17/Build/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/num-traits-0.2.17/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/num-traits-f6f3accc185d082e/build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for autocfg v1.1.0/Build/TargetInner { ..: lib_target("autocfg", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/autocfg-1.1.0/src/lib.rs", Edition2015) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/autocfg-e580bc91d2bcf900/lib-autocfg`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for edgeless_function v0.1.0 (/var/home/claudio/Repo/edgeless_mvp/edgeless_function)/Build/TargetInner { ..: lib_target("edgeless_function", ["lib"], "/var/home/claudio/Repo/edgeless_mvp/edgeless_function/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/edgeless_function-a6ed6fa2b2109999/lib-edgeless_function`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for log v0.4.20/Build/TargetInner { ..: lib_target("log", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.20/src/lib.rs", Edition2015) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/log-fcbeb0e75d98162d/lib-log`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wit-bindgen v0.8.0/Build/TargetInner { ..: lib_target("wit-bindgen", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-0.8.0/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/wit-bindgen-4d9f661b1ac80487/lib-wit-bindgen`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for bitflags v2.4.2/Build/TargetInner { ..: lib_target("bitflags", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.4.2/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/bitflags-20477b15691a12f3/lib-bitflags`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wit-bindgen-rust-macro v0.8.0/Build/TargetInner { tested: false, doctest: false, for_host: true, proc_macro: true, ..: lib_target("wit-bindgen-rust-macro", ["proc-macro"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-rust-macro-0.8.0/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wit-bindgen-rust-macro-4fe6ce72871ac21b/lib-wit-bindgen-rust-macro`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for anyhow v1.0.79/Build/TargetInner { doc_scrape_examples: Disabled, ..: lib_target("anyhow", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anyhow-1.0.79/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/anyhow-4bf991c24bad79fe/lib-anyhow`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for anyhow v1.0.79/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anyhow-1.0.79/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/anyhow-32cb6d31dcbce4f2/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for anyhow v1.0.79/Build/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anyhow-1.0.79/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/anyhow-67e26e5d29b4ef53/build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wit-bindgen-core v0.8.0/Build/TargetInner { doctest: false, ..: lib_target("wit-bindgen-core", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-core-0.8.0/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wit-bindgen-core-3cd4b9d69c4e6660/lib-wit-bindgen-core`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wit-component v0.11.0/Build/TargetInner { ..: lib_target("wit-component", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-component-0.11.0/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wit-component-b921dca2e43dc39c/lib-wit-component`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for bitflags v1.3.2/Build/TargetInner { ..: lib_target("bitflags", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-1.3.2/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/bitflags-11f705b2723a91b6/lib-bitflags`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for indexmap v1.9.3/Build/TargetInner { benched: false, ..: lib_target("indexmap", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/indexmap-1.9.3/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/indexmap-dd749c369e7dee60/lib-indexmap`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for hashbrown v0.12.3/Build/TargetInner { ..: lib_target("hashbrown", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/hashbrown-0.12.3/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/hashbrown-db7e658b5db67947/lib-hashbrown`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for indexmap v1.9.3/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/indexmap-1.9.3/build.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/indexmap-fa67ec150ae12f62/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for indexmap v1.9.3/Build/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/indexmap-1.9.3/build.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/indexmap-efa44f3b2717f24d/build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for serde v1.0.195/Build/TargetInner { doc_scrape_examples: Disabled, ..: lib_target("serde", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde-1.0.195/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/serde-1a72e14948c91378/lib-serde`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for serde v1.0.195/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde-1.0.195/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/serde-e02e18617a0c9612/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for serde v1.0.195/Build/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde-1.0.195/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/serde-2d2fd6e86bf2ec70/build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for serde_derive v1.0.195/Build/TargetInner { for_host: true, proc_macro: true, ..: lib_target("serde_derive", ["proc-macro"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde_derive-1.0.195/src/lib.rs", Edition2015) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/serde_derive-a664063632b80c0d/lib-serde_derive`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wasm-encoder v0.29.0/Build/TargetInner { ..: lib_target("wasm-encoder", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-encoder-0.29.0/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wasm-encoder-ad1e50ef4826dcdb/lib-wasm-encoder`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for leb128 v0.2.5/Build/TargetInner { ..: lib_target("leb128", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/leb128-0.2.5/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/leb128-be5daf26d35c3daf/lib-leb128`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wasm-metadata v0.8.0/Build/TargetInner { ..: lib_target("wasm-metadata", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-metadata-0.8.0/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wasm-metadata-a536db6ce74aab38/lib-wasm-metadata`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wasmparser v0.107.0/Build/TargetInner { ..: lib_target("wasmparser", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasmparser-0.107.0/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wasmparser-f9c021ede2b97b32/lib-wasmparser`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for semver v1.0.21/Build/TargetInner { doc_scrape_examples: Disabled, ..: lib_target("semver", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/semver-1.0.21/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/semver-e63ec9ff4affa441/lib-semver`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for semver v1.0.21/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/semver-1.0.21/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/semver-ce8515112c4d3b0c/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for semver v1.0.21/Build/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/semver-1.0.21/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/semver-7bb73d9b3cb11e83/build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wit-parser v0.8.0/Build/TargetInner { ..: lib_target("wit-parser", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-parser-0.8.0/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wit-parser-d39ad60e4073bcfd/lib-wit-parser`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for id-arena v2.2.1/Build/TargetInner { ..: lib_target("id-arena", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/id-arena-2.2.1/src/lib.rs", Edition2015) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/id-arena-a65008235ac7fae9/lib-id-arena`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for pulldown-cmark v0.8.0/Build/TargetInner { ..: lib_target("pulldown-cmark", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/pulldown-cmark-0.8.0/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/pulldown-cmark-5be84d1f113b5331/lib-pulldown-cmark`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for memchr v2.7.1/Build/TargetInner { benched: false, ..: lib_target("memchr", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/memchr-2.7.1/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/memchr-df140dc45715ea98/lib-memchr`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for pulldown-cmark v0.8.0/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/pulldown-cmark-0.8.0/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/pulldown-cmark-71703f96b602d1f0/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for pulldown-cmark v0.8.0/Build/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/pulldown-cmark-0.8.0/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/pulldown-cmark-5de9ff3f4d00c853/build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for unicase v2.7.0/Build/TargetInner { ..: lib_target("unicase", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicase-2.7.0/src/lib.rs", Edition2015) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/unicase-cbc66a8afaadd3ed/lib-unicase`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for unicase v2.7.0/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicase-2.7.0/build.rs", Edition2015) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/unicase-06819a4a081da449/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for unicase v2.7.0/Build/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicase-2.7.0/build.rs", Edition2015) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/unicase-e97d6f5b7095fad3/build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for version_check v0.9.4/Build/TargetInner { ..: lib_target("version_check", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.4/src/lib.rs", Edition2015) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/version_check-8f1d29bbcfd11282/lib-version_check`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for unicode-xid v0.2.4/Build/TargetInner { ..: lib_target("unicode-xid", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-xid-0.2.4/src/lib.rs", Edition2015) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/unicode-xid-2f98eaf22fb52c20/lib-unicode-xid`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for url v2.5.0/Build/TargetInner { ..: lib_target("url", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.0/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/url-a30136803f130a6d/lib-url`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for form_urlencoded v1.2.1/Build/TargetInner { tested: false, ..: lib_target("form_urlencoded", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/form_urlencoded-1.2.1/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/form_urlencoded-77ac8f812674432f/lib-form_urlencoded`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for percent-encoding v2.3.1/Build/TargetInner { ..: lib_target("percent-encoding", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/percent-encoding-2.3.1/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/percent-encoding-c978f0e5be4686bc/lib-percent-encoding`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for idna v0.5.0/Build/TargetInner { doctest: false, ..: lib_target("idna", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/idna-0.5.0/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/idna-af9ed2be6d085db4/lib-idna`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for unicode-bidi v0.3.15/Build/TargetInner { ..: lib_target("unicode_bidi", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-bidi-0.3.15/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/unicode-bidi-64562a706135eb88/lib-unicode_bidi`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for unicode-normalization v0.1.22/Build/TargetInner { ..: lib_target("unicode-normalization", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-normalization-0.1.22/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/unicode-normalization-3309866749779d20/lib-unicode-normalization`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for tinyvec v1.6.0/Build/TargetInner { ..: lib_target("tinyvec", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinyvec-1.6.0/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/tinyvec-b1bd6fdfe74f3e31/lib-tinyvec`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for tinyvec_macros v0.1.1/Build/TargetInner { ..: lib_target("tinyvec_macros", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinyvec_macros-0.1.1/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/tinyvec_macros-7f54c64e8abec907/lib-tinyvec_macros`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wit-bindgen-rust v0.8.0/Build/TargetInner { tested: false, doctest: false, ..: lib_target("wit-bindgen-rust", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-rust-0.8.0/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wit-bindgen-rust-9e43d8c1ee7a82ec/lib-wit-bindgen-rust`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for heck v0.4.1/Build/TargetInner { ..: lib_target("heck", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/heck-0.4.1/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/heck-c48dc0861d5cbb2d/lib-heck`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for unicode-segmentation v1.10.1/Build/TargetInner { ..: lib_target("unicode-segmentation", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-segmentation-1.10.1/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/unicode-segmentation-b916fcf936604881/lib-unicode-segmentation`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wit-bindgen-rust v0.8.0/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-rust-0.8.0/build.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wit-bindgen-rust-2e677966433be536/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wit-bindgen-rust v0.8.0/Build/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-rust-0.8.0/build.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wit-bindgen-rust-f4a31013a50ed6a3/build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for wit-bindgen-rust-lib v0.8.0/Build/TargetInner { tested: false, doctest: false, ..: lib_target("wit-bindgen-rust-lib", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-rust-lib-0.8.0/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/wit-bindgen-rust-lib-6b50ec7977b47d89/lib-wit-bindgen-rust-lib`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for serde v1.0.195/Build/TargetInner { doc_scrape_examples: Disabled, ..: lib_target("serde", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde-1.0.195/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/serde-dfb026d15be375b0/lib-serde`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for serde v1.0.195/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde-1.0.195/build.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/serde-65b95ea0868070d5/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for serde_json v1.0.111/Build/TargetInner { doc_scrape_examples: Disabled, ..: lib_target("serde_json", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde_json-1.0.111/src/lib.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/serde_json-af25e9166b3fe0ab/lib-serde_json`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for itoa v1.0.10/Build/TargetInner { doc_scrape_examples: Disabled, ..: lib_target("itoa", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/itoa-1.0.10/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/itoa-ea9390493f0a1061/lib-itoa`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for ryu v1.0.16/Build/TargetInner { doc_scrape_examples: Disabled, ..: lib_target("ryu", ["lib"], "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ryu-1.0.16/src/lib.rs", Edition2018) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/ryu-8c160cff4a61aa18/lib-ryu`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for serde_json v1.0.111/RunCustomBuild/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde_json-1.0.111/build.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/.fingerprint/serde_json-4fd407bb06ffedb2/run-build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint] fingerprint error for serde_json v1.0.111/Build/TargetInner { ..: custom_build_target("build-script-build", "/home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde_json-1.0.111/build.rs", Edition2021) }
+[2024-01-20T11:37:46Z INFO  cargo::core::compiler::fingerprint]     err: failed to read `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/.fingerprint/serde_json-93239c1890b5c06a/build-script-build-script-build`
+    
+    Caused by:
+        No such file or directory (os error 2)
+   Compiling proc-macro2 v1.0.76
+   Compiling unicode-ident v1.0.12
+   Compiling autocfg v1.1.0
+   Compiling serde v1.0.195
+   Compiling log v0.4.20
+   Compiling semver v1.0.21
+   Compiling version_check v0.9.4
+   Compiling tinyvec_macros v0.1.1
+   Compiling anyhow v1.0.79
+   Compiling hashbrown v0.12.3
+   Compiling unicode-bidi v0.3.15
+   Compiling percent-encoding v2.3.1
+   Compiling pulldown-cmark v0.8.0
+   Compiling memchr v2.7.1
+   Compiling bitflags v1.3.2
+   Compiling leb128 v0.2.5
+   Compiling unicode-xid v0.2.4
+   Compiling id-arena v2.2.1
+   Compiling wasm-bindgen-shared v0.2.90
+   Compiling unicode-segmentation v1.10.1
+   Compiling bumpalo v3.14.0
+   Compiling once_cell v1.19.0
+   Compiling wit-bindgen-rust v0.8.0
+   Compiling wasm-bindgen v0.2.90
+   Compiling cfg-if v1.0.0
+   Compiling bitflags v2.4.2
+   Compiling serde_json v1.0.111
+   Compiling ryu v1.0.16
+   Compiling itoa v1.0.10
+     Running `rustc --crate-name build_script_build --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/proc-macro2-1.0.76/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="proc-macro"' -C metadata=e4faa7f48d743a33 -C extra-filename=-e4faa7f48d743a33 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/proc-macro2-e4faa7f48d743a33 -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name unicode_ident --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-ident-1.0.12/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=db9e303675df603f -C extra-filename=-db9e303675df603f --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name autocfg /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/autocfg-1.1.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=e580bc91d2bcf900 -C extra-filename=-e580bc91d2bcf900 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name build_script_build --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde-1.0.195/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="derive"' --cfg 'feature="serde_derive"' --cfg 'feature="std"' -C metadata=2d2fd6e86bf2ec70 -C extra-filename=-2d2fd6e86bf2ec70 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/serde-2d2fd6e86bf2ec70 -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name log /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.20/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=aae2ac94d7b0e56c -C extra-filename=-aae2ac94d7b0e56c --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name build_script_build --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/semver-1.0.21/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="std"' -C metadata=7bb73d9b3cb11e83 -C extra-filename=-7bb73d9b3cb11e83 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/semver-7bb73d9b3cb11e83 -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name version_check /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/version_check-0.9.4/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=8f1d29bbcfd11282 -C extra-filename=-8f1d29bbcfd11282 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name tinyvec_macros --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinyvec_macros-0.1.1/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=7f54c64e8abec907 -C extra-filename=-7f54c64e8abec907 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name leb128 --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/leb128-0.2.5/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=be5daf26d35c3daf -C extra-filename=-be5daf26d35c3daf --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name build_script_build --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anyhow-1.0.79/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="std"' -C metadata=67e26e5d29b4ef53 -C extra-filename=-67e26e5d29b4ef53 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/anyhow-67e26e5d29b4ef53 -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name hashbrown --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/hashbrown-0.12.3/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="raw"' -C metadata=db7e658b5db67947 -C extra-filename=-db7e658b5db67947 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name id_arena /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/id-arena-2.2.1/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="std"' -C metadata=a65008235ac7fae9 -C extra-filename=-a65008235ac7fae9 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name unicode_bidi --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-bidi-0.3.15/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="hardcoded-data"' --cfg 'feature="std"' -C metadata=64562a706135eb88 -C extra-filename=-64562a706135eb88 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name build_script_build --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-shared-0.2.90/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debug-assertions=off -C metadata=bd8e3c34d19ec4cf -C extra-filename=-bd8e3c34d19ec4cf --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/wasm-bindgen-shared-bd8e3c34d19ec4cf -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name percent_encoding --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/percent-encoding-2.3.1/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="alloc"' --cfg 'feature="default"' --cfg 'feature="std"' -C metadata=c978f0e5be4686bc -C extra-filename=-c978f0e5be4686bc --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name build_script_build --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/pulldown-cmark-0.8.0/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debug-assertions=off -C metadata=5de9ff3f4d00c853 -C extra-filename=-5de9ff3f4d00c853 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/pulldown-cmark-5de9ff3f4d00c853 -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name memchr --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/memchr-2.7.1/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="alloc"' --cfg 'feature="default"' --cfg 'feature="std"' -C metadata=df140dc45715ea98 -C extra-filename=-df140dc45715ea98 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name bitflags --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-1.3.2/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' -C metadata=11f705b2723a91b6 -C extra-filename=-11f705b2723a91b6 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name unicode_segmentation --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-segmentation-1.10.1/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=b916fcf936604881 -C extra-filename=-b916fcf936604881 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name once_cell --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/once_cell-1.19.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="alloc"' --cfg 'feature="default"' --cfg 'feature="race"' --cfg 'feature="std"' -C metadata=7940841908f2d3ac -C extra-filename=-7940841908f2d3ac --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name build_script_build --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-0.2.90/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="spans"' --cfg 'feature="std"' -C metadata=abed3a9052c68cff -C extra-filename=-abed3a9052c68cff --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/wasm-bindgen-abed3a9052c68cff -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name unicode_xid /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-xid-0.2.4/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' -C metadata=2f98eaf22fb52c20 -C extra-filename=-2f98eaf22fb52c20 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name log /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/log-0.4.20/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto -C metadata=fcbeb0e75d98162d -C extra-filename=-fcbeb0e75d98162d --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name ryu --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/ryu-1.0.16/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto -C metadata=8c160cff4a61aa18 -C extra-filename=-8c160cff4a61aa18 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name bumpalo --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bumpalo-3.14.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' -C metadata=5623fb3c3e8202f3 -C extra-filename=-5623fb3c3e8202f3 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name cfg_if --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/cfg-if-1.0.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto -C metadata=4f9846caff4b8acd -C extra-filename=-4f9846caff4b8acd --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name bitflags --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/bitflags-2.4.2/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto -C metadata=20477b15691a12f3 -C extra-filename=-20477b15691a12f3 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name itoa --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/itoa-1.0.10/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto -C metadata=ea9390493f0a1061 -C extra-filename=-ea9390493f0a1061 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name build_script_build --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-rust-0.8.0/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debug-assertions=off -C metadata=f4a31013a50ed6a3 -C extra-filename=-f4a31013a50ed6a3 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/wit-bindgen-rust-f4a31013a50ed6a3 -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `rustc --crate-name build_script_build --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde_json-1.0.111/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="std"' -C metadata=93239c1890b5c06a -C extra-filename=-93239c1890b5c06a --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/serde_json-93239c1890b5c06a -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+   Compiling tinyvec v1.6.0
+     Running `rustc --crate-name tinyvec --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/tinyvec-1.6.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="alloc"' --cfg 'feature="default"' --cfg 'feature="tinyvec_macros"' -C metadata=b1bd6fdfe74f3e31 -C extra-filename=-b1bd6fdfe74f3e31 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern tinyvec_macros=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libtinyvec_macros-7f54c64e8abec907.rmeta --cap-lints allow`
+   Compiling wasm-encoder v0.29.0
+     Running `rustc --crate-name wasm_encoder --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-encoder-0.29.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=ad1e50ef4826dcdb -C extra-filename=-ad1e50ef4826dcdb --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern leb128=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libleb128-be5daf26d35c3daf.rmeta --cap-lints allow`
+   Compiling form_urlencoded v1.2.1
+     Running `rustc --crate-name form_urlencoded --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/form_urlencoded-1.2.1/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="alloc"' --cfg 'feature="default"' --cfg 'feature="std"' -C metadata=77ac8f812674432f -C extra-filename=-77ac8f812674432f --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern percent_encoding=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libpercent_encoding-c978f0e5be4686bc.rmeta --cap-lints allow`
+   Compiling unicase v2.7.0
+     Running `rustc --crate-name build_script_build /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicase-2.7.0/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debug-assertions=off -C metadata=e97d6f5b7095fad3 -C extra-filename=-e97d6f5b7095fad3 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/unicase-e97d6f5b7095fad3 -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern version_check=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libversion_check-8f1d29bbcfd11282.rlib --cap-lints allow`
+   Compiling indexmap v1.9.3
+   Compiling num-traits v0.2.17
+     Running `rustc --crate-name build_script_build --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/indexmap-1.9.3/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="serde"' -C metadata=efa44f3b2717f24d -C extra-filename=-efa44f3b2717f24d --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/indexmap-efa44f3b2717f24d -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern autocfg=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libautocfg-e580bc91d2bcf900.rlib --cap-lints allow`
+     Running `rustc --crate-name build_script_build --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/num-traits-0.2.17/build.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debug-assertions=off -C metadata=f6f3accc185d082e -C extra-filename=-f6f3accc185d082e --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/num-traits-f6f3accc185d082e -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern autocfg=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libautocfg-e580bc91d2bcf900.rlib --cap-lints allow`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/wasm-bindgen-abed3a9052c68cff/build-script-build`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/serde-2d2fd6e86bf2ec70/build-script-build`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/serde-2d2fd6e86bf2ec70/build-script-build`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/semver-7bb73d9b3cb11e83/build-script-build`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/pulldown-cmark-5de9ff3f4d00c853/build-script-build`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/anyhow-67e26e5d29b4ef53/build-script-build`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/proc-macro2-e4faa7f48d743a33/build-script-build`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/serde_json-93239c1890b5c06a/build-script-build`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/wit-bindgen-rust-f4a31013a50ed6a3/build-script-build`
+     Running `rustc --crate-name semver --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/semver-1.0.21/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="std"' -C metadata=e63ec9ff4affa441 -C extra-filename=-e63ec9ff4affa441 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/wasm-bindgen-shared-bd8e3c34d19ec4cf/build-script-build`
+     Running `rustc --crate-name wasm_bindgen_shared --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-shared-0.2.90/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=855c65d3fa930632 -C extra-filename=-855c65d3fa930632 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow`
+   Compiling heck v0.4.1
+     Running `rustc --crate-name heck --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/heck-0.4.1/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="unicode"' --cfg 'feature="unicode-segmentation"' -C metadata=c48dc0861d5cbb2d -C extra-filename=-c48dc0861d5cbb2d --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern unicode_segmentation=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libunicode_segmentation-b916fcf936604881.rmeta --cap-lints allow`
+     Running `rustc --crate-name proc_macro2 --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/proc-macro2-1.0.76/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="proc-macro"' -C metadata=aad2d3e135a136b8 -C extra-filename=-aad2d3e135a136b8 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern unicode_ident=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libunicode_ident-db9e303675df603f.rmeta --cap-lints allow --cfg wrap_proc_macro`
+     Running `rustc --crate-name anyhow --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/anyhow-1.0.79/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="std"' -C metadata=4bf991c24bad79fe -C extra-filename=-4bf991c24bad79fe --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow --cfg std_backtrace`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/unicase-e97d6f5b7095fad3/build-script-build`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/indexmap-efa44f3b2717f24d/build-script-build`
+     Running `/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/build/num-traits-f6f3accc185d082e/build-script-build`
+     Running `rustc --crate-name unicase /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicase-2.7.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=cbc66a8afaadd3ed -C extra-filename=-cbc66a8afaadd3ed --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow --cfg __unicase__iter_cmp --cfg __unicase__default_hasher --cfg __unicase__const_fns --cfg __unicase__core_and_alloc`
+   Compiling quote v1.0.35
+     Running `rustc --crate-name quote --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/quote-1.0.35/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="proc-macro"' -C metadata=d76259c4d6d37ee8 -C extra-filename=-d76259c4d6d37ee8 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern proc_macro2=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libproc_macro2-aad2d3e135a136b8.rmeta --cap-lints allow`
+   Compiling unicode-normalization v0.1.22
+     Running `rustc --crate-name unicode_normalization --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/unicode-normalization-0.1.22/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="std"' -C metadata=3309866749779d20 -C extra-filename=-3309866749779d20 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern tinyvec=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libtinyvec-b1bd6fdfe74f3e31.rmeta --cap-lints allow`
+     Running `rustc --crate-name pulldown_cmark --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/pulldown-cmark-0.8.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=5be84d1f113b5331 -C extra-filename=-5be84d1f113b5331 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern bitflags=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libbitflags-11f705b2723a91b6.rmeta --extern memchr=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libmemchr-df140dc45715ea98.rmeta --extern unicase=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libunicase-cbc66a8afaadd3ed.rmeta --cap-lints allow`
+   Compiling syn v2.0.48
+     Running `rustc --crate-name syn --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/syn-2.0.48/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="clone-impls"' --cfg 'feature="default"' --cfg 'feature="derive"' --cfg 'feature="full"' --cfg 'feature="parsing"' --cfg 'feature="printing"' --cfg 'feature="proc-macro"' --cfg 'feature="quote"' --cfg 'feature="visit"' -C metadata=51c0991cfbb59b90 -C extra-filename=-51c0991cfbb59b90 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern proc_macro2=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libproc_macro2-aad2d3e135a136b8.rmeta --extern quote=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libquote-d76259c4d6d37ee8.rmeta --extern unicode_ident=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libunicode_ident-db9e303675df603f.rmeta --cap-lints allow`
+     Running `rustc --crate-name num_traits --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/num-traits-0.2.17/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto -C metadata=8d835e6449e33278 -C extra-filename=-8d835e6449e33278 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --cap-lints allow --cfg has_to_int_unchecked --cfg has_reverse_bits --cfg has_leading_trailing_ones --cfg has_div_euclid --cfg has_is_subnormal --cfg has_int_to_from_bytes --cfg has_float_to_from_bytes`
+   Compiling idna v0.5.0
+     Running `rustc --crate-name idna --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/idna-0.5.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="alloc"' --cfg 'feature="default"' --cfg 'feature="std"' -C metadata=af9ed2be6d085db4 -C extra-filename=-af9ed2be6d085db4 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern unicode_bidi=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libunicode_bidi-64562a706135eb88.rmeta --extern unicode_normalization=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libunicode_normalization-3309866749779d20.rmeta --cap-lints allow`
+   Compiling url v2.5.0
+     Running `rustc --crate-name url --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/url-2.5.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' -C metadata=a30136803f130a6d -C extra-filename=-a30136803f130a6d --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern form_urlencoded=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libform_urlencoded-77ac8f812674432f.rmeta --extern idna=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libidna-af9ed2be6d085db4.rmeta --extern percent_encoding=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libpercent_encoding-c978f0e5be4686bc.rmeta --cap-lints allow`
+   Compiling wasm-bindgen-backend v0.2.90
+     Running `rustc --crate-name wasm_bindgen_backend --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-backend-0.2.90/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="spans"' -C metadata=a7c970424b5a2a92 -C extra-filename=-a7c970424b5a2a92 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern bumpalo=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libbumpalo-5623fb3c3e8202f3.rmeta --extern log=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/liblog-aae2ac94d7b0e56c.rmeta --extern once_cell=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libonce_cell-7940841908f2d3ac.rmeta --extern proc_macro2=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libproc_macro2-aad2d3e135a136b8.rmeta --extern quote=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libquote-d76259c4d6d37ee8.rmeta --extern syn=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libsyn-51c0991cfbb59b90.rmeta --extern wasm_bindgen_shared=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwasm_bindgen_shared-855c65d3fa930632.rmeta --cap-lints allow`
+   Compiling serde_derive v1.0.195
+     Running `rustc --crate-name serde_derive /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde_derive-1.0.195/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type proc-macro --emit=dep-info,link -C prefer-dynamic -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' -C metadata=a664063632b80c0d -C extra-filename=-a664063632b80c0d --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern proc_macro2=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libproc_macro2-aad2d3e135a136b8.rlib --extern quote=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libquote-d76259c4d6d37ee8.rlib --extern syn=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libsyn-51c0991cfbb59b90.rlib --extern proc_macro --cap-lints allow`
+   Compiling wasm-bindgen-macro-support v0.2.90
+     Running `rustc --crate-name wasm_bindgen_macro_support --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-macro-support-0.2.90/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="spans"' -C metadata=0b2fe477de554442 -C extra-filename=-0b2fe477de554442 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern proc_macro2=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libproc_macro2-aad2d3e135a136b8.rmeta --extern quote=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libquote-d76259c4d6d37ee8.rmeta --extern syn=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libsyn-51c0991cfbb59b90.rmeta --extern wasm_bindgen_backend=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwasm_bindgen_backend-a7c970424b5a2a92.rmeta --extern wasm_bindgen_shared=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwasm_bindgen_shared-855c65d3fa930632.rmeta --cap-lints allow`
+   Compiling wasm-bindgen-macro v0.2.90
+     Running `rustc --crate-name wasm_bindgen_macro --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-macro-0.2.90/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type proc-macro --emit=dep-info,link -C prefer-dynamic -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="spans"' -C metadata=84d9d587072567ce -C extra-filename=-84d9d587072567ce --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern quote=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libquote-d76259c4d6d37ee8.rlib --extern wasm_bindgen_macro_support=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwasm_bindgen_macro_support-0b2fe477de554442.rlib --extern proc_macro --cap-lints allow`
+     Running `rustc --crate-name wasm_bindgen --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-bindgen-0.2.90/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto --cfg 'feature="default"' --cfg 'feature="spans"' --cfg 'feature="std"' -C metadata=73d9c257dad8154f -C extra-filename=-73d9c257dad8154f --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern cfg_if=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libcfg_if-4f9846caff4b8acd.rmeta --extern wasm_bindgen_macro=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwasm_bindgen_macro-84d9d587072567ce.so --cap-lints allow`
+   Compiling js-sys v0.3.67
+     Running `rustc --crate-name js_sys --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/js-sys-0.3.67/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto -C metadata=70808e4cabddaafc -C extra-filename=-70808e4cabddaafc --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern wasm_bindgen=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libwasm_bindgen-73d9c257dad8154f.rmeta --cap-lints allow`
+     Running `rustc --crate-name serde --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde-1.0.195/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="default"' --cfg 'feature="derive"' --cfg 'feature="serde_derive"' --cfg 'feature="std"' -C metadata=1a72e14948c91378 -C extra-filename=-1a72e14948c91378 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern serde_derive=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libserde_derive-a664063632b80c0d.so --cap-lints allow`
+     Running `rustc --crate-name serde --edition=2018 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde-1.0.195/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto --cfg 'feature="default"' --cfg 'feature="derive"' --cfg 'feature="serde_derive"' --cfg 'feature="std"' -C metadata=dfb026d15be375b0 -C extra-filename=-dfb026d15be375b0 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern serde_derive=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libserde_derive-a664063632b80c0d.so --cap-lints allow`
+   Compiling chrono v0.4.31
+     Running `rustc --crate-name chrono --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/chrono-0.4.31/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto --cfg 'feature="js-sys"' --cfg 'feature="wasm-bindgen"' --cfg 'feature="wasmbind"' -C metadata=57b7362ff10edae5 -C extra-filename=-57b7362ff10edae5 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern js_sys=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libjs_sys-70808e4cabddaafc.rmeta --extern num_traits=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libnum_traits-8d835e6449e33278.rmeta --extern wasm_bindgen=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libwasm_bindgen-73d9c257dad8154f.rmeta --cap-lints allow`
+     Running `rustc --crate-name serde_json --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/serde_json-1.0.111/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto --cfg 'feature="default"' --cfg 'feature="std"' -C metadata=af25e9166b3fe0ab -C extra-filename=-af25e9166b3fe0ab --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern itoa=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libitoa-ea9390493f0a1061.rmeta --extern ryu=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libryu-8c160cff4a61aa18.rmeta --extern serde=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libserde-dfb026d15be375b0.rmeta --cap-lints allow --cfg limb_width_32`
+     Running `rustc --crate-name indexmap --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/indexmap-1.9.3/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off --cfg 'feature="serde"' -C metadata=dd749c369e7dee60 -C extra-filename=-dd749c369e7dee60 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern hashbrown=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libhashbrown-db7e658b5db67947.rmeta --extern serde=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libserde-1a72e14948c91378.rmeta --cap-lints allow --cfg has_std`
+   Compiling wasmparser v0.107.0
+   Compiling wit-parser v0.8.0
+     Running `rustc --crate-name wasmparser --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasmparser-0.107.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=f9c021ede2b97b32 -C extra-filename=-f9c021ede2b97b32 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern indexmap=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libindexmap-dd749c369e7dee60.rmeta --extern semver=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libsemver-e63ec9ff4affa441.rmeta --cap-lints allow`
+     Running `rustc --crate-name wit_parser --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-parser-0.8.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=d39ad60e4073bcfd -C extra-filename=-d39ad60e4073bcfd --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern anyhow=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libanyhow-4bf991c24bad79fe.rmeta --extern id_arena=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libid_arena-a65008235ac7fae9.rmeta --extern indexmap=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libindexmap-dd749c369e7dee60.rmeta --extern log=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/liblog-aae2ac94d7b0e56c.rmeta --extern pulldown_cmark=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libpulldown_cmark-5be84d1f113b5331.rmeta --extern semver=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libsemver-e63ec9ff4affa441.rmeta --extern unicode_xid=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libunicode_xid-2f98eaf22fb52c20.rmeta --extern url=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/liburl-a30136803f130a6d.rmeta --cap-lints allow`
+   Compiling wasm-metadata v0.8.0
+     Running `rustc --crate-name wasm_metadata --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wasm-metadata-0.8.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=a536db6ce74aab38 -C extra-filename=-a536db6ce74aab38 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern anyhow=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libanyhow-4bf991c24bad79fe.rmeta --extern indexmap=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libindexmap-dd749c369e7dee60.rmeta --extern serde=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libserde-1a72e14948c91378.rmeta --extern wasm_encoder=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwasm_encoder-ad1e50ef4826dcdb.rmeta --extern wasmparser=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwasmparser-f9c021ede2b97b32.rmeta --cap-lints allow`
+   Compiling wit-component v0.11.0
+     Running `rustc --crate-name wit_component --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-component-0.11.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=b921dca2e43dc39c -C extra-filename=-b921dca2e43dc39c --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern anyhow=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libanyhow-4bf991c24bad79fe.rmeta --extern bitflags=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libbitflags-11f705b2723a91b6.rmeta --extern indexmap=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libindexmap-dd749c369e7dee60.rmeta --extern log=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/liblog-aae2ac94d7b0e56c.rmeta --extern wasm_encoder=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwasm_encoder-ad1e50ef4826dcdb.rmeta --extern wasm_metadata=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwasm_metadata-a536db6ce74aab38.rmeta --extern wasmparser=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwasmparser-f9c021ede2b97b32.rmeta --extern wit_parser=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwit_parser-d39ad60e4073bcfd.rmeta --cap-lints allow`
+   Compiling wit-bindgen-core v0.8.0
+     Running `rustc --crate-name wit_bindgen_core --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-core-0.8.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=3cd4b9d69c4e6660 -C extra-filename=-3cd4b9d69c4e6660 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern anyhow=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libanyhow-4bf991c24bad79fe.rmeta --extern wit_component=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwit_component-b921dca2e43dc39c.rmeta --extern wit_parser=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwit_parser-d39ad60e4073bcfd.rmeta --cap-lints allow`
+   Compiling wit-bindgen-rust-lib v0.8.0
+     Running `rustc --crate-name wit_bindgen_rust_lib --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-rust-lib-0.8.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=6b50ec7977b47d89 -C extra-filename=-6b50ec7977b47d89 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern heck=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libheck-c48dc0861d5cbb2d.rmeta --extern wit_bindgen_core=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwit_bindgen_core-3cd4b9d69c4e6660.rmeta --cap-lints allow`
+     Running `rustc --crate-name wit_bindgen_rust --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-rust-0.8.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C embed-bitcode=no -C debug-assertions=off -C metadata=9e43d8c1ee7a82ec -C extra-filename=-9e43d8c1ee7a82ec --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern heck=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libheck-c48dc0861d5cbb2d.rmeta --extern wasm_metadata=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwasm_metadata-a536db6ce74aab38.rmeta --extern wit_bindgen_core=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwit_bindgen_core-3cd4b9d69c4e6660.rmeta --extern wit_bindgen_rust_lib=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwit_bindgen_rust_lib-6b50ec7977b47d89.rmeta --extern wit_component=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwit_component-b921dca2e43dc39c.rmeta --cap-lints allow`
+   Compiling wit-bindgen-rust-macro v0.8.0
+     Running `rustc --crate-name wit_bindgen_rust_macro --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-rust-macro-0.8.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type proc-macro --emit=dep-info,link -C prefer-dynamic -C embed-bitcode=no -C debug-assertions=off -C metadata=4fe6ce72871ac21b -C extra-filename=-4fe6ce72871ac21b --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern anyhow=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libanyhow-4bf991c24bad79fe.rlib --extern proc_macro2=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libproc_macro2-aad2d3e135a136b8.rlib --extern syn=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libsyn-51c0991cfbb59b90.rlib --extern wit_bindgen_core=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwit_bindgen_core-3cd4b9d69c4e6660.rlib --extern wit_bindgen_rust=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwit_bindgen_rust-9e43d8c1ee7a82ec.rlib --extern wit_component=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwit_component-b921dca2e43dc39c.rlib --extern proc_macro --cap-lints allow`
+   Compiling wit-bindgen v0.8.0
+     Running `rustc --crate-name wit_bindgen --edition=2021 /home/claudio/.cargo/registry/src/index.crates.io-6f17d22bba15001f/wit-bindgen-0.8.0/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto --cfg 'feature="default"' --cfg 'feature="macros"' --cfg 'feature="realloc"' --cfg 'feature="wit-bindgen-rust-macro"' -C metadata=4d9f661b1ac80487 -C extra-filename=-4d9f661b1ac80487 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern bitflags=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libbitflags-20477b15691a12f3.rmeta --extern wit_bindgen_rust_macro=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps/libwit_bindgen_rust_macro-4fe6ce72871ac21b.so --cap-lints allow`
+   Compiling edgeless_function v0.1.0 (/var/home/claudio/Repo/edgeless_mvp/edgeless_function)
+     Running `rustc --crate-name edgeless_function --edition=2021 /var/home/claudio/Repo/edgeless_mvp/edgeless_function/src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type lib --emit=dep-info,metadata,link -C opt-level=s -C linker-plugin-lto -C metadata=a6ed6fa2b2109999 -C extra-filename=-a6ed6fa2b2109999 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern log=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/liblog-fcbeb0e75d98162d.rmeta --extern wit_bindgen=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libwit_bindgen-4d9f661b1ac80487.rmeta`
+   Compiling edgeless_sample_function v0.1.0 (/var/home/claudio/Repo/edgeless_mvp/edgeless_benchmark/functions/matrix_mul)
+     Running `rustc --crate-name edgeless_sample_function --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type cdylib --emit=dep-info,link -C opt-level=s -C lto -C metadata=5680bdc5ea6f9353 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern chrono=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libchrono-57b7362ff10edae5.rlib --extern edgeless_function=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libedgeless_function-a6ed6fa2b2109999.rlib --extern log=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/liblog-fcbeb0e75d98162d.rlib --extern serde=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libserde-dfb026d15be375b0.rlib --extern serde_json=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libserde_json-af25e9166b3fe0ab.rlib`
+error[E0599]: no function or associated item named `now` found for struct `Utc` in the current scope
+  --> src/lib.rs:75:37
+   |
+75 |         let ts_start = chrono::Utc::now();
+   |                                     ^^^ function or associated item not found in `Utc`
+
+error[E0599]: no function or associated item named `now` found for struct `Utc` in the current scope
+   --> src/lib.rs:100:35
+    |
+100 |         let ts_end = chrono::Utc::now();
+    |                                   ^^^ function or associated item not found in `Utc`
+
+error[E0599]: no method named `num_milliseconds` found for struct `DateTime` in the current scope
+   --> src/lib.rs:138:54
+    |
+138 |                 delayed_cast(time_until_next_arrival.num_milliseconds() as u64, "self", "");
+    |                                                      ^^^^^^^^^^^^^^^^ method not found in `DateTime<Utc>`
+
+error[E0599]: no function or associated item named `now` found for struct `Utc` in the current scope
+   --> src/lib.rs:192:30
+    |
+192 |         let t = chrono::Utc::now();
+    |                              ^^^ function or associated item not found in `Utc`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `edgeless_sample_function` (lib) due to 4 previous errors
+
+Caused by:
+  process didn't exit successfully: `rustc --crate-name edgeless_sample_function --edition=2021 src/lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type cdylib --emit=dep-info,link -C opt-level=s -C lto -C metadata=5680bdc5ea6f9353 --out-dir /tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps --target wasm32-unknown-unknown -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps -L dependency=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/release/deps --extern chrono=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libchrono-57b7362ff10edae5.rlib --extern edgeless_function=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libedgeless_function-a6ed6fa2b2109999.rlib --extern log=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/liblog-fcbeb0e75d98162d.rlib --extern serde=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libserde-dfb026d15be375b0.rlib --extern serde_json=/tmp/edgeless-matrix_mul-4971e7c6-8ea7-4c29-85d5-69161d30f9a1/wasm32-unknown-unknown/release/deps/libserde_json-af25e9166b3fe0ab.rlib` (exit status: 1)
+[2024-01-20T11:38:02Z INFO  cargo::util::rustc] updated rustc info cache
+Error: 1 job failed
