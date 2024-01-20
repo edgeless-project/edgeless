@@ -143,7 +143,7 @@ async fn main() -> anyhow::Result<()> {
     let interarrival_rv = Exp::new(1.0 / args.interarrival).unwrap();
 
     // Start the metrics collector node
-    tokio::spawn(async move {
+    let _ = tokio::spawn(async move {
         edgeless_benchmark::edgeless_metrics_collector_node_main(edgeless_node::EdgelessNodeSettings {
             node_id: uuid::Uuid::new_v4(),
             agent_url: format!("http://{}:7121/", args.bind_address),
@@ -156,6 +156,7 @@ async fn main() -> anyhow::Result<()> {
             file_log_provider: "".to_string(),
             redis_provider: "".to_string(),
         })
+        .await
     });
 
     // Create an e-ORC client
