@@ -6,6 +6,7 @@ use clap::Parser;
 use edgeless_api::controller::ControllerAPI;
 use edgeless_api::workflow_instance::{SpawnWorkflowResponse, WorkflowFunction, WorkflowId, WorkflowInstanceAPI};
 use rand::prelude::*;
+use rand::SeedableRng;
 use rand_distr::Exp;
 use rand_pcg::Pcg64;
 use std::collections::BTreeMap;
@@ -57,7 +58,17 @@ fn to_microseconds(s: f64) -> u64 {
 
 enum WorkflowType {
     None,
+    // 0: function.json path
+    // 1: function.wasm path
     Single(String, String),
+    // 0: min chain length
+    // 1: max chain length
+    // 2: min matrix size
+    // 3: max matrix size
+    // 4: interval between consecutive transactions, in ms
+    // 5: matrix_mul.wasm path
+    // 6: Redis URL
+    MatrixMulChain(u32, u32, u32, u32, u32, String, String),
 }
 
 fn workflow_type(wf_type: &str) -> anyhow::Result<WorkflowType> {
@@ -66,6 +77,16 @@ fn workflow_type(wf_type: &str) -> anyhow::Result<WorkflowType> {
         return Ok(WorkflowType::None);
     } else if !tokens.is_empty() && tokens[0] == "single" && tokens.len() == 3 {
         return Ok(WorkflowType::Single(tokens[1].to_string(), tokens[2].to_string()));
+    } else if !tokens.is_empty() && tokens[0] == "matrix-mul-chain" && tokens.len() == 8 {
+        return Ok(WorkflowType::MatrixMulChain(
+            tokens[1].parse::<u32>().unwrap_or_default(),
+            tokens[2].parse::<u32>().unwrap_or_default(),
+            tokens[3].parse::<u32>().unwrap_or_default(),
+            tokens[4].parse::<u32>().unwrap_or_default(),
+            tokens[5].parse::<u32>().unwrap_or_default(),
+            tokens[6].to_string(),
+            tokens[7].to_string(),
+        ));
     }
     Err(anyhow!("unknown workflow type: {}", wf_type))
 }
@@ -73,6 +94,8 @@ fn workflow_type(wf_type: &str) -> anyhow::Result<WorkflowType> {
 struct ClientInterface {
     client: Box<dyn WorkflowInstanceAPI>,
     wf_type: WorkflowType,
+    rng: rand::rngs::StdRng,
+    wf_id: u32,
 }
 
 impl ClientInterface {
@@ -82,11 +105,14 @@ impl ClientInterface {
                 .await
                 .workflow_instance_api(),
             wf_type,
+            rng: rand::rngs::StdRng::from_entropy(),
+            wf_id: 0,
         }
     }
 
     async fn start_workflow(&mut self) -> anyhow::Result<String> {
-        let mut functions: Vec<WorkflowFunction> = vec![];
+        let mut functions = vec![];
+        let mut resources: Vec<edgeless_api::workflow_instance::WorkflowResource> = vec![];
 
         match &self.wf_type {
             WorkflowType::None => {}
@@ -107,9 +133,70 @@ impl ClientInterface {
                     annotations: std::collections::HashMap::new(),
                 });
             }
+            WorkflowType::MatrixMulChain(min_chain_size, max_chain_size, min_matrix_size, max_matrix_size, inter_arrival, path_wasm, redis_url) => {
+                let chain_size: u32 = self.rng.gen_range(*min_chain_size..=*max_chain_size);
+
+                for i in 0..chain_size {
+                    let mut outputs = vec!["metrics".to_string()];
+                    for k in 0..20 {
+                        outputs.push(format!("out-{}", k).to_string());
+                    }
+                    let mut output_mapping = std::collections::HashMap::from([("metric".to_string(), "metrics-collector".to_string())]);
+                    if i != (chain_size - 1) {
+                        output_mapping.insert("out-0".to_string(), format!("f{}", (i + 1)));
+                    }
+                    let matrix_size: u32 = self.rng.gen_range(*min_matrix_size..=*max_matrix_size);
+
+                    let annotations = std::collections::HashMap::from([(
+                        "init-payload".to_string(),
+                        format!(
+                            "seed={},inter_arrival={},is_first={},is_last={},wf_name=wf{},fun_name=f{},matrix_size={},outputs=0",
+                            i,
+                            inter_arrival,
+                            match i {
+                                0 => "true",
+                                _ => "false",
+                            }
+                            .to_string(),
+                            match chain_size - 1 - i {
+                                0 => "true",
+                                _ => "false",
+                            }
+                            .to_string(),
+                            self.wf_id,
+                            i,
+                            matrix_size
+                        )
+                        .to_string(),
+                    )]);
+
+                    functions.push(WorkflowFunction {
+                        name: format!("f{}", i).to_string(),
+                        function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                            function_class_id: "matrix_mul".to_string(),
+                            function_class_type: "RUST_WASM".to_string(),
+                            function_class_version: "0.1".to_string(),
+                            function_class_inlude_code: std::fs::read(path_wasm).unwrap(),
+                            outputs,
+                        },
+                        output_mapping,
+                        annotations,
+                    });
+                }
+
+                resources.push(edgeless_api::workflow_instance::WorkflowResource {
+                    name: "metrics-collector".to_string(),
+                    class_type: "metrics-collector".to_string(),
+                    output_mapping: std::collections::HashMap::new(),
+                    configurations: std::collections::HashMap::from([("url".to_string(), redis_url.to_string())]),
+                })
+            }
         }
 
+        self.wf_id += 1;
+
         if functions.is_empty() {
+            assert!(resources.is_empty());
             return Ok("".to_string());
         }
 
@@ -117,7 +204,7 @@ impl ClientInterface {
             .client
             .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
                 workflow_functions: functions,
-                workflow_resources: vec![],
+                workflow_resources: resources,
                 annotations: std::collections::HashMap::new(),
             })
             .await;
