@@ -987,6 +987,7 @@ dependencies = [
  "rand",
  "rand_distr",
  "rand_pcg",
+ "redis",
  "serde",
  "serde_json",
  "tokio",

@@ -29,6 +29,7 @@ edgeless_dataplane = { path = "../edgeless_dataplane" }
 edgeless_node = { path = "../edgeless_node" }
 edgeless_telemetry = { path = "../edgeless_telemetry" }
 clap = { version = "4.3", features=["derive"] }
+redis = "*"
 serde = "1"
 toml = "0.7"
 serde_json = "1.0"
