@@ -45,6 +45,8 @@ struct Conf {
     wf_name: String,
     // Name of the function (for stats only).
     fun_name: String,
+    // Matrix size.
+    matrix_size: usize,
     // Which outputs are enabled.
     outputs: std::collections::HashSet<String>,
 }
@@ -97,7 +99,7 @@ impl Edgefunction for MatrixMulFunction {
         cast("metric", format!("function:start:{}:{}:{}", conf.wf_name, conf.fun_name, id).as_str());
 
         // Fill a new matrix with random numbers.
-        let n = state.matrix.len();
+        let n = conf.matrix_size;
         let random_matrix = make_new_matrix(&mut state.lcg, n);
 
         // Multiply previous matrix by the random one.
@@ -166,6 +168,7 @@ impl Edgefunction for MatrixMulFunction {
             is_last,
             wf_name,
             fun_name,
+            matrix_size,
             outputs,
         });
 
@@ -189,6 +192,7 @@ edgeless_function::export!(MatrixMulFunction);
 
 #[cfg(test)]
 mod test {
+    use crate::make_new_matrix;
     use crate::parse_init;
     use crate::Lcg;
 
@@ -221,5 +225,13 @@ mod test {
             numbers.insert((rnd * 20.0).floor() as u32);
         }
         assert_eq!(20, numbers.len());
+    }
+
+    #[test]
+    fn test_matrix_mul_make_new_matrix() {
+        let mut lcg = Lcg::new(42);
+        let matrix = make_new_matrix(&mut lcg, 1000);
+        assert_eq!(1000 * 1000, matrix.len());
+        assert_ne!(0.0 as f32, matrix.iter().sum());
     }
 }
