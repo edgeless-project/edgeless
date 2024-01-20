@@ -143,10 +143,8 @@ async fn main() -> anyhow::Result<()> {
     let interarrival_rv = Exp::new(1.0 / args.interarrival).unwrap();
 
     // Start the metrics collector node
-    let async_runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(8).enable_all().build()?;
-    let mut async_tasks = vec![];
-    async_tasks.push(async_runtime.spawn(edgeless_benchmark::edgeless_metrics_collector_node_main(
-        edgeless_node::EdgelessNodeSettings {
+    tokio::spawn(async move {
+        edgeless_benchmark::edgeless_metrics_collector_node_main(edgeless_node::EdgelessNodeSettings {
             node_id: uuid::Uuid::new_v4(),
             agent_url: format!("http://{}:7121/", args.bind_address),
             invocation_url: format!("http://{}:7102/", args.bind_address),
@@ -157,9 +155,8 @@ async fn main() -> anyhow::Result<()> {
             http_egress_provider: "".to_string(),
             file_log_provider: "".to_string(),
             redis_provider: "".to_string(),
-        },
-    )));
-    // async_runtime.block_on(async { futures::future::join_all(async_tasks).await });
+        })
+    });
 
     // Create an e-ORC client
     let mut client_interface = ClientInterface::new(&args.controller_url, workflow_type(&args.wf_type)?).await;
