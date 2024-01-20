@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 use edgeless_dataplane::core::Message;
-// extern crate redis;
-// use redis::Commands;
+extern crate redis;
+use redis::Commands;
 
 #[derive(Clone)]
 pub struct MetricsCollectorResourceProvider {
@@ -30,11 +30,13 @@ impl MetricsCollectorResource {
     async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, redis_url: &str) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
 
-        // let mut connection = redis::Client::open(redis_url)?.get_connection()?;
+        let mut connection = redis::Client::open(redis_url)?.get_connection()?;
 
         log::info!("MetricsCollectorResource created, URL: {}", redis_url);
 
         let handle = tokio::spawn(async move {
+            let mut workflow_ts = std::collections::HashMap::new();
+            let mut function_ts = std::collections::HashMap::new();
             loop {
                 let edgeless_dataplane::core::DataplaneEvent {
                     source_id,
@@ -54,11 +56,40 @@ impl MetricsCollectorResource {
                     }
                 };
 
-                log::info!("XXX {}", &message_data);
-
-                // if let Err(e) = connection.set::<&str, &str, std::string::String>(&redis_key, &message_data) {
-                //     log::error!("Could not set key '{}' to value '{}': {}", redis_key, &message_data, e);
-                // }
+                let tokens: Vec<&str> = message_data.split(':').collect();
+                if tokens.len() == 4 && tokens[0] == "workflow" {
+                    let key = format!("{}:{}", tokens[2], tokens[3]).to_string();
+                    if tokens[1] == "start" {
+                        workflow_ts.insert(key, std::time::Instant::now());
+                    } else if tokens[1] == "end" {
+                        if let Some(ts) = workflow_ts.remove(&key) {
+                            let redis_key = format!("workflow:latency:{}", tokens[2]).to_string();
+                            let latency = ts.elapsed().as_millis() as i64;
+                            if let Err(e) = connection.lpush::<&str, i64, usize>(&redis_key, latency) {
+                                log::error!("Could not lpush value '{}' to key '{}': {}", latency, redis_key, e);
+                            }
+                        }
+                    } else {
+                        log::error!("invalid workflow command '{}' in: {}", tokens[1], message_data);
+                    }
+                } else if tokens.len() == 5 && tokens[0] == "function" {
+                    let key = format!("{}:{}:{}", tokens[2], tokens[3], tokens[4]).to_string();
+                    if tokens[1] == "start" {
+                        function_ts.insert(key, std::time::Instant::now());
+                    } else if tokens[1] == "end" {
+                        if let Some(ts) = function_ts.remove(&key) {
+                            let redis_key = format!("function:latency:{}:{}", tokens[2], tokens[3]).to_string();
+                            let latency = ts.elapsed().as_millis() as i64;
+                            if let Err(e) = connection.lpush::<&str, i64, usize>(&redis_key, latency) {
+                                log::error!("Could not lpush value '{}' to key '{}': {}", latency, redis_key, e);
+                            }
+                        }
+                    } else {
+                        log::error!("invalid workflow command '{}' in: {}", tokens[1], message_data);
+                    }
+                } else {
+                    log::error!("invalid metric command received: {}", message_data);
+                }
 
                 if need_reply {
                     dataplane_handle
