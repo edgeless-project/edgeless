@@ -72,7 +72,7 @@ enum WorkflowType {
 }
 
 fn workflow_type(wf_type: &str) -> anyhow::Result<WorkflowType> {
-    let tokens: Vec<&str> = wf_type.split(";").collect();
+    let tokens: Vec<&str> = wf_type.split(';').collect();
     if !tokens.is_empty() && tokens[0] == "none" {
         return Ok(WorkflowType::None);
     } else if !tokens.is_empty() && tokens[0] == "single" && tokens.len() == 3 {

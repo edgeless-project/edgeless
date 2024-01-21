@@ -5,6 +5,9 @@ use edgeless_dataplane::core::Message;
 extern crate redis;
 use redis::Commands;
 
+// Smoothing factor of the EWMA of function/workflow latencies.
+const ALPHA: f64 = 0.9_f64;
+
 #[derive(Clone)]
 pub struct MetricsCollectorResourceProvider {
     inner: std::sync::Arc<tokio::sync::Mutex<MetricsCollectorResourceProviderInner>>,
@@ -37,6 +40,8 @@ impl MetricsCollectorResource {
         let handle = tokio::spawn(async move {
             let mut workflow_ts = std::collections::HashMap::new();
             let mut function_ts = std::collections::HashMap::new();
+            let mut workflow_avg_lat = std::collections::HashMap::new();
+            let mut function_avg_lat = std::collections::HashMap::new();
             loop {
                 let edgeless_dataplane::core::DataplaneEvent {
                     source_id,
@@ -58,30 +63,57 @@ impl MetricsCollectorResource {
 
                 let tokens: Vec<&str> = message_data.split(':').collect();
                 if tokens.len() == 4 && tokens[0] == "workflow" {
-                    let key = format!("{}:{}", tokens[2], tokens[3]).to_string();
-                    if tokens[1] == "start" {
+                    let command = tokens[1];
+                    let wf_name = tokens[2];
+                    let transaction_id = tokens[3];
+                    let key = format!("{}:{}", wf_name, transaction_id).to_string();
+                    if command == "start" {
                         workflow_ts.insert(key, std::time::Instant::now());
-                    } else if tokens[1] == "end" {
+                    } else if command == "end" {
                         if let Some(ts) = workflow_ts.remove(&key) {
-                            let redis_key = format!("workflow:latency:{}", tokens[2]).to_string();
+                            let redis_key = format!("workflow:latencies:{}", wf_name).to_string();
                             let latency = ts.elapsed().as_millis() as i64;
                             if let Err(e) = connection.lpush::<&str, i64, usize>(&redis_key, latency) {
                                 log::error!("Could not lpush value '{}' to key '{}': {}", latency, redis_key, e);
+                            }
+                            let avg_key: String = format!("{}", wf_name).to_string();
+                            let avg_latency = match workflow_avg_lat.get(&avg_key) {
+                                Some(prev_value) => latency as f64 * ALPHA + (1.0_f64 - ALPHA) * prev_value,
+                                None => latency as f64,
+                            };
+                            let redis_key = format!("workflow:avg-latency:{}", wf_name).to_string();
+                            workflow_avg_lat.insert(avg_key, avg_latency);
+                            if let Err(e) = connection.set::<&str, f64, std::string::String>(&redis_key, avg_latency) {
+                                log::error!("Could not set value '{}' for key '{}': {}", avg_latency, redis_key, e);
                             }
                         }
                     } else {
                         log::error!("invalid workflow command '{}' in: {}", tokens[1], message_data);
                     }
                 } else if tokens.len() == 5 && tokens[0] == "function" {
-                    let key = format!("{}:{}:{}", tokens[2], tokens[3], tokens[4]).to_string();
-                    if tokens[1] == "start" {
+                    let command = tokens[1];
+                    let wf_name = tokens[2];
+                    let fun_name = tokens[3];
+                    let transaction_id = tokens[3];
+                    let key: String = format!("{}:{}:{}", wf_name, fun_name, transaction_id).to_string();
+                    if command == "start" {
                         function_ts.insert(key, std::time::Instant::now());
-                    } else if tokens[1] == "end" {
+                    } else if command == "end" {
                         if let Some(ts) = function_ts.remove(&key) {
-                            let redis_key = format!("function:latency:{}:{}", tokens[2], tokens[3]).to_string();
+                            let redis_key = format!("function:latencies:{}:{}", wf_name, fun_name).to_string();
                             let latency = ts.elapsed().as_millis() as i64;
                             if let Err(e) = connection.lpush::<&str, i64, usize>(&redis_key, latency) {
                                 log::error!("Could not lpush value '{}' to key '{}': {}", latency, redis_key, e);
+                            }
+                            let avg_key: String = format!("{}:{}", wf_name, fun_name).to_string();
+                            let avg_latency = match function_avg_lat.get(&avg_key) {
+                                Some(prev_value) => latency as f64 * ALPHA + (1.0_f64 - ALPHA) * prev_value,
+                                None => latency as f64,
+                            };
+                            let redis_key = format!("function:avg-latency:{}", avg_key).to_string();
+                            function_avg_lat.insert(avg_key, avg_latency);
+                            if let Err(e) = connection.set::<&str, f64, std::string::String>(&redis_key, avg_latency) {
+                                log::error!("Could not set value '{}' for key '{}': {}", avg_latency, redis_key, e);
                             }
                         }
                     } else {
