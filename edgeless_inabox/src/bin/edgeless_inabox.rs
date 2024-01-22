@@ -120,7 +120,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     let mut first_node = true;
     for node_id in node_invocation_urls.keys() {
         node_confs.push(EdgelessNodeSettings {
-            node_id: node_id.clone(),
+            node_id: *node_id,
             agent_url: node_orc_agent_urls.get(node_id).expect("").clone(), // we are sure that it is there
             invocation_url: node_invocation_urls.get(node_id).expect("").clone(), // we are sure that it is there
             metrics_url: next_url(),
@@ -152,15 +152,15 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     // Save the config files to a hard-coded directory if its empty, to give
     // users reference on how the cluster is configured
     let path = "config/";
-    if fs::metadata(&path).is_ok() {
-        let is_empty = fs::read_dir(&path).map(|entries| entries.count() == 0).unwrap_or(true);
+    if fs::metadata(path).is_ok() {
+        let is_empty = fs::read_dir(path).map(|entries| entries.count() == 0).unwrap_or(true);
         if !is_empty {
             return Err(format!(
                 "Configuration directory '{}' not empty: remove old configuration files first",
                 &path
             ));
         }
-    } else if let Err(_err) = fs::create_dir(&path) {
+    } else if let Err(_err) = fs::create_dir(path) {
         return Err(format!("Failed with creating directory: {}", &path));
     }
 

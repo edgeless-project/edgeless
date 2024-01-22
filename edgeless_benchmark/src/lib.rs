@@ -56,7 +56,7 @@ pub async fn edgeless_metrics_collector_node_main(settings: edgeless_node::Edgel
     // Create the telemetry provider.
     let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.metrics_url.clone())
         .await
-        .expect(&format!("could not build the telemetry provider at URL {}", &settings.metrics_url));
+        .unwrap_or_else(|_| panic!("could not build the telemetry provider at URL {}", &settings.metrics_url));
 
     // Create the WebAssembly runner.
     let (rust_runtime_client, mut rust_runtime_task_s) = edgeless_node::base_runtime::runtime::create::<DummyFunctionInstance>(
@@ -86,7 +86,7 @@ pub async fn edgeless_metrics_collector_node_main(settings: edgeless_node::Edgel
         Box::new(
             crate::resources::metrics_collector::MetricsCollectorResourceProvider::new(
                 data_plane.clone(),
-                edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+                edgeless_api::function_instance::InstanceId::new(settings.node_id),
             )
             .await,
         ),
@@ -104,7 +104,7 @@ pub async fn edgeless_metrics_collector_node_main(settings: edgeless_node::Edgel
         agent_api_server,
         edgeless_node::register_node(
             &settings,
-            edgeless_api::node_registration::NodeCapabilities::default(),
+            edgeless_api::node_registration::NodeCapabilities::empty(),
             resource_provider_specifications
         )
     );

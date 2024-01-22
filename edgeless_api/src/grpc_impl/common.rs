@@ -100,13 +100,9 @@ impl CommonConverters {
             output_mapping: api_update
                 .output_mapping
                 .iter()
-                .filter_map(|(key, value)| {
-                    return {
-                        match CommonConverters::parse_instance_id(&value) {
-                            Ok(val) => Some((key.clone(), val)),
-                            Err(_) => None,
-                        }
-                    };
+                .filter_map(|(key, value)| match CommonConverters::parse_instance_id(value) {
+                    Ok(val) => Some((key.clone(), val)),
+                    Err(_) => None,
                 })
                 .collect(),
         })
@@ -137,7 +133,7 @@ impl CommonConverters {
     ) -> crate::grpc_impl::api::StartComponentResponse {
         match req {
             crate::common::StartComponentResponse::ResponseError(err) => crate::grpc_impl::api::StartComponentResponse {
-                response_error: Some(CommonConverters::serialize_response_error(&err)),
+                response_error: Some(CommonConverters::serialize_response_error(err)),
                 instance_id: None,
             },
             crate::common::StartComponentResponse::InstanceId(id) => crate::grpc_impl::api::StartComponentResponse {
@@ -153,7 +149,7 @@ impl CommonConverters {
             output_mapping: crate_update
                 .output_mapping
                 .iter()
-                .map(|(key, value)| (key.clone(), CommonConverters::serialize_instance_id(&value)))
+                .map(|(key, value)| (key.clone(), CommonConverters::serialize_instance_id(value)))
                 .collect(),
         }
     }

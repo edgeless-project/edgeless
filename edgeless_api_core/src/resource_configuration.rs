@@ -15,7 +15,7 @@ impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
             let mut true_callbacks_size: u64 = 0;
             for i in self.output_mapping {
                 if i.is_some() {
-                    true_callbacks_size = true_callbacks_size + 1;
+                    true_callbacks_size += 1;
                 }
             }
             e = e.array(true_callbacks_size)?;
@@ -30,7 +30,7 @@ impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
             let mut true_config_size: u64 = 0;
             for i in self.configuration {
                 if i.is_some() {
-                    true_config_size = true_config_size + 1;
+                    true_config_size += 1;
                 }
             }
             e = e.array(true_config_size)?;
@@ -55,21 +55,21 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
         for item in d.array_iter::<(&str, crate::instance_id::InstanceId)>().unwrap() {
             if let Ok(item) = item {
                 outputs[outputs_i] = Some(item);
-                outputs_i = outputs_i + 1;
+                outputs_i += 1;
             }
         }
 
         for item in d.array_iter::<(&str, &str)>().unwrap() {
             if let Ok(item) = item {
                 configuration[configuration_i] = Some(item);
-                configuration_i = configuration_i + 1;
+                configuration_i += 1;
             }
         }
 
         Ok(EncodedResourceInstanceSpecification {
             class_type: id,
             output_mapping: outputs,
-            configuration: configuration,
+            configuration,
         })
     }
 }
@@ -86,20 +86,20 @@ impl<C> minicbor::CborLen<C> for EncodedResourceInstanceSpecification<'_> {
         for item in self.output_mapping {
             if let Some((key, val)) = item {
                 outputs[outputs_i] = (key, val);
-                outputs_i = outputs_i + 1;
+                outputs_i += 1;
             }
         }
 
         for item in self.configuration {
             if let Some((key, val)) = item {
                 configuration[configuration_i] = (key, val);
-                configuration_i = configuration_i + 1;
+                configuration_i += 1;
             }
         }
 
-        len = len + outputs[..outputs_i].cbor_len(ctx);
+        len += outputs[..outputs_i].cbor_len(ctx);
 
-        len = len + configuration[..configuration_i].cbor_len(ctx);
+        len += configuration[..configuration_i].cbor_len(ctx);
 
         len
     }

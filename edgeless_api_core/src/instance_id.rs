@@ -26,7 +26,7 @@ impl<C> minicbor::Encode<C> for InstanceId {
 
 impl<C> minicbor::CborLen<C> for InstanceId {
     fn cbor_len(&self, _ctx: &mut C) -> usize {
-        return 34;
+        34
     }
 }
 
@@ -46,7 +46,7 @@ impl<C> minicbor::Decode<'_, C> for InstanceId {
 impl InstanceId {
     pub fn new(node_id: uuid::Uuid) -> Self {
         Self {
-            node_id: node_id,
+            node_id,
             function_id: uuid::Uuid::new_v4(),
         }
     }

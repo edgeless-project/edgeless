@@ -38,7 +38,7 @@ impl CoapClient {
 
         CoapClient {
             inner: std::sync::Arc::new(tokio::sync::Mutex::new(CoapClientInner {
-                sock: sock,
+                sock,
                 endpoint: peer,
                 next_token: 0,
             })),
@@ -102,7 +102,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
         let encoded_resource_spec = edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification {
             class_type: &instance_specification.class_type,
             output_mapping: outputs,
-            configuration: configuration,
+            configuration,
         };
 
         let mut buffer = vec![0 as u8; 5000];

@@ -141,13 +141,13 @@ impl Controller {
 
             log::debug!("stopping function/resource of workflow {}: {}", wf_id.to_string(), &component);
             match component.component_type {
-                ComponentType::Function => match fn_client.stop(component.fid.clone()).await {
+                ComponentType::Function => match fn_client.stop(component.fid).await {
                     Ok(_) => {}
                     Err(err) => {
                         log::error!("Unhandled: {}", err);
                     }
                 },
-                ComponentType::Resource => match resource_client.stop(component.fid.clone()).await {
+                ComponentType::Resource => match resource_client.stop(component.fid).await {
                     Ok(_) => {}
                     Err(err) => {
                         log::error!("Unhandled: {}", err);
@@ -157,7 +157,7 @@ impl Controller {
         }
 
         // Remove the workflow from the active set.
-        let remove_res = active_workflows.remove(&wf_id);
+        let remove_res = active_workflows.remove(wf_id);
         assert!(remove_res.is_some());
     }
 
@@ -263,12 +263,12 @@ impl Controller {
                                         component_type: ComponentType::Function,
                                         name: function.name.clone(),
                                         domain_id: orc_domain.clone(),
-                                        fid: id.clone(),
+                                        fid: id,
                                     });
                                 }
                             },
                             Err(err) => {
-                                res = Err(format!("failed interaction when creating a function instance: {}", err.to_string()));
+                                res = Err(format!("failed interaction when creating a function instance: {}", err));
                             }
                         }
                     }
@@ -303,12 +303,12 @@ impl Controller {
                                         component_type: ComponentType::Resource,
                                         name: resource.name.clone(),
                                         domain_id: orc_domain.clone(),
-                                        fid: id.clone(),
+                                        fid: id,
                                     });
                                 }
                             },
                             Err(err) => {
-                                res = Err(format!("failed interaction when starting a resource: {}", err.to_string()));
+                                res = Err(format!("failed interaction when starting a resource: {}", err));
                             }
                         }
                     }
@@ -345,7 +345,7 @@ impl Controller {
                                 // Loop on all the identifiers for the
                                 // target function/resource (once for each
                                 // assigned orchestration domain).
-                                for target_fid in cur_workflow.mapped_fids(&to_name) {
+                                for target_fid in cur_workflow.mapped_fids(to_name) {
                                     // [TODO] Issue#96 The output_mapping
                                     // structure should be changed so that
                                     // multiple values are possible (with
@@ -375,11 +375,7 @@ impl Controller {
                             {
                                 Ok(_) => {}
                                 Err(err) => {
-                                    res = Err(format!(
-                                        "failed interaction when patching component {}: {}",
-                                        &component_name,
-                                        err.to_string()
-                                    ));
+                                    res = Err(format!("failed interaction when patching component {}: {}", &component_name, err));
                                 }
                             }
                         }
@@ -424,7 +420,7 @@ impl Controller {
                 ControllerRequest::LIST(workflow_id, reply_sender) => {
                     let mut ret: Vec<WorkflowInstance> = vec![];
                     if let Some(w_id) = workflow_id.is_valid() {
-                        if let Some(wf) = active_workflows.get(&w_id) {
+                        if let Some(wf) = active_workflows.get(w_id) {
                             ret = vec![WorkflowInstance {
                                 workflow_id: w_id.clone(),
                                 domain_mapping: wf
