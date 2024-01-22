@@ -492,7 +492,6 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
         &mut self,
         request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
     ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse> {
-        let request = request;
         let (reply_sender, reply_receiver) =
             tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>();
         match self.sender.send(ControllerRequest::START(request.clone(), reply_sender)).await {
