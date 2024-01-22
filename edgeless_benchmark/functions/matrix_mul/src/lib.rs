@@ -83,7 +83,7 @@ fn parse_init(payload: &str) -> std::collections::HashMap<&str, &str> {
 impl Edgefunction for MatrixMulFunction {
     fn handle_cast(_src: InstanceId, encoded_message: String) {
         let conf = CONF.get().unwrap();
-        log::info!("MatrixMul casted, wf {}, fun {}, MSG: {}", conf.wf_name, conf.fun_name, encoded_message);
+        // log::info!("MatrixMul casted, wf {}, fun {}, MSG: {}", conf.wf_name, conf.fun_name, encoded_message);
         let mut state = STATE.get().unwrap().lock().unwrap();
 
         // Schedule the next transaction.
