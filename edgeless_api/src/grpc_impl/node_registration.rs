@@ -113,14 +113,14 @@ fn parse_update_node_request(api_instance: &crate::grpc_impl::api::UpdateNodeReq
                     invocation_url.to_string(),
                     resource_providers,
                     match &api_instance.capabilities {
-                        Some(val) => parse_node_capabilities(&val),
-                        None => crate::node_registration::NodeCapabilities::default(),
+                        Some(val) => parse_node_capabilities(val),
+                        None => crate::node_registration::NodeCapabilities::empty(),
                     },
                 ))
             } else {
-                return Err(anyhow::anyhow!(
+                Err(anyhow::anyhow!(
                     "Ill-formed UpdateNodeRequest message: agent or invocation URL not present in registration"
-                ));
+                ))
             }
         }
         x if x == crate::grpc_impl::api::UpdateNodeRequestType::Deregister as i32 => {
@@ -164,7 +164,7 @@ fn serialize_update_node_request(req: &crate::node_registration::UpdateNodeReque
                 node_id: node_id.to_string(),
                 agent_url: Some(agent_url.to_string()),
                 invocation_url: Some(invocation_url.to_string()),
-                resource_providers: resource_providers.iter().map(|x| serialize_resource_provider_specification(x)).collect(),
+                resource_providers: resource_providers.iter().map(serialize_resource_provider_specification).collect(),
                 capabilities: Some(serialize_node_capabilities(capabilities)),
             }
         }
@@ -242,7 +242,7 @@ mod test {
                 "http://127.0.0.1:10000".to_string(),
                 "http://127.0.0.1:10001".to_string(),
                 vec![],
-                NodeCapabilities::default(),
+                NodeCapabilities::empty(),
             ),
             UpdateNodeRequest::Deregistration(uuid::Uuid::new_v4()),
         ];

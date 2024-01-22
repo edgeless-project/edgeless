@@ -145,7 +145,7 @@ impl TelemetryProcessor {
                         Box::new(crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
                         Box::new(EventLogger {}),
                     ],
-                    receiver: receiver,
+                    receiver,
                 };
 
                 tokio::spawn(async move {
@@ -161,7 +161,7 @@ impl TelemetryProcessor {
 
     pub fn get_handle(&self, handle_tags: std::collections::BTreeMap<String, String>) -> TelemetryHandle {
         TelemetryHandle {
-            handle_tags: handle_tags,
+            handle_tags,
             sender: self.sender.clone(),
         }
     }

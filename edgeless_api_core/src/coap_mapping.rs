@@ -74,7 +74,7 @@ impl COAPEncoder {
         req.set_method(coap_lite::RequestType::Post);
         req.set_path("resources/stop");
         req.message.set_token(vec![token]);
-        let mut buffer = [0 as u8; 512];
+        let mut buffer = [0_u8; 512];
         minicbor::encode(&instance_id, &mut buffer[..]).unwrap();
         let len = minicbor::len(&instance_id);
         let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);

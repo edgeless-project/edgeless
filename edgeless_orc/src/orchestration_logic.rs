@@ -37,11 +37,11 @@ impl OrchestrationLogic {
         }
     }
 
-    pub fn update_nodes(&mut self, clients: &std::collections::HashMap<uuid::Uuid, ClientDesc>) -> () {
+    pub fn update_nodes(&mut self, clients: &std::collections::HashMap<uuid::Uuid, ClientDesc>) {
         self.nodes.clear();
         self.weights.clear();
         for (node, desc) in clients {
-            self.nodes.push(node.clone());
+            self.nodes.push(*node);
             let mut weight = desc.capabilities.num_cores as f32 * desc.capabilities.num_cpus as f32 * desc.capabilities.clock_freq_cpu;
             if weight == 0.0 {
                 // Force a vanishing weight to an arbitrary value.
@@ -73,7 +73,7 @@ impl Iterator for OrchestrationLogic {
             OrchestrationStrategy::Random => {
                 assert!(self.nodes.len() == self.weights.len());
                 let rnd = self.weight_dist.sample(&mut self.rng);
-                let mut sum = 0.0 as f32;
+                let mut sum = 0.0_f32;
                 for i in 0..self.nodes.len() {
                     sum += self.weights[i];
                     if sum >= rnd {
