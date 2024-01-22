@@ -752,7 +752,6 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::Dom
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
         log::debug!("FunctionInstance::StartFunction() {:?}", request);
-        let request = request;
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
             anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>,
         >();
@@ -801,7 +800,6 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for NodeRegistrationCl
         request: edgeless_api::node_registration::UpdateNodeRequest,
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
         log::debug!("FunctionInstance::UpdateNode() {:?}", request);
-        let request = request;
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>();
         if let Err(err) = self.sender.send(OrchestratorRequest::UPDATENODE(request, reply_sender)).await {
             return Err(anyhow::anyhow!("Orchestrator channel error when updating a node: {}", err.to_string()));
@@ -820,7 +818,6 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         request: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
         log::debug!("FunctionInstance::StartResource() {:?}", request);
-        let request = request;
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
             anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>,
         >();
