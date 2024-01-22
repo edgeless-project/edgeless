@@ -136,6 +136,8 @@ impl ClientInterface {
             WorkflowType::MatrixMulChain(min_chain_size, max_chain_size, min_matrix_size, max_matrix_size, inter_arrival, path_wasm, redis_url) => {
                 let chain_size: u32 = self.rng.gen_range(*min_chain_size..=*max_chain_size);
 
+                let mut matrix_sizes = vec![];
+
                 for i in 0..chain_size {
                     let mut outputs = vec!["metrics".to_string()];
                     for k in 0..20 {
@@ -146,6 +148,7 @@ impl ClientInterface {
                         output_mapping.insert("out-0".to_string(), format!("f{}", (i + 1)));
                     }
                     let matrix_size: u32 = self.rng.gen_range(*min_matrix_size..=*max_matrix_size);
+                    matrix_sizes.push(matrix_size);
 
                     let annotations = std::collections::HashMap::from([(
                         "init-payload".to_string(),
@@ -183,6 +186,13 @@ impl ClientInterface {
                         annotations,
                     });
                 }
+
+                log::info!(
+                    "wf{}, chain size {}, matrix sizes {}",
+                    self.wf_id,
+                    chain_size,
+                    matrix_sizes.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                );
 
                 resources.push(edgeless_api::workflow_instance::WorkflowResource {
                     name: "metrics-collector".to_string(),
@@ -237,25 +247,35 @@ async fn main() -> anyhow::Result<()> {
     let lifetime_rv = Exp::new(1.0 / args.lifetime).unwrap();
     let interarrival_rv = Exp::new(1.0 / args.interarrival).unwrap();
 
-    // Start the metrics collector node
-    let _ = tokio::spawn(async move {
-        edgeless_benchmark::edgeless_metrics_collector_node_main(edgeless_node::EdgelessNodeSettings {
-            node_id: uuid::Uuid::new_v4(),
-            agent_url: format!("http://{}:7121/", args.bind_address),
-            invocation_url: format!("http://{}:7102/", args.bind_address),
-            metrics_url: format!("http://{}:7103/", args.bind_address),
-            orchestrator_url: args.orchestrator_url,
-            http_ingress_url: "".to_string(),
-            http_ingress_provider: "".to_string(),
-            http_egress_provider: "".to_string(),
-            file_log_provider: "".to_string(),
-            redis_provider: "".to_string(),
-        })
-        .await
-    });
+    // Parse the worflow type from command line option.
+    let wf_type = match workflow_type(&args.wf_type) {
+        Ok(val) => val,
+        Err(err) => {
+            return Err(anyhow::anyhow!("invalid workflow type: {}", err));
+        }
+    };
+
+    // Start the metrics collector node, if needed
+    if let WorkflowType::MatrixMulChain(_, _, _, _, _, _, _) = wf_type {
+        let _ = tokio::spawn(async move {
+            edgeless_benchmark::edgeless_metrics_collector_node_main(edgeless_node::EdgelessNodeSettings {
+                node_id: uuid::Uuid::new_v4(),
+                agent_url: format!("http://{}:7121/", args.bind_address),
+                invocation_url: format!("http://{}:7102/", args.bind_address),
+                metrics_url: format!("http://{}:7103/", args.bind_address),
+                orchestrator_url: args.orchestrator_url,
+                http_ingress_url: "".to_string(),
+                http_ingress_provider: "".to_string(),
+                http_egress_provider: "".to_string(),
+                file_log_provider: "".to_string(),
+                redis_provider: "".to_string(),
+            })
+            .await
+        });
+    }
 
     // Create an e-ORC client
-    let mut client_interface = ClientInterface::new(&args.controller_url, workflow_type(&args.wf_type)?).await;
+    let mut client_interface = ClientInterface::new(&args.controller_url, wf_type).await;
 
     // event queue, the first event is always a new workflow arriving at time 0
     let mut events = BTreeMap::new();
