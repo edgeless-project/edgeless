@@ -23,7 +23,7 @@ pub struct NodeCapabilities {
 }
 
 impl NodeCapabilities {
-    pub fn default() -> Self {
+    pub fn empty() -> Self {
         Self {
             num_cpus: 0,
             model_name_cpu: "".to_string(),

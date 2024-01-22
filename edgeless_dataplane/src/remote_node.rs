@@ -25,8 +25,8 @@ impl DataPlaneLink for RemoteLink {
             .lock()
             .await
             .handle(edgeless_api::invocation::Event {
-                target: target.clone(),
-                source: src.clone(),
+                target: *target,
+                source: *src,
                 stream_id,
                 data: match msg {
                     Message::Call(data) => edgeless_api::invocation::EventData::Call(data),
@@ -103,7 +103,7 @@ impl RemoteLinkProvider {
         target: edgeless_api::function_instance::InstanceId,
         sender: futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
     ) -> Box<dyn DataPlaneLink> {
-        self.locals.lock().await.receivers.insert(target.function_id.clone(), sender);
+        self.locals.lock().await.receivers.insert(target.function_id, sender);
         Box::new(RemoteLink {
             remotes: self.remotes.clone(),
         })
@@ -111,7 +111,7 @@ impl RemoteLinkProvider {
 
     pub async fn incomming_api(&mut self) -> Box<dyn edgeless_api::invocation::InvocationAPI> {
         Box::new(InvocationEventHandler {
-            node_id: self.own_node_id.clone(),
+            node_id: self.own_node_id,
             locals: self.locals.clone(),
         })
     }

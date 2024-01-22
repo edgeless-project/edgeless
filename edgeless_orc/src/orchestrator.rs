@@ -276,12 +276,12 @@ impl Orchestrator {
                                 assert!(selected_node_id == id.node_id);
                                 let ext_fid = uuid::Uuid::new_v4();
                                 active_instances.insert(
-                                    ext_fid.clone(),
+                                    ext_fid,
                                     ActiveInstance::Function(
                                         spawn_req_copy,
                                         vec![InstanceId {
-                                            node_id: selected_node_id.clone(),
-                                            function_id: id.function_id.clone(),
+                                            node_id: selected_node_id,
+                                            function_id: id.function_id,
                                         }],
                                     ),
                                 );
@@ -292,7 +292,7 @@ impl Orchestrator {
                                     id.function_id
                                 );
 
-                                Ok(edgeless_api::common::StartComponentResponse::InstanceId(ext_fid.clone()))
+                                Ok(edgeless_api::common::StartComponentResponse::InstanceId(ext_fid))
                             }
                         },
                         Err(err) => {
@@ -356,13 +356,7 @@ impl Orchestrator {
                     // Find all resource providers that can start this resource.
                     let matching_providers = resource_providers
                         .iter()
-                        .filter_map(|(id, p)| {
-                            if p.class_type == start_req.class_type {
-                                return Some(id.clone());
-                            } else {
-                                return None;
-                            }
-                        })
+                        .filter_map(|(id, p)| if p.class_type == start_req.class_type { Some(id.clone()) } else { None })
                         .collect::<Vec<String>>();
 
                     // Select one provider at random.

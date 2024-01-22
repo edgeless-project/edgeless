@@ -13,10 +13,10 @@ const TYPE_CALL_NO_RET: i32 = crate::grpc_impl::api::EventType::CallNoRet as i32
 impl InvocationConverters {
     fn parse_api_event(api_event: &crate::grpc_impl::api::Event) -> anyhow::Result<crate::invocation::Event> {
         Ok(crate::invocation::Event {
-            target: CommonConverters::parse_instance_id(&api_event.target.as_ref().unwrap())?,
-            source: CommonConverters::parse_instance_id(&api_event.source.as_ref().unwrap())?,
+            target: CommonConverters::parse_instance_id(api_event.target.as_ref().unwrap())?,
+            source: CommonConverters::parse_instance_id(api_event.source.as_ref().unwrap())?,
             stream_id: api_event.stream_id,
-            data: Self::parse_api_event_data(&api_event.msg.as_ref().unwrap())?,
+            data: Self::parse_api_event_data(api_event.msg.as_ref().unwrap())?,
         })
     }
 

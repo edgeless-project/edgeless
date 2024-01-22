@@ -159,13 +159,11 @@ impl ClientInterface {
                             match i {
                                 0 => "true",
                                 _ => "false",
-                            }
-                            .to_string(),
+                            },
                             match chain_size - 1 - i {
                                 0 => "true",
                                 _ => "false",
-                            }
-                            .to_string(),
+                            },
                             self.wf_id,
                             i,
                             matrix_size
@@ -279,7 +277,7 @@ async fn main() -> anyhow::Result<()> {
 
     // event queue, the first event is always a new workflow arriving at time 0
     let mut events = BTreeMap::new();
-    events.insert(0 as u64, Event::WfNew()); // in us
+    events.insert(0_u64, Event::WfNew()); // in us
 
     // main experiment loop
     let mut wf_started = 0;
@@ -323,10 +321,10 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // terminate all workflows that are still active
-    for (_, event_type) in &events {
+    for event_type in events.values() {
         if let Event::WfEnd(uuid) = event_type {
             if !uuid.is_empty() {
-                match client_interface.stop_workflow(&uuid).await {
+                match client_interface.stop_workflow(uuid).await {
                     Ok(_) => {}
                     Err(err) => {
                         panic!("error when stopping a workflow: {}", err);

@@ -27,8 +27,8 @@ impl DataPlaneLink for NodeLocalLink {
                 .lock()
                 .await
                 .handle(edgeless_api::invocation::Event {
-                    target: target.clone(),
-                    source: src.clone(),
+                    target: *target,
+                    source: *src,
                     stream_id,
                     data: match msg {
                         Message::Call(data) => edgeless_api::invocation::EventData::Call(data),
@@ -65,7 +65,7 @@ impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
             match sender
                 .send(DataplaneEvent {
                     source_id: event.source.clone(),
-                    channel_id: event.stream_id.clone(),
+                    channel_id: event.stream_id,
                     message: msg,
                 })
                 .await
@@ -100,9 +100,9 @@ impl NodeLocalLinkProvider {
         target: edgeless_api::function_instance::InstanceId,
         sender: futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
     ) -> Box<dyn DataPlaneLink> {
-        self.router.lock().await.receivers.insert(target.function_id.clone(), sender);
+        self.router.lock().await.receivers.insert(target.function_id, sender);
         Box::new(NodeLocalLink {
-            node_id: target.node_id.clone(),
+            node_id: target.node_id,
             router: self.router.clone(),
         })
     }
