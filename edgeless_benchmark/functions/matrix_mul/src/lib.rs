@@ -89,7 +89,9 @@ impl Edgefunction for MatrixMulFunction {
         // Schedule the next transaction.
         let id = match conf.is_first {
             true => {
-                delayed_cast(conf.inter_arrival, "self", "");
+                if conf.inter_arrival > 0 {
+                    delayed_cast(conf.inter_arrival, "self", "");
+                }
                 cast("metric", format!("workflow:start:{}:{}", conf.wf_name, state.next_id).as_str());
                 state.next_id += 1;
                 state.next_id - 1
@@ -178,7 +180,7 @@ impl Edgefunction for MatrixMulFunction {
         let _ = STATE.set(std::sync::Mutex::new(State { next_id: 0, lcg, matrix }));
 
         if is_first {
-            cast("self", "");
+            delayed_cast(1000, "self", "");
         }
     }
 
