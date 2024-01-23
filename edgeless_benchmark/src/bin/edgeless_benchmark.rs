@@ -66,6 +66,9 @@ enum WorkflowType {
     // 2: min matrix size
     // 3: max matrix size
     // 4: interval between consecutive transactions, in ms
+    //    if 0 then make the workflow circular, i.e., the last
+    //    function calls the first one to trigger a new
+    //    transaction
     // 5: matrix_mul.wasm path
     // 6: Redis URL
     MatrixMulChain(u32, u32, u32, u32, u32, String, String),
@@ -146,6 +149,9 @@ impl ClientInterface {
                     let mut output_mapping = std::collections::HashMap::from([("metric".to_string(), "metrics-collector".to_string())]);
                     if i != (chain_size - 1) {
                         output_mapping.insert("out-0".to_string(), format!("f{}", (i + 1)));
+                    } else if *inter_arrival == 0 {
+                        assert!(i == (chain_size - 1));
+                        output_mapping.insert("out-0".to_string(), "f0".to_string());
                     }
                     let matrix_size: u32 = self.rng.gen_range(*min_matrix_size..=*max_matrix_size);
                     matrix_sizes.push(matrix_size);
