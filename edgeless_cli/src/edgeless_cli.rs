@@ -55,6 +55,22 @@ struct CLiConfig {
     controller_url: String,
 }
 
+enum Platform {
+    WASM,
+    X86,
+    ARM,
+}
+
+impl Platform {
+    fn target(&self) -> String {
+        match self {
+            Self::WASM => String::from("wasm32-unknown-unknown"),
+            Self::X86 => String::from("x86_64-unknown-linux-gnu"),
+            Self::ARM => String::from("aarch64-unknown-linux-gnu"),
+        }
+    }
+}
+
 pub fn edgeless_cli_default_conf() -> String {
     String::from("controller_url = \"http://127.0.0.1:7001\"")
 }
@@ -178,6 +194,8 @@ async fn main() -> anyhow::Result<()> {
 
                     let pack = ws.current()?;
 
+                    let platform = Platform::X86;
+
                     let lib_name = match pack.library() {
                         Some(val) => val.name(),
                         None => {
@@ -189,7 +207,8 @@ async fn main() -> anyhow::Result<()> {
                         config,
                         None,
                         false,
-                        &vec!["wasm32-unknown-unknown".to_string()],
+                        //&vec!["wasm32-unknown-unknown".to_string()],
+                        &vec![platform.target()],
                         cargo::core::compiler::CompileMode::Build,
                     )?;
                     build_config.requested_profile = cargo::util::interning::InternedString::new("release");
@@ -211,7 +230,7 @@ async fn main() -> anyhow::Result<()> {
                     cargo::ops::compile(&ws, &compile_options)?;
 
                     let raw_result = build_dir
-                        .join(format!("wasm32-unknown-unknown/release/{}.wasm", lib_name))
+                        .join(format!("{}/release/{}.wasm", platform.target(), lib_name))
                         .to_str()
                         .unwrap()
                         .to_string();
