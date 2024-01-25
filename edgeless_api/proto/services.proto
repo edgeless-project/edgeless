@@ -95,3 +95,69 @@ service ResourceConfiguration {
     // Output: none.
     rpc Patch (PatchRequest) returns (google.protobuf.Empty);
 }
+
+// API exposed by a function to manage the lifecycle and run-time of a function instance.
+service GuestAPIFunction {
+    // Initialize the function instance.
+    // Input: the payload and saved state of the function instance.
+    // Output: none.
+    rpc Init (FunctionInstanceInit) returns (google.protobuf.Empty);
+
+    // Invoke the function instance (asynchronous).
+    // Input: the source instance identifier and function arguments.
+    // Output: none.
+    rpc Cast (InputEventData) returns (google.protobuf.Empty);
+
+    // Invoke the function instance and wait for a return.
+    // Input: the source instance identifier and function arguments.
+    // Output: the return value.
+    rpc Call (InputEventData) returns (CallReturn);
+
+    // Clean up the function instance before termination.
+    // Input: none.
+    // Output: none.
+    rpc Stop (google.protobuf.Empty) returns (google.protobuf.Empty);
+}
+
+// API exposed by a node towards a function instance.
+service GuestAPIHost {
+    // Generate an asynchronous event.
+    // Input: the destination (alias) and payload of the event generated.
+    // Output: none.
+    rpc Cast (OutputEventData) returns (google.protobuf.Empty);
+
+    // Generate an asynchronous event on a specific function instance.
+    // Input: the destination and payload of the event generated.
+    // Output: none.
+    rpc CastRaw (OutputEventDataRaw) returns (google.protobuf.Empty);
+
+    // Generate a synchronous event for which a return is expected.
+    // Input: the destination (alias) and payload of the event generated.
+    // Output: none.
+    rpc Call (OutputEventData) returns (CallReturn);
+
+    // Generate a synchronous event for which a return is expected on a specific function instance.
+    // Input: the destination and payload of the event generated.
+    // Output: none.
+    rpc CallRaw (OutputEventDataRaw) returns (CallReturn);
+
+    // Generate a telemetry log event.
+    // Input: the log data.
+    // Output: none.
+    rpc TelemetryLog (TelemetryLogEvent) returns (google.protobuf.Empty);
+
+    // Return the identifier of the current function instance.
+    // Input: none.
+    // Output: the function instance identifier.
+    rpc Slf (google.protobuf.Empty) returns (InstanceIdVariant);
+
+    // Generate an asynchronous event at a later time.
+    // Input: the delay, destination (alias) and payload of the event generated.
+    // Output: none.
+    rpc DelayedCast (DelayedEventData) returns (google.protobuf.Empty);
+
+    // Synchronize distributed state.
+    // Input: the state to be synchronized.
+    // Output: none.
+    rpc Sync (SyncData) returns (google.protobuf.Empty);
+}
