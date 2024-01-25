@@ -313,10 +313,10 @@ message FunctionInstanceInit {
 // Argument of GuestAPIFunction::Cast() and GuestAPIFunction::Call().
 message InputEventData {
     // The function instance that generated the event.
-    InstanceIdVariant src = 1;
+    InstanceId src = 1;
     
     // The event payload. Can be empty.
-    string msg            = 2;
+    string msg     = 2;
 }
 
 // Types of CallReturn.
@@ -350,10 +350,10 @@ message OutputEventData {
 // Argument of GuestAPIHost::Cast() and GuestAPIHost::Call().
 message OutputEventDataRaw {
     // The function instance recipient of this event.
-    InstanceIdVariant dst = 1;
+    InstanceId dst = 1;
     
     // The event payload. Can be empty.
-    string msg            = 2;
+    string msg     = 2;
 }
 
 enum TelemetryLogLevel {
