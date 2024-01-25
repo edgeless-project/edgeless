@@ -149,7 +149,7 @@ service GuestAPIHost {
     // Return the identifier of the current function instance.
     // Input: none.
     // Output: the function instance identifier.
-    rpc Slf (google.protobuf.Empty) returns (InstanceIdVariant);
+    rpc Slf (google.protobuf.Empty) returns (InstanceId);
 
     // Generate an asynchronous event at a later time.
     // Input: the delay, destination (alias) and payload of the event generated.
