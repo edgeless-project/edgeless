@@ -11,6 +11,13 @@ cargo build
 
 Below you will find instructions to create different flavors of your working environment.
 
+- [EDGELESS building instructions](#edgeless-building-instructions)
+  - [Quick start (Ubuntu 22.04/multipass VM)](#quick-start-ubuntu-2204multipass-vm)
+  - [Devcontainer](#devcontainer)
+  - [NixOS](#nixos)
+  - [Jetson Nano/Ubuntu 18.04](#jetson-nanoubuntu-1804)
+  - [Mac OS](#mac-os)
+
 ## Quick start (Ubuntu 22.04/multipass VM)
 
 [Optional] You can install an Ubuntu 22.04 VM (5 cores, 8 GB RAM, 20 GB disk) very easily with [multipass](https://multipass.run/):
@@ -128,4 +135,17 @@ Finally, you can just clone the repo and build the system:
 git clone https://github.com/edgeless-project/edgeless.git
 cd edgeless
 cargo build --target aarch64-unknown-linux-gnu
+```
+
+## Mac OS
+
+Tested on Apple M3 Pro with Sonoma 14.2.1
+
+```bash
+brew install protobuf
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+rustup target add wasm32-unknown-unknown
+cargo install wasm-tools
+cargo build
 ```
