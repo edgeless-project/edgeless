@@ -8,17 +8,8 @@ mod tests {
     use edgeless_api::controller::ControllerAPI;
     use edgeless_api::workflow_instance::WorkflowInstanceAPI;
 
-    async fn setup(
-        num_domains: u32,
-        num_nodes_per_domain: u32,
-    ) -> (tokio::runtime::Runtime, Vec<tokio::task::JoinHandle<()>>, Box<(dyn WorkflowInstanceAPI)>) {
-        let runtime = tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(8)
-            .enable_all()
-            .build()
-            .unwrap();
-
-        let mut tasks = vec![];
+    async fn setup(num_domains: u32, num_nodes_per_domain: u32) -> (Vec<futures::future::AbortHandle>, Box<(dyn WorkflowInstanceAPI)>) {
+        let mut handles = vec![];
 
         let address = "127.0.0.1";
         let mut port = 7001;
@@ -39,28 +30,34 @@ mod tests {
                 orchestrator_url: orchestrator_url.clone(),
             });
 
-            tasks.push(runtime.spawn(edgeless_orc::edgeless_orc_main(edgeless_orc::EdgelessOrcSettings {
+            let (task, handle) = futures::future::abortable(edgeless_orc::edgeless_orc_main(edgeless_orc::EdgelessOrcSettings {
                 domain_id: domain_id.to_string(),
                 orchestrator_url: orchestrator_url.to_string(),
                 orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
                 keep_alive_interval_secs: 1,
-            })));
+            }));
+            tokio::spawn(task);
+            handles.push(handle);
 
             for _ in 0..num_nodes_per_domain {
-                tasks.push(runtime.spawn(edgeless_node::edgeless_node_main(
+                let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(
                     edgeless_node::EdgelessNodeSettings::new_without_resources(&orchestrator_url, address, next_port(), next_port(), next_port()),
-                )));
+                ));
+                tokio::spawn(task);
+                handles.push(handle);
             }
         }
 
-        tasks.push(runtime.spawn(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
+        let (task, handle) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
             controller_url: controller_url.clone(),
             orchestrators,
-        })));
+        }));
+        tokio::spawn(task);
+        handles.push(handle);
 
         let mut con_client = edgeless_api::grpc_impl::controller::ControllerAPIClient::new(controller_url.as_str()).await;
 
-        (runtime, tasks, con_client.workflow_instance_api())
+        (handles, con_client.workflow_instance_api())
     }
 
     async fn wf_list(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> Vec<edgeless_api::workflow_instance::WorkflowInstance> {
@@ -70,70 +67,84 @@ mod tests {
         }
     }
 
+    fn fixture_spec() -> edgeless_api::function_instance::FunctionClassSpecification {
+        edgeless_api::function_instance::FunctionClassSpecification {
+            function_class_id: "system_test".to_string(),
+            function_class_type: "RUST_WASM".to_string(),
+            function_class_version: "0.1".to_string(),
+            function_class_inlude_code: include_bytes!("fixtures/system_test.wasm").to_vec(),
+            outputs: vec!["out1".to_string(), "out2".to_string(), "err".to_string(), "log".to_string()],
+        }
+    }
+
     #[tokio::test]
-    async fn test_single_domain_single_node() -> anyhow::Result<()> {
+    async fn system_test_single_domain_single_node() -> anyhow::Result<()> {
         env_logger::init();
 
-        let (runtime, tasks, mut client) = setup(1, 1).await;
+        // Create the EDGELESS system.
+        let (handles, mut client) = setup(1, 1).await;
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         assert!(wf_list(&mut client).await.is_empty());
 
-        // let workflow: workflow_spec::WorkflowSpec = serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
-        // let res = con_wf_client
-        //     .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-        //         workflow_functions: workflow
-        //             .functions
-        //             .into_iter()
-        //             .map(|func_spec| {
-        //                 let p = std::path::Path::new(&spec_file)
-        //                     .parent()
-        //                     .unwrap()
-        //                     .join(func_spec.class_specification.include_code_file.unwrap());
-        //                 edgeless_api::workflow_instance::WorkflowFunction {
-        //                     name: func_spec.name,
-        //                     function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-        //                         function_class_id: func_spec.class_specification.id,
-        //                         function_class_type: func_spec.class_specification.function_type,
-        //                         function_class_version: func_spec.class_specification.version,
-        //                         function_class_inlude_code: std::fs::read(p).unwrap(),
-        //                         outputs: func_spec.class_specification.outputs,
-        //                     },
-        //                     output_mapping: func_spec.output_mapping,
-        //                     annotations: func_spec.annotations,
-        //                 }
-        //             })
-        //             .collect(),
-        //         workflow_resources: workflow
-        //             .resources
-        //             .into_iter()
-        //             .map(|res_spec| edgeless_api::workflow_instance::WorkflowResource {
-        //                 name: res_spec.name,
-        //                 class_type: res_spec.class_type,
-        //                 output_mapping: res_spec.output_mapping,
-        //                 configurations: res_spec.configurations,
-        //             })
-        //             .collect(),
-        //         annotations: workflow.annotations.clone(),
-        //     })
-        //     .await;
-        // match res {
-        //     Ok(response) => {
-        //         match &response {
-        //             SpawnWorkflowResponse::ResponseError(err) => {
-        //                 println!("{:?}", err);
-        //             }
-        //             SpawnWorkflowResponse::WorkflowInstance(val) => {
-        //                 println!("{}", val.workflow_id.workflow_id.to_string());
-        //             }
-        //         }
-        //         log::info!("{:?}", response)
-        //     }
-        //     Err(err) => println!("{}", err),
-        // };
+        // Create 10 workflows
+        let mut workflow_ids = vec![];
+        for _ in 0..10 {
+            let res = client
+                .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
+                    workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
+                        name: "f1".to_string(),
+                        function_class_specification: fixture_spec(),
+                        output_mapping: std::collections::HashMap::new(),
+                        annotations: std::collections::HashMap::new(),
+                    }],
+                    workflow_resources: vec![],
+                    annotations: std::collections::HashMap::new(),
+                })
+                .await;
+            workflow_ids.push(match res {
+                Ok(response) => match &response {
+                    edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => {
+                        panic!("workflow rejected: {}", err)
+                    }
+                    edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val) => {
+                        assert_eq!(1, val.domain_mapping.len());
+                        assert_eq!("f1", val.domain_mapping[0].name);
+                        assert_eq!("domain-0", val.domain_mapping[0].domain_id);
+                        val.workflow_id.clone()
+                    }
+                },
+                Err(err) => panic!("could not start the workflow: {}", err),
+            });
+        }
 
-        // runtime.block_on(async { futures::future::join_all(tasks).await });
+        assert_eq!(10, wf_list(&mut client).await.len());
+
+        // Stop the workflows
+        for workflow_id in workflow_ids {
+            match client.stop(workflow_id).await {
+                Ok(_) => {}
+                Err(err) => panic!("could not stop the workflow: {}", err),
+            }
+        }
+
+        // Stop a non-existing workflow
+        match client
+            .stop(edgeless_api::workflow_instance::WorkflowId {
+                workflow_id: uuid::Uuid::new_v4(),
+            })
+            .await
+        {
+            Ok(_) => {}
+            Err(err) => panic!("could not stop the workflow: {}", err),
+        }
+        assert!(wf_list(&mut client).await.is_empty());
+
+        // Terminate
+        for handle in handles {
+            handle.abort();
+        }
 
         Ok(())
     }
