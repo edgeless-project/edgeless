@@ -13,6 +13,7 @@ members = [
     "edgeless_inabox",
     "edgeless_node",
     "edgeless_orc",
+    "edgeless_systemtests",
     "edgeless_telemetry",
     # "edgeless_embedded"
 ]
