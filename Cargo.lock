@@ -1146,6 +1146,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "edgeless_systemtests"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "clap",
+ "edgeless_api",
+ "edgeless_bal",
+ "edgeless_con",
+ "edgeless_dataplane",
+ "edgeless_node",
+ "edgeless_orc",
+ "env_logger",
+ "futures",
+ "log",
+ "serde",
+ "tokio",
+ "toml 0.7.6",
+ "uuid",
+ "wasmtime",
+ "wasmtime-wasi",
+]
+
+[[package]]
 name = "edgeless_telemetry"
 version = "0.1.0"
 dependencies = [
