@@ -57,6 +57,8 @@ mod tests {
 
         let mut con_client = edgeless_api::grpc_impl::controller::ControllerAPIClient::new(controller_url.as_str()).await;
 
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+
         (handles, con_client.workflow_instance_api())
     }
 
@@ -77,14 +79,20 @@ mod tests {
         }
     }
 
+    fn terminate(handles: Vec<futures::future::AbortHandle>) -> anyhow::Result<()> {
+        for handle in handles {
+            handle.abort();
+        }
+        Ok(())
+    }
+
     #[tokio::test]
+    #[serial_test::serial]
     async fn system_test_single_domain_single_node() -> anyhow::Result<()> {
-        env_logger::init();
+        let _ = env_logger::try_init();
 
         // Create the EDGELESS system.
         let (handles, mut client) = setup(1, 1).await;
-
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
         assert!(wf_list(&mut client).await.is_empty());
 
@@ -141,11 +149,80 @@ mod tests {
         }
         assert!(wf_list(&mut client).await.is_empty());
 
-        // Terminate
-        for handle in handles {
-            handle.abort();
+        terminate(handles)
+    }
+
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn system_test_single_domain_three_nodes() -> anyhow::Result<()> {
+        let _ = env_logger::try_init();
+
+        // Create the EDGELESS system.
+        let (handles, mut client) = setup(1, 3).await;
+
+        assert!(wf_list(&mut client).await.is_empty());
+
+        // Create 10 workflows
+        let mut workflow_ids = vec![];
+        for _ in 0..10 {
+            let res = client
+                .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
+                    workflow_functions: vec![
+                        edgeless_api::workflow_instance::WorkflowFunction {
+                            name: "f1".to_string(),
+                            function_class_specification: fixture_spec(),
+                            output_mapping: std::collections::HashMap::from([
+                                ("out1".to_string(), "f2".to_string()),
+                                ("out2".to_string(), "f3".to_string()),
+                            ]),
+                            annotations: std::collections::HashMap::new(),
+                        },
+                        edgeless_api::workflow_instance::WorkflowFunction {
+                            name: "f2".to_string(),
+                            function_class_specification: fixture_spec(),
+                            output_mapping: std::collections::HashMap::new(),
+                            annotations: std::collections::HashMap::new(),
+                        },
+                        edgeless_api::workflow_instance::WorkflowFunction {
+                            name: "f3".to_string(),
+                            function_class_specification: fixture_spec(),
+                            output_mapping: std::collections::HashMap::new(),
+                            annotations: std::collections::HashMap::new(),
+                        },
+                    ],
+                    workflow_resources: vec![],
+                    annotations: std::collections::HashMap::new(),
+                })
+                .await;
+            workflow_ids.push(match res {
+                Ok(response) => match &response {
+                    edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => {
+                        panic!("workflow rejected: {}", err)
+                    }
+                    edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val) => {
+                        assert_eq!(3, val.domain_mapping.len());
+                        for i in 0..3 {
+                            assert_eq!(format!("f{}", i + 1), val.domain_mapping[i].name);
+                            assert_eq!("domain-0", val.domain_mapping[i].domain_id);
+                        }
+                        val.workflow_id.clone()
+                    }
+                },
+                Err(err) => panic!("could not start the workflow: {}", err),
+            });
         }
 
-        Ok(())
+        assert_eq!(10, wf_list(&mut client).await.len());
+
+        // Stop the workflows
+        for workflow_id in workflow_ids {
+            match client.stop(workflow_id).await {
+                Ok(_) => {}
+                Err(err) => panic!("could not stop the workflow: {}", err),
+            }
+        }
+        assert!(wf_list(&mut client).await.is_empty());
+
+        terminate(handles)
     }
 }
