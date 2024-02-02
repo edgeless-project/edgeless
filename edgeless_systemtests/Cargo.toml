@@ -30,3 +30,4 @@ edgeless_bal = {path = "../edgeless_bal" }
 edgeless_con = {path = "../edgeless_con" }
 edgeless_orc = {path = "../edgeless_orc" }
 edgeless_node = {path = "../edgeless_node" }
+serial_test = { version = "0.4" }
