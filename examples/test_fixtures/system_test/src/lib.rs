@@ -7,6 +7,7 @@ struct SystemTest;
 
 impl Edgefunction for SystemTest {
     fn handle_cast(_src: InstanceId, encoded_message: String) {
+        // log::info!("cast {}: {}", _src.function, encoded_message);
         match encoded_message.parse::<i32>() {
             Ok(val) => {
                 cast("out1", format!("{}", val / 2).as_str());
@@ -21,7 +22,16 @@ impl Edgefunction for SystemTest {
         CallRet::Noreply
     }
 
-    fn handle_init(_payload: String, _serialized_state: Option<String>) {}
+    fn handle_init(payload: String, _serialized_state: Option<String>) {
+        // edgeless_function::init_logger();
+        // log::info!("started: {}", payload);
+        if !payload.is_empty() {
+            match payload.parse::<i32>() {
+                Ok(_) => delayed_cast(500, "self", &payload),
+                Err(_) => {}
+            }
+        }
+    }
 
     fn handle_stop() {}
 }
