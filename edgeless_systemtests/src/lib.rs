@@ -9,6 +9,9 @@ mod tests {
     use edgeless_api::workflow_instance::WorkflowInstanceAPI;
 
     async fn setup(num_domains: u32, num_nodes_per_domain: u32) -> (Vec<futures::future::AbortHandle>, Box<(dyn WorkflowInstanceAPI)>) {
+        assert!(num_domains > 0);
+        assert!(num_nodes_per_domain > 0);
+
         let mut handles = vec![];
 
         let address = "127.0.0.1";
@@ -39,10 +42,25 @@ mod tests {
             tokio::spawn(task);
             handles.push(handle);
 
-            for _ in 0..num_nodes_per_domain {
-                let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(
-                    edgeless_node::EdgelessNodeSettings::new_without_resources(&orchestrator_url, address, next_port(), next_port(), next_port()),
-                ));
+            // The first node in each domain is also assigned a file-log resource.
+            for node_i in 0..num_nodes_per_domain {
+                let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(match node_i {
+                    0 => edgeless_node::EdgelessNodeSettings {
+                        node_id: uuid::Uuid::new_v4(),
+                        agent_url: format!("http://{}:{}", address, next_port()),
+                        invocation_url: format!("http://{}:{}", address, next_port()),
+                        metrics_url: format!("http://{}:{}", address, next_port()),
+                        orchestrator_url: orchestrator_url.to_string(),
+                        http_ingress_url: "".to_string(),
+                        http_ingress_provider: "".to_string(),
+                        http_egress_provider: "".to_string(),
+                        file_log_provider: "file-log-1".to_string(),
+                        redis_provider: "".to_string(),
+                    },
+                    _ => {
+                        edgeless_node::EdgelessNodeSettings::new_without_resources(&orchestrator_url, address, next_port(), next_port(), next_port())
+                    }
+                }));
                 tokio::spawn(task);
                 handles.push(handle);
             }
@@ -162,9 +180,20 @@ mod tests {
 
         assert!(wf_list(&mut client).await.is_empty());
 
+        let num_workflows = 3;
+
+        let removeme_filename = |workflow_i| format!("removeme-{}.log", workflow_i);
+
+        let cleanup = || {
+            for workflow_i in 0..num_workflows {
+                let _ = std::fs::remove_file(removeme_filename(workflow_i));
+            }
+        };
+
         // Create 10 workflows
         let mut workflow_ids = vec![];
-        for _ in 0..10 {
+        cleanup();
+        for workflow_i in 0..num_workflows {
             let res = client
                 .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
                     workflow_functions: vec![
@@ -174,23 +203,29 @@ mod tests {
                             output_mapping: std::collections::HashMap::from([
                                 ("out1".to_string(), "f2".to_string()),
                                 ("out2".to_string(), "f3".to_string()),
+                                ("log".to_string(), "log".to_string()),
                             ]),
-                            annotations: std::collections::HashMap::new(),
+                            annotations: std::collections::HashMap::from([("init-payload".to_string(), "8".to_string())]),
                         },
                         edgeless_api::workflow_instance::WorkflowFunction {
                             name: "f2".to_string(),
                             function_class_specification: fixture_spec(),
-                            output_mapping: std::collections::HashMap::new(),
+                            output_mapping: std::collections::HashMap::from([("log".to_string(), "log".to_string())]),
                             annotations: std::collections::HashMap::new(),
                         },
                         edgeless_api::workflow_instance::WorkflowFunction {
                             name: "f3".to_string(),
                             function_class_specification: fixture_spec(),
-                            output_mapping: std::collections::HashMap::new(),
+                            output_mapping: std::collections::HashMap::from([("log".to_string(), "log".to_string())]),
                             annotations: std::collections::HashMap::new(),
                         },
                     ],
-                    workflow_resources: vec![],
+                    workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
+                        name: "log".to_string(),
+                        class_type: "file-log".to_string(),
+                        output_mapping: std::collections::HashMap::new(),
+                        configurations: std::collections::HashMap::from([("filename".to_string(), removeme_filename(workflow_i))]),
+                    }],
                     annotations: std::collections::HashMap::new(),
                 })
                 .await;
@@ -200,9 +235,12 @@ mod tests {
                         panic!("workflow rejected: {}", err)
                     }
                     edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val) => {
-                        assert_eq!(3, val.domain_mapping.len());
-                        for i in 0..3 {
-                            assert_eq!(format!("f{}", i + 1), val.domain_mapping[i].name);
+                        assert_eq!(4, val.domain_mapping.len());
+                        for i in 0..4 {
+                            match i {
+                                3 => assert_eq!("log", val.domain_mapping[i].name),
+                                _ => assert_eq!(format!("f{}", i + 1), val.domain_mapping[i].name),
+                            };
                             assert_eq!("domain-0", val.domain_mapping[i].domain_id);
                         }
                         val.workflow_id.clone()
@@ -212,7 +250,28 @@ mod tests {
             });
         }
 
-        assert_eq!(10, wf_list(&mut client).await.len());
+        assert_eq!(num_workflows, wf_list(&mut client).await.len());
+
+        // Wait until the log files have been filled.
+        let mut not_done_yet: std::collections::HashSet<usize> = std::collections::HashSet::from_iter(0..num_workflows);
+        let values_expected = std::collections::HashSet::<i32>::from([4, 7, 8]);
+        for _ in 0..100 {
+            for workflow_i in 0..num_workflows {
+                let values_from_file: std::collections::HashSet<i32> = std::fs::read_to_string(removeme_filename(workflow_i))
+                    .expect("could not read file")
+                    .split('\n')
+                    .filter_map(|x| x.parse::<i32>().ok())
+                    .collect();
+                if values_from_file == values_expected {
+                    not_done_yet.remove(&workflow_i);
+                }
+            }
+            if not_done_yet.is_empty() {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+        assert!(not_done_yet.is_empty(), "not all logs have been filled properly");
 
         // Stop the workflows
         for workflow_id in workflow_ids {
@@ -223,6 +282,7 @@ mod tests {
         }
         assert!(wf_list(&mut client).await.is_empty());
 
+        cleanup();
         terminate(handles)
     }
 }
