@@ -1,0 +1,10 @@
+{
+    "id": "vector_mul",
+    "function_type": "RUST_WASM",
+    "version": "0.1",
+    "build": "Cargo.toml",
+    "outputs": [
+        "metric",
+        "out"
+    ]
+}
