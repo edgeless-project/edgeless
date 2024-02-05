@@ -113,6 +113,16 @@ enum WorkflowType {
     MatrixMulChain(u32, u32, u32, u32, u32, String, String),
 }
 
+impl WorkflowType {
+    fn metrics_collector(&self) -> bool {
+        match self {
+            Self::None => true,
+            Self::Single(_, _) => false,
+            Self::MatrixMulChain(_, _, _, _, _, _, _) => true,
+        }
+    }
+}
+
 fn workflow_type(wf_type: &str) -> anyhow::Result<WorkflowType> {
     let tokens: Vec<&str> = wf_type.split(';').collect();
     if !tokens.is_empty() && tokens[0] == "none" {
@@ -306,7 +316,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Start the metrics collector node, if needed
-    if let WorkflowType::MatrixMulChain(_, _, _, _, _, _, _) = wf_type {
+    if wf_type.metrics_collector() {
         let _ = tokio::spawn(async move {
             edgeless_benchmark::edgeless_metrics_collector_node_main(edgeless_node::EdgelessNodeSettings {
                 node_id: uuid::Uuid::new_v4(),
