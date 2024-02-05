@@ -3,13 +3,14 @@
 
 use anyhow::anyhow;
 use clap::Parser;
+use core::cmp::Ordering;
 use edgeless_api::controller::ControllerAPI;
 use edgeless_api::workflow_instance::{SpawnWorkflowResponse, WorkflowFunction, WorkflowId, WorkflowInstanceAPI};
 use rand::prelude::*;
 use rand::SeedableRng;
 use rand_distr::Exp;
 use rand_pcg::Pcg64;
-use std::collections::BTreeMap;
+use std::collections::BinaryHeap;
 use std::time;
 
 #[derive(Debug, clap::Parser)]
@@ -24,6 +25,9 @@ struct Args {
     /// Address to use to bind servers
     #[arg(short, long, default_value_t = String::from("127.0.0.1"))]
     bind_address: String,
+    /// Arrival model, one of {poisson, incremental}
+    #[arg(long, default_value_t = String::from("poisson"))]
+    arrival_model: String,
     /// Duration of the benchmarking experiment, in s
     #[arg(short, long, default_value_t = 30.0)]
     duration: f64,
@@ -41,9 +45,44 @@ struct Args {
     wf_type: String,
 }
 
+#[derive(PartialEq, Eq)]
 enum Event {
-    WfNew(),
-    WfEnd(String),
+    /// 0: Event time.
+    WfNew(u64),
+    /// 0: Event time.
+    /// 1: UUID of the workflow.
+    WfEnd(u64, String),
+    /// 0: Event time.
+    WfExperimentEnd(u64),
+}
+
+impl Event {
+    fn time(&self) -> u64 {
+        match self {
+            Self::WfNew(t) => *t,
+            Self::WfEnd(t, _) => *t,
+            Self::WfExperimentEnd(t) => *t,
+        }
+    }
+}
+
+impl PartialOrd for Event {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        other.time().partial_cmp(&self.time())
+    }
+}
+
+impl Ord for Event {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap()
+    }
+}
+
+enum ArrivalModel {
+    /// Inter-arrival between consecutive workflows and durations are exponentially distributed.
+    Poisson,
+    /// One new workflow arrive every new inter-arrival time.
+    Incremental,
 }
 
 static MEGA: u64 = 1000000;
@@ -259,6 +298,13 @@ async fn main() -> anyhow::Result<()> {
         }
     };
 
+    // Parse the arrival model.
+    let arrival_model = match args.arrival_model.as_str() {
+        "poisson" => ArrivalModel::Poisson,
+        "incremental" => ArrivalModel::Incremental,
+        _ => panic!("unknown arrival model {}: ", args.arrival_model),
+    };
+
     // Start the metrics collector node, if needed
     if let WorkflowType::MatrixMulChain(_, _, _, _, _, _, _) = wf_type {
         let _ = tokio::spawn(async move {
@@ -282,36 +328,58 @@ async fn main() -> anyhow::Result<()> {
     let mut client_interface = ClientInterface::new(&args.controller_url, wf_type).await;
 
     // event queue, the first event is always a new workflow arriving at time 0
-    let mut events = BTreeMap::new();
-    events.insert(0_u64, Event::WfNew()); // in us
+    let mut events = BinaryHeap::new();
+    events.push(Event::WfNew(0_u64)); // in us
+
+    // add the end-of-experiment event
+    events.push(Event::WfExperimentEnd(to_microseconds(args.duration)));
 
     // main experiment loop
     let mut wf_started = 0;
     let mut wf_requested = 0;
     let mut now = 0;
-    while now < to_microseconds(args.duration) {
-        if let Some((event_time, event_type)) = events.pop_first() {
+    'outer: loop {
+        if let Some(event) = events.pop() {
             // wait until the event
-            assert!(event_time >= now);
-            std::thread::sleep(time::Duration::from_micros(event_time - now));
+            assert!(event.time() >= now);
+            if event.time() > now {
+                std::thread::sleep(time::Duration::from_micros(event.time() - now));
+            }
 
             // handle the event
-            now = event_time;
-            match event_type {
-                Event::WfNew() => {
+            now = event.time();
+            match event {
+                Event::WfNew(_) => {
                     wf_requested += 1;
                     match client_interface.start_workflow().await {
                         Ok(uuid) => {
                             wf_started += 1;
-                            let lifetime = lifetime_rv.sample(&mut rng);
-                            log::info!("{} new wf created '{}', will last {} s", to_seconds(now), &uuid, lifetime);
-                            events.insert(now + to_microseconds(lifetime), Event::WfEnd(uuid));
+                            let end_time = match arrival_model {
+                                ArrivalModel::Poisson => now + to_microseconds(lifetime_rv.sample(&mut rng)),
+                                ArrivalModel::Incremental => to_microseconds(args.duration) - 1,
+                            };
+                            assert!(end_time >= now);
+                            log::info!(
+                                "{} new wf created '{}', will last {} s",
+                                to_seconds(now),
+                                &uuid,
+                                to_seconds(end_time - now)
+                            );
+                            events.push(Event::WfEnd(end_time, uuid));
                         }
                         Err(_) => {}
                     }
-                    events.insert(now + to_microseconds(interarrival_rv.sample(&mut rng)), Event::WfNew());
+                    let new_arrival_time = now
+                        + to_microseconds(match arrival_model {
+                            ArrivalModel::Poisson => interarrival_rv.sample(&mut rng),
+                            ArrivalModel::Incremental => args.interarrival,
+                        });
+                    if new_arrival_time < to_microseconds(args.duration) {
+                        // only add the event if it is before the end of the experiment
+                        events.push(Event::WfNew(new_arrival_time));
+                    }
                 }
-                Event::WfEnd(uuid) => {
+                Event::WfEnd(_, uuid) => {
                     log::info!("{} wf terminated  '{}'", to_seconds(now), &uuid);
                     if !uuid.is_empty() {
                         match client_interface.stop_workflow(&uuid).await {
@@ -322,13 +390,16 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                 }
+                Event::WfExperimentEnd(_) => {
+                    break 'outer;
+                }
             }
         }
     }
 
     // terminate all workflows that are still active
-    for event_type in events.values() {
-        if let Event::WfEnd(uuid) = event_type {
+    for event_type in events.iter() {
+        if let Event::WfEnd(_, uuid) = event_type {
             if !uuid.is_empty() {
                 match client_interface.stop_workflow(uuid).await {
                     Ok(_) => {}
