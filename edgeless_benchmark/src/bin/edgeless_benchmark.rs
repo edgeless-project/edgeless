@@ -25,9 +25,12 @@ struct Args {
     /// Address to use to bind servers
     #[arg(short, long, default_value_t = String::from("127.0.0.1"))]
     bind_address: String,
-    /// Arrival model, one of {poisson, incremental}
+    /// Arrival model, one of {poisson, incremental, incr-and-keep}
     #[arg(long, default_value_t = String::from("poisson"))]
     arrival_model: String,
+    /// Warmup duration, in s
+    #[arg(long, default_value_t = 10.0)]
+    warmup: f64,
     /// Duration of the benchmarking experiment, in s
     #[arg(short, long, default_value_t = 30.0)]
     duration: f64,
@@ -54,6 +57,8 @@ enum Event {
     WfEnd(u64, String),
     /// 0: Event time.
     WfExperimentEnd(u64),
+    /// 0: Event time.
+    WfWarmUpEnd(u64),
 }
 
 impl Event {
@@ -62,6 +67,7 @@ impl Event {
             Self::WfNew(t) => *t,
             Self::WfEnd(t, _) => *t,
             Self::WfExperimentEnd(t) => *t,
+            Self::WfWarmUpEnd(t) => *t,
         }
     }
 }
@@ -83,6 +89,8 @@ enum ArrivalModel {
     Poisson,
     /// One new workflow arrive every new inter-arrival time.
     Incremental,
+    /// Add workflows incrementally until the warm up period finishes, then keep until the end of the experiment.
+    IncrAndKeep,
 }
 
 static MEGA: u64 = 1000000;
@@ -99,6 +107,7 @@ enum WorkflowType {
     None,
     // 0: function.json path
     // 1: function.wasm path
+    // Example: single;examples/noop/noop_function/function.json;examples/noop/noop_function/noop.wasm
     Single(String, String),
     // 0: min chain length
     // 1: max chain length
@@ -110,6 +119,7 @@ enum WorkflowType {
     //    transaction
     // 5: matrix_mul.wasm path
     // 6: Redis URL
+    // Example: matrix-mul-chain;5;5;1000;2000;1000;edgeless_benchmark/functions/vector_mul/matrix_mul.wasm;redis://127.0.0.1:6379/
     MatrixMulChain(u32, u32, u32, u32, u32, String, String),
     // 0: min chain length
     // 1: max chain length
@@ -388,6 +398,7 @@ async fn main() -> anyhow::Result<()> {
     let arrival_model = match args.arrival_model.as_str() {
         "poisson" => ArrivalModel::Poisson,
         "incremental" => ArrivalModel::Incremental,
+        "incr-and-keep" => ArrivalModel::IncrAndKeep,
         _ => panic!("unknown arrival model {}: ", args.arrival_model),
     };
 
@@ -420,6 +431,17 @@ async fn main() -> anyhow::Result<()> {
     // add the end-of-experiment event
     events.push(Event::WfExperimentEnd(to_microseconds(args.duration)));
 
+    // add the event for the end of the warm-up period
+    if args.warmup < args.duration {
+        events.push(Event::WfWarmUpEnd(to_microseconds(args.warmup)));
+    } else {
+        log::warn!(
+            "metrics will not be collected since warm-up period ({} s) >= experiment duration ({} s)",
+            args.warmup,
+            args.duration
+        );
+    }
+
     // main experiment loop
     let mut wf_started = 0;
     let mut wf_requested = 0;
@@ -436,13 +458,19 @@ async fn main() -> anyhow::Result<()> {
             now = event.time();
             match event {
                 Event::WfNew(_) => {
+                    // do not schedule any more workflows after the warm-up period is finished
+                    // for IncrAndKeep arrival model
+                    if now >= to_microseconds(args.warmup) {
+                        continue;
+                    }
+
                     wf_requested += 1;
                     match client_interface.start_workflow().await {
                         Ok(uuid) => {
                             wf_started += 1;
                             let end_time = match arrival_model {
                                 ArrivalModel::Poisson => now + to_microseconds(lifetime_rv.sample(&mut rng)),
-                                ArrivalModel::Incremental => to_microseconds(args.duration) - 1,
+                                ArrivalModel::Incremental | ArrivalModel::IncrAndKeep => to_microseconds(args.duration) - 1,
                             };
                             assert!(end_time >= now);
                             log::info!(
@@ -458,7 +486,7 @@ async fn main() -> anyhow::Result<()> {
                     let new_arrival_time = now
                         + to_microseconds(match arrival_model {
                             ArrivalModel::Poisson => interarrival_rv.sample(&mut rng),
-                            ArrivalModel::Incremental => args.interarrival,
+                            ArrivalModel::Incremental | ArrivalModel::IncrAndKeep => args.interarrival,
                         });
                     if new_arrival_time < to_microseconds(args.duration) {
                         // only add the event if it is before the end of the experiment
@@ -478,6 +506,9 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Event::WfExperimentEnd(_) => {
                     break 'outer;
+                }
+                Event::WfWarmUpEnd(_) => {
+                    // XXX
                 }
             }
         }
