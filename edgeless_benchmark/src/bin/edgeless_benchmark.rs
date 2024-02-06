@@ -111,6 +111,14 @@ enum WorkflowType {
     // 5: matrix_mul.wasm path
     // 6: Redis URL
     MatrixMulChain(u32, u32, u32, u32, u32, String, String),
+    // 0: min chain length
+    // 1: max chain length
+    // 2: min input size
+    // 3: max input size
+    // 4: vector_mul.wasm path
+    // 5: Redis URL
+    // Example: vector-mul-chain;5;5;1000;2000;edgeless_benchmark/functions/vector_mul/vector_mul.wasm;redis://127.0.0.1:6379/
+    VectorMulChain(u32, u32, u32, u32, String, String),
 }
 
 impl WorkflowType {
@@ -119,6 +127,7 @@ impl WorkflowType {
             Self::None => true,
             Self::Single(_, _) => false,
             Self::MatrixMulChain(_, _, _, _, _, _, _) => true,
+            Self::VectorMulChain(_, _, _, _, _, _) => true,
         }
     }
 }
@@ -138,6 +147,15 @@ fn workflow_type(wf_type: &str) -> anyhow::Result<WorkflowType> {
             tokens[5].parse::<u32>().unwrap_or_default(),
             tokens[6].to_string(),
             tokens[7].to_string(),
+        ));
+    } else if !tokens.is_empty() && tokens[0] == "vector-mul-chain" && tokens.len() == 7 {
+        return Ok(WorkflowType::VectorMulChain(
+            tokens[1].parse::<u32>().unwrap_or_default(),
+            tokens[2].parse::<u32>().unwrap_or_default(),
+            tokens[3].parse::<u32>().unwrap_or_default(),
+            tokens[4].parse::<u32>().unwrap_or_default(),
+            tokens[5].to_string(),
+            tokens[6].to_string(),
         ));
     }
     Err(anyhow!("unknown workflow type: {}", wf_type))
@@ -191,7 +209,7 @@ impl ClientInterface {
                 let mut matrix_sizes = vec![];
 
                 for i in 0..chain_size {
-                    let mut outputs = vec!["metrics".to_string()];
+                    let mut outputs = vec!["metric".to_string()];
                     for k in 0..20 {
                         outputs.push(format!("out-{}", k).to_string());
                     }
@@ -252,9 +270,67 @@ impl ClientInterface {
                     class_type: "metrics-collector".to_string(),
                     output_mapping: std::collections::HashMap::new(),
                     configurations: std::collections::HashMap::from([("url".to_string(), redis_url.to_string())]),
-                })
+                });
             }
-        }
+            WorkflowType::VectorMulChain(min_chain_size, max_chain_size, min_input_size, max_input_size, path_wasm, redis_url) => {
+                let chain_size: u32 = self.rng.gen_range(*min_chain_size..=*max_chain_size);
+                let input_size = self.rng.gen_range(*min_input_size..=*max_input_size);
+
+                for i in 0..chain_size {
+                    let func_name = match i {
+                        0 => "client".to_string(),
+                        i => format!("f{}", i - 1),
+                    };
+                    let next_func_name = match chain_size - i - 1 {
+                        0 => "client".to_string(),
+                        i => format!("f{}", chain_size - i - 1),
+                    };
+
+                    let output_mapping = std::collections::HashMap::from([
+                        ("metric".to_string(), "metrics-collector".to_string()),
+                        ("out".to_string(), next_func_name),
+                    ]);
+
+                    let annotations = std::collections::HashMap::from([(
+                        "init-payload".to_string(),
+                        format!(
+                            "seed={},is_client={},wf_name=wf{},fun_name=f{},input_size={}",
+                            i,
+                            match i {
+                                0 => "true",
+                                _ => "false",
+                            },
+                            self.wf_id,
+                            i,
+                            input_size
+                        )
+                        .to_string(),
+                    )]);
+
+                    functions.push(WorkflowFunction {
+                        name: func_name,
+                        function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                            function_class_id: "vector_mul".to_string(),
+                            function_class_type: "RUST_WASM".to_string(),
+                            function_class_version: "0.1".to_string(),
+                            function_class_inlude_code: std::fs::read(path_wasm).unwrap(),
+                            outputs: vec!["metric".to_string(), "out".to_string()],
+                        },
+                        output_mapping,
+                        annotations,
+                    });
+                }
+
+                log::info!("wf{}, chain size {}, input size {}", self.wf_id, chain_size, input_size);
+
+                resources.push(edgeless_api::workflow_instance::WorkflowResource {
+                    name: "metrics-collector".to_string(),
+                    class_type: "metrics-collector".to_string(),
+                    output_mapping: std::collections::HashMap::new(),
+                    configurations: std::collections::HashMap::from([("url".to_string(), redis_url.to_string())]),
+                });
+            }
+        };
 
         self.wf_id += 1;
 
