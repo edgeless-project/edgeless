@@ -46,6 +46,12 @@ struct Args {
     /// Workflow type.
     #[arg(short, long, default_value_t = String::from("single;examples/noop/noop_function/function.json;examples/noop/noop_function/noop.wasm"))]
     wf_type: String,
+    /// URL of the Redis server to use for metrics.
+    #[arg(short, long, default_value_t = String::from("redis://127.0.0.1:6379/"))]
+    redis_url: String,
+    /// Name of the CSV output file where to save the metrics collected.
+    #[arg(long, default_value_t = String::from("out.csv"))]
+    output: String,
 }
 
 #[derive(PartialEq, Eq)]
@@ -118,17 +124,15 @@ enum WorkflowType {
     //    function calls the first one to trigger a new
     //    transaction
     // 5: matrix_mul.wasm path
-    // 6: Redis URL
-    // Example: matrix-mul-chain;5;5;1000;2000;1000;edgeless_benchmark/functions/vector_mul/matrix_mul.wasm;redis://127.0.0.1:6379/
-    MatrixMulChain(u32, u32, u32, u32, u32, String, String),
+    // Example: matrix-mul-chain;5;5;1000;2000;1000;edgeless_benchmark/functions/vector_mul/matrix_mul.wasm
+    MatrixMulChain(u32, u32, u32, u32, u32, String),
     // 0: min chain length
     // 1: max chain length
     // 2: min input size
     // 3: max input size
     // 4: vector_mul.wasm path
-    // 5: Redis URL
-    // Example: vector-mul-chain;5;5;1000;2000;edgeless_benchmark/functions/vector_mul/vector_mul.wasm;redis://127.0.0.1:6379/
-    VectorMulChain(u32, u32, u32, u32, String, String),
+    // Example: vector-mul-chain;5;5;1000;2000;edgeless_benchmark/functions/vector_mul/vector_mul.wasm
+    VectorMulChain(u32, u32, u32, u32, String),
 }
 
 impl WorkflowType {
@@ -136,8 +140,8 @@ impl WorkflowType {
         match self {
             Self::None => true,
             Self::Single(_, _) => false,
-            Self::MatrixMulChain(_, _, _, _, _, _, _) => true,
-            Self::VectorMulChain(_, _, _, _, _, _) => true,
+            Self::MatrixMulChain(_, _, _, _, _, _) => true,
+            Self::VectorMulChain(_, _, _, _, _) => true,
         }
     }
 }
@@ -148,7 +152,7 @@ fn workflow_type(wf_type: &str) -> anyhow::Result<WorkflowType> {
         return Ok(WorkflowType::None);
     } else if !tokens.is_empty() && tokens[0] == "single" && tokens.len() == 3 {
         return Ok(WorkflowType::Single(tokens[1].to_string(), tokens[2].to_string()));
-    } else if !tokens.is_empty() && tokens[0] == "matrix-mul-chain" && tokens.len() == 8 {
+    } else if !tokens.is_empty() && tokens[0] == "matrix-mul-chain" && tokens.len() == 7 {
         return Ok(WorkflowType::MatrixMulChain(
             tokens[1].parse::<u32>().unwrap_or_default(),
             tokens[2].parse::<u32>().unwrap_or_default(),
@@ -156,16 +160,14 @@ fn workflow_type(wf_type: &str) -> anyhow::Result<WorkflowType> {
             tokens[4].parse::<u32>().unwrap_or_default(),
             tokens[5].parse::<u32>().unwrap_or_default(),
             tokens[6].to_string(),
-            tokens[7].to_string(),
         ));
-    } else if !tokens.is_empty() && tokens[0] == "vector-mul-chain" && tokens.len() == 7 {
+    } else if !tokens.is_empty() && tokens[0] == "vector-mul-chain" && tokens.len() == 6 {
         return Ok(WorkflowType::VectorMulChain(
             tokens[1].parse::<u32>().unwrap_or_default(),
             tokens[2].parse::<u32>().unwrap_or_default(),
             tokens[3].parse::<u32>().unwrap_or_default(),
             tokens[4].parse::<u32>().unwrap_or_default(),
             tokens[5].to_string(),
-            tokens[6].to_string(),
         ));
     }
     Err(anyhow!("unknown workflow type: {}", wf_type))
@@ -173,26 +175,35 @@ fn workflow_type(wf_type: &str) -> anyhow::Result<WorkflowType> {
 
 struct ClientInterface {
     client: Box<dyn WorkflowInstanceAPI>,
+    redis_url: String,
     wf_type: WorkflowType,
     rng: rand::rngs::StdRng,
+    /// Identifier of the next workflow to start.
     wf_id: u32,
+    /// Workflows started. For each workflow, functions started.
+    workflows: std::collections::HashMap<String, std::collections::HashSet<String>>,
 }
 
 impl ClientInterface {
-    async fn new(controller_url: &str, wf_type: WorkflowType) -> Self {
+    async fn new(controller_url: &str, redis_url: &str, wf_type: WorkflowType) -> Self {
         Self {
             client: edgeless_api::grpc_impl::controller::ControllerAPIClient::new(controller_url)
                 .await
                 .workflow_instance_api(),
+            redis_url: redis_url.to_string(),
             wf_type,
             rng: rand::rngs::StdRng::from_entropy(),
             wf_id: 0,
+            workflows: std::collections::HashMap::new(),
         }
     }
 
     async fn start_workflow(&mut self) -> anyhow::Result<String> {
         let mut functions = vec![];
         let mut resources: Vec<edgeless_api::workflow_instance::WorkflowResource> = vec![];
+
+        let mut function_names = std::collections::HashSet::new();
+        let wf_name = format!("wf{}", self.wf_id);
 
         match &self.wf_type {
             WorkflowType::None => {}
@@ -213,7 +224,7 @@ impl ClientInterface {
                     annotations: std::collections::HashMap::new(),
                 });
             }
-            WorkflowType::MatrixMulChain(min_chain_size, max_chain_size, min_matrix_size, max_matrix_size, inter_arrival, path_wasm, redis_url) => {
+            WorkflowType::MatrixMulChain(min_chain_size, max_chain_size, min_matrix_size, max_matrix_size, inter_arrival, path_wasm) => {
                 let chain_size: u32 = self.rng.gen_range(*min_chain_size..=*max_chain_size);
 
                 let mut matrix_sizes = vec![];
@@ -236,7 +247,7 @@ impl ClientInterface {
                     let annotations = std::collections::HashMap::from([(
                         "init-payload".to_string(),
                         format!(
-                            "seed={},inter_arrival={},is_first={},is_last={},wf_name=wf{},fun_name=f{},matrix_size={},outputs=0",
+                            "seed={},inter_arrival={},is_first={},is_last={},wf_name={},fun_name=f{},matrix_size={},outputs=0",
                             i,
                             inter_arrival,
                             match i {
@@ -247,15 +258,17 @@ impl ClientInterface {
                                 0 => "true",
                                 _ => "false",
                             },
-                            self.wf_id,
+                            &wf_name,
                             i,
                             matrix_size
                         )
                         .to_string(),
                     )]);
 
+                    let name = format!("f{}", i);
+                    function_names.insert(name.clone());
                     functions.push(WorkflowFunction {
-                        name: format!("f{}", i).to_string(),
+                        name,
                         function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
                             function_class_id: "matrix_mul".to_string(),
                             function_class_type: "RUST_WASM".to_string(),
@@ -279,15 +292,15 @@ impl ClientInterface {
                     name: "metrics-collector".to_string(),
                     class_type: "metrics-collector".to_string(),
                     output_mapping: std::collections::HashMap::new(),
-                    configurations: std::collections::HashMap::from([("url".to_string(), redis_url.to_string())]),
+                    configurations: std::collections::HashMap::from([("url".to_string(), self.redis_url.clone())]),
                 });
             }
-            WorkflowType::VectorMulChain(min_chain_size, max_chain_size, min_input_size, max_input_size, path_wasm, redis_url) => {
+            WorkflowType::VectorMulChain(min_chain_size, max_chain_size, min_input_size, max_input_size, path_wasm) => {
                 let chain_size: u32 = self.rng.gen_range(*min_chain_size..=*max_chain_size);
                 let input_size = self.rng.gen_range(*min_input_size..=*max_input_size);
 
                 for i in 0..chain_size {
-                    let func_name = match i {
+                    let name = match i {
                         0 => "client".to_string(),
                         i => format!("f{}", i - 1),
                     };
@@ -304,21 +317,24 @@ impl ClientInterface {
                     let annotations = std::collections::HashMap::from([(
                         "init-payload".to_string(),
                         format!(
-                            "seed={},is_client={},wf_name=wf{},fun_name=f{},input_size={}",
+                            "seed={},is_client={},wf_name={},fun_name=f{},input_size={}",
                             i,
                             match i {
                                 0 => "true",
                                 _ => "false",
                             },
-                            self.wf_id,
+                            &wf_name,
                             i,
                             input_size
                         )
                         .to_string(),
                     )]);
 
+                    if i > 0 {
+                        function_names.insert(name.clone());
+                    }
                     functions.push(WorkflowFunction {
-                        name: func_name,
+                        name,
                         function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
                             function_class_id: "vector_mul".to_string(),
                             function_class_type: "RUST_WASM".to_string(),
@@ -337,7 +353,7 @@ impl ClientInterface {
                     name: "metrics-collector".to_string(),
                     class_type: "metrics-collector".to_string(),
                     output_mapping: std::collections::HashMap::new(),
-                    configurations: std::collections::HashMap::from([("url".to_string(), redis_url.to_string())]),
+                    configurations: std::collections::HashMap::from([("url".to_string(), self.redis_url.clone())]),
                 });
             }
         };
@@ -348,6 +364,8 @@ impl ClientInterface {
             assert!(resources.is_empty());
             return Ok("".to_string());
         }
+
+        self.workflows.insert(wf_name, function_names);
 
         let res = self
             .client
@@ -403,6 +421,10 @@ async fn main() -> anyhow::Result<()> {
     };
 
     // Start the metrics collector node, if needed
+    let mut redis_client = edgeless_benchmark::redis_dumper::RedisDumper::new(&args.redis_url);
+    if redis_client.is_ok() {
+        log::info!("connected to Redis at {}", &args.redis_url);
+    }
     if wf_type.metrics_collector() {
         let _ = tokio::spawn(async move {
             edgeless_benchmark::edgeless_metrics_collector_node_main(edgeless_node::EdgelessNodeSettings {
@@ -419,10 +441,13 @@ async fn main() -> anyhow::Result<()> {
             })
             .await
         });
+        if let Err(err) = &redis_client {
+            log::warn!("could not connect to Redis at {}: {}", &args.redis_url, err);
+        }
     }
 
     // Create an e-ORC client
-    let mut client_interface = ClientInterface::new(&args.controller_url, wf_type).await;
+    let mut client_interface = ClientInterface::new(&args.controller_url, &args.redis_url, wf_type).await;
 
     // event queue, the first event is always a new workflow arriving at time 0
     let mut events = BinaryHeap::new();
@@ -508,7 +533,9 @@ async fn main() -> anyhow::Result<()> {
                     break 'outer;
                 }
                 Event::WfWarmUpEnd(_) => {
-                    // XXX
+                    if let Ok(client) = &mut redis_client {
+                        let _ = client.flushdb();
+                    }
                 }
             }
         }
@@ -525,6 +552,14 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
             }
+        }
+    }
+
+    // dump data collected in Redis
+    if let Ok(client) = &mut redis_client {
+        log::info!("XXX {:?}", client_interface.workflows);
+        if let Err(err) = client.dump_csv(&args.output) {
+            log::error!("error dumping to {}: {}", args.output, err);
         }
     }
 
