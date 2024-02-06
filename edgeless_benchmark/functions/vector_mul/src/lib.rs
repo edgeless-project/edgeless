@@ -2,45 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 use edgeless_function::api::*;
-use std::num::Wrapping;
 
 struct VectorMulFunction;
-
-// Parameters from glib's implementation.
-const MODULUS: Wrapping<u32> = Wrapping(2147483648);
-const MULTIPLIER: Wrapping<u32> = Wrapping(1103515245);
-const OFFSET: Wrapping<u32> = Wrapping(12345);
-
-struct Lcg {
-    seed: Wrapping<u32>,
-}
-
-impl Lcg {
-    fn new(seed: u32) -> Self {
-        Self { seed: Wrapping(seed) }
-    }
-
-    fn rand(&mut self) -> f32 {
-        self.seed = (MULTIPLIER * self.seed + OFFSET) % MODULUS;
-        self.seed.0 as f32 / MODULUS.0 as f32
-    }
-}
-
-fn make_new_matrix(lcg: &mut Lcg, size: usize) -> Vec<f32> {
-    let mut new_matrix = vec![0.0; size * size];
-    for value in new_matrix.iter_mut() {
-        *value = lcg.rand();
-    }
-    new_matrix
-}
-
-fn make_new_vector(lcg: &mut Lcg, size: usize) -> Vec<f32> {
-    let mut new_vector = vec![0.0; size];
-    for value in new_vector.iter_mut() {
-        *value = lcg.rand();
-    }
-    new_vector
-}
 
 struct Conf {
     // True: this is the client, which triggers the first input and receives the last output.
@@ -56,31 +19,13 @@ struct State {
     // ID of the next transaction. Only used if is_client == true.
     next_id: usize,
     // Pseudo-random number generator.
-    lcg: Lcg,
+    lcg: edgeless_function::lcg::Lcg,
     // Matrix of values to consume CPU in processing functions. Unused by clients.
     matrix: Vec<f32>,
 }
 
 static CONF: std::sync::OnceLock<Conf> = std::sync::OnceLock::new();
 static STATE: std::sync::OnceLock<std::sync::Mutex<State>> = std::sync::OnceLock::new();
-
-fn parse_init(payload: &str) -> std::collections::HashMap<&str, &str> {
-    let tokens = payload.split(',');
-    let mut arguments = std::collections::HashMap::new();
-    for token in tokens {
-        let mut inner_tokens = token.split('=');
-        if let Some(key) = inner_tokens.next() {
-            if let Some(value) = inner_tokens.next() {
-                arguments.insert(key, value);
-            } else {
-                log::error!("invalid initialization token: {}", token);
-            }
-        } else {
-            log::error!("invalid initialization token: {}", token);
-        }
-    }
-    arguments
-}
 
 impl Edgefunction for VectorMulFunction {
     fn handle_cast(_src: InstanceId, encoded_message: String) {
@@ -98,7 +43,7 @@ impl Edgefunction for VectorMulFunction {
             }
 
             state.next_id += 1;
-            let random_input = make_new_vector(&mut state.lcg, conf.input_size);
+            let random_input = edgeless_function::lcg::random_vector(&mut state.lcg, conf.input_size);
             let payload = format!(
                 "{},{}",
                 state.next_id,
@@ -143,7 +88,7 @@ impl Edgefunction for VectorMulFunction {
     fn handle_init(payload: String, _serialized_state: Option<String>) {
         edgeless_function::init_logger();
         log::info!("VectorMul initialized, payload: {}", payload);
-        let arguments = parse_init(&payload);
+        let arguments = edgeless_function::parse_init_payload(&payload);
 
         let seed = arguments.get("seed").unwrap_or(&"0").parse::<u32>().unwrap_or(0);
 
@@ -165,8 +110,8 @@ impl Edgefunction for VectorMulFunction {
             input_size,
         });
 
-        let mut lcg = Lcg::new(seed);
-        let matrix = make_new_matrix(
+        let mut lcg = edgeless_function::lcg::Lcg::new(seed);
+        let matrix = edgeless_function::lcg::random_matrix(
             &mut lcg,
             match is_client {
                 true => 0,
