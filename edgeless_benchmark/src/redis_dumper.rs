@@ -63,7 +63,12 @@ impl RedisDumper {
                 Ok(metadata) => metadata.len() == 0,
                 Err(_) => true,
             };
-        let mut f = std::fs::OpenOptions::new().write(true).append(append).create(true).open(output)?;
+        let mut f = std::fs::OpenOptions::new()
+            .write(true)
+            .append(append)
+            .create(true)
+            .truncate(true)
+            .open(output)?;
 
         if header {
             writeln!(&mut f, "entity,name,value")?;

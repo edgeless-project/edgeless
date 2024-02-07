@@ -247,10 +247,11 @@ impl ClientInterface {
                     let matrix_size: u32 = self.rng.gen_range(*min_matrix_size..=*max_matrix_size);
                     matrix_sizes.push(matrix_size);
 
+                    let name = format!("f{}", i);
                     let annotations = std::collections::HashMap::from([(
                         "init-payload".to_string(),
                         format!(
-                            "seed={},inter_arrival={},is_first={},is_last={},wf_name={},fun_name=f{},matrix_size={},outputs=0",
+                            "seed={},inter_arrival={},is_first={},is_last={},wf_name={},fun_name={},matrix_size={},outputs=0",
                             i,
                             inter_arrival,
                             match i {
@@ -262,13 +263,12 @@ impl ClientInterface {
                                 _ => "false",
                             },
                             &wf_name,
-                            i,
+                            &name,
                             matrix_size
                         )
                         .to_string(),
                     )]);
 
-                    let name = format!("f{}", i);
                     function_names.insert(name.clone());
                     functions.push(WorkflowFunction {
                         name,
@@ -320,14 +320,14 @@ impl ClientInterface {
                     let annotations = std::collections::HashMap::from([(
                         "init-payload".to_string(),
                         format!(
-                            "seed={},is_client={},wf_name={},fun_name=f{},input_size={}",
+                            "seed={},is_client={},wf_name={},fun_name={},input_size={}",
                             i,
                             match i {
                                 0 => "true",
                                 _ => "false",
                             },
                             &wf_name,
-                            i,
+                            &name,
                             input_size
                         )
                         .to_string(),
