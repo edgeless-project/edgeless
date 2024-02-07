@@ -1,7 +1,7 @@
 # EDGELESS building instructions
 
 The implementation relies on [Rust](https://www.rust-lang.org/).
-[gRPC](https://grpc.io/) and [protobuf(https://protobuf.dev/) are used for interprocess communication.
+[gRPC](https://grpc.io/) and [protobuf](https://protobuf.dev/) are used for interprocess communication.
 
 Once you have a working environment, building the core components and tools is done simply with the following command:
 

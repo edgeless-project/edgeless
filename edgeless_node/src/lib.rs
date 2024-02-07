@@ -26,6 +26,24 @@ pub struct EdgelessNodeSettings {
     pub redis_provider: String,
 }
 
+impl EdgelessNodeSettings {
+    /// Create settings for a node with no resources binding the given ports on the same address.
+    pub fn new_without_resources(orchestrator_url: &str, node_address: &str, agent_port: u16, invocation_port: u16, metrics_port: u16) -> Self {
+        Self {
+            node_id: uuid::Uuid::new_v4(),
+            agent_url: format!("http://{}:{}", node_address, agent_port),
+            invocation_url: format!("http://{}:{}", node_address, invocation_port),
+            metrics_url: format!("http://{}:{}", node_address, metrics_port),
+            orchestrator_url: orchestrator_url.to_string(),
+            http_ingress_url: "".to_string(),
+            http_ingress_provider: "".to_string(),
+            http_egress_provider: "".to_string(),
+            file_log_provider: "".to_string(),
+            redis_provider: "".to_string(),
+        }
+    }
+}
+
 fn get_capabilities() -> edgeless_api::node_registration::NodeCapabilities {
     let s = sysinfo::System::new();
     let mut model_name_set = std::collections::HashSet::new();
