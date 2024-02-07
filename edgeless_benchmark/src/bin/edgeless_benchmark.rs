@@ -52,6 +52,9 @@ struct Args {
     /// Name of the CSV output file where to save the metrics collected.
     #[arg(long, default_value_t = String::from("out.csv"))]
     output: String,
+    /// Append to the output file.
+    #[arg(long, default_value_t = false)]
+    append: bool,
 }
 
 #[derive(PartialEq, Eq)]
@@ -557,8 +560,7 @@ async fn main() -> anyhow::Result<()> {
 
     // dump data collected in Redis
     if let Ok(client) = &mut redis_client {
-        log::info!("XXX {:?}", client_interface.workflows);
-        if let Err(err) = client.dump_csv(&args.output) {
+        if let Err(err) = client.dump_csv(&args.output, args.append, client_interface.workflows) {
             log::error!("error dumping to {}: {}", args.output, err);
         }
     }
