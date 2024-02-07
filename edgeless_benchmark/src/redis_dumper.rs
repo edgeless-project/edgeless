@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 extern crate redis;
-// use redis::{Commands, ConnectionLike};
+use std::io::Write;
+
+use redis::Commands;
 
 pub struct RedisDumper {
     connection: redis::Connection,
@@ -24,8 +26,63 @@ impl RedisDumper {
         Ok(())
     }
 
-    pub fn dump_csv(&mut self, output: &str) -> anyhow::Result<()> {
-        // XXX
+    ///
+    /// Dump the content from Redis to a CSV file.
+    ///
+    /// # Example with Pandas
+    ///
+    /// ```ignore
+    /// >>> import pandas as pd
+    /// >>> df = pd.read_csv('../../out.csv')
+    /// >>> df[df["entity"] == "W"]["value"].mean()
+    /// 146.875
+    /// >>> df
+    ///     entity    name  value
+    /// 0        W     wf0    161
+    /// 1        W     wf0    151
+    /// 2        W     wf0    176
+    /// 3        W     wf0    146
+    /// 4        W     wf0    121
+    /// ..     ...     ...    ...
+    /// 120      F  wf1:f3     33
+    /// 121      F  wf1:f3     26
+    /// 122      F  wf1:f3     30
+    /// 123      F  wf1:f3     26
+    /// 124      F  wf1:f3     21
+    ///
+    /// [125 rows x 3 columns]
+    /// ```
+    pub fn dump_csv(
+        &mut self,
+        output: &str,
+        append: bool,
+        workflows: std::collections::HashMap<String, std::collections::HashSet<String>>,
+    ) -> anyhow::Result<()> {
+        let header = !append
+            || match std::fs::metadata(output) {
+                Ok(metadata) => metadata.len() == 0,
+                Err(_) => true,
+            };
+        let mut f = std::fs::OpenOptions::new().write(true).append(append).create(true).open(output)?;
+
+        if header {
+            writeln!(&mut f, "entity,name,value")?;
+        }
+
+        for (workflow, functions) in workflows {
+            self.write_values(&mut f, "workflow:latencies", "W", &workflow)?;
+            for function in functions {
+                self.write_values(&mut f, "function:latencies", "F", format!("{}:{}", workflow, function).as_str())?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn write_values(&mut self, f: &mut std::fs::File, key_in: &str, key_out: &str, name: &str) -> anyhow::Result<()> {
+        for value in self.connection.lrange::<String, Vec<String>>(format!("{}:{}", key_in, name), 0, -1)? {
+            writeln!(f, "{},{},{}", key_out, name, value)?;
+        }
         Ok(())
     }
 }
