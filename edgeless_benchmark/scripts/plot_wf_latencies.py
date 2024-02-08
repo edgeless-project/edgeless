@@ -9,7 +9,7 @@ df = pd.read_csv('out.csv')
 fig, ax = plt.subplots()
 
 for workflow in df[df["entity"] == "W"]["name"].unique():
-    values = df[df["entity"] == "W"][df["name"] == workflow]["value"].tolist()
+    values = df.loc[(df["entity"] == "W") & (df["name"] == workflow)]["value"].tolist()
     ax.plot(range(len(values)), sorted(values), label=workflow)
 
 ax.legend()
