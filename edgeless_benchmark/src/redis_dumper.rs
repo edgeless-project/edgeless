@@ -73,7 +73,7 @@ impl RedisDumper {
             .write(true)
             .append(append)
             .create(true)
-            .truncate(true)
+            .truncate(!append)
             .open(output)?;
 
         if header {
