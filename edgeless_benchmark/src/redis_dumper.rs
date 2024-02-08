@@ -8,13 +8,19 @@ use redis::Commands;
 
 pub struct RedisDumper {
     connection: redis::Connection,
+    additional_fields: String,
+    additional_header: String,
 }
 
 impl RedisDumper {
-    pub fn new(redis_url: &str) -> Result<Self, String> {
+    pub fn new(redis_url: &str, additional_fields: String, additional_header: String) -> Result<Self, String> {
         match redis::Client::open(redis_url) {
             Ok(client) => match client.get_connection() {
-                Ok(val) => Ok(Self { connection: val }),
+                Ok(val) => Ok(Self {
+                    connection: val,
+                    additional_fields,
+                    additional_header,
+                }),
                 Err(err) => Err(format!("could not open a Redis connection: {}", err)),
             },
             Err(err) => Err(format!("could not open a Redis connection: {}", err)),
@@ -71,7 +77,7 @@ impl RedisDumper {
             .open(output)?;
 
         if header {
-            writeln!(&mut f, "entity,name,value")?;
+            writeln!(&mut f, "{},entity,name,value", self.additional_header)?;
         }
 
         for (workflow, functions) in workflows {
@@ -86,7 +92,7 @@ impl RedisDumper {
 
     fn write_values(&mut self, f: &mut std::fs::File, key_in: &str, key_out: &str, name: &str) -> anyhow::Result<()> {
         for value in self.connection.lrange::<String, Vec<String>>(format!("{}:{}", key_in, name), 0, -1)? {
-            writeln!(f, "{},{},{}", key_out, name, value)?;
+            writeln!(f, "{},{},{},{}", self.additional_fields, key_out, name, value)?;
         }
         Ok(())
     }
