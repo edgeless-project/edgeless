@@ -55,6 +55,12 @@ struct Args {
     /// Append to the output file.
     #[arg(long, default_value_t = false)]
     append: bool,
+    /// Additional fields recorded in the CSV output file.
+    #[arg(long, default_value_t = String::from(""))]
+    additional_fields: String,
+    /// Header of additional fields recorded in the CSV output file.
+    #[arg(long, default_value_t = String::from(""))]
+    additional_header: String,
 }
 
 #[derive(PartialEq, Eq)]
@@ -423,8 +429,23 @@ async fn main() -> anyhow::Result<()> {
         _ => panic!("unknown arrival model {}: ", args.arrival_model),
     };
 
+    // Check that the additional fields, if present, have a consistent header.
+    let mut additional_fields = args.additional_fields.split(',').filter(|x| !x.is_empty()).collect::<Vec<&str>>();
+    let mut additional_header = args.additional_header.split(',').filter(|x| !x.is_empty()).collect::<Vec<&str>>();
+    if additional_fields.len() != additional_header.len() {
+        return Err(anyhow::anyhow!(
+            "mismatching number of additional fields ({}) vs header ({})",
+            additional_fields.len(),
+            additional_header.len()
+        ));
+    }
+    let seed = format!("{}", args.seed);
+    additional_fields.push(&seed);
+    additional_header.push("seed");
+
     // Start the metrics collector node, if needed
-    let mut redis_client = edgeless_benchmark::redis_dumper::RedisDumper::new(&args.redis_url);
+    let mut redis_client =
+        edgeless_benchmark::redis_dumper::RedisDumper::new(&args.redis_url, additional_fields.join(","), additional_header.join(","));
     if redis_client.is_ok() {
         log::info!("connected to Redis at {}", &args.redis_url);
     }
