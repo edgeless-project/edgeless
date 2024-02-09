@@ -117,8 +117,14 @@ pub async fn register_node(
             .node_registration_api()
             .update_node(edgeless_api::node_registration::UpdateNodeRequest::Registration(
                 settings.node_id.clone(),
-                settings.agent_url_announced.clone(),
-                settings.invocation_url_announced.clone(),
+                match settings.agent_url_announced.is_empty() {
+                    true => settings.agent_url.clone(),
+                    false => settings.agent_url_announced.clone(),
+                },
+                match settings.invocation_url_announced.is_empty() {
+                    true => settings.invocation_url.clone(),
+                    false => settings.invocation_url_announced.clone(),
+                },
                 resource_provider_specifications,
                 capabilities,
             ))

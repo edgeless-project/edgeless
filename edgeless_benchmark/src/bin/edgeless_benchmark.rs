@@ -454,7 +454,9 @@ async fn main() -> anyhow::Result<()> {
             edgeless_benchmark::edgeless_metrics_collector_node_main(edgeless_node::EdgelessNodeSettings {
                 node_id: uuid::Uuid::new_v4(),
                 agent_url: format!("http://{}:7121/", args.bind_address),
+                agent_url_announced: "".to_string(),
                 invocation_url: format!("http://{}:7102/", args.bind_address),
+                invocation_url_announced: "".to_string(),
                 metrics_url: format!("http://{}:7103/", args.bind_address),
                 orchestrator_url: args.orchestrator_url,
                 http_ingress_url: "".to_string(),
