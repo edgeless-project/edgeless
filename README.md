@@ -159,11 +159,13 @@ You can find [here](examples/README.md) the full list with a short description o
 
 Please refer to the following specific docs:
 
+- [A step-by-step guide to deploying a minimal EDGELESS system](documentation/deploy_step_by_step.md)
 - [Repository layout](documentation/repository_layout.md)
 - [How to create a new function](documentation/rust_functions.md)
   ([YouTube tutorial](https://youtu.be/1JnQIM9VTLk?si=o34YKRRJXNz0H54f))
 - [How to compose a new workflow](documentation/workflows.md)
   ([YouTube tutorial](https://youtu.be/kc4Ku5p5Nrw?si=ZRxx0kmsIuAYLie1))
+- [Examples shipped with the repository](../examples/README.md)
 
 ## Contributing
 
