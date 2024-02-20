@@ -86,7 +86,7 @@ or a node while running);
 The full list of issues is tracked on
 [GitHub](https://github.com/edgeless-project/edgeless/issues).
 
-Stay tuned (star&watch [the GitHub project](https://github.com/edgeless-project/edgeless))
+Stay tuned (star & watch [the GitHub project](https://github.com/edgeless-project/edgeless))
 to remain up to date on future developments.
 
 ### Repository structure
@@ -176,7 +176,7 @@ The [contributing guide](CONTRIBUTING_GUIDE.md) contains some rules you should a
 ## License
 
 The Repository is licensed under the MIT License. Please refer to
-[LICENSE-MIT.txt](LICENSE-MIT.txt) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
+[LICENSE](LICENSE) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
 
 ## Funding
 
