@@ -255,17 +255,15 @@ async fn main() -> anyhow::Result<()> {
                         .to_str()
                         .unwrap()
                         .to_string();
-
                     match platform {
                         Platform::WASM => println!(
-                                            "{:?}",
-                                            std::process::Command::new("wasm-tools")
-                                                .args(["component", "new", &raw_result, "-o", &out_file])
-                                                .status()?
-                                    
-                                        ),
+                            "{:?}",
+                            std::process::Command::new("wasm-tools")
+                                .args(["component", "new", &raw_result, "-o", &out_file])
+                                .status()?
+                        ),
                         _ => fs::write(&out_file, &raw_result).expect("Unable to write file"),
-                    } 
+                    }
                 }
                 FunctionCommands::Invoke {
                     event_type,
