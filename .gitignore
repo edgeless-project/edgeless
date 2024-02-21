@@ -12,3 +12,4 @@ settings.json
 vendor/
 secrets/
 .venv
+.DS_Store

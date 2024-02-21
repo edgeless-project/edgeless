@@ -55,7 +55,7 @@ apis:
     # "unix:/tmp/mydda.sock".
     #
     # If not present, default address string is ":8900".
-    address: :8900
+    address: :12000
 
     # Indicates whether this API service should be disabled within the DDA.
     # Specify true to opt out from exposing this API service in your DDA. This

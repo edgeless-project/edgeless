@@ -6,7 +6,7 @@
                 "id": "check_temperature",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./check_temperature/check_temperature.wasm",
+                "include_code_file": "./functions/check_temperature/check_temperature.wasm",
                 "outputs": [
                     "dda",
                     "move_arm",
@@ -26,7 +26,7 @@
                 "id": "move_arm",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./move_arm/move_arm.wasm",
+                "include_code_file": "./functions/move_arm/move_arm.wasm",
                 "outputs": [
                     "dda",
                     "log_output"
