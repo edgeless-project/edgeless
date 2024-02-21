@@ -25,7 +25,7 @@
             "class_type": "dda",
             "output_mapping": {},
             "configurations": {
-                "dda_sidecar_url": "http://127.0.0.1:12000"
+                "dda_url": "http://127.0.0.1:12000"
             }
         },
         {

@@ -37,8 +37,7 @@ pub struct EdgelessNodeSettings {
     /// If `http_ingress_provider` is not empty, this is the URL of the
     /// HTTP web server exposed by the http-ingress resource for this node.
     pub http_ingress_url: String,
-    pub dda_sidecar_url: String,
-    /// If not empty, a http-ingress resource with the given name is created.
+        /// If not empty, a http-ingress resource with the given name is created.
     pub http_ingress_provider: String,
     /// If not empty, a http-egress resource with the given name is created.
     pub http_egress_provider: String,
@@ -50,6 +49,10 @@ pub struct EdgelessNodeSettings {
     /// value of a given given, as specified in the resource configuration
     /// at run-time.
     pub redis_provider: String,
+    /// The URL of DDA used by this node, used for communication via the DDA resources
+    pub dda_url: String,
+    /// If not empty, a DDA resource with the given name is created.
+    pub dda_provider: String,
 }
 
 impl EdgelessNodeSettings {
@@ -70,6 +73,8 @@ impl EdgelessNodeSettings {
             http_egress_provider: "".to_string(),
             file_log_provider: "".to_string(),
             redis_provider: "".to_string(),
+            dda_url: "".to_string(),
+            dda_provider: "".to_string(),
         }
     }
 }
@@ -352,7 +357,8 @@ http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"
 file_log_provider = "file-log-1"
 redis_provider = "redis-1"
-dda_sidecar_url = "http://127.0.0.1:10000"
+dda_url = "http://127.0.0.1:10000"
+dda_provider = "dda-1"
 "##,
     )
 }

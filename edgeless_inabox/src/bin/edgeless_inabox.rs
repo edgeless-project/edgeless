@@ -147,7 +147,14 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 true => "redis-1".to_string(),
                 false => "".to_string(),
             },
-            //TODO(MS-FIX) dda_sidecar_url: "localhost:10000".to_string(),
+            dda_url: match first_node {
+                true => "localhost:12000".to_string(),
+                false => "".to_string(),
+            },
+            dda_provider: match first_node {
+                true => "dda-1".to_string(),
+                false => "".to_string(),
+            },
         });
         first_node = false;
     }

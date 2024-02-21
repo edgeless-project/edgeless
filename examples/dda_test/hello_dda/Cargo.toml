@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: © 2024 Siemens AG
+# SPDX-License-Identifier: MIT
+
 [profile.release]
 lto = true
 opt-level = "s"

@@ -1,8 +1,11 @@
+// SPDX-FileCopyrightText: © 2024 Siemens AG
+// SPDX-License-Identifier: MIT
+
 use edgeless_api::{function_instance::InstanceId, resource_configuration::ResourceConfigurationAPI};
 use edgeless_dataplane::handle::DataplaneProvider;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tonic::transport::Channel;
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 
 // imports the generated proto file for dda
 // TODO: maybe generate the rust bindings for all the proto files and put them
@@ -39,19 +42,19 @@ pub struct DDAResource {
 }
 
 impl DDAResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, dda_sidecar_url: String) -> Self {
+    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, dda_url: String) -> Self {
         let mut dataplane_handle = dataplane_handle;
 
         // connect the gRPC client to the server
-        log::info!("Trying to connect to the DDA sidecar at url={}", dda_sidecar_url.clone());
-        let mut dda_client = match dda_com::com_service_client::ComServiceClient::connect(dda_sidecar_url.clone()).await {
+        log::info!("Trying to connect to the DDA sidecar at url={}", dda_url.clone());
+        let mut dda_client = match dda_com::com_service_client::ComServiceClient::connect(dda_url.clone()).await {
             Ok(client) => client,
             Err(err) => {
                 log::error!("Failed to connect to the DDA sidecar: {}", err);
                 panic!("Failed to connect to the DDA sidecar: {}", err);
             }
         };
-        log::info!("DDA singleton resource created, connected to the sidecar at url={}", dda_sidecar_url);
+        log::info!("DDA singleton resource created, connected to the sidecar at url={}", dda_url);
 
         // handle dataplane events for dda resource
         // unused, since we never want to stop the dda sidecar (singleton)
@@ -94,7 +97,7 @@ impl DDAResource {
                         request.r#type = "com.edgeless.moveRobotArm".to_string();
                         request.id = "0".to_string();
                         request.source = "r2d2".to_string();
-                        request.params = base64::encode("boop").to_string().into_bytes();
+                        request.params = STANDARD.encode("boop").to_string().into_bytes();
                         let stream = dda_client.publish_action(request).await;
                         match stream {
                             Ok(responses) => {
@@ -156,13 +159,13 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
         // read the sidecar url from the instance specification configuration
-        if let Some(dda_sidecar_url) = instance_specification.configuration.get("dda_sidecar_url") {
+        if let Some(dda_url) = instance_specification.configuration.get("dda_url") {
             let mut lck = self.inner.lock().await;
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
 
             // wrap the grpc client into a nice DDAResource object
-            let dda_res = DDAResource::new(dataplane_handle, dda_sidecar_url.clone()).await;
+            let dda_res = DDAResource::new(dataplane_handle, dda_url.clone()).await;
             lck.dda_resource = dda_res;
 
             // we always return the fixed singleton id
@@ -171,7 +174,7 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
             Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                 edgeless_api::common::ResponseError {
                     summary: "Invalid resource configuration".to_string(),
-                    detail: Some("dda_sidecar_url not found in configuration".to_string()),
+                    detail: Some("dda_url not found in configuration".to_string()),
                 },
             ))
         }

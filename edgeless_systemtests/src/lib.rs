@@ -58,6 +58,8 @@ mod tests {
                         http_egress_provider: "".to_string(),
                         file_log_provider: "file-log-1".to_string(),
                         redis_provider: "".to_string(),
+                        dda_url: "".to_string(),
+                        dda_provider: "".to_string(),
                     },
                     _ => {
                         edgeless_node::EdgelessNodeSettings::new_without_resources(&orchestrator_url, address, next_port(), next_port(), next_port())

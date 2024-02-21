@@ -464,6 +464,8 @@ async fn main() -> anyhow::Result<()> {
                 http_egress_provider: "".to_string(),
                 file_log_provider: "".to_string(),
                 redis_provider: "".to_string(),
+                dda_url: "".to_string(),
+                dda_provider: "".to_string(),
             })
             .await
         });
