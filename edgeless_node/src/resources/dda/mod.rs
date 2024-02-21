@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use edgeless_api::{function_instance::InstanceId, resource_configuration::ResourceConfigurationAPI};
 use edgeless_dataplane::handle::DataplaneProvider;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use base64::{engine::general_purpose::STANDARD, Engine as _};
 
 // imports the generated proto file for dda
 // TODO: maybe generate the rust bindings for all the proto files and put them

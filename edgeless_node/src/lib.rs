@@ -37,7 +37,7 @@ pub struct EdgelessNodeSettings {
     /// If `http_ingress_provider` is not empty, this is the URL of the
     /// HTTP web server exposed by the http-ingress resource for this node.
     pub http_ingress_url: String,
-        /// If not empty, a http-ingress resource with the given name is created.
+    /// If not empty, a http-ingress resource with the given name is created.
     pub http_ingress_provider: String,
     /// If not empty, a http-egress resource with the given name is created.
     pub http_egress_provider: String,
