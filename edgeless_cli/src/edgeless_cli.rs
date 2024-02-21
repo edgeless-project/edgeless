@@ -5,6 +5,7 @@ mod workflow_spec;
 
 use clap::Parser;
 use edgeless_api::{controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
+use std::fs;
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -263,7 +264,7 @@ async fn main() -> anyhow::Result<()> {
                                                 .status()?
                                     
                                         ),
-                        _ => (),
+                        _ => fs::write(&out_file, &raw_result).expect("Unable to write file"),
                     } 
                 }
                 FunctionCommands::Invoke {
