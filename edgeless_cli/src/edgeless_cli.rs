@@ -17,6 +17,8 @@ enum WorkflowCommands {
 enum FunctionCommands {
     Build {
         spec_file: String,
+        #[arg(short, long, default_value_t = String::from("wasm"))]
+        architecture: String,
     },
     Invoke {
         event_type: String,
@@ -67,6 +69,14 @@ impl Platform {
             Self::WASM => String::from("wasm32-unknown-unknown"),
             Self::X86 => String::from("x86_64-unknown-linux-gnu"),
             Self::ARM => String::from("aarch64-unknown-linux-gnu"),
+        }
+    }
+
+    fn suffix(&self) -> String {
+        match self {
+            Self::WASM => String::from("wasm"),
+            Self::X86 => String::from("so"),
+            Self::ARM => String::from("arm"),
         }
     }
 }
@@ -180,7 +190,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
             Commands::Function { function_command } => match function_command {
-                FunctionCommands::Build { spec_file } => {
+                FunctionCommands::Build { spec_file, architecture } => {
                     let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
                     let cargo_project_path = spec_file_path.parent().unwrap().to_path_buf();
                     let cargo_manifest = cargo_project_path.join("Cargo.toml");
@@ -194,7 +204,12 @@ async fn main() -> anyhow::Result<()> {
 
                     let pack = ws.current()?;
 
-                    let platform = Platform::X86;
+                    let platform = match architecture.as_str() {
+                        "wasm" => Platform::WASM,
+                        "x86" => Platform::X86,
+                        "arm" => Platform::ARM,
+                        _ => Platform::WASM,
+                    };
 
                     let lib_name = match pack.library() {
                         Some(val) => val.name(),
@@ -230,22 +245,26 @@ async fn main() -> anyhow::Result<()> {
                     cargo::ops::compile(&ws, &compile_options)?;
 
                     let raw_result = build_dir
-                        .join(format!("{}/release/{}.wasm", platform.target(), lib_name))
+                        .join(format!("{}/release/{}.{}", platform.target(), lib_name, platform.suffix()))
                         .to_str()
                         .unwrap()
                         .to_string();
                     let out_file = cargo_project_path
-                        .join(format!("{}.wasm", function_spec.id))
+                        .join(format!("{}.{}", function_spec.id, platform.suffix()))
                         .to_str()
                         .unwrap()
                         .to_string();
 
-                    println!(
-                        "{:?}",
-                        std::process::Command::new("wasm-tools")
-                            .args(["component", "new", &raw_result, "-o", &out_file])
-                            .status()?
-                    );
+                    match platform {
+                        Platform::WASM => println!(
+                                            "{:?}",
+                                            std::process::Command::new("wasm-tools")
+                                                .args(["component", "new", &raw_result, "-o", &out_file])
+                                                .status()?
+                                    
+                                        ),
+                        _ => (),
+                    } 
                 }
                 FunctionCommands::Invoke {
                     event_type,
