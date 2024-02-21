@@ -2,37 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 use edgeless_function::api::*;
-use std::num::Wrapping;
 
 struct MatrixMulFunction;
-
-// Parameters from glib's implementation.
-const MODULUS: Wrapping<u32> = Wrapping(2147483648);
-const MULTIPLIER: Wrapping<u32> = Wrapping(1103515245);
-const OFFSET: Wrapping<u32> = Wrapping(12345);
-
-struct Lcg {
-    seed: Wrapping<u32>,
-}
-
-impl Lcg {
-    fn new(seed: u32) -> Self {
-        Self { seed: Wrapping(seed) }
-    }
-
-    fn rand(&mut self) -> f32 {
-        self.seed = (MULTIPLIER * self.seed + OFFSET) % MODULUS;
-        self.seed.0 as f32 / MODULUS.0 as f32
-    }
-}
-
-fn make_new_matrix(lcg: &mut Lcg, size: usize) -> Vec<f32> {
-    let mut new_matrix = vec![0 as f32; size * size];
-    for value in new_matrix.iter_mut() {
-        *value = lcg.rand();
-    }
-    new_matrix
-}
 
 struct Conf {
     // Interarrival time before the next event, in ms. Only if is_first == true.
@@ -54,31 +25,13 @@ struct State {
     // ID of the next transaction. Only used if is_first == true.
     next_id: usize,
     // Pseudo-random number generator.
-    lcg: Lcg,
+    lcg: edgeless_function::lcg::Lcg,
     // Matrix of values to consume CPU.
     matrix: Vec<f32>,
 }
 
 static CONF: std::sync::OnceLock<Conf> = std::sync::OnceLock::new();
 static STATE: std::sync::OnceLock<std::sync::Mutex<State>> = std::sync::OnceLock::new();
-
-fn parse_init(payload: &str) -> std::collections::HashMap<&str, &str> {
-    let tokens = payload.split(',');
-    let mut arguments = std::collections::HashMap::new();
-    for token in tokens {
-        let mut inner_tokens = token.split('=');
-        if let Some(key) = inner_tokens.next() {
-            if let Some(value) = inner_tokens.next() {
-                arguments.insert(key, value);
-            } else {
-                log::error!("invalid initialization token: {}", token);
-            }
-        } else {
-            log::error!("invalid initialization token: {}", token);
-        }
-    }
-    arguments
-}
 
 impl Edgefunction for MatrixMulFunction {
     fn handle_cast(_src: InstanceId, encoded_message: String) {
@@ -102,7 +55,7 @@ impl Edgefunction for MatrixMulFunction {
 
         // Fill a new matrix with random numbers.
         let n = conf.matrix_size;
-        let random_matrix = make_new_matrix(&mut state.lcg, n);
+        let random_matrix = edgeless_function::lcg::random_matrix(&mut state.lcg, n);
 
         // Multiply previous matrix by the random one.
         let mut output_matrix = vec![0 as f32; n * n];
@@ -141,7 +94,7 @@ impl Edgefunction for MatrixMulFunction {
     fn handle_init(payload: String, _serialized_state: Option<String>) {
         edgeless_function::init_logger();
         log::info!("MatrixMul initialized, payload: {}", payload);
-        let arguments = parse_init(&payload);
+        let arguments = edgeless_function::parse_init_payload(&payload);
 
         let seed = arguments.get("seed").unwrap_or(&"0").parse::<u32>().unwrap_or(0);
 
@@ -174,8 +127,8 @@ impl Edgefunction for MatrixMulFunction {
             outputs,
         });
 
-        let mut lcg = Lcg::new(seed);
-        let matrix = make_new_matrix(&mut lcg, matrix_size);
+        let mut lcg = edgeless_function::lcg::Lcg::new(seed);
+        let matrix = edgeless_function::lcg::random_matrix(&mut lcg, matrix_size);
 
         let _ = STATE.set(std::sync::Mutex::new(State { next_id: 0, lcg, matrix }));
 
@@ -191,49 +144,3 @@ impl Edgefunction for MatrixMulFunction {
 }
 
 edgeless_function::export!(MatrixMulFunction);
-
-#[cfg(test)]
-mod test {
-    use crate::make_new_matrix;
-    use crate::parse_init;
-    use crate::Lcg;
-
-    #[test]
-    fn test_matrix_mul_parse_init() {
-        assert_eq!(
-            std::collections::HashMap::from([("a", "b"), ("c", "d"), ("my_key", "my_value")]),
-            parse_init("a=b,c=d,my_key=my_value")
-        );
-
-        assert_eq!(
-            std::collections::HashMap::from([("a", ""), ("", "d"), ("my_key", "my_value")]),
-            parse_init("a=,=d,my_key=my_value")
-        );
-
-        assert_eq!(
-            std::collections::HashMap::from([("my_key", "my_value")]),
-            parse_init("a,d,my_key=my_value")
-        );
-
-        assert!(parse_init(",,,a,s,s,,42,").is_empty());
-    }
-
-    #[test]
-    fn test_matrix_mul_lcg() {
-        let mut numbers = std::collections::HashSet::new();
-        let mut lcg = Lcg::new(42);
-        for _ in 0..1000 {
-            let rnd = lcg.rand();
-            numbers.insert((rnd * 20.0).floor() as u32);
-        }
-        assert_eq!(20, numbers.len());
-    }
-
-    #[test]
-    fn test_matrix_mul_make_new_matrix() {
-        let mut lcg = Lcg::new(42);
-        let matrix = make_new_matrix(&mut lcg, 1000);
-        assert_eq!(1000 * 1000, matrix.len());
-        assert_ne!(0.0 as f32, matrix.iter().sum());
-    }
-}

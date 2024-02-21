@@ -122,7 +122,9 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         node_confs.push(EdgelessNodeSettings {
             node_id: *node_id,
             agent_url: node_orc_agent_urls.get(node_id).expect("").clone(), // we are sure that it is there
+            agent_url_announced: "".to_string(),
             invocation_url: node_invocation_urls.get(node_id).expect("").clone(), // we are sure that it is there
+            invocation_url_announced: "".to_string(),
             metrics_url: next_url(),
             orchestrator_url: orc_conf.orchestrator_url.clone(),
             http_ingress_url: match first_node {

@@ -11,3 +11,4 @@ config/
 settings.json
 vendor/
 secrets/
+.venv

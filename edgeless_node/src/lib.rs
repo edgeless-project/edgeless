@@ -14,25 +14,51 @@ pub mod wasm_runner;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
+    /// The UUID of this node.
     pub node_id: uuid::Uuid,
+    /// The URL of the agent of this node used for creating the local server.
     pub agent_url: String,
+    /// The agent URL announced by the node.
+    /// It is the end-point used by the orchestrator to manage the node.
+    /// It can be different from `agent_url`, e.g., for NAT traversal.
+    pub agent_url_announced: String,
+    /// The URL of the dataplane of this node, used for event dispatching.
     pub invocation_url: String,
+    /// The invocation URL announced by the node.
+    /// It can be different from `agent_url`, e.g., for NAT traversal.
+    pub invocation_url_announced: String,
+    /// The URL exposed by this node to publish telemetry metrics collected.
     pub metrics_url: String,
+    /// The URL of the orchestrator to which this node registers.
     pub orchestrator_url: String,
+    /// If `http_ingress_provider` is not empty, this is the URL of the
+    /// HTTP web server exposed by the http-ingress resource for this node.
     pub http_ingress_url: String,
+    /// If not empty, a http-ingress resource with the given name is created.
     pub http_ingress_provider: String,
+    /// If not empty, a http-egress resource with the given name is created.
     pub http_egress_provider: String,
+    /// If not empty, a file-log resource with the given name is created.
+    /// The resource will write on the local filesystem.
     pub file_log_provider: String,
+    /// If not empty, a redis resource with the given name is created.
+    /// The resource will connect to a remote Redis server to update the
+    /// value of a given given, as specified in the resource configuration
+    /// at run-time.
     pub redis_provider: String,
 }
 
 impl EdgelessNodeSettings {
     /// Create settings for a node with no resources binding the given ports on the same address.
     pub fn new_without_resources(orchestrator_url: &str, node_address: &str, agent_port: u16, invocation_port: u16, metrics_port: u16) -> Self {
+        let agent_url = format!("http://{}:{}", node_address, agent_port);
+        let invocation_url = format!("http://{}:{}", node_address, invocation_port);
         Self {
             node_id: uuid::Uuid::new_v4(),
-            agent_url: format!("http://{}:{}", node_address, agent_port),
-            invocation_url: format!("http://{}:{}", node_address, invocation_port),
+            agent_url: agent_url.clone(),
+            agent_url_announced: agent_url,
+            invocation_url: invocation_url.clone(),
+            invocation_url_announced: invocation_url,
             metrics_url: format!("http://{}:{}", node_address, metrics_port),
             orchestrator_url: orchestrator_url.to_string(),
             http_ingress_url: "".to_string(),
@@ -91,8 +117,14 @@ pub async fn register_node(
             .node_registration_api()
             .update_node(edgeless_api::node_registration::UpdateNodeRequest::Registration(
                 settings.node_id.clone(),
-                settings.agent_url.clone(),
-                settings.invocation_url.clone(),
+                match settings.agent_url_announced.is_empty() {
+                    true => settings.agent_url.clone(),
+                    false => settings.agent_url_announced.clone(),
+                },
+                match settings.invocation_url_announced.is_empty() {
+                    true => settings.invocation_url.clone(),
+                    false => settings.invocation_url_announced.clone(),
+                },
                 resource_provider_specifications,
                 capabilities,
             ))
@@ -236,7 +268,9 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let resources = fill_resources(data_plane.clone(), &settings, &mut resource_provider_specifications).await;
 
     // Create the agent.
-    let (mut agent, agent_task) = agent::Agent::new(Box::new(rust_runtime_client.clone()), resources, settings.clone(), data_plane.clone());
+    let mut runners = std::collections::HashMap::<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>::new();
+    runners.insert("RUST_WASM".to_string(), Box::new(rust_runtime_client.clone()));
+    let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.clone(), data_plane.clone());
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.agent_url.clone());
 
     // Wait for all the tasks to complete.
@@ -252,10 +286,11 @@ pub fn edgeless_node_default_conf() -> String {
     String::from(
         r##"node_id = "fda6ce79-46df-4f96-a0d2-456f720f606c"
 agent_url = "http://127.0.0.1:7021"
+agent_url_announced = ""
 invocation_url = "http://127.0.0.1:7002"
+invocation_url_announced = ""
 metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://127.0.0.1:7011"
-resource_configuration_url = "http://127.0.0.1:7033"
 http_ingress_url = "http://127.0.0.1:7035"
 http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"

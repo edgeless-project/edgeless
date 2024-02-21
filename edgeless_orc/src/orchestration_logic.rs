@@ -5,26 +5,29 @@
 use rand::distributions::Distribution;
 use rand::SeedableRng;
 
-use crate::orchestrator::ClientDesc;
-use crate::OrchestrationStrategy;
-
 /// Keeps all the necessary state that is needed to make simple orchestration
 /// decisions. Provides convenience methods that can be used by the
 /// orchestrator.
 pub struct OrchestrationLogic {
-    orchestration_strategy: OrchestrationStrategy,
+    /// Orchestration strategy.
+    orchestration_strategy: crate::OrchestrationStrategy,
+    /// Used by RoundRobin. Current index in vector nodes (circular).
     round_robin_current_index: usize,
+    /// Random-number generator.
     rng: rand::rngs::StdRng,
+    /// Vector of the nodes that can be selected.
     nodes: Vec<uuid::Uuid>,
+    /// Used by Random, pair of (weight, node_id).
     weights: Vec<f32>,
+    /// Used by Random.
     weight_dist: rand::distributions::Uniform<f32>,
 }
 
 impl OrchestrationLogic {
-    pub fn new(orchestration_strategy: OrchestrationStrategy) -> Self {
+    pub fn new(orchestration_strategy: crate::OrchestrationStrategy) -> Self {
         match orchestration_strategy {
-            OrchestrationStrategy::Random => log::info!("Orchestration logic strategy: random"),
-            OrchestrationStrategy::RoundRobin => log::info!("Orchestration logic strategy: round-robin"),
+            crate::OrchestrationStrategy::Random => log::info!("Orchestration logic strategy: random"),
+            crate::OrchestrationStrategy::RoundRobin => log::info!("Orchestration logic strategy: round-robin"),
         };
 
         Self {
@@ -37,10 +40,15 @@ impl OrchestrationLogic {
         }
     }
 
-    pub fn update_nodes(&mut self, clients: &std::collections::HashMap<uuid::Uuid, ClientDesc>) {
+    pub fn update_nodes(&mut self, clients: &std::collections::HashMap<uuid::Uuid, crate::orchestrator::ClientDesc>) {
+        // Refresh the nodes and weights data structures with the current set of nodes and their capabilities.
         self.nodes.clear();
         self.weights.clear();
         for (node, desc) in clients {
+            if desc.capabilities.do_not_use() {
+                // Skip the node if it must not be used, no matter what.
+                continue;
+            }
             self.nodes.push(*node);
             let mut weight = desc.capabilities.num_cores as f32 * desc.capabilities.num_cpus as f32 * desc.capabilities.clock_freq_cpu;
             if weight == 0.0 {
@@ -49,13 +57,20 @@ impl OrchestrationLogic {
             }
             self.weights.push(weight);
         }
-        assert!(self.nodes.len() == self.nodes.len());
-        self.round_robin_current_index = 0;
-        let high = match self.nodes.is_empty() {
-            true => 1.0,
-            false => self.weights.iter().sum::<f32>(),
+        assert!(self.nodes.len() == self.weights.len());
+        assert!(self.nodes.len() <= clients.len());
+
+        // Initialize the orchestration variables depending on the strategy
+        match self.orchestration_strategy {
+            crate::OrchestrationStrategy::Random => {
+                let high = match self.nodes.is_empty() {
+                    true => 1.0,
+                    false => self.weights.iter().sum::<f32>(),
+                };
+                self.weight_dist = rand::distributions::Uniform::new(0.0, high);
+            }
+            crate::OrchestrationStrategy::RoundRobin => self.round_robin_current_index = 0,
         };
-        self.weight_dist = rand::distributions::Uniform::new(0.0, high);
     }
 }
 
@@ -70,7 +85,7 @@ impl Iterator for OrchestrationLogic {
             return None;
         }
         match self.orchestration_strategy {
-            OrchestrationStrategy::Random => {
+            crate::OrchestrationStrategy::Random => {
                 assert!(self.nodes.len() == self.weights.len());
                 let rnd = self.weight_dist.sample(&mut self.rng);
                 let mut sum = 0.0_f32;
@@ -82,7 +97,7 @@ impl Iterator for OrchestrationLogic {
                 }
                 self.nodes.last().cloned()
             }
-            OrchestrationStrategy::RoundRobin => {
+            crate::OrchestrationStrategy::RoundRobin => {
                 if self.round_robin_current_index >= self.nodes.len() {
                     self.round_robin_current_index = 0;
                 }

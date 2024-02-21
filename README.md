@@ -86,32 +86,34 @@ or a node while running);
 The full list of issues is tracked on
 [GitHub](https://github.com/edgeless-project/edgeless/issues).
 
-Stay tuned (star&watch [the GitHub project](https://github.com/edgeless-project/edgeless))
+Stay tuned (star & watch [the GitHub project](https://github.com/edgeless-project/edgeless))
 to remain up to date on future developments.
 
 ### Repository structure
 
-| Directory               | Description                                                                                                                                                       |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| documentation           | Repository documentation.                                                                                                                                         |
-| edgeless_api            | gRPC API definitions, both services and messages. This directory must be imported by other projects wishing to interact with EDGELESS components through its      | interfaces. The following interfaces are currently implemented: s01, s04, s06, s07.          |
-| edgeless_api_core       | Work-in-progress development on minimal functions for embedded devices using CoAP.                                                                                |
-| edgeless_bal            | Reference implementation of the ε-BAL, currently a mere skeleton. The concrete implementation will be done in the next project phase when inter-domain workflows  | will be supported.                                                                           |
-| edgeless_cli            | EDGELESS command-line interface. This is used currently to locally build function instances and to interact with the ε-CON via the s04 interface to create/       | terminate/list workflows.                                                                    |
-| edgeless_con            | Reference implementation of the ε-CON. Currently, it does not support SLA/annotations but rather accepts any workflow and allocates all the function instances/   | resources on the first ε-ORC configured.                                                     |
-| edgeless_dataplane      | EDGELESS intra-domain dataplane, which is realised through the full-mesh interconnection of gRPC services implementing the s01 API.                               |
-| edgeless_embedded       | Work-in-progress implementation of special features for embedded devices.                                                                                         |
-| edgeless_embedded_emu   | Embedded device emulator.                                                                                                                                         |
-| edgeless_embedded_esp32 | Support of some ESP32 microcontrollers.                                                                                                                           |
-| edgeless_function       | WebAssembly Rust bindings and function programming model.                                                                                                         |
-| edgeless_http           | Utility structures and methods for HTTP bindings.                                                                                                                 |
-| edgeless_inabox         | Implements a minimal, yet complete, EDGELESS system consisting of an ε-CON, an ε-ORC, an ε-BAL and an edgeless node. This is intended to be used for              | development/                                                                                 | validation purposes.  |
-| edgeless_node           | EDGELESS node with WebAssembly run-time. Further run-times, possibly including OCI containers with Python/C++ support, are planned to be developed in the         | upcoming                                                                                     | phase of the project. |
-| edgeless_orc            | Reference implementation of the ε-ORC. Currently it ignores function annotations and it implements two simple function instance allocation strategies: random and | round-robin. Upscaling is not supported: all the functions are deployed as single instances. |
-| edgeless_telemetry      | Work-in-progress component that provides telemetry data regarding the EDGELESS operation, also supporting Prometheus agents.                                      |
-| examples                | Contains several examples showcasing the key features of the EDGELESS reference implementation.                                                                   |
-| model                   | Work-in-progress OCaml model of the EDGELESS system.                                                                                                              |
-| scripts                 | Collection of scripts                                                                                                                                             |
+| Directory               | Description                                                                                                                                                                                                                                                    |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| documentation           | Repository documentation.                                                                                                                                                                                                                                      |
+| edgeless_api            | gRPC API definitions, both services and messages. This directory must be imported by other projects wishing to interact with EDGELESS components through its interfaces. The following interfaces are currently implemented: s01, s04, s06, s07.               |
+| edgeless_api_core       | Work-in-progress development on minimal functions for embedded devices using CoAP.                                                                                                                                                                             |
+| edgeless_bal            | Reference implementation of the ε-BAL, currently a mere skeleton. The concrete implementation will be done in the next project phase when inter-domain workflows will be supported.                                                                            |
+| edgeless_benchmark      | Suite to benchmark an EDGELESS system in controlled and repeatable conditions using artificial workloads                                                                                                                                                       |
+| edgeless_cli            | EDGELESS command-line interface. This is used currently to locally build function instances and to interact with the ε-CON via the s04 interface to create/terminate/list workflows.                                                                           |
+| edgeless_con            | Reference implementation of the ε-CON. Currently, it does not support SLA/annotations but rather accepts any workflow and allocates all the function instances/                                                                                                | resources on the first ε-ORC configured. |
+| edgeless_dataplane      | EDGELESS intra-domain dataplane, which is realised through the full-mesh interconnection of gRPC services implementing the s01 API.                                                                                                                            |
+| edgeless_embedded       | Work-in-progress implementation of special features for embedded devices.                                                                                                                                                                                      |
+| edgeless_embedded_emu   | Embedded device emulator.                                                                                                                                                                                                                                      |
+| edgeless_embedded_esp32 | Support of some ESP32 microcontrollers.                                                                                                                                                                                                                        |
+| edgeless_function       | WebAssembly Rust bindings and function programming model.                                                                                                                                                                                                      |
+| edgeless_http           | Utility structures and methods for HTTP bindings.                                                                                                                                                                                                              |
+| edgeless_inabox         | Implements a minimal, yet complete, EDGELESS system consisting of an ε-CON, an ε-ORC, an ε-BAL and an edgeless node. This is intended to be used for development/validation purposes.                                                                          |
+| edgeless_node           | EDGELESS node with WebAssembly run-time. Further run-times, possibly including OCI containers with Python/C++ support, are planned to be developed in the upcoming phase of the project.                                                                       |
+| edgeless_orc            | Reference implementation of the ε-ORC. Currently it ignores function annotations and it implements two simple function instance allocation strategies: random and round-robin. Upscaling is not supported: all the functions are deployed as single instances. |
+| edgeless_systemtests    | Tests of EDGELESS components deployed in a system fashion, e.g., interacting through gRPC interfaces.                                                                                                                                                          |
+| edgeless_telemetry      | Work-in-progress component that provides telemetry data regarding the EDGELESS operation, also supporting Prometheus agents.                                                                                                                                   |
+| examples                | Contains several examples showcasing the key features of the EDGELESS reference implementation.                                                                                                                                                                |
+| model                   | Work-in-progress OCaml model of the EDGELESS system.                                                                                                                                                                                                           |
+| scripts                 | Collection of scripts                                                                                                                                                                                                                                          |
 
 
 ## How to build
@@ -157,9 +159,13 @@ You can find [here](examples/README.md) the full list with a short description o
 
 Please refer to the following specific docs:
 
-- [Repository laytout](documentation/repository_layout.md)
+- [A step-by-step guide to deploying a minimal EDGELESS system](documentation/deploy_step_by_step.md)
+- [Repository layout](documentation/repository_layout.md)
 - [How to create a new function](documentation/rust_functions.md)
+  ([YouTube tutorial](https://youtu.be/1JnQIM9VTLk?si=o34YKRRJXNz0H54f))
 - [How to compose a new workflow](documentation/workflows.md)
+  ([YouTube tutorial](https://youtu.be/kc4Ku5p5Nrw?si=ZRxx0kmsIuAYLie1))
+- [Examples shipped with the repository](../examples/README.md)
 
 ## Contributing
 
@@ -170,7 +176,7 @@ The [contributing guide](CONTRIBUTING_GUIDE.md) contains some rules you should a
 ## License
 
 The Repository is licensed under the MIT License. Please refer to
-[LICENSE-MIT.txt](LICENSE-MIT.txt) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
+[LICENSE](LICENSE) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
 
 ## Funding
 

@@ -48,7 +48,9 @@ mod tests {
                     0 => edgeless_node::EdgelessNodeSettings {
                         node_id: uuid::Uuid::new_v4(),
                         agent_url: format!("http://{}:{}", address, next_port()),
+                        agent_url_announced: "".to_string(),
                         invocation_url: format!("http://{}:{}", address, next_port()),
+                        invocation_url_announced: "".to_string(),
                         metrics_url: format!("http://{}:{}", address, next_port()),
                         orchestrator_url: orchestrator_url.to_string(),
                         http_ingress_url: "".to_string(),
