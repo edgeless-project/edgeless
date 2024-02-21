@@ -23,6 +23,7 @@ pub struct NodeCapabilities {
 }
 
 impl NodeCapabilities {
+    /// Create capabilities with all values empty.
     pub fn empty() -> Self {
         Self {
             num_cpus: 0,
@@ -31,6 +32,22 @@ impl NodeCapabilities {
             num_cores: 0,
             mem_size: 0,
         }
+    }
+
+    /// Create a usable node with minimum capabilities.
+    pub fn minimum() -> Self {
+        Self {
+            num_cpus: 1,
+            model_name_cpu: "".to_string(),
+            clock_freq_cpu: 0.0,
+            num_cores: 1,
+            mem_size: 0,
+        }
+    }
+
+    /// Return true if this node must not be assigned function instances.
+    pub fn do_not_use(&self) -> bool {
+        self.num_cpus * self.num_cores == 0
     }
 }
 

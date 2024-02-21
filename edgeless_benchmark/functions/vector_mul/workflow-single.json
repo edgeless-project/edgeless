@@ -1,0 +1,35 @@
+{
+    "functions": [
+        {
+            "name": "client",
+            "class_specification": {
+                "id": "vector_mul",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "include_code_file": "./vector_mul.wasm",
+                "outputs": [
+                    "metric",
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "metric": "metrics-collector",
+                "out": "client"
+            },
+            "annotations": {
+                "init-payload": "seed=42,is_client=true,wf_name=wf0,fun_name=my_function,input_size=1000"
+            }
+        }
+    ],
+    "resources": [
+        {
+            "name": "metrics-collector",
+            "class_type": "metrics-collector",
+            "output_mapping": {},
+            "configurations": {
+                "url": "redis://127.0.0.1:6379/"
+            }
+        }
+    ],
+    "annotations": {}
+}
