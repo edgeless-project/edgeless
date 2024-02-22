@@ -7,23 +7,25 @@ struct CheckTemperatureFun;
 
 impl Edgefunction for CheckTemperatureFun {
     fn handle_cast(_source: InstanceId, msg: String) {
-        log::info!("CheckTemperatureFun: 'Cast' called with msg={}", msg);
         if msg == "routine_temperature_check" {
-            log::info!("calling dda");
-            // TODO: call of dda is blocking - dataplane event is never received
-            // by the dda singleton - something is wrong in the configuration?
-            // -> write a simple workflow with just one call to the dda, compare
-            // dda configuration to http_ingress configuration
-            let temperature_readings = call("dda", "read_temperature"); // TODO: how do we pass a parameter to the read_temperature action?
+            log::info!("CheckTemperatureFun: Starting the routine temperature check");
+            // call the dda to check the temperature
+            let temperature_readings = call("dda", "check_temperature");
             match temperature_readings {
-                CallRet::Reply(msg) => log::info!("returned {}", msg),
+                CallRet::Reply(msg) => match msg.as_str() {
+                    "too_hot" => {
+                        log::info!("It's too hot! We need to move the robotic arm!");
+                        let move_arm_result = call("move_arm", "hello, can you please move the robotic arm?");
+                    }
+                    _ => {
+                        log::info!("We don't need to move the robotic arm - the temperature is fine")
+                    }
+                },
                 CallRet::Noreply => log::info!("dda noreply"),
                 CallRet::Err => log::info!("dda err"),
             }
-            let _hello = cast("output", "hello");
-            let _log = cast("log_output", "test");
-            log::info!("after dda call");
-            // TODO: trigger move_arm function
+
+            delayed_cast(5000, "self", "routine_temperature_check")
         }
     }
 
@@ -35,9 +37,9 @@ impl Edgefunction for CheckTemperatureFun {
     }
 
     fn handle_init(_payload: String, _state: Option<String>) {
-        // Periodically, every 10 seconds invokes itself
+        // Periodically, every 5 seconds invokes itself
         edgeless_function::init_logger();
-        log::info!("CheckTemperatureFun: 'Init' called");
+        log::info!("CheckTemperatureFun: 'Init' called. It will invoke itself every 5 seconds to check for too high temperatures");
 
         // Inside of a function we can also call outputs that are not explicitly
         // specified in the function.json / workflow.json file

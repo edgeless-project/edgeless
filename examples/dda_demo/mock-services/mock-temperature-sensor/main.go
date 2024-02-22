@@ -46,8 +46,8 @@ func main() {
 	cfg := config.New()
 	cfg.Identity.Name = "mock-temperature-sensor"
 	cfg.Cluster = "edgeless-demo"
-	cfg.Apis.Grpc.Disabled = false
-	cfg.Apis.GrpcWeb.Disabled = false
+	cfg.Apis.Grpc.Disabled = true
+	cfg.Apis.GrpcWeb.Disabled = true
 	cfg.Services.Com.Protocol = "mqtt5"
 	cfg.Services.Com.Url = os.Getenv("MQTT_DDA")
 

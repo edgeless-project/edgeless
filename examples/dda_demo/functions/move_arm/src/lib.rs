@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2024 Siemens AG
+// SPDX-License-Identifier: MIT
 use edgeless_function::api::*;
 
 // Communication with the outside world (also with resources / other components)
@@ -38,6 +40,7 @@ impl Edgefunction for MoveArmFun {
         // get a stream of responses from the dda resource (scenario: call
         // subscribeEvent on the DDA resource and receive 5 responses and then
         // proceed with WASM function execution)? -> I think it's not possible
+        log::info!("MoveArmFun called with {}", encoded_message);
         let res = call(&"dda", &"move_arm");
 
         if let edgeless_function::api::CallRet::Reply(response) = res {

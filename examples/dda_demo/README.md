@@ -59,6 +59,8 @@ For convenience you can simply call `build_demo_functions.sh`in the `scripts` fo
     1. First run an actor `run_mock_actor.sh` in `scripts` folder
     1. Second run a sensor `run_mock_sensor.sh` in `scripts` folder
 
+You should see A, B, C
+
 ## License
 
 Code and documentation copyright 2024 Siemens AG.

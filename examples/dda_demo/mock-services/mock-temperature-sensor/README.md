@@ -13,7 +13,7 @@ A current version of `go` installed.
 
 ## How to run
 
-MQTT configuration hard-coded in main.go.
+MQTT url expected as environment variable `MQTT_DDA` e.g. somthing like `$MQTT_DDA="mqtt://localhost:1883"`.
 
 Run with:
 
