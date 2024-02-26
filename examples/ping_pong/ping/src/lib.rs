@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 use std::ops::Deref;
 
-use edgeless_function::api::*;
+use edgeless_function::*;
 
 struct PingerFun;
 
@@ -14,40 +14,45 @@ struct PingerState {
 
 static STATE: std::sync::OnceLock<std::sync::Mutex<PingerState>> = std::sync::OnceLock::new();
 
-impl Edgefunction for PingerFun {
-    fn handle_cast(_src: InstanceId, encoded_message: String) {
-        log::info!("Pinger: 'Cast' called, MSG: {}", encoded_message);
-        if encoded_message == "wakeup" {
+impl EdgeFunction for PingerFun {
+    fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
+        let str_message = core::str::from_utf8(encoded_message).unwrap();
+        log::info!("Pinger: 'Cast' called, MSG: {}", str_message);
+        if str_message == "wakeup" {
             let id = STATE.get().unwrap().lock().unwrap().count;
 
             STATE.get().unwrap().lock().unwrap().count += 1;
-            sync(&serde_json::to_string(STATE.get().unwrap().lock().unwrap().deref()).unwrap());
+            sync(&serde_json::to_string(STATE.get().unwrap().lock().unwrap().deref()).unwrap().as_bytes());
 
-            let res = call("ponger", &format!("PING-{}", id));
+            let res = call("ponger", &format!("PING-{}", id).as_bytes());
             if let CallRet::Reply(_msg) = res {
                 log::info!("Got Reply");
             }
 
-            delayed_cast(1000, "self", "wakeup");
+            delayed_cast(1000, "self", b"wakeup");
         }
     }
 
-    fn handle_call(_src: InstanceId, encoded_message: String) -> CallRet {
-        log::info!("Pinger: 'Call' called, MSG: {}", encoded_message);
-        CallRet::Noreply
+    fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
+        log::info!("Pinger: 'Call' called, MSG: {:?}", encoded_message);
+        CallRet::NoReply
     }
 
-    fn handle_init(_payload: String, serialized_state: Option<String>) {
+    fn handle_init(_payload: Option<&[u8]>, serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();
         log::info!("Pinger: 'Init' called");
 
         if let Some(serialized) = serialized_state {
-            STATE.set(std::sync::Mutex::new(serde_json::from_str(&serialized).unwrap())).unwrap();
+            STATE
+                .set(std::sync::Mutex::new(
+                    serde_json::from_str(core::str::from_utf8(serialized).unwrap()).unwrap(),
+                ))
+                .unwrap();
         } else {
             STATE.set(std::sync::Mutex::new(PingerState { count: 0 })).unwrap();
         }
 
-        cast("self", "wakeup");
+        cast("self", b"wakeup");
     }
 
     fn handle_stop() {

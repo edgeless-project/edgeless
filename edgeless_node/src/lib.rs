@@ -252,7 +252,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         .expect(&format!("could not build the telemetry provider at URL {}", &settings.metrics_url));
 
     // Create the WebAssembly runner.
-    let (rust_runtime_client, mut rust_runtime_task_s) = base_runtime::runtime::create::<wasm_runner::function_instance::WASMFunctionInstance>(
+    let (_rust_runtime_client, mut rust_runtime_task_s) = base_runtime::runtime::create::<wasm_runner::function_instance::WASMFunctionInstance>(
         data_plane.clone(),
         state_manager.clone(),
         Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
@@ -283,8 +283,8 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     // Create the agent.
     let mut runners = std::collections::HashMap::<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>::new();
-    runners.insert("RUST_WASM".to_string(), Box::new(rust_runtime_client.clone()));
-    // runners.insert("RUST_WASM".to_string(), Box::new(wasmi_runtime_client.clone()));
+    // runners.insert("RUST_WASM".to_string(), Box::new(rust_runtime_client.clone()));
+    runners.insert("RUST_WASM".to_string(), Box::new(wasmi_runtime_client.clone()));
     let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.clone(), data_plane.clone());
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.agent_url.clone());
 

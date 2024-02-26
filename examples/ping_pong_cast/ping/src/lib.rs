@@ -1,35 +1,32 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use edgeless_function::api::*;
+use edgeless_function::*;
 
 struct PingerFun;
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-struct PingerState {
-    count: u64,
-}
+impl EdgeFunction for PingerFun {
+    fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
+        let msg = core::str::from_utf8(encoded_message);
 
-impl Edgefunction for PingerFun {
-    fn handle_cast(_src: InstanceId, encoded_message: String) {
-        log::info!("AsyncPinger: 'Cast' called, MSG: {}", encoded_message);
-        if encoded_message == "wakeup" {
-            cast("ponger", "PING");
-            delayed_cast(1000, "self", "wakeup");
+        if msg.unwrap() == "wakeup" {
+            log::info!("AsyncPinger: 'Cast' Wakeup");
+            cast("ponger", b"PING");
+            delayed_cast(1000, "self", b"wakeup");
         } else {
-            log::info!("Got Response");
+            log::info!("AsyncPinger: 'Cast' Got Response");
         }
     }
 
-    fn handle_call(_src: InstanceId, encoded_message: String) -> CallRet {
-        log::info!("AsyncPinger: 'Call' called, MSG: {}", encoded_message);
-        CallRet::Noreply
+    fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
+        log::info!("AsyncPinger: 'Call' called, MSG: {}", core::str::from_utf8(encoded_message).unwrap());
+        CallRet::NoReply
     }
 
-    fn handle_init(_payload: String, serialized_state: Option<String>) {
+    fn handle_init(_payload: Option<&[u8]>, serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();
         log::info!("AsyncPinger: 'Init' called");
-        cast("self", "wakeup");
+        delayed_cast(10000, "self", b"wakeup");
     }
 
     fn handle_stop() {
