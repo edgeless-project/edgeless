@@ -1,33 +1,35 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
-use edgeless_function::api::*;
+use edgeless_function::*;
 
 struct SystemTest;
 
-impl Edgefunction for SystemTest {
-    fn handle_cast(_src: InstanceId, encoded_message: String) {
-        // log::info!("cast {}: {}", _src.function, encoded_message);
-        match encoded_message.parse::<i32>() {
+impl EdgeFunction for SystemTest {
+    fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
+        let str_message = core::str::from_utf8(encoded_message).unwrap();
+        log::info!("cast {:?}: {}", _src.component_id, str_message);
+
+        match str_message.parse::<i32>() {
             Ok(val) => {
-                cast("out1", format!("{}", val / 2).as_str());
-                cast("out2", format!("{}", val - 1).as_str());
+                cast("out1", format!("{}", val / 2).as_str().as_bytes());
+                cast("out2", format!("{}", val - 1).as_str().as_bytes());
             }
-            Err(err) => cast("err", format!("parsing error: {}", err).as_str()),
+            Err(err) => cast("err", format!("parsing error: {}", err).as_str().as_bytes()),
         };
-        cast("log", encoded_message.as_str());
+        cast("log", encoded_message);
     }
 
-    fn handle_call(_src: InstanceId, _encoded_message: String) -> CallRet {
-        CallRet::Noreply
+    fn handle_call(_src: InstanceId, _encoded_message: &[u8]) -> CallRet {
+        CallRet::NoReply
     }
 
-    fn handle_init(payload: String, _serialized_state: Option<String>) {
-        // edgeless_function::init_logger();
-        // log::info!("started: {}", payload);
-        if !payload.is_empty() {
-            match payload.parse::<i32>() {
-                Ok(_) => delayed_cast(500, "self", &payload),
+    fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
+        edgeless_function::init_logger();
+        log::info!("started: {:?}", payload);
+        if let Some(pld) = payload {
+            match core::str::from_utf8(pld).unwrap().parse::<i32>() {
+                Ok(_) => delayed_cast(1000, "self", pld),
                 Err(_) => {}
             }
         }

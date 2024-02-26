@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
-use edgeless_function::api::*;
+use edgeless_function::*;
 
 struct VectorMulFunction;
 
@@ -27,8 +27,8 @@ struct State {
 static CONF: std::sync::OnceLock<Conf> = std::sync::OnceLock::new();
 static STATE: std::sync::OnceLock<std::sync::Mutex<State>> = std::sync::OnceLock::new();
 
-impl Edgefunction for VectorMulFunction {
-    fn handle_cast(_src: InstanceId, encoded_message: String) {
+impl EdgeFunction for VectorMulFunction {
+    fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
         let conf = CONF.get().unwrap();
         // log::info!("VectorMul casted, wf {}, fun {}, MSG: {}", conf.wf_name, conf.fun_name, encoded_message);
         let mut state = STATE.get().unwrap().lock().unwrap();
@@ -39,7 +39,7 @@ impl Edgefunction for VectorMulFunction {
         if conf.is_client {
             let id = state.next_id;
             if id > 0 {
-                cast("metric", format!("workflow:end:{}:{}", conf.wf_name, id).as_str());
+                cast("metric", format!("workflow:end:{}:{}", conf.wf_name, id).as_bytes());
             }
 
             state.next_id += 1;
@@ -50,18 +50,22 @@ impl Edgefunction for VectorMulFunction {
                 random_input.iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(",")
             );
 
-            cast("metric", format!("workflow:start:{}:{}", conf.wf_name, state.next_id).as_str());
-            cast("out", &payload);
+            cast("metric", format!("workflow:start:{}:{}", conf.wf_name, state.next_id).as_bytes());
+            cast("out", payload.as_bytes());
 
         //
         // Processing function
         //
         } else {
-            let input = encoded_message.split(',').map(|x| x.parse::<f32>().unwrap_or(0.0)).collect::<Vec<f32>>();
+            let input = core::str::from_utf8(encoded_message)
+                .unwrap_or("0.0")
+                .split(',')
+                .map(|x| x.parse::<f32>().unwrap_or(0.0))
+                .collect::<Vec<f32>>();
             let n = conf.input_size;
             assert!(input.len() == (1 + n));
             let id = input[0] as usize;
-            cast("metric", format!("function:start:{}:{}:{}", conf.wf_name, conf.fun_name, id).as_str());
+            cast("metric", format!("function:start:{}:{}:{}", conf.wf_name, conf.fun_name, id).as_bytes());
 
             // Produce the output by multiplying the internal matrix by the input.
             let mut output = vec![0.0_f32; n];
@@ -72,23 +76,28 @@ impl Edgefunction for VectorMulFunction {
             }
             cast(
                 "out",
-                format!("{},{}", id, output.iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(",")).as_str(),
+                format!("{},{}", id, output.iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(",")).as_bytes(),
             );
-            cast("metric", format!("function:end:{}:{}:{}", conf.wf_name, conf.fun_name, id).as_str());
+            cast("metric", format!("function:end:{}:{}:{}", conf.wf_name, conf.fun_name, id).as_bytes());
         }
     }
 
-    fn handle_call(_src: InstanceId, _encoded_message: String) -> CallRet {
+    fn handle_call(_src: InstanceId, _encoded_message: &[u8]) -> CallRet {
         log::info!("VectorMul called: ignored");
-        CallRet::Noreply
+        CallRet::NoReply
     }
 
     // example of payload:
     // seed=42,is_client=true,is_last=false,wf_name=my_workflow,fun_name=my_function,input_size=1000
-    fn handle_init(payload: String, _serialized_state: Option<String>) {
+    fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();
-        log::info!("VectorMul initialized, payload: {}", payload);
-        let arguments = edgeless_function::parse_init_payload(&payload);
+        log::info!("VectorMul initialized, payload: {:?}", payload);
+        let arguments = if let Some(payload) = payload {
+            let str_payload = core::str::from_utf8(payload).unwrap();
+            edgeless_function::parse_init_payload(str_payload)
+        } else {
+            std::collections::HashMap::new()
+        };
 
         let seed = arguments.get("seed").unwrap_or(&"0").parse::<u32>().unwrap_or(0);
 
@@ -122,7 +131,7 @@ impl Edgefunction for VectorMulFunction {
         let _ = STATE.set(std::sync::Mutex::new(State { next_id: 0, lcg, matrix }));
 
         if is_client {
-            delayed_cast(1000, "self", "");
+            delayed_cast(1000, "self", b"");
         }
     }
 

@@ -1,19 +1,20 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use edgeless_function::api::*;
+use edgeless_function::*;
 use edgeless_http::*;
 
 struct ProcesorFun;
 
-impl Edgefunction for ProcesorFun {
-    fn handle_cast(_src: InstanceId, encoded_message: String) {
-        log::info!("HTTP_Processor: 'Cast' called, MSG: {}", encoded_message);
+impl EdgeFunction for ProcesorFun {
+    fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
+        log::info!("HTTP_Processor: 'Cast' called, MSG: {:?}", encoded_message);
     }
 
-    fn handle_call(_src: InstanceId, encoded_message: String) -> CallRet {
-        log::info!("HTTP_Processor: 'Call' called, MSG: {}", encoded_message);
-        let req: EdgelessHTTPRequest = edgeless_http::request_from_string(&encoded_message).unwrap();
+    fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
+        let str_message = core::str::from_utf8(encoded_message).unwrap();
+        log::info!("HTTP_Processor: 'Call' called, MSG: {}", str_message);
+        let req: EdgelessHTTPRequest = edgeless_http::request_from_string(str_message).unwrap();
 
         let resp = if req.path == "/hello" {
             EdgelessHTTPResponse {
@@ -29,10 +30,10 @@ impl Edgefunction for ProcesorFun {
             }
         };
 
-        CallRet::Reply(edgeless_http::response_to_string(&resp))
+        CallRet::Reply(OwnedByteBuff::new_from_slice(edgeless_http::response_to_string(&resp).as_bytes()))
     }
 
-    fn handle_init(_payload: String, serialized_state: Option<String>) {
+    fn handle_init(_payload: Option<&[u8]>, serialized_state: Option<&[u8]>) {
         log::info!("HTTP_Processor: 'Init' called");
     }
 

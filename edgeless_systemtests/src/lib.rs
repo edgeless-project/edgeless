@@ -172,7 +172,7 @@ mod tests {
         terminate(handles)
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     #[serial_test::serial]
     async fn system_test_single_domain_three_nodes() -> anyhow::Result<()> {
         let _ = env_logger::try_init();
@@ -271,7 +271,7 @@ mod tests {
             if not_done_yet.is_empty() {
                 break;
             }
-            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
         }
         assert!(not_done_yet.is_empty(), "not all logs have been filled properly");
 
