@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Roman Kolcun <roman.kolcun@cl.cam.ac.uk>
 // SPDX-License-Identifier: MIT
 mod workflow_spec;
 
@@ -78,6 +79,14 @@ impl Platform {
             Self::WASM => String::from("wasm"),
             Self::X86 => String::from("so"),
             Self::ARM => String::from("arm"),
+        }
+    }
+
+    fn name(&self) -> String {
+        match self {
+            Self::WASM => String::from("WASM"),
+            Self::X86 => String::from("x86"),
+            Self::ARM => String::from("Arm"),
         }
     }
 }
@@ -211,6 +220,8 @@ async fn main() -> anyhow::Result<()> {
                         "arm" => Platform::ARM,
                         _ => Platform::WASM,
                     };
+
+                    println!("Building for architecture {} using {} target.", platform.name(), platform.target());
 
                     let lib_name = match pack.library() {
                         Some(val) => val.name(),
