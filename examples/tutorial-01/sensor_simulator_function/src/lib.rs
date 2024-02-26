@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use edgeless_function::api::*;
+use edgeless_function::*;
 use log;
 
 struct SensorSimulatorFunction;
@@ -108,27 +108,33 @@ const RANDOM_VALUES: [&'static f32; 100] = [
     &-5.880393484541017,
 ];
 
-impl Edgefunction for SensorSimulatorFunction {
-    fn handle_cast(src: InstanceId, encoded_message: String) {
-        if let Ok(mut index) = encoded_message.parse::<usize>() {
+impl EdgeFunction for SensorSimulatorFunction {
+    fn handle_cast(src: InstanceId, encoded_message: &[u8]) {
+        let str_message = core::str::from_utf8(encoded_message).unwrap();
+        if let Ok(mut index) = str_message.parse::<usize>() {
             if index >= RANDOM_VALUES.len() {
                 index = 0;
             }
             let value = RANDOM_VALUES[index];
             index += 1;
-            log::info!("sensor_simulator {}:{}, new value generated: {}", src.node, src.function, value);
-            cast(&"output", format!("{}", value).as_str());
-            delayed_cast(100, "self", format!("{}", index).as_str());
+            log::info!(
+                "sensor_simulator {:?}:{:?}, new value generated: {}",
+                src.node_id,
+                src.component_id,
+                value
+            );
+            cast(&"output", format!("{}", value).as_bytes());
+            delayed_cast(100, "self", format!("{}", index).as_bytes());
         }
     }
 
-    fn handle_call(_src: InstanceId, _encoded_message: String) -> CallRet {
-        CallRet::Noreply
+    fn handle_call(_src: InstanceId, _encoded_message: &[u8]) -> CallRet {
+        CallRet::NoReply
     }
 
-    fn handle_init(_payload: String, _serialized_state: Option<String>) {
+    fn handle_init(_payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();
-        cast("self", &"0");
+        cast("self", b"0");
     }
 
     fn handle_stop() {

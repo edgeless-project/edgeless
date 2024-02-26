@@ -223,8 +223,8 @@ async fn main() -> anyhow::Result<()> {
 
                     println!(
                         "{:?}",
-                        std::process::Command::new("wasm-tools")
-                            .args(["component", "new", &raw_result, "-o", &out_file])
+                        std::process::Command::new("wasm-opt")
+                            .args(["-Oz", &raw_result, "-o", &out_file])
                             .status()?
                     );
                 }

@@ -75,35 +75,19 @@ pub trait EdgeFunction {
 
 pub fn cast_raw(target: InstanceId, msg: &[u8]) {
     unsafe {
-        cast_raw_asm(
-            target.node_id.as_ptr(),
-            target.component_id.as_ptr(),
-            msg.as_ptr(),
-            msg.len(),
-        );
+        cast_raw_asm(target.node_id.as_ptr(), target.component_id.as_ptr(), msg.as_ptr(), msg.len());
     }
 }
 
 pub fn cast(name: &str, msg: &[u8]) {
     unsafe {
-        cast_asm(
-            name.as_bytes().as_ptr(),
-            name.as_bytes().len(),
-            msg.as_ptr(),
-            msg.len(),
-        );
+        cast_asm(name.as_bytes().as_ptr(), name.as_bytes().len(), msg.as_ptr(), msg.len());
     }
 }
 
 pub fn delayed_cast(delay_ms: u64, name: &str, msg: &[u8]) {
     unsafe {
-        delayed_cast_asm(
-            delay_ms,
-            name.as_bytes().as_ptr(),
-            name.as_bytes().len(),
-            msg.as_ptr(),
-            msg.len(),
-        );
+        delayed_cast_asm(delay_ms, name.as_bytes().as_ptr(), name.as_bytes().len(), msg.as_ptr(), msg.len());
     }
 }
 
