@@ -96,7 +96,7 @@ pub fn cast(
     let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     match tokio::runtime::Handle::current().block_on(caller.data_mut().host.cast_alias(&target, &payload)) {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(_) => {
             // We ignore casts to unknown targets.
             log::warn!("Cast to unknown target");
