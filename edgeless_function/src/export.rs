@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+/// Export Macro generating the functions that are exported by the WASM module and call into an instance of `EdgeFunction`.
 #[macro_export]
 macro_rules! export {
     ( $fun:ident ) => {
