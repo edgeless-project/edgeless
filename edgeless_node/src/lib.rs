@@ -10,7 +10,9 @@ pub mod agent;
 pub mod base_runtime;
 pub mod resources;
 pub mod state_management;
+#[cfg(feature = "wasmtime")]
 pub mod wasm_runner;
+#[cfg(feature = "wasmi")]
 pub mod wasmi_runner;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -251,47 +253,58 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         .await
         .expect(&format!("could not build the telemetry provider at URL {}", &settings.metrics_url));
 
-    // Create the WebAssembly runner.
-    let (_rust_runtime_client, mut rust_runtime_task_s) = base_runtime::runtime::create::<wasm_runner::function_instance::WASMFunctionInstance>(
-        data_plane.clone(),
-        state_manager.clone(),
-        Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-            ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
-            ("NODE_ID".to_string(), settings.node_id.to_string()),
-        ]))),
-    );
-    let rust_runtime_task = tokio::spawn(async move {
-        rust_runtime_task_s.run().await;
-    });
+    let mut runners = std::collections::HashMap::<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>::new();
 
-    // Create the WebAssembly (WASMI) runner.
-    let (wasmi_runtime_client, mut wasmi_runtime_task_s) = base_runtime::runtime::create::<wasmi_runner::WASMIFunctionInstance>(
-        data_plane.clone(),
-        state_manager.clone(),
-        Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-            ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
-            ("NODE_ID".to_string(), settings.node_id.to_string()),
-        ]))),
-    );
-    let wasmi_runtime_task = tokio::spawn(async move {
-        wasmi_runtime_task_s.run().await;
-    });
+    // Create the WebAssembly (Wasmtime) runner.
+    #[allow(unused_variables)]
+    #[cfg(feature = "wasmtime")]
+    let rust_runtime_task = {
+        let (wasmtime_runtime_client, mut wasmtime_runtime_task_s) =
+            base_runtime::runtime::create::<wasm_runner::function_instance::WASMFunctionInstance>(
+                data_plane.clone(),
+                state_manager.clone(),
+                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                    ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
+                    ("WASM_RUNTIME".to_string(), "wasmtime".to_string()),
+                    ("NODE_ID".to_string(), settings.node_id.to_string()),
+                ]))),
+            );
+        runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
+        tokio::spawn(async move {
+            wasmtime_runtime_task_s.run().await;
+        })
+    };
+
+    // Create the WebAssembly (Wasmi) runner.
+    #[allow(unused_variables)]
+    #[cfg(feature = "wasmi")]
+    let rust_runtime_task = {
+        let (wasmi_runtime_client, mut wasmi_runtime_task_s) = base_runtime::runtime::create::<wasmi_runner::WASMIFunctionInstance>(
+            data_plane.clone(),
+            state_manager.clone(),
+            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
+                ("WASM_RUNTIME".to_string(), "wasmi".to_string()),
+                ("NODE_ID".to_string(), settings.node_id.to_string()),
+            ]))),
+        );
+        runners.insert("RUST_WASM".to_string(), Box::new(wasmi_runtime_client.clone()));
+        tokio::spawn(async move {
+            wasmi_runtime_task_s.run().await;
+        })
+    };
 
     // Create the resources.
     let mut resource_provider_specifications = vec![];
     let resources = fill_resources(data_plane.clone(), &settings, &mut resource_provider_specifications).await;
 
     // Create the agent.
-    let mut runners = std::collections::HashMap::<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>::new();
-    // runners.insert("RUST_WASM".to_string(), Box::new(rust_runtime_client.clone()));
-    runners.insert("RUST_WASM".to_string(), Box::new(wasmi_runtime_client.clone()));
     let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.clone(), data_plane.clone());
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.agent_url.clone());
 
     // Wait for all the tasks to complete.
     let _ = futures::join!(
         rust_runtime_task,
-        wasmi_runtime_task,
         agent_task,
         agent_api_server,
         register_node(&settings, get_capabilities(), resource_provider_specifications)
