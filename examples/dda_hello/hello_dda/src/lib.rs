@@ -6,7 +6,7 @@ use edgeless_function::api::*;
 struct HelloDDA;
 
 impl Edgefunction for HelloDDA {
-    fn handle_cast(src: InstanceId, message: String) {
+    fn handle_cast(_src: InstanceId, message: String) {
         cast("file_log_output", "HelloDDA");
         cast("dda_output", "Hello DDA");
 
