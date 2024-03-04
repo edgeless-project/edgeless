@@ -6,7 +6,7 @@
                 "id": "esp_test_fun",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./esp_test_fun/esp_test_fun.wasm",
+                "code": "./esp_test_fun/esp_test_fun.wasm",
                 "outputs": [
                     "check_display"
                 ]
