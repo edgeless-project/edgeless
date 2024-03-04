@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
-use edgeless_function::api::*;
+use edgeless_function::*;
 
 // Communication with the outside world (also with resources / other components)
 // from an edgless function always happens explicitly over the dataplane calls
@@ -14,10 +14,12 @@ use edgeless_function::api::*;
 
 struct MoveArmFun;
 
-impl Edgefunction for MoveArmFun {
-    fn handle_cast(_src: InstanceId, encoded_message: String) {}
+impl EdgeFunction for MoveArmFun {
+    fn handle_cast(_src: InstanceId, _encoded_message: &[u8]) {
+        log::info!("MoveArmFun: handle_cast should never be called!");
+    }
 
-    fn handle_call(_src: InstanceId, encoded_message: String) -> CallRet {
+    fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
         // TODO: we would preferably add a new definition to edgeless_function
         // .wti which would allow us to call the dda resource directly and not
         // through the dataplane -> this would be inconsistent with how the
@@ -40,21 +42,31 @@ impl Edgefunction for MoveArmFun {
         // get a stream of responses from the dda resource (scenario: call
         // subscribeEvent on the DDA resource and receive 5 responses and then
         // proceed with WASM function execution)? -> I think it's not possible
-        log::info!("MoveArmFun called with {}", encoded_message);
-        let res = call(&"dda", &"move_arm");
-
-        if let edgeless_function::api::CallRet::Reply(response) = res {
-            log::info!("moved arm over DDA with the following response {}", response);
+        match std::str::from_utf8(encoded_message) {
+            Ok(s) => log::info!("MoveArmFun: called with {}", s),
+            Err(e) => log::info!("MoveArmFun: Received invalid UTF-8 data {}", e),
         }
-        CallRet::Noreply
+        
+        let res = call("dda", b"move_arm");
+
+        if let CallRet::Reply(response) = res {
+            match std::str::from_utf8(&response) {
+                Ok(s) => log::info!("MoveArmFun: moved arm over DDA with the following response {}", s),
+                Err(e) => log::info!("MoveArmFun: Received invalid UTF-8 data {}", e),
+            }
+        }
+        CallRet::NoReply
     }
 
-    fn handle_init(_payload: String, serialized_state: Option<String>) {
+    fn handle_init(_payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         // TODO: register events that should trigger this function here using
         // API of dda
+        log::info!("MoveArmFun: 'Init' called");
     }
 
-    fn handle_stop() {}
+    fn handle_stop() {
+        log::info!("MoveArmFun: 'Stop' called");
+    }
 }
 
 edgeless_function::export!(MoveArmFun);
