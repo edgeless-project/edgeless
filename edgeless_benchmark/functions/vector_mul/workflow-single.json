@@ -6,7 +6,7 @@
                 "id": "vector_mul",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./vector_mul.wasm",
+                "code": "./vector_mul.wasm",
                 "outputs": [
                     "metric",
                     "out"
