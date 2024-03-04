@@ -265,7 +265,7 @@ fn make_spawn_function_request(class_id: &str) -> edgeless_api::function_instanc
             function_class_type: "ft-1".to_string(),
             function_class_version: "0.1".to_string(),
             function_class_code: "function_code".as_bytes().to_vec(),
-            outputs: vec![],
+            function_class_outputs: vec![],
         },
         annotations: std::collections::HashMap::new(),
         state_specification: StateSpecification {

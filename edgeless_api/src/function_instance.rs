@@ -20,11 +20,16 @@ pub struct StateSpecification {
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
 pub struct FunctionClassSpecification {
+    /// Function class identifier.
     pub function_class_id: String,
+    /// Run-time agent type this function is made for.
     pub function_class_type: String,
+    /// Function class version.
     pub function_class_version: String,
+    /// Inline function's code (if present).
     pub function_class_code: Vec<u8>,
-    pub outputs: Vec<String>,
+    /// Output channels in which the function may generate new. Can be empty.
+    pub function_class_outputs: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

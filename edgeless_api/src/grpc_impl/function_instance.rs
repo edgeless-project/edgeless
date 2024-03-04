@@ -13,8 +13,8 @@ impl FunctonInstanceConverters {
             function_class_id: api_spec.function_class_id.clone(),
             function_class_type: api_spec.function_class_type.clone(),
             function_class_version: api_spec.function_class_version.clone(),
-            function_class_code: api_spec.function_class_inline_code().to_vec(),
-            outputs: api_spec.outputs.clone(),
+            function_class_code: api_spec.function_class_code().to_vec(),
+            function_class_outputs: api_spec.function_class_outputs.clone(),
         })
     }
 
@@ -62,8 +62,8 @@ impl FunctonInstanceConverters {
             function_class_id: spec.function_class_id.clone(),
             function_class_type: spec.function_class_type.clone(),
             function_class_version: spec.function_class_version.clone(),
-            function_class_inline_code: Some(spec.function_class_code.clone()),
-            outputs: spec.outputs.clone(),
+            function_class_code: Some(spec.function_class_code.clone()),
+            function_class_outputs: spec.function_class_outputs.clone(),
         }
     }
 
@@ -271,7 +271,7 @@ mod tests {
                 function_class_type: "WASM".to_string(),
                 function_class_version: "1.0.0".to_string(),
                 function_class_code: "binary-code".as_bytes().to_vec(),
-                outputs: vec!["out".to_string(), "err".to_string()],
+                function_class_outputs: vec!["out".to_string(), "err".to_string()],
             },
             annotations: std::collections::HashMap::from([("key1".to_string(), "value1".to_string())]),
             state_specification: StateSpecification {
