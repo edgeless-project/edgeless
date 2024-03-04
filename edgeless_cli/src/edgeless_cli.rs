@@ -97,7 +97,7 @@ async fn main() -> anyhow::Result<()> {
                                         let p = std::path::Path::new(&spec_file)
                                             .parent()
                                             .unwrap()
-                                            .join(func_spec.class_specification.include_code_file.unwrap());
+                                            .join(func_spec.class_specification.code.unwrap());
                                         edgeless_api::workflow_instance::WorkflowFunction {
                                             name: func_spec.name,
                                             function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
