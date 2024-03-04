@@ -155,7 +155,7 @@ async fn single_function_start_stop() {
         function_class_type: "RUST_WASM".to_string(),
         function_class_version: "0.1".to_string(),
         function_class_code: vec![],
-        outputs: vec![],
+        function_class_outputs: vec![],
     };
     let start_workflow_request = edgeless_api::workflow_instance::SpawnWorkflowRequest {
         workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
@@ -221,7 +221,7 @@ async fn resource_to_function_start_stop() {
                     function_class_type: "RUST_WASM".to_string(),
                     function_class_version: "0.1".to_string(),
                     function_class_code: vec![],
-                    outputs: vec![],
+                    function_class_outputs: vec![],
                 },
                 output_mapping: std::collections::HashMap::new(),
                 annotations: std::collections::HashMap::new(),
@@ -309,7 +309,7 @@ async fn function_link_loop_start_stop() {
                         function_class_type: "RUST_WASM".to_string(),
                         function_class_version: "0.1".to_string(),
                         function_class_code: vec![],
-                        outputs: vec!["output-1".to_string()],
+                        function_class_outputs: vec!["output-1".to_string()],
                     },
                     output_mapping: std::collections::HashMap::from([("output-1".to_string(), "f2".to_string())]),
                     annotations: std::collections::HashMap::new(),
@@ -321,7 +321,7 @@ async fn function_link_loop_start_stop() {
                         function_class_type: "RUST_WASM".to_string(),
                         function_class_version: "0.1".to_string(),
                         function_class_code: vec![],
-                        outputs: vec!["output-2".to_string()],
+                        function_class_outputs: vec!["output-2".to_string()],
                     },
                     output_mapping: std::collections::HashMap::from([("output-2".to_string(), "f1".to_string())]),
                     annotations: std::collections::HashMap::new(),
