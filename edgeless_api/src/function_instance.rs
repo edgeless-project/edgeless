@@ -23,7 +23,7 @@ pub struct FunctionClassSpecification {
     pub function_class_id: String,
     pub function_class_type: String,
     pub function_class_version: String,
-    pub function_class_inlude_code: Vec<u8>,
+    pub function_class_code: Vec<u8>,
     pub outputs: Vec<String>,
 }
 

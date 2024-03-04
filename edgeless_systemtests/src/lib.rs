@@ -94,7 +94,7 @@ mod tests {
             function_class_id: "system_test".to_string(),
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
-            function_class_inlude_code: include_bytes!("fixtures/system_test.wasm").to_vec(),
+            function_class_code: include_bytes!("fixtures/system_test.wasm").to_vec(),
             outputs: vec!["out1".to_string(), "out2".to_string(), "err".to_string(), "log".to_string()],
         }
     }
