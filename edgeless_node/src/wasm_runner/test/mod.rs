@@ -92,7 +92,7 @@ async fn basic_lifecycle() {
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
             function_class_code: include_bytes!("fixtures/messaging_test.wasm").to_vec(),
-            outputs: vec![],
+            function_class_outputs: vec![],
         },
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
@@ -227,7 +227,7 @@ async fn messaging_test_setup() -> (
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
             function_class_code: include_bytes!("fixtures/messaging_test.wasm").to_vec(),
-            outputs: vec!["test".to_string()],
+            function_class_outputs: vec!["test".to_string()],
         },
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
@@ -514,7 +514,7 @@ async fn state_management() {
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
             function_class_code: include_bytes!("fixtures/state_test.wasm").to_vec(),
-            outputs: Vec::new(),
+            function_class_outputs: Vec::new(),
         },
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
