@@ -62,7 +62,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
                 poison_pill_receiver,
                 telemetry_handle,
                 guest_api_host,
-                spawn_req.code.function_class_inlude_code.clone(),
+                spawn_req.code.function_class_code.clone(),
                 data_plane,
                 serialized_state,
                 spawn_req.annotations.get("init-payload").map(|x| x.clone()),
