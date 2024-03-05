@@ -459,11 +459,7 @@ async fn main() -> anyhow::Result<()> {
                 invocation_url_announced: "".to_string(),
                 metrics_url: format!("http://{}:7103/", args.bind_address),
                 orchestrator_url: args.orchestrator_url,
-                http_ingress_url: "".to_string(),
-                http_ingress_provider: "".to_string(),
-                http_egress_provider: "".to_string(),
-                file_log_provider: "".to_string(),
-                redis_provider: "".to_string(),
+                resources: None,
             })
             .await
         });

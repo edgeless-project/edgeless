@@ -53,11 +53,13 @@ mod tests {
                         invocation_url_announced: "".to_string(),
                         metrics_url: format!("http://{}:{}", address, next_port()),
                         orchestrator_url: orchestrator_url.to_string(),
-                        http_ingress_url: "".to_string(),
-                        http_ingress_provider: "".to_string(),
-                        http_egress_provider: "".to_string(),
-                        file_log_provider: "file-log-1".to_string(),
-                        redis_provider: "".to_string(),
+                        resources: Some(edgeless_node::EdgelessNodeResourceSettings {
+                            http_ingress_url: None,
+                            http_ingress_provider: None,
+                            http_egress_provider: None,
+                            file_log_provider: Some("file-log-1".to_string()),
+                            redis_provider: None,
+                        }),
                     },
                     _ => {
                         edgeless_node::EdgelessNodeSettings::new_without_resources(&orchestrator_url, address, next_port(), next_port(), next_port())
