@@ -150,6 +150,8 @@ invocation_url = "http://127.0.0.1:7002"
 invocation_url_announced = ""
 metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://127.0.0.1:7011"
+
+[resources]
 http_ingress_url = "http://127.0.0.1:7035"
 http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"

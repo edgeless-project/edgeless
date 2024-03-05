@@ -34,21 +34,27 @@ pub struct EdgelessNodeSettings {
     pub metrics_url: String,
     /// The URL of the orchestrator to which this node registers.
     pub orchestrator_url: String,
+    /// Resource settings.
+    pub resources: Option<EdgelessNodeResourceSettings>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct EdgelessNodeResourceSettings {
     /// If `http_ingress_provider` is not empty, this is the URL of the
     /// HTTP web server exposed by the http-ingress resource for this node.
-    pub http_ingress_url: String,
+    pub http_ingress_url: Option<String>,
     /// If not empty, a http-ingress resource with the given name is created.
-    pub http_ingress_provider: String,
+    pub http_ingress_provider: Option<String>,
     /// If not empty, a http-egress resource with the given name is created.
-    pub http_egress_provider: String,
+    pub http_egress_provider: Option<String>,
     /// If not empty, a file-log resource with the given name is created.
     /// The resource will write on the local filesystem.
-    pub file_log_provider: String,
+    pub file_log_provider: Option<String>,
     /// If not empty, a redis resource with the given name is created.
     /// The resource will connect to a remote Redis server to update the
     /// value of a given given, as specified in the resource configuration
     /// at run-time.
-    pub redis_provider: String,
+    pub redis_provider: Option<String>,
 }
 
 impl EdgelessNodeSettings {
@@ -64,11 +70,7 @@ impl EdgelessNodeSettings {
             invocation_url_announced: invocation_url,
             metrics_url: format!("http://{}:{}", node_address, metrics_port),
             orchestrator_url: orchestrator_url.to_string(),
-            http_ingress_url: "".to_string(),
-            http_ingress_provider: "".to_string(),
-            http_egress_provider: "".to_string(),
-            file_log_provider: "".to_string(),
-            redis_provider: "".to_string(),
+            resources: None,
         }
     }
 }
@@ -149,7 +151,8 @@ pub async fn register_node(
 
 async fn fill_resources(
     data_plane: edgeless_dataplane::handle::DataplaneProvider,
-    settings: &EdgelessNodeSettings,
+    node_id: uuid::Uuid,
+    settings: &Option<EdgelessNodeResourceSettings>,
     provider_specifications: &mut Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
 ) -> std::collections::HashMap<
     String,
@@ -160,79 +163,81 @@ async fn fill_resources(
         Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
     >::new();
 
-    if !settings.http_ingress_url.is_empty() && !settings.http_ingress_provider.is_empty() {
-        log::info!("Creating resource 'http-ingress-1' at {}", &settings.http_ingress_url);
-        ret.insert(
-            settings.http_ingress_provider.clone(),
-            resources::http_ingress::ingress_task(
-                data_plane.clone(),
-                edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
-                settings.http_ingress_url.clone(),
-            )
-            .await,
-        );
-        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-            provider_id: settings.http_ingress_provider.clone(),
-            class_type: "http-ingress".to_string(),
-            outputs: vec!["new_request".to_string()],
-        });
-    }
-
-    if !settings.http_egress_provider.is_empty() {
-        log::info!("Creating resource 'http-egress-1'");
-        ret.insert(
-            settings.http_egress_provider.clone(),
-            Box::new(
-                resources::http_egress::EgressResourceProvider::new(
+    if let Some(settings) = settings {
+        if let (Some(http_ingress_url), Some(provider_id)) = (&settings.http_ingress_url, &settings.http_ingress_provider) {
+            log::info!("Creating resource '{}' at {}", provider_id, http_ingress_url);
+            ret.insert(
+                provider_id.clone(),
+                resources::http_ingress::ingress_task(
                     data_plane.clone(),
-                    edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
+                    edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                    http_ingress_url.clone(),
                 )
                 .await,
-            ),
-        );
-        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-            provider_id: settings.http_egress_provider.clone(),
-            class_type: "http-egress".to_string(),
-            outputs: vec![],
-        });
-    }
+            );
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id: provider_id.clone(),
+                class_type: "http-ingress".to_string(),
+                outputs: vec!["new_request".to_string()],
+            });
+        }
 
-    if !settings.file_log_provider.is_empty() {
-        log::info!("Creating resource 'file-log-1'");
-        ret.insert(
-            settings.file_log_provider.clone(),
-            Box::new(
-                resources::file_log::FileLogResourceProvider::new(
-                    data_plane.clone(),
-                    edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
-                )
-                .await,
-            ),
-        );
-        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-            provider_id: settings.file_log_provider.clone(),
-            class_type: "file-log".to_string(),
-            outputs: vec![],
-        });
-    }
+        if let Some(provider_id) = &settings.http_egress_provider {
+            log::info!("Creating resource '{}'", provider_id);
+            ret.insert(
+                provider_id.clone(),
+                Box::new(
+                    resources::http_egress::EgressResourceProvider::new(
+                        data_plane.clone(),
+                        edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                    )
+                    .await,
+                ),
+            );
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id: provider_id.clone(),
+                class_type: "http-egress".to_string(),
+                outputs: vec![],
+            });
+        }
 
-    if !settings.redis_provider.is_empty() {
-        log::info!("Creating resource 'redis-1'");
-        ret.insert(
-            settings.redis_provider.clone(),
-            Box::new(
-                resources::redis::RedisResourceProvider::new(
-                    data_plane.clone(),
-                    edgeless_api::function_instance::InstanceId::new(settings.node_id.clone()),
-                )
-                .await,
-            ),
-        );
-        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-            provider_id: settings.redis_provider.clone(),
-            class_type: "redis".to_string(),
-            outputs: vec![],
-        });
+        if let Some(provider_id) = &settings.file_log_provider {
+            log::info!("Creating resource '{}'", provider_id);
+            ret.insert(
+                provider_id.clone(),
+                Box::new(
+                    resources::file_log::FileLogResourceProvider::new(
+                        data_plane.clone(),
+                        edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                    )
+                    .await,
+                ),
+            );
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id: provider_id.clone(),
+                class_type: "file-log".to_string(),
+                outputs: vec![],
+            });
+        }
+
+        if let Some(provider_id) = &settings.redis_provider {
+            log::info!("Creating resource '{}'", provider_id);
+            ret.insert(
+                provider_id.clone(),
+                Box::new(
+                    resources::redis::RedisResourceProvider::new(
+                        data_plane.clone(),
+                        edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                    )
+                    .await,
+                ),
+            );
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id: provider_id.clone(),
+                class_type: "redis".to_string(),
+                outputs: vec![],
+            });
+        }
     }
 
     ret
@@ -296,7 +301,13 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     // Create the resources.
     let mut resource_provider_specifications = vec![];
-    let resources = fill_resources(data_plane.clone(), &settings, &mut resource_provider_specifications).await;
+    let resources = fill_resources(
+        data_plane.clone(),
+        settings.node_id,
+        &settings.resources,
+        &mut resource_provider_specifications,
+    )
+    .await;
 
     // Create the agent.
     let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.clone(), data_plane.clone());
@@ -320,6 +331,8 @@ invocation_url = "http://127.0.0.1:7002"
 invocation_url_announced = ""
 metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://127.0.0.1:7011"
+
+[resources]
 http_ingress_url = "http://127.0.0.1:7035"
 http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"
