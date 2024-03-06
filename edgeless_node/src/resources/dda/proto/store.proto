@@ -31,7 +31,7 @@ service StoreService {
   // Set sets the value for the given KeyValue pair. It overwrites any previous
   // value for that key.
   //
-  // If a value is not present, a gRPC error with status code INVALIDARGUMENT
+  // If a value is not present, a gRPC error with status code INVALID_ARGUMENT
   // (3) is signaled. Otherwise, if the operation fails, a gRPC error with
   // status code UNAVAILABLE (14) is signaled.
   rpc Set(KeyValue) returns (Ack);
@@ -48,6 +48,14 @@ service StoreService {
   // signaled.
   rpc DeleteAll(DeleteAllParams) returns (Ack);
 
+  // DeletePrefix deletes all of the keys (and values) that start with the given
+  // prefix. Key strings are ordered lexicographically by their underlying byte
+  // representation, i.e. UTF-8 encoding.
+  //
+  // If the operation fails, a gRPC error with status code UNAVAILABLE (14) is
+  // signaled.
+  rpc DeletePrefix(Key) returns (Ack);
+
   // DeleteRange deletes all of the keys (and values) in the right-open Range
   // [start,end) (inclusive on start, exclusive on end). Key strings are ordered
   // lexicographically by their underlying byte representation, i.e. UTF-8
@@ -57,12 +65,17 @@ service StoreService {
   // signaled.
   rpc DeleteRange(Range) returns (Ack);
 
-  // ScanPrefix iterates over key-value pairs whose keys match the given prefix
-  // Key in key order. Key strings are ordered lexicographically by their
+  // ScanPrefix iterates over key-value pairs whose keys start with the given
+  // prefix Key in key order. Key strings are ordered lexicographically by their
   // underlying byte representation, i.e. UTF-8 encoding.
   //
   // If the operation fails, a gRPC error with status code UNAVAILABLE (14) is
   // signaled.
+  //
+  // It is not safe to invoke Set, Delete, DeleteAll, DeletePrefix, and
+  // DeleteRange operations while receiving data from the stream as such calls
+  // may block until the stream is closed. Instead, accumulate key-value pairs
+  // and issue such operations after scanning is finished.
   rpc ScanPrefix(Key) returns (stream KeyValue);
 
   // ScanRange iterates over a given right-open Range of key-value pairs in key
@@ -75,6 +88,11 @@ service StoreService {
   //
   // If the operation fails, a gRPC error with status code UNAVAILABLE (14) is
   // signaled.
+  //
+  // It is not safe to invoke Set, Delete, DeleteAll, DeletePrefix, and
+  // DeleteRange operations while receiving data from the stream as such calls
+  // may block until the stream is closed. Instead, accumulate key-value pairs
+  // and issue such operations after scanning is finished.
   rpc ScanRange(Range) returns (stream KeyValue);
 }
 
