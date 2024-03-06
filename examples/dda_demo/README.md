@@ -50,7 +50,8 @@ For convenience you can simply call `build_demo_functions.sh`in the `scripts` fo
 ### Data Distribution Agent (DDA) - Setup the DDA environment for EDGELESS
 
 1. Run MQTT Broker
-1. Configure MQTT Broker in DDA `dda.yaml` and mock functions. 
+1. Configure MQTT Broker in DDA `dda.yaml` and mock functions.
+1. Run a DDA sidecar e.g. bei running `run_dda.sh`in the `scripts` folder.
 
 ## Run the demo
 

@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: MIT
 
 # start dda and broker
-echo "Install dda via go...\n"
+echo "Install dda via go..."
 go install github.com/coatyio/dda/cmd/dda@latest
 
-echo "Start a dda (note: make sure a MQTT broker is running)...\n"
+echo "Start a dda (note: make sure a MQTT broker is running)..."
 dda -c ../dda.yaml

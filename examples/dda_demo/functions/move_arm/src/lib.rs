@@ -47,7 +47,7 @@ impl EdgeFunction for MoveArmFun {
             Err(e) => log::info!("MoveArmFun: Received invalid UTF-8 data {}", e),
         }
         
-        let res = call("dda", b"move_arm");
+        let res = call("dda", b"dda_move_arm");
 
         if let CallRet::Reply(response) = res {
             match std::str::from_utf8(&response) {
@@ -61,6 +61,7 @@ impl EdgeFunction for MoveArmFun {
     fn handle_init(_payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         // TODO: register events that should trigger this function here using
         // API of dda
+        edgeless_function::init_logger();
         log::info!("MoveArmFun: 'Init' called");
     }
 

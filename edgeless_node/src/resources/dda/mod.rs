@@ -4,7 +4,7 @@
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use edgeless_api::{function_instance::InstanceId, resource_configuration::ResourceConfigurationAPI};
 use edgeless_dataplane::handle::DataplaneProvider;
-use std::sync::Arc;
+use std::{str::from_utf8, sync::Arc};
 use tokio::sync::Mutex;
 
 // imports the generated proto file for dda
@@ -45,7 +45,7 @@ impl DDAResource {
     async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, dda_url: String) -> Self {
         let mut dataplane_handle = dataplane_handle;
 
-        // connect the gRPC client to the server
+        // connect the DDAResource gRPC client to the DDA sidecar server
         log::info!("Trying to connect to the DDA sidecar at url={}", dda_url.clone());
         let mut dda_client = match dda_com::com_service_client::ComServiceClient::connect(dda_url.clone()).await {
             Ok(client) => client,
@@ -54,20 +54,64 @@ impl DDAResource {
                 panic!("Failed to connect to the DDA sidecar: {}", err);
             }
         };
-        log::info!("DDA singleton resource created, connected to the sidecar at url={}", dda_url);
+        log::info!("DDA singleton resource created, connected to the DDA sidecar at url={}", dda_url);
+
+        // SETUP exemplary subscription for temperature to DDA
+        // TODO: integrate subscription management for functions 
+
+        let mut dda_subscription_filter = dda_com::SubscriptionFilter::default();
+        dda_subscription_filter.r#type = "com.edgeless.temperature".to_string();
+
+        // let mut current_temperature = "0";
+        
+        let mut dda_temp_subcription_stream = match dda_client.subscribe_event(dda_subscription_filter).await {
+            Ok(dda_resp) => {
+                log::info!("Subscription successfull");
+                dda_resp.into_inner()
+            },
+            Err(err) => {
+                log::error!("Subscription failed {}", err);
+                panic!("Subscription failed {}", err);
+            }
+        };
+
+        let _sub_task = tokio::spawn(async move {
+            loop {
+                match dda_temp_subcription_stream.message().await {
+                    Ok(evt) => {
+                        let evt_d = evt.unwrap().data;
+                        match from_utf8(&evt_d) {
+                            Ok(str) => {
+                                //current_temperature = str.clone();
+                                log::info!("Temperature from subscription {}", str);
+                                // TODO set current temperature current_temperature = from_utf8(str).expect("String for temperature");
+                            },
+                            Err(_) => {
+                                log::error!("Subscription event parser error");
+                            }
+                        };
+                    },
+                    Err(_) => {
+                        log::error!("Subscription event parser error");
+                    }
+                };
+                
+            }
+        });
+        // END SETUP SOME SUBSCRIPTIONS TO DDA
 
         // handle dataplane events for dda resource
         // unused, since we never want to stop the dda sidecar (singleton)
         let _dda_task = tokio::spawn(async move {
             loop {
-                log::info!("dda waiting for dataplane events");
+                log::info!("Waiting for dataplane events");
                 let edgeless_dataplane::core::DataplaneEvent {
                     source_id,
                     channel_id,
                     message,
                 } = dataplane_handle.receive_next().await;
 
-                log::info!("dda received a dataplane event!");
+                log::info!("Received a dataplane event");
 
                 let mut need_reply = false;
                 let message_data = match message {
@@ -85,15 +129,21 @@ impl DDAResource {
                 // forward to the dda sidecar
                 match message_data.as_str() {
                     // Example for DDA subscribing to a varying number of events (x)
-                    "read_temperature" => {
+                    "dda_read_temperature" => {
+                        log::info!("Read_temperature called");
                         // TODO: listen for x temperature readings and return
                         // them as a vector
-                        log::info!("read_temperature called");
+                        // subscribe DDA event
+                        // onEvent we call back to the function callee
+                        dataplane_handle
+                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("too_hot".to_string()))
+                            .await;
+
                     }
                     // Example for a DDA request/response pattern using Action
-                    "move_arm" => {
+                    "dda_move_arm" => {
                         let mut request = dda_com::Action::default();
-                        log::info!("move_arm called");
+                        log::info!("Move_arm called");
                         request.r#type = "com.edgeless.moveRobotArm".to_string();
                         request.id = "0".to_string();
                         request.source = "r2d2".to_string();
@@ -101,7 +151,7 @@ impl DDAResource {
                         let stream = dda_client.publish_action(request).await;
                         match stream {
                             Ok(responses) => {
-                                println!("dda action worked!");
+                                log::info!("DDA com.edgeless.moveRobotArm action successfully executed");
                                 let response = responses.into_inner().message().await;
                                 match response {
                                     Ok(_response) => {
@@ -130,17 +180,17 @@ impl DDAResource {
                                                 .await;
                                         }
                                     }
-                                    Err(e) => println!("gRPC error {}", e),
+                                    Err(e) => log::error!("gRPC error {}", e),
                                 }
                             }
                             Err(status) => {
-                                println!("gRPC error {}", status);
+                                log::error!("gRPC error {}", status);
                             }
                         }
                     }
                     // TODO: add an example for a query service
                     _ => {
-                        log::info!("dda resource only supports call / cast to test for now");
+                        log::info!("DDA resource only supports call / cast to test for now");
                         continue;
                     }
                 }

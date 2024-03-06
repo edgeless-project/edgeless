@@ -7,10 +7,12 @@ struct CheckTemperatureFun;
 
 impl EdgeFunction for CheckTemperatureFun {
     fn handle_cast(_source: InstanceId, encoded_message: &[u8]) {
+        log::info!("CheckTemperatureFun: handle_cast called");
         if encoded_message == b"routine_temperature_check" {
             log::info!("CheckTemperatureFun: Starting the routine temperature check");
             // call the dda to check the temperature
-            let temperature_readings = call("dda", b"check_temperature");
+            let temperature_readings = call("dda", b"dda_read_temperature");
+            // let temperature_readings = call("dda", b"move_arm");
             match temperature_readings {
                 CallRet::Reply(msg) => match std::str::from_utf8(&msg) {
                     Ok("too_hot") => {
@@ -24,12 +26,12 @@ impl EdgeFunction for CheckTemperatureFun {
                     }
                     Err(_) => log::info!("CheckTemperatureFun: Received invalid UTF-8 data"),
                 },
-                CallRet::NoReply => log::info!("dda noreply"),
-                CallRet::Err => log::info!("dda err"),
+                CallRet::NoReply => log::info!("CheckTemperatureFun: dda noreply"),
+                CallRet::Err => log::info!("CheckTemperatureFun: dda err"),
             }
-            // Periodically, every 5 seconds invokes itself
-            delayed_cast(5000, "self", b"routine_temperature_check")
         }
+        // Periodically, every 5 seconds invokes itself
+        delayed_cast(5000, "self", b"routine_temperature_check")
     }
 
     fn handle_call(_source: InstanceId, _encoded_message: &[u8]) -> CallRet {
@@ -40,6 +42,7 @@ impl EdgeFunction for CheckTemperatureFun {
     }
 
     fn handle_init(_payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
+        edgeless_function::init_logger();
         // Periodically, every 5 seconds invokes itself        edgeless_function::init_logger();
         log::info!("CheckTemperatureFun: 'Init' called. It will invoke itself every 5 seconds to check for too high temperatures");
 

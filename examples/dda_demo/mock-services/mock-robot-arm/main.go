@@ -22,17 +22,17 @@ var isRoboticArmUp = false
 func acceptActions(ctx context.Context) {
 	events, err := inst.SubscribeAction(ctx, api.SubscriptionFilter{Type: measurementType})
 	if err != nil {
-		println("Failed to subscribe to events for arm movement")
+		println("Failed to subscribe to DDA events for arm movement")
 	}
 	for action := range events {
-		println("received an action to move the robotic arm")
+		println("Deceived an action to move the robotic arm from DDA")
 
 		time.Sleep(2 * time.Second) // artificial delay
 		isRoboticArmUp = !isRoboticArmUp
 		if isRoboticArmUp {
-			println("Beep boop. Robotic arm is now up!")
+			println("Beep boop. Robotic arm is now UP!")
 		} else {
-			println("Beep boop. Robotic arm is now down!")
+			println("Beep boop. Robotic arm is now DOWN!")
 		}
 
 		action.Callback(api.ActionResult{
@@ -46,7 +46,6 @@ func acceptActions(ctx context.Context) {
 func main() {
 	cfg := config.New()
 	cfg.Identity.Name = "mock-robot-arm"
-	cfg.Cluster = "edgeless-demo"
 	cfg.Apis.Grpc.Disabled = true
 	cfg.Apis.GrpcWeb.Disabled = true
 	cfg.Services.Com.Protocol = "mqtt5"
@@ -61,12 +60,12 @@ func main() {
 	// open the instance
 	open_err := inst.Open(10 * time.Second)
 	if open_err != nil {
-		println("could not open instance" + open_err.Error())
+		println("Could not open DDA instance" + open_err.Error())
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	println("starting to accept actions to move my robotic arm")
+	println("Starting to accept actions to move my robotic arm from DDA")
 	go acceptActions(ctx)
 
 	// This is needed to keep the connection alive

@@ -13,3 +13,4 @@ vendor/
 secrets/
 .venv
 .DS_Store
+*.log

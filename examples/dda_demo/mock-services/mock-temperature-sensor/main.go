@@ -45,7 +45,6 @@ func publishSensorData() {
 func main() {
 	cfg := config.New()
 	cfg.Identity.Name = "mock-temperature-sensor"
-	cfg.Cluster = "edgeless-demo"
 	cfg.Apis.Grpc.Disabled = true
 	cfg.Apis.GrpcWeb.Disabled = true
 	cfg.Services.Com.Protocol = "mqtt5"
