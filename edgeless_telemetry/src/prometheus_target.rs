@@ -64,8 +64,8 @@ impl PrometheusEventTarget {
                 async move {
                     let mut buffer = String::new();
                     match prometheus_client::encoding::text::encode(&mut buffer, &*cloned.lock().await) {
-                        Ok(_) => Ok(warp::http::Response::builder().body(buffer)),
-                        Err(_) => Ok(warp::http::Response::builder().status(500).body("".to_string())),
+                        Ok(_) => warp::http::Response::builder().body(buffer),
+                        Err(_) => warp::http::Response::builder().status(500).body("".to_string()),
                     }
                 }
             });

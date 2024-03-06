@@ -1,22 +1,24 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use edgeless_function::api::*;
+use edgeless_function::*;
 use edgeless_http::*;
 
 struct HttpReadNumberFun;
 
-impl Edgefunction for HttpReadNumberFun {
-    fn handle_cast(_src: InstanceId, _encoded_message: String) {}
+impl EdgeFunction for HttpReadNumberFun {
+    fn handle_cast(_src: InstanceId, _encoded_message: &[u8]) {}
 
-    fn handle_call(_src: InstanceId, encoded_message: String) -> CallRet {
-        log::info!("http_read_number: 'Call' called, MSG: {}", encoded_message);
-        let req: EdgelessHTTPRequest = edgeless_http::request_from_string(&encoded_message).unwrap();
+    fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
+        let str_message = core::str::from_utf8(encoded_message).unwrap();
+
+        log::info!("http_read_number: 'Call' called, MSG: {}", str_message);
+        let req: EdgelessHTTPRequest = edgeless_http::request_from_string(&str_message).unwrap();
 
         let res_params = if req.path == "/read_number" {
             if let Some(body) = req.body {
                 if let Ok(content) = String::from_utf8(body) {
                     if let Ok(_) = content.parse::<i32>() {
-                        cast("parsed_value", &content);
+                        cast("parsed_value", content.as_bytes());
                         (200, None)
                     } else {
                         (400, Some(Vec::<u8>::from("body does not contain an integer")))
@@ -37,10 +39,10 @@ impl Edgefunction for HttpReadNumberFun {
             headers: std::collections::HashMap::<String, String>::new(),
         };
 
-        CallRet::Reply(edgeless_http::response_to_string(&res))
+        CallRet::Reply(OwnedByteBuff::new_from_slice(edgeless_http::response_to_string(&res).as_bytes()))
     }
 
-    fn handle_init(_payload: String, _serialized_state: Option<String>) {
+    fn handle_init(_payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();
         log::info!("http_read_number: 'Init' called");
     }

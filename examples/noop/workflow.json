@@ -6,7 +6,7 @@
                 "id": "noop",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./noop_function/noop.wasm",
+                "code": "./noop_function/noop.wasm",
                 "outputs": []
             },
             "output_mapping": {},

@@ -2,9 +2,15 @@
 # SPDX-License-Identifier: MIT
 [workspace]
 
+[profile.dev]
+panic = "abort"
+
 [profile.release]
 lto = true
-opt-level = "s"
+opt-level = "z"
+panic = "abort"
+codegen-units = 1
+strip = true
 
 [package]
 name = "message_generator"
@@ -22,3 +28,4 @@ edgeless_function = { path = "../../../edgeless_function" }
 serde = {version="1", features=["derive"] }
 serde_json = "1"
 log = "0.4"
+uuid = "1.7.0"

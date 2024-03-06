@@ -6,7 +6,7 @@
                 "id": "matrix_mul",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./matrix_mul.wasm",
+                "code": "./matrix_mul.wasm",
                 "outputs": [
                     "metric",
                     "out-0",

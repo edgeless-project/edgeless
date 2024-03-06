@@ -6,7 +6,7 @@
                 "id": "ponger",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./pong/ponger.wasm",
+                "code": "./pong/ponger.wasm",
                 "outputs": [
                     "ping"
                 ]
@@ -22,7 +22,7 @@
                 "id": "pinger",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./ping/pinger.wasm",
+                "code": "./ping/pinger.wasm",
                 "outputs": [
                     "ponger"
                 ]

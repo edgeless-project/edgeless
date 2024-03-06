@@ -11,7 +11,7 @@ RUN echo '%wheel ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 RUN su $USERNAME -l -c "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
 RUN su $USERNAME -l -c "rustup target add wasm32-unknown-unknown"
-RUN su $USERNAME -l -c "cargo install wasm-tools cargo-generate ldproxy espup espflash cargo-espflash"
+RUN su $USERNAME -l -c "cargo install wasm-tools wasm-opt cargo-generate ldproxy espup espflash cargo-espflash"
 
 # These are lightweight and nice to have anyways
 # to get further enhancments, run the scripts/enhance_dev_container.sh script

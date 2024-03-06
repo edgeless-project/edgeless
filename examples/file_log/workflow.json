@@ -6,7 +6,7 @@
                 "id": "message_generator",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./message_generator/message_generator.wasm",
+                "code": "./message_generator/message_generator.wasm",
                 "outputs": []
             },
             "output_mapping": {

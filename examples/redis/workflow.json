@@ -6,7 +6,7 @@
                 "id": "counter",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./counter/counter.wasm",
+                "code": "./counter/counter.wasm",
                 "outputs": []
             },
             "output_mapping": {

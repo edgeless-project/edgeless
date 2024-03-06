@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
-use edgeless_function::api::*;
+use edgeless_function::*;
 
 struct MatrixMulFunction;
 
@@ -33,25 +33,25 @@ struct State {
 static CONF: std::sync::OnceLock<Conf> = std::sync::OnceLock::new();
 static STATE: std::sync::OnceLock<std::sync::Mutex<State>> = std::sync::OnceLock::new();
 
-impl Edgefunction for MatrixMulFunction {
-    fn handle_cast(_src: InstanceId, encoded_message: String) {
+impl EdgeFunction for MatrixMulFunction {
+    fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
         let conf = CONF.get().unwrap();
-        // log::info!("MatrixMul casted, wf {}, fun {}, MSG: {}", conf.wf_name, conf.fun_name, encoded_message);
+        // log::info!("MatrixMul casted, wf {}, fun {}, MSG: {:?}", conf.wf_name, conf.fun_name, encoded_message);
         let mut state = STATE.get().unwrap().lock().unwrap();
 
         // Schedule the next transaction.
         let id = match conf.is_first {
             true => {
                 if conf.inter_arrival > 0 {
-                    delayed_cast(conf.inter_arrival, "self", "");
+                    delayed_cast(conf.inter_arrival, "self", b"");
                 }
-                cast("metric", format!("workflow:start:{}:{}", conf.wf_name, state.next_id).as_str());
+                cast("metric", format!("workflow:start:{}:{}", conf.wf_name, state.next_id).as_bytes());
                 state.next_id += 1;
                 state.next_id - 1
             }
-            false => encoded_message.parse::<usize>().unwrap_or(0),
+            false => core::str::from_utf8(encoded_message).unwrap_or("0").parse::<usize>().unwrap_or(0),
         };
-        cast("metric", format!("function:start:{}:{}:{}", conf.wf_name, conf.fun_name, id).as_str());
+        cast("metric", format!("function:start:{}:{}:{}", conf.wf_name, conf.fun_name, id).as_bytes());
 
         // Fill a new matrix with random numbers.
         let n = conf.matrix_size;
@@ -74,27 +74,34 @@ impl Edgefunction for MatrixMulFunction {
 
         // Save metrics at the end of the execution.
         if conf.is_last {
-            cast("metric", format!("workflow:end:{}:{}", conf.wf_name, id).as_str());
+            cast("metric", format!("workflow:end:{}:{}", conf.wf_name, id).as_bytes());
         }
-        cast("metric", format!("function:end:{}:{}:{}", conf.wf_name, conf.fun_name, id).as_str());
+        cast("metric", format!("function:end:{}:{}:{}", conf.wf_name, conf.fun_name, id).as_bytes());
 
         // Call outputs
         for output in &conf.outputs {
-            cast(output, format!("{}", id).as_str());
+            cast(output, format!("{}", id).as_bytes());
         }
     }
 
-    fn handle_call(_src: InstanceId, _encoded_message: String) -> CallRet {
+    fn handle_call(_src: InstanceId, _encoded_message: &[u8]) -> CallRet {
         log::info!("MatrixMul called: ignored");
-        CallRet::Noreply
+        CallRet::NoReply
     }
 
     // example of payload:
     // seed=42,inter_arrival=2000,is_first=true,is_last=false,wf_name=my_workflow,fun_name=my_function,matrix_size=1000,outputs=0:2:19
-    fn handle_init(payload: String, _serialized_state: Option<String>) {
+    fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();
-        log::info!("MatrixMul initialized, payload: {}", payload);
-        let arguments = edgeless_function::parse_init_payload(&payload);
+        log::info!("MatrixMul initialized, payload: {:?}", payload);
+        
+
+        let arguments = if let Some(payload) = payload {
+            let str_payload = core::str::from_utf8(payload).unwrap();
+            edgeless_function::parse_init_payload(str_payload)
+        } else {
+            std::collections::HashMap::new()
+        };
 
         let seed = arguments.get("seed").unwrap_or(&"0").parse::<u32>().unwrap_or(0);
 
@@ -133,7 +140,7 @@ impl Edgefunction for MatrixMulFunction {
         let _ = STATE.set(std::sync::Mutex::new(State { next_id: 0, lcg, matrix }));
 
         if is_first {
-            delayed_cast(1000, "self", "");
+            delayed_cast(1000, "self", b"");
         }
     }
 

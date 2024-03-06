@@ -2,9 +2,15 @@
 # SPDX-License-Identifier: MIT
 [workspace]
 
+[profile.dev]
+panic = "abort"
+
 [profile.release]
 lto = true
-opt-level = "s"
+opt-level = "z"
+panic = "abort"
+codegen-units = 1
+strip = true
 
 [package]
 name = "edgeless_sample_http_write_number"

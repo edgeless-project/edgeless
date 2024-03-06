@@ -18,7 +18,7 @@ mean in more detail further down).
                 "id": "http_processor",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./compiled_function.wasm",
+                "code": "./compiled_function.wasm",
                 "outputs": ["success_cb", "failure_cb"] 
             },
             "output_mapping": { // defines a mapping of output channels to logical names of functions/resources in this workflow
@@ -33,7 +33,7 @@ mean in more detail further down).
                 "id": "http_processor2",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./processing_function2/http_processor2.wasm",
+                "code": "./processing_function2/http_processor2.wasm",
                 "outputs": []
             },
             "output_mapping": {},
@@ -77,7 +77,7 @@ contains the following elements:
     * `id`, `version`, and `function_type` uniquely identify the function,
       similar to what happens with docker containers, this can be used to
       fetch the function from a repository.
-    * `include_code_file` specifies the location on the local filesystem
+    * `code` specifies the location on the local filesystem
       of the client of the WebAssembly bytecode that contains the function
       logic
     * `outputs` specifies which output channels are used within the function
