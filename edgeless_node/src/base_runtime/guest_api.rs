@@ -13,6 +13,7 @@ pub struct GuestAPIHost {
 
 /// Errors to be reported by the host side of the guest binding.
 /// This may need to be bridged into the runtime by the virtualization-specific runtime implementation.
+#[derive(Debug)]
 pub enum GuestAPIError {
     UnknownAlias,
 }

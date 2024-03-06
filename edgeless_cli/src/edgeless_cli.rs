@@ -133,15 +133,15 @@ async fn main() -> anyhow::Result<()> {
                                         let p = std::path::Path::new(&spec_file)
                                             .parent()
                                             .unwrap()
-                                            .join(func_spec.class_specification.include_code_file.unwrap());
+                                            .join(func_spec.class_specification.code.unwrap());
                                         edgeless_api::workflow_instance::WorkflowFunction {
                                             name: func_spec.name,
                                             function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
                                                 function_class_id: func_spec.class_specification.id,
                                                 function_class_type: func_spec.class_specification.function_type,
                                                 function_class_version: func_spec.class_specification.version,
-                                                function_class_inlude_code: std::fs::read(p).unwrap(),
-                                                outputs: func_spec.class_specification.outputs,
+                                                function_class_code: std::fs::read(p).unwrap(),
+                                                function_class_outputs: func_spec.class_specification.outputs,
                                             },
                                             output_mapping: func_spec.output_mapping,
                                             annotations: func_spec.annotations,
@@ -266,15 +266,17 @@ async fn main() -> anyhow::Result<()> {
                         .to_str()
                         .unwrap()
                         .to_string();
+
                     match platform {
                         Platform::WASM => println!(
                             "{:?}",
-                            std::process::Command::new("wasm-tools")
-                                .args(["component", "new", &raw_result, "-o", &out_file])
+                            std::process::Command::new("wasm-opt")
+                                .args(["-Oz", &raw_result, "-o", &out_file])
                                 .status()?
                         ),
                         _ => fs::write(&out_file, &raw_result).expect("Unable to write file"),
                     }
+
                 }
                 FunctionCommands::Invoke {
                     event_type,

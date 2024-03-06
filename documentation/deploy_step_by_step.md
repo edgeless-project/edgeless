@@ -150,6 +150,8 @@ invocation_url = "http://127.0.0.1:7002"
 invocation_url_announced = ""
 metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://127.0.0.1:7011"
+
+[resources]
 http_ingress_url = "http://127.0.0.1:7035"
 http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"
@@ -221,7 +223,7 @@ The simplest workflow consists of a single function, which does not interact wit
                 "id": "noop",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./noop_function/noop.wasm",
+                "code": "./noop_function/noop.wasm",
                 "outputs": []
             },
             "output_mapping": {},

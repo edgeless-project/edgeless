@@ -1,44 +1,57 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+#![cfg_attr(not(feature = "std"), no_std)]
+
+#[cfg(feature = "std")]
 pub mod lcg;
 
-pub mod api {
-    wit_bindgen::generate!({world: "edgefunction", macro_export, export_macro_name: "export"});
+/// Provides the FunctionSpecific exports (using the crate-global `export` macro).
+/// Other exported functions come from the `memory` module.
+pub mod export;
+
+/// These functions are imported by the WASM module.
+pub mod imports;
+
+/// Provides a memory managment wrapper for data that was passed by the host and must be freed outside of the internal functions of this crate.
+/// Mostly exists to only require one abstraction for both std and no_std mode.
+pub mod owned_data;
+pub use owned_data::OwnedByteBuff;
+
+/// Provides a log-crate-compatible logger passing the logs the host.
+/// The reexported `init_logger` function must be called (e.g., in the init function) for the `log` macros the work.
+pub mod logging;
+pub use logging::init_logger;
+
+/// Provides the memory management functions required by the host to pass data to the WASM environment.
+/// These functions are exported by the WASM module.
+pub mod memory;
+
+/// Provides the (reeported) functions that enable the edgeless actors to interact with the outside world.
+pub mod output_api;
+pub use output_api::*;
+
+pub enum CallRet {
+    NoReply,
+    Reply(owned_data::OwnedByteBuff),
+    Err,
 }
 
-pub fn rust_to_api(lvl: log::Level) -> String {
-    match lvl {
-        log::Level::Trace => "Trace".to_string(),
-        log::Level::Debug => "Debug".to_string(),
-        log::Level::Info => "Info".to_string(),
-        log::Level::Warn => "Warn".to_string(),
-        log::Level::Error => "Error".to_string(),
-    }
+pub struct InstanceId {
+    /// UUID node_id
+    pub node_id: [u8; 16],
+    /// UUID component_id
+    pub component_id: [u8; 16],
 }
 
-struct Logger;
-
-impl log::Log for Logger {
-    fn enabled(&self, _metadata: &log::Metadata) -> bool {
-        true
-    }
-
-    fn log(&self, record: &log::Record) {
-        if self.enabled(record.metadata()) {
-            api::telemetry_log(&rust_to_api(record.level()), record.target(), &record.args().to_string());
-        }
-    }
-
-    fn flush(&self) {}
+pub trait EdgeFunction {
+    fn handle_cast(src: InstanceId, encoded_message: &[u8]);
+    fn handle_call(src: InstanceId, encoded_message: &[u8]) -> CallRet;
+    fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>);
+    fn handle_stop();
 }
 
-static LOGGER: Logger = Logger;
-
-pub fn init_logger() {
-    log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug)).unwrap();
-}
-
+#[cfg(feature = "std")]
 pub fn parse_init_payload(payload: &str) -> std::collections::HashMap<&str, &str> {
     let tokens = payload.split(',');
     let mut arguments = std::collections::HashMap::new();
@@ -61,6 +74,7 @@ pub fn parse_init_payload(payload: &str) -> std::collections::HashMap<&str, &str
 mod test {
     use super::*;
 
+    #[cfg(feature = "std")]
     #[test]
     fn test_parse_init_payload() {
         assert_eq!(
