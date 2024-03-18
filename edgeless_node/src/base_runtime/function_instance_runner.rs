@@ -13,14 +13,14 @@ use super::{FunctionInstance, FunctionInstanceError};
 pub struct FunctionInstanceRunner<FunctionInstanceType: FunctionInstance> {
     task_handle: Option<tokio::task::JoinHandle<()>>,
     alias_mapping: super::alias_mapping::AliasMapping,
-    poison_pill_sender: Option<futures::channel::oneshot::Sender<()>>,
+    poison_pill_sender: tokio::sync::broadcast::Sender<()>,
     _instance: PhantomData<FunctionInstanceType>,
 }
 
 /// This is a runnable object (with all required state) actually executing a function.
 /// It is managed/owned by a FunctionInstanceRunner, which also runs it using a tokio task.
 struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
-    poison_pill_receiver: Option<futures::channel::oneshot::Receiver<()>>,
+    poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
     function_instance: Option<Box<FunctionInstanceType>>,
     guest_api_host: Option<super::guest_api::GuestAPIHost>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
@@ -46,7 +46,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
 
         let alias_mapping = super::alias_mapping::AliasMapping::new();
         // alias_mapping.update(spawn_req.output_mapping).await;
-        let (poison_pill_sender, poison_pill_receiver) = futures::channel::oneshot::channel::<()>();
+        let (poison_pill_sender, poison_pill_receiver) = tokio::sync::broadcast::channel::<()>(1);
         let serialized_state = state_handle.get().await;
 
         let guest_api_host = crate::base_runtime::guest_api::GuestAPIHost {
@@ -55,6 +55,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
             callback_table: alias_mapping.clone(),
             state_handle: state_handle,
             telemetry_handle: telemetry_handle.fork(std::collections::BTreeMap::new()),
+            poison_pill_receiver: poison_pill_sender.subscribe(),
         };
 
         let task = Box::new(
@@ -80,15 +81,14 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         Self {
             task_handle: Some(task_handle),
             alias_mapping: alias_mapping,
-            poison_pill_sender: Some(poison_pill_sender),
+            poison_pill_sender: poison_pill_sender,
             _instance: PhantomData {},
         }
     }
 
     pub async fn stop(&mut self) {
-        if let Some(poison_pill_sender) = self.poison_pill_sender.take() {
-            poison_pill_sender.send(()).unwrap();
-        }
+        self.poison_pill_sender.send(()).unwrap();
+
         if let Some(handle) = self.task_handle.take() {
             handle.await.unwrap();
         }
@@ -101,7 +101,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
 
 impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstanceType> {
     pub async fn new(
-        poison_pill_receiver: futures::channel::oneshot::Receiver<()>,
+        poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         guest_api_host: super::guest_api::GuestAPIHost,
         code: Vec<u8>,
@@ -112,7 +112,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         instance_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {
-            poison_pill_receiver: Some(poison_pill_receiver),
+            poison_pill_receiver: poison_pill_receiver,
             function_instance: None,
             guest_api_host: Some(guest_api_host),
             telemetry_handle: telemetry_handle,
@@ -174,11 +174,11 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     }
 
     async fn processing_loop(&mut self) -> Result<(), super::FunctionInstanceError> {
-        let mut poison_pill_recv = Box::pin(self.poison_pill_receiver.take().ok_or(super::FunctionInstanceError::InternalError)?).fuse();
+        // let mut poison_pill_recv = Box::pin(self.poison_pill_receiver.recv()).fuse();
         loop {
             futures::select! {
                 // Given each function instance is an independent task, the runtime needs to send a poison pill to cleanly stop it (processed here)
-                _ = poison_pill_recv => {
+                _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
                     return self.stop().await;
                 },
                 // Receive a normal event from the dataplane and invoke the function instance
