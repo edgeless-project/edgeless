@@ -23,3 +23,4 @@ serde_json = "1.0"
 clap = { version = "4.3", features=["derive"] }
 toml = "0.7"
 edgeless_api = {path = "../edgeless_api", features = ["grpc_impl"]}
+pin-project = "1"

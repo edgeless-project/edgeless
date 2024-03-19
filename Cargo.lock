@@ -1293,6 +1293,7 @@ dependencies = [
  "env_logger",
  "futures",
  "log",
+ "pin-project",
  "serde",
  "serde_json",
  "tokio",
