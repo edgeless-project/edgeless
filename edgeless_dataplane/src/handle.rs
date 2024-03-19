@@ -3,6 +3,9 @@
 // SPDX-License-Identifier: MIT
 use futures::{SinkExt, StreamExt};
 
+use futures::Future;
+use pin_project::{pin_project, pinned_drop};
+
 use crate::core::*;
 use crate::node_local::*;
 use crate::remote_node::*;
@@ -16,6 +19,7 @@ pub struct DataplaneHandle {
     output_chain: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn DataPlaneLink>>>>,
     receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
     next_id: u64,
+    temp_sub_removal_channel: futures::channel::mpsc::UnboundedSender<u64>,
 }
 
 impl DataplaneHandle {
@@ -29,43 +33,54 @@ impl DataplaneHandle {
             temporary_receivers: std::collections::HashMap::new(),
         }));
 
+        let (temp_sub_sender, mut temp_sub_receiver) = futures::channel::mpsc::unbounded::<u64>();
+
         let clone_overwrites = receiver_overwrites.clone();
         // This task intercepts the messages received and routes responses towards temporary receivers while routing other events towards the main receiver used in `receive_next`.
         tokio::spawn(async move {
             let mut receiver = receiver;
             let mut main_sender = main_sender;
             loop {
-                if let Some(DataplaneEvent {
-                    source_id,
-                    channel_id,
-                    message,
-                }) = receiver.next().await
-                {
-                    if let Some(sender) = clone_overwrites.lock().await.temporary_receivers.get_mut(&channel_id) {
-                        if let Some(sender) = sender.take() {
-                            match sender.send((source_id, message.clone())) {
-                                Ok(_) => {
-                                    continue;
-                                }
-                                Err(_) => {
-                                    log::error!("Tried to use expired overwrite send handle.");
-                                }
-                            }
-                        } else {
-                            log::error!("Tried to use expired overwrite send handle.");
+                futures::select! {
+                    removal = temp_sub_receiver.next() => {
+                        if let Some(removal) = removal {
+                            clone_overwrites.lock().await.temporary_receivers.remove(&removal);
                         }
-                    }
-                    match main_sender
-                        .send(DataplaneEvent {
+                    },
+                    m = receiver.next() => {
+                        if let Some(DataplaneEvent {
                             source_id,
                             channel_id,
                             message,
-                        })
-                        .await
-                    {
-                        Ok(_) => {}
-                        Err(_) => {
-                            break;
+                        }) = m
+                        {
+                            if let Some(sender) = clone_overwrites.lock().await.temporary_receivers.get_mut(&channel_id) {
+                                if let Some(sender) = sender.take() {
+                                    match sender.send((source_id, message.clone())) {
+                                        Ok(_) => {
+                                            continue;
+                                        }
+                                        Err(_) => {
+                                            log::error!("Tried to use expired overwrite send handle.");
+                                        }
+                                    }
+                                } else {
+                                    log::error!("Tried to use expired overwrite send handle.");
+                                }
+                            }
+                            match main_sender
+                                .send(DataplaneEvent {
+                                    source_id,
+                                    channel_id,
+                                    message,
+                                })
+                                .await
+                            {
+                                Ok(_) => {}
+                                Err(_) => {
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
@@ -78,6 +93,7 @@ impl DataplaneHandle {
             output_chain: std::sync::Arc::new(tokio::sync::Mutex::new(output_chain)),
             receiver_overwrites,
             next_id: 1,
+            temp_sub_removal_channel: temp_sub_sender,
         }
     }
 
@@ -112,19 +128,30 @@ impl DataplaneHandle {
 
     // Send a `call` event and wait for the return event.
     // Internally, this sets up a receiver override to handle the message before it would be sent to the `receive_next` function.
-    pub async fn call(&mut self, target: edgeless_api::function_instance::InstanceId, msg: String) -> CallRet {
-        let (send, rec) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
+    pub fn call<'a>(&'a mut self, target: edgeless_api::function_instance::InstanceId, msg: String) -> impl Future<Output = CallRet> + 'a {
         let channel_id = self.next_id;
         self.next_id += 1;
-        self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, Some(send));
-        self.send_inner(target, Message::Call(msg), channel_id).await;
-        match rec.await {
-            Ok((_src, msg)) => match msg {
-                Message::CallRet(ret) => CallRet::Reply(ret),
-                Message::CallNoRet => CallRet::NoReply,
-                _ => CallRet::Err,
+        let cloned_channel = self.temp_sub_removal_channel.clone();
+
+        CallRetFuture {
+            async_call: async move {
+                let (sender, rec) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
+
+                self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, Some(sender));
+
+                self.send_inner(target, Message::Call(msg), channel_id).await;
+                match rec.await {
+                    Ok((_src, msg)) => match msg {
+                        Message::CallRet(ret) => CallRet::Reply(ret),
+                        Message::CallNoRet => CallRet::NoReply,
+                        _ => CallRet::Err,
+                    },
+                    Err(_) => CallRet::Err,
+                }
             },
-            Err(_) => CallRet::Err,
+            id: channel_id,
+            sender: cloned_channel,
+            done: false,
         }
     }
 
@@ -222,6 +249,40 @@ impl DataplaneProvider {
                 Box::new(edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port)).await)
             }
             _ => Box::new(edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&target.invocation_url).await),
+        }
+    }
+}
+
+/// A call future might be dropped, in which case we need to remove the temporary receiver.
+/// This struct handles this by sending a message when an incomplete call future is dropped.
+#[pin_project(PinnedDrop)] // https://stackoverflow.com/q/74985153 has some discussions on the problem solved here.
+struct CallRetFuture<F: Future<Output = CallRet>> {
+    #[pin]
+    async_call: F,
+    id: u64,
+    sender: futures::channel::mpsc::UnboundedSender<u64>,
+    done: bool,
+}
+
+impl<F: Future<Output = CallRet>> Future for CallRetFuture<F> {
+    type Output = CallRet;
+
+    fn poll(self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Self::Output> {
+        let this = self.project();
+        let res = this.async_call.poll(cx);
+        if let &core::task::Poll::Ready(_) = &res {
+            *this.done = true;
+        }
+        res
+    }
+}
+
+#[pinned_drop]
+impl<F: Future<Output = CallRet>> PinnedDrop for CallRetFuture<F> {
+    fn drop(self: std::pin::Pin<&mut Self>) {
+        let this = self.project();
+        if let Err(e) = this.sender.unbounded_send(this.id.clone()) {
+            log::error!("Failure while dropping: {}", e)
         }
     }
 }
