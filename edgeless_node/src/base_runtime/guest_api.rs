@@ -1,5 +1,8 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
+
+use futures::FutureExt;
+
 /// Each function instance can import a set of functions that need to be implemented on the host-side.
 /// This provides the generic host-side implementation of these functions.
 /// Those need to be made available to the guest using a virtualization-specific interface/binding.
@@ -9,6 +12,7 @@ pub struct GuestAPIHost {
     pub callback_table: crate::base_runtime::alias_mapping::AliasMapping,
     pub state_handle: Box<dyn crate::state_management::StateHandleAPI>,
     pub telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+    pub poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
 }
 
 /// Errors to be reported by the host side of the guest binding.
@@ -38,9 +42,11 @@ impl GuestAPIHost {
 
     pub async fn call_alias(&mut self, alias: &str, msg: &str) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         if alias == "self" {
-            return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
+            return self.call_raw(self.instance_id.clone(), msg).await;
+            // return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            return Ok(self.data_plane.call(target.clone(), msg.to_string()).await);
+            return self.call_raw(target, msg).await;
+            // return Ok(self.data_plane.call(target.clone(), msg.to_string()).await);
         } else {
             log::warn!("Unknown alias.");
             Err(GuestAPIError::UnknownAlias)
@@ -52,7 +58,14 @@ impl GuestAPIHost {
         target: edgeless_api::function_instance::InstanceId,
         msg: &str,
     ) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
-        return Ok(self.data_plane.call(target, msg.to_string()).await);
+        futures::select! {
+            _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
+                return Ok(edgeless_dataplane::core::CallRet::Err)
+            },
+            call_res = Box::pin(self.data_plane.call(target, msg.to_string())).fuse() => {
+                return Ok(call_res)
+            }
+        }
     }
 
     pub async fn telemetry_log(&mut self, lvl: edgeless_telemetry::telemetry_events::TelemetryLogLevel, target: &str, msg: &str) {
