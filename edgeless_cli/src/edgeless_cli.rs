@@ -6,6 +6,14 @@ mod workflow_spec;
 use clap::Parser;
 use edgeless_api::{controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
 use std::fs;
+use toml;
+use reqwest::header::ACCEPT;
+
+use reqwest::{Body, multipart, Client};
+use tokio::fs::File;
+use tokio_util::codec::{BytesCodec, FramedRead};
+use std::collections::HashMap;
+
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -27,6 +35,8 @@ enum FunctionCommands {
         node_id: String,
         function_id: String,
         payload: String,
+    },
+    Push {
     },
 }
 
@@ -290,6 +300,71 @@ async fn main() -> anyhow::Result<()> {
                         Ok(_) => println!("event casted"),
                         Err(err) => return Err(anyhow::anyhow!("error casting the event: {}", err)),
                     }
+                }
+
+                FunctionCommands::Push {
+                    //toml file specify the function
+                } => {
+                    // let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
+                    
+                    let filename = "endpoint.toml";
+                    //read end point and credentials in a file
+
+                    let contents = fs::read_to_string(filename).expect("Failed to read Cargo.toml file");
+                       
+
+                    println!("contents {}", contents); // => 42.69.42.0
+
+
+                    let repo_endpoint: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
+
+                    // Print out the values to `stdout`.
+                    println!("{}", repo_endpoint.url.name); // => 42.69.42.0
+                    println!("{}", repo_endpoint.credential.basic_auth_user); // => 42
+                    println!("{}", repo_endpoint.credential.basic_auth_pass); // => 42
+                   
+                 
+                    //create a curl request as follow
+                    // curl -X 'POST' \
+                    //    'https://function-repository.edgeless.wlilab.eu/api/admin/function/upload' \
+                    //    -H 'accept: application/json' \
+                    //    -H 'Content-Type: multipart/form-data' \
+                    //    -F 'file=@function_x86'
+
+                     
+                    //use multipart
+                    let client = Client::new();
+                    let file = File::open("./function_x86").await?;
+
+                    // read file body stream
+                    let stream = FramedRead::new(file, BytesCodec::new());
+                    let file_body = Body::wrap_stream(stream);
+
+                    //make form part of file
+                    let some_file = multipart::Part::stream(file_body)
+                        .file_name("function_x86"); // this is in curl -F "function_x86" in "file=@function_x86"
+
+                    //create the multipart form
+                    let form = multipart::Form::new()
+                        .part("file", some_file);// this is in curl -F "file"
+
+                    let response = client.post(repo_endpoint.url.name)
+                        .header(ACCEPT, "application/json")
+                        .basic_auth(repo_endpoint.credential.basic_auth_user, Some(repo_endpoint.credential.basic_auth_pass))
+                        .multipart(form)
+                        .send()
+                        .await
+                        .expect("failed to get response");
+
+                    println!("Response body: {:?}", response);
+
+                    let json = response.json::<HashMap<String, String>>().await?;
+                    println!("{:?}", json)
+
+                   
+   
+                   
+
                 }
             },
         },
