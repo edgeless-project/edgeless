@@ -72,6 +72,9 @@ pub struct NodeCapabilitiesUser {
     pub clock_freq_cpu: Option<f32>,
     pub num_cores: Option<u32>,
     pub mem_size: Option<u32>,
+    pub labels: Option<Vec<String>>,
+    pub is_tee_running: Option<bool>,
+    pub has_tpm: Option<bool>,
 }
 
 impl NodeCapabilitiesUser {
@@ -82,6 +85,9 @@ impl NodeCapabilitiesUser {
             clock_freq_cpu: None,
             num_cores: None,
             mem_size: None,
+            labels: None,
+            is_tee_running: None,
+            has_tpm: None,
         }
     }
 }
@@ -135,6 +141,9 @@ fn get_capabilities(user_node_capabilities: NodeCapabilitiesUser) -> edgeless_ap
         clock_freq_cpu: user_node_capabilities.clock_freq_cpu.unwrap_or(clock_freq_cpu),
         num_cores: user_node_capabilities.num_cores.unwrap_or(1),
         mem_size: user_node_capabilities.mem_size.unwrap_or(s.get_total_memory() as u32 / 1024),
+        labels: user_node_capabilities.labels.unwrap_or(vec![]),
+        is_tee_running: user_node_capabilities.is_tee_running.unwrap_or(false),
+        has_tpm: user_node_capabilities.has_tpm.unwrap_or(false),
     }
 }
 
@@ -366,7 +375,7 @@ pub fn edgeless_node_default_conf() -> String {
     let caps = get_capabilities(NodeCapabilitiesUser::empty());
 
     format!(
-        "{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n",
+        "{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}",
         r##"[general]
 node_id = "fda6ce79-46df-4f96-a0d2-456f720f606c"
 agent_url = "http://127.0.0.1:7021"
@@ -390,5 +399,8 @@ redis_provider = "redis-1"
         caps.clock_freq_cpu,
         caps.num_cores,
         caps.mem_size,
+        r##"labels = []
+is_tee_running = false
+has_tpm = false"##
     )
 }
