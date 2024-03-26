@@ -199,6 +199,86 @@ impl Orchestrator {
         }
     }
 
+    async fn apply_patch(
+        active_instances: &std::collections::HashMap<ComponentId, ActiveInstance>,
+        clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        origin_ext_fid: &ComponentId,
+        ext_output_mapping: &std::collections::HashMap<String, ComponentId>,
+    ) {
+        // Transform the external function identifiers into
+        // internal ones.
+        for source in Self::ext_to_int(&active_instances, origin_ext_fid) {
+            let mut int_output_mapping = std::collections::HashMap::new();
+            for (channel, target_ext_fid) in ext_output_mapping {
+                for target in Self::ext_to_int(&active_instances, target_ext_fid) {
+                    // [TODO] Issue#96 The output_mapping structure
+                    // should be changed so that multiple
+                    // values are possible (with weights), and
+                    // this change must be applied to runners,
+                    // as well. For now, we just keep
+                    // overwriting the same entry.
+                    int_output_mapping.insert(channel.clone(), target.instance_id());
+                }
+            }
+
+            // Notify the new mapping to the node / resource.
+            match source {
+                IntFid::Function(instance_id) => match clients.get_mut(&instance_id.node_id) {
+                    Some(client_desc) => match client_desc
+                        .api
+                        .function_instance_api()
+                        .patch(edgeless_api::common::PatchRequest {
+                            function_id: instance_id.function_id.clone(),
+                            output_mapping: int_output_mapping,
+                        })
+                        .await
+                    {
+                        Ok(_) => {
+                            log::info!("Patched node_id {} int_fid {}", instance_id.node_id, instance_id.function_id);
+                        }
+                        Err(err) => {
+                            log::error!(
+                                "Error when patching node_id {} int_fid {}: {}",
+                                instance_id.node_id,
+                                instance_id.function_id,
+                                err
+                            );
+                        }
+                    },
+                    None => {
+                        log::error!("Cannot patch unknown node_id {}", instance_id.node_id);
+                    }
+                },
+                IntFid::Resource(instance_id) => match clients.get_mut(&instance_id.node_id) {
+                    Some(client_desc) => match client_desc
+                        .api
+                        .resource_configuration_api()
+                        .patch(edgeless_api::common::PatchRequest {
+                            function_id: instance_id.function_id.clone(),
+                            output_mapping: int_output_mapping,
+                        })
+                        .await
+                    {
+                        Ok(_) => {
+                            log::info!("Patched provider node_id {} int_fid {}", instance_id.node_id, instance_id.function_id);
+                        }
+                        Err(err) => {
+                            log::error!(
+                                "Error when patching provider node_id {} int_fid {}: {}",
+                                instance_id.node_id,
+                                instance_id.function_id,
+                                err
+                            );
+                        }
+                    },
+                    None => {
+                        log::error!("Cannot patch unknown provider node_id {}", instance_id.node_id);
+                    }
+                },
+            };
+        }
+    }
+
     async fn main_task(
         receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>,
         orchestrator_settings: crate::EdgelessOrcSettings,
@@ -484,90 +564,22 @@ impl Orchestrator {
                 OrchestratorRequest::PATCH(update) => {
                     log::debug!("Orchestrator Patch {:?}", update);
 
+                    // Extract the ext_fid identifiers for the origin and
+                    // target logical functions.
+                    let origin_ext_fid = update.function_id.clone();
+                    let output_mapping = update
+                        .output_mapping
+                        .iter()
+                        .map(|x| (x.0.clone(), x.1.function_id.clone()))
+                        .collect::<std::collections::HashMap<String, ComponentId>>();
+
+                    // Apply the patch.
+                    Self::apply_patch(&active_instances, &mut clients, &origin_ext_fid, &output_mapping).await;
+
                     // Save the patch request into an internal data structure,
                     // keeping track only of the ext_fid for both origin
                     // and target (logical) functions.
-                    active_patches.insert(
-                        update.function_id.clone(),
-                        update
-                            .output_mapping
-                            .iter()
-                            .map(|x| (x.0.clone(), x.1.function_id.clone()))
-                            .collect::<std::collections::HashMap<String, ComponentId>>(),
-                    );
-
-                    // Transform the external function identifiers into
-                    // internal ones.
-                    for source in Self::ext_to_int(&active_instances, &update.function_id) {
-                        let mut output_mapping = std::collections::HashMap::new();
-                        for (channel, instance_id) in &update.output_mapping {
-                            for target in Self::ext_to_int(&active_instances, &instance_id.function_id) {
-                                // [TODO] Issue#96 The output_mapping structure
-                                // should be changed so that multiple
-                                // values are possible (with weights), and
-                                // this change must be applied to runners,
-                                // as well. For now, we just keep
-                                // overwriting the same entry.
-                                output_mapping.insert(channel.clone(), target.instance_id());
-                            }
-                        }
-
-                        // Notify the new mapping to the node / resource.
-                        match source {
-                            IntFid::Function(instance_id) => match clients.get_mut(&instance_id.node_id) {
-                                Some(client_desc) => match client_desc
-                                    .api
-                                    .function_instance_api()
-                                    .patch(edgeless_api::common::PatchRequest {
-                                        function_id: instance_id.function_id.clone(),
-                                        output_mapping,
-                                    })
-                                    .await
-                                {
-                                    Ok(_) => {
-                                        log::info!("Patched node_id {} int_fid {}", instance_id.node_id, instance_id.function_id);
-                                    }
-                                    Err(err) => {
-                                        log::error!(
-                                            "Error when patching node_id {} int_fid {}: {}",
-                                            instance_id.node_id,
-                                            instance_id.function_id,
-                                            err
-                                        );
-                                    }
-                                },
-                                None => {
-                                    log::error!("Cannot patch unknown node_id {}", instance_id.node_id);
-                                }
-                            },
-                            IntFid::Resource(instance_id) => match clients.get_mut(&instance_id.node_id) {
-                                Some(client_desc) => match client_desc
-                                    .api
-                                    .resource_configuration_api()
-                                    .patch(edgeless_api::common::PatchRequest {
-                                        function_id: instance_id.function_id.clone(),
-                                        output_mapping,
-                                    })
-                                    .await
-                                {
-                                    Ok(_) => {
-                                        log::info!("Patched provider node_id {} int_fid {}", instance_id.node_id, instance_id.function_id);
-                                    }
-                                    Err(err) => {
-                                        log::error!(
-                                            "Error when patching provider node_id {} int_fid {}: {}",
-                                            instance_id.node_id,
-                                            instance_id.function_id,
-                                            err
-                                        );
-                                    }
-                                },
-                                None => {
-                                    log::error!("Cannot patch unknown provider node_id {}", instance_id.node_id);
-                                }
-                            },
-                        };
-                    }
+                    active_patches.insert(origin_ext_fid, output_mapping);
                 }
                 OrchestratorRequest::UPDATENODE(request, reply_channel) => {
                     // Update the map of clients and, at the same time, prepare
