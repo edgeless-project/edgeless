@@ -107,15 +107,21 @@ message UpdateNodeRequest {
 // Node capabilities exposed to the orchestrator.
 message NodeCapabilities {
     // Number of (actual or virtual) CPUs associated with the edge node.
-    uint32 num_cpus       = 10;
+    uint32 num_cpus         = 10;
     // Name of the CPU model.
-    string model_name_cpu = 11;
+    string model_name_cpu   = 11;
     // Clock frequency of the CPU, in BogoMIPS.
-    float clock_freq_cpu  = 12;
+    float clock_freq_cpu    = 12;
     // Number of cores for each CPU.
-    uint32 num_cores      = 13;
+    uint32 num_cores        = 13;
     // Size of memory available to applications running on the edge node, in MB.
-    uint32 mem_size       = 14;
+    uint32 mem_size         = 14;
+    // List of labels assigned to this node.
+    repeated string labels  = 20;
+    // True if the node is running inside a Trusted Execution Environment.
+    bool is_tee_running     = 30;
+    // True if the node has a Trusted Platform Module for authenticated registration.
+    bool has_tpm            = 40;
 }
 
 // Response message of FunctionInstance::UpdateNode().
