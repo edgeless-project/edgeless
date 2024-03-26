@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
+use serde::{Deserialize};
+
 #[derive(Debug, serde::Deserialize)]
 pub struct WorkflowSpecFunctionClass {
     pub id: String,
@@ -32,4 +34,22 @@ pub struct WorkflowSpec {
     pub functions: Vec<WorflowSpecFunction>,
     pub resources: Vec<WorkflowSpecResourceInstance>,
     pub annotations: std::collections::HashMap<String, String>,
+}
+
+#[derive(Deserialize)]
+pub struct RepoEndpoint {
+    pub url: Url,
+    pub credential: Credential,
+}
+
+// Config struct holds to data from the `[config]` section.
+#[derive(Deserialize)]
+pub struct Url {
+    pub name: String,
+}
+
+#[derive(Deserialize)]
+pub struct Credential {
+    pub basic_auth_user: String,
+    pub basic_auth_pass: String,
 }
