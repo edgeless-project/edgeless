@@ -48,8 +48,7 @@ enum ActiveInstance {
     Function(edgeless_api::function_instance::SpawnFunctionRequest, Vec<InstanceId>),
 
     // 0: request
-    // 1: node_id, int_fid
-    // 2: provider_id
+    // 1: (node_id, int_fid)
     Resource(edgeless_api::resource_configuration::ResourceInstanceSpecification, InstanceId),
 }
 
@@ -138,6 +137,15 @@ enum IntFid {
     Function(InstanceId),
     // 0: node_id, int_fid
     Resource(InstanceId),
+}
+
+impl IntFid {
+    fn instance_id(&self) -> InstanceId {
+        match self {
+            Self::Function(id) => *id,
+            Self::Resource(id) => *id,
+        }
+    }
 }
 
 impl Orchestrator {
@@ -231,6 +239,13 @@ impl Orchestrator {
         // instances that the orchestrator promised to keep active
         // key: ext_fid
         let mut active_instances = std::collections::HashMap::new();
+
+        // active patches to which the orchestrator committed
+        // key:   ext_fid (origin function)
+        // value: map of:
+        //        key:   channel output name
+        //        value: ext_fid (target function)
+        let mut active_patches = std::collections::HashMap::new();
 
         // Main loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
@@ -469,6 +484,18 @@ impl Orchestrator {
                 OrchestratorRequest::PATCH(update) => {
                     log::debug!("Orchestrator Patch {:?}", update);
 
+                    // Save the patch request into an internal data structure,
+                    // keeping track only of the ext_fid for both origin
+                    // and target (logical) functions.
+                    active_patches.insert(
+                        update.function_id.clone(),
+                        update
+                            .output_mapping
+                            .iter()
+                            .map(|x| (x.0.clone(), x.1.function_id.clone()))
+                            .collect::<std::collections::HashMap<String, ComponentId>>(),
+                    );
+
                     // Transform the external function identifiers into
                     // internal ones.
                     for source in Self::ext_to_int(&active_instances, &update.function_id) {
@@ -481,11 +508,7 @@ impl Orchestrator {
                                 // this change must be applied to runners,
                                 // as well. For now, we just keep
                                 // overwriting the same entry.
-                                let target_instance_id = match target {
-                                    IntFid::Function(instance_id) => instance_id,
-                                    IntFid::Resource(instance_id) => instance_id,
-                                };
-                                output_mapping.insert(channel.clone(), target_instance_id);
+                                output_mapping.insert(channel.clone(), target.instance_id());
                             }
                         }
 
@@ -681,7 +704,7 @@ impl Orchestrator {
                 OrchestratorRequest::KEEPALIVE() => {
                     log::debug!("keep alive");
 
-                    // First check if there nodes that must be disconnected
+                    // First check if there are nodes that must be disconnected
                     // because they failed to reply to a keep-alive.
                     let mut to_be_disconnected = std::collections::HashSet::new();
                     for (node_id, client_desc) in &mut clients {
@@ -725,6 +748,9 @@ impl Orchestrator {
                             }
                         }
                     }
+
+                    // Makes sure that all active functions are assigned at
+                    // least one instance.
                 }
             }
         }
