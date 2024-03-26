@@ -17,6 +17,16 @@ pub mod wasmi_runner;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
+    /// General settings.
+    pub general: EdgelessNodeGeneralSettings,
+    /// Resource settings.
+    pub resources: Option<EdgelessNodeResourceSettings>,
+    /// User-specific capabilities.
+    pub user_node_capabilities: Option<NodeCapabilitiesUser>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct EdgelessNodeGeneralSettings {
     /// The UUID of this node.
     pub node_id: uuid::Uuid,
     /// The URL of the agent of this node used for creating the local server.
@@ -34,8 +44,6 @@ pub struct EdgelessNodeSettings {
     pub metrics_url: String,
     /// The URL of the orchestrator to which this node registers.
     pub orchestrator_url: String,
-    /// Resource settings.
-    pub resources: Option<EdgelessNodeResourceSettings>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -57,25 +65,49 @@ pub struct EdgelessNodeResourceSettings {
     pub redis_provider: Option<String>,
 }
 
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct NodeCapabilitiesUser {
+    pub num_cpus: Option<u32>,
+    pub model_name_cpu: Option<String>,
+    pub clock_freq_cpu: Option<f32>,
+    pub num_cores: Option<u32>,
+    pub mem_size: Option<u32>,
+}
+
+impl NodeCapabilitiesUser {
+    pub fn empty() -> Self {
+        Self {
+            num_cpus: None,
+            model_name_cpu: None,
+            clock_freq_cpu: None,
+            num_cores: None,
+            mem_size: None,
+        }
+    }
+}
+
 impl EdgelessNodeSettings {
     /// Create settings for a node with no resources binding the given ports on the same address.
     pub fn new_without_resources(orchestrator_url: &str, node_address: &str, agent_port: u16, invocation_port: u16, metrics_port: u16) -> Self {
         let agent_url = format!("http://{}:{}", node_address, agent_port);
         let invocation_url = format!("http://{}:{}", node_address, invocation_port);
         Self {
-            node_id: uuid::Uuid::new_v4(),
-            agent_url: agent_url.clone(),
-            agent_url_announced: agent_url,
-            invocation_url: invocation_url.clone(),
-            invocation_url_announced: invocation_url,
-            metrics_url: format!("http://{}:{}", node_address, metrics_port),
-            orchestrator_url: orchestrator_url.to_string(),
+            general: EdgelessNodeGeneralSettings {
+                node_id: uuid::Uuid::new_v4(),
+                agent_url: agent_url.clone(),
+                agent_url_announced: agent_url,
+                invocation_url: invocation_url.clone(),
+                invocation_url_announced: invocation_url,
+                metrics_url: format!("http://{}:{}", node_address, metrics_port),
+                orchestrator_url: orchestrator_url.to_string(),
+            },
             resources: None,
+            user_node_capabilities: None,
         }
     }
 }
 
-fn get_capabilities() -> edgeless_api::node_registration::NodeCapabilities {
+fn get_capabilities(user_node_capabilities: NodeCapabilitiesUser) -> edgeless_api::node_registration::NodeCapabilities {
     let s = sysinfo::System::new();
     let mut model_name_set = std::collections::HashSet::new();
     let mut clock_freq_cpu_set = std::collections::HashSet::new();
@@ -88,26 +120,26 @@ fn get_capabilities() -> edgeless_api::node_registration::NodeCapabilities {
         None => "".to_string(),
     };
     if model_name_set.len() > 1 {
-        log::warn!("CPUs have different models, using: {}", model_name_cpu);
+        log::debug!("CPUs have different models, using: {}", model_name_cpu);
     }
     let clock_freq_cpu = match clock_freq_cpu_set.iter().next() {
         Some(val) => *val as f32,
         None => 0.0,
     };
     if clock_freq_cpu_set.len() > 1 {
-        log::warn!("CPUs have different frequencies, using: {}", clock_freq_cpu);
+        log::debug!("CPUs have different frequencies, using: {}", clock_freq_cpu);
     }
     edgeless_api::node_registration::NodeCapabilities {
-        num_cpus: s.get_processors().len() as u32,
-        model_name_cpu,
-        clock_freq_cpu,
-        num_cores: 1,
-        mem_size: s.get_total_memory() as u32 / 1024,
+        num_cpus: user_node_capabilities.num_cpus.unwrap_or(s.get_processors().len() as u32),
+        model_name_cpu: user_node_capabilities.model_name_cpu.unwrap_or(model_name_cpu),
+        clock_freq_cpu: user_node_capabilities.clock_freq_cpu.unwrap_or(clock_freq_cpu),
+        num_cores: user_node_capabilities.num_cores.unwrap_or(1),
+        mem_size: user_node_capabilities.mem_size.unwrap_or(s.get_total_memory() as u32 / 1024),
     }
 }
 
 pub async fn register_node(
-    settings: &EdgelessNodeSettings,
+    settings: EdgelessNodeGeneralSettings,
     capabilities: edgeless_api::node_registration::NodeCapabilities,
     resource_provider_specifications: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
 ) {
@@ -251,12 +283,16 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let state_manager = Box::new(state_management::StateManager::new().await);
 
     // Create the data plane.
-    let data_plane = edgeless_dataplane::handle::DataplaneProvider::new(settings.node_id.clone(), settings.invocation_url.clone()).await;
+    let data_plane =
+        edgeless_dataplane::handle::DataplaneProvider::new(settings.general.node_id.clone(), settings.general.invocation_url.clone()).await;
 
     // Create the telemetry provider.
-    let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.metrics_url.clone())
+    let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.general.metrics_url.clone())
         .await
-        .expect(&format!("could not build the telemetry provider at URL {}", &settings.metrics_url));
+        .expect(&format!(
+            "could not build the telemetry provider at URL {}",
+            &settings.general.metrics_url
+        ));
 
     let mut runners = std::collections::HashMap::<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>::new();
 
@@ -271,7 +307,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                 Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
                     ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
                     ("WASM_RUNTIME".to_string(), "wasmtime".to_string()),
-                    ("NODE_ID".to_string(), settings.node_id.to_string()),
+                    ("NODE_ID".to_string(), settings.general.node_id.to_string()),
                 ]))),
             );
         runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
@@ -303,28 +339,36 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let mut resource_provider_specifications = vec![];
     let resources = fill_resources(
         data_plane.clone(),
-        settings.node_id,
+        settings.general.node_id,
         &settings.resources,
         &mut resource_provider_specifications,
     )
     .await;
 
     // Create the agent.
-    let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.clone(), data_plane.clone());
-    let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.agent_url.clone());
+    let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.general.node_id.clone(), data_plane.clone());
+    let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
 
     // Wait for all the tasks to complete.
     let _ = futures::join!(
         rust_runtime_task,
         agent_task,
         agent_api_server,
-        register_node(&settings, get_capabilities(), resource_provider_specifications)
+        register_node(
+            settings.general,
+            get_capabilities(settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
+            resource_provider_specifications
+        )
     );
 }
 
 pub fn edgeless_node_default_conf() -> String {
-    String::from(
-        r##"node_id = "fda6ce79-46df-4f96-a0d2-456f720f606c"
+    let caps = get_capabilities(NodeCapabilitiesUser::empty());
+
+    format!(
+        "{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n",
+        r##"[general]
+node_id = "fda6ce79-46df-4f96-a0d2-456f720f606c"
 agent_url = "http://127.0.0.1:7021"
 agent_url_announced = ""
 invocation_url = "http://127.0.0.1:7002"
@@ -338,6 +382,13 @@ http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"
 file_log_provider = "file-log-1"
 redis_provider = "redis-1"
+
+[user_node_capabilities]
 "##,
+        caps.num_cpus,
+        caps.model_name_cpu,
+        caps.clock_freq_cpu,
+        caps.num_cores,
+        caps.mem_size,
     )
 }

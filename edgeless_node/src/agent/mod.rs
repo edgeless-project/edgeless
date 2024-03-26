@@ -23,7 +23,7 @@ enum AgentRequest {
 
 pub struct Agent {
     sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
-    node_settings: crate::EdgelessNodeSettings,
+    node_id: uuid::Uuid,
 }
 
 impl Agent {
@@ -33,7 +33,7 @@ impl Agent {
             String,
             Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
         >,
-        node_settings: crate::EdgelessNodeSettings,
+        node_id: uuid::Uuid,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
@@ -42,7 +42,7 @@ impl Agent {
             Self::main_task(receiver, runners, resources, data_plane_provider).await;
         });
 
-        (Agent { sender, node_settings }, main_task)
+        (Agent { sender, node_id }, main_task)
     }
 
     async fn main_task(
@@ -283,7 +283,7 @@ impl Agent {
         Box::new(AgentClient {
             function_instance_client: Box::new(FunctionInstanceNodeClient {
                 sender: self.sender.clone(),
-                node_id: self.node_settings.node_id.clone(),
+                node_id: self.node_id.clone(),
             }),
             node_management_client: Box::new(NodeManagementClient { sender: self.sender.clone() }),
             resource_configuration_client: Box::new(ResourceConfigurationClient { sender: self.sender.clone() }),
