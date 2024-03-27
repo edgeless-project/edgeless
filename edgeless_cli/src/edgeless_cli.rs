@@ -1,20 +1,20 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 University of Cambridge, System Research Group
 // SPDX-FileCopyrightText: © 2024 Roman Kolcun <roman.kolcun@cl.cam.ac.uk>
 // SPDX-License-Identifier: MIT
 mod workflow_spec;
 
 use clap::Parser;
 use edgeless_api::{controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
+use reqwest::header::ACCEPT;
 use std::fs;
 use toml;
-use reqwest::header::ACCEPT;
 
-use reqwest::{Body, multipart, Client};
+use reqwest::{multipart, Body, Client};
+use std::collections::HashMap;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use std::collections::HashMap;
-
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -37,8 +37,7 @@ enum FunctionCommands {
         function_id: String,
         payload: String,
     },
-    Push {
-    },
+    Push {},
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -318,33 +317,23 @@ async fn main() -> anyhow::Result<()> {
                 FunctionCommands::Push {
                     //toml file specify the function
                 } => {
-                    // let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
-                    
                     let filename = "endpoint.toml";
                     //read end point and credentials in a file
 
                     let contents = fs::read_to_string(filename).expect("Failed to read Cargo.toml file");
-                       
-
                     println!("contents {}", contents); // => 42.69.42.0
-
-
                     let repo_endpoint: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
 
                     // Print out the values to `stdout`.
                     println!("{}", repo_endpoint.url.name); // => 42.69.42.0
                     println!("{}", repo_endpoint.credential.basic_auth_user); // => 42
                     println!("{}", repo_endpoint.credential.basic_auth_pass); // => 42
-                   
-                 
                     //create a curl request as follow
                     // curl -X 'POST' \
                     //    'https://function-repository.edgeless.wlilab.eu/api/admin/function/upload' \
                     //    -H 'accept: application/json' \
                     //    -H 'Content-Type: multipart/form-data' \
                     //    -F 'file=@function_x86'
-
-                     
                     //use multipart
                     let client = Client::new();
                     let file = File::open("./function_x86").await?;
@@ -369,14 +358,52 @@ async fn main() -> anyhow::Result<()> {
                         .await
                         .expect("failed to get response");
 
-                    println!("Response body: {:?}", response);
+                    // println!("Response body: {:?}", response);
 
                     let json = response.json::<HashMap<String, String>>().await?;
-                    println!("{:?}", json)
+                    println!("code_file_id {:?}", json);
 
-                   
-   
-                   
+                    //post to /api/admin/function
+                    //example
+                    // curl -X 'POST' \
+                    //   'https://function-repository.edgeless.wlilab.eu/api/admin/function' \
+                    //   -H 'accept: application/json' \
+                    //   -H 'Content-Type: application/json' \
+                    //   -d '{
+                    //   "function_type": "RUST_WASM",
+                    //   "id": "http_requestor",
+                    //   "version": "0.1",
+                    //   "code_file_id": "652faf54465c2e7ec15facce",
+                    //   "outputs": [
+                    //     "success_cb",
+                    //     "failure_cb"
+                    //   ]
+                    // }'
+
+
+                    let r = serde_json::json!({
+
+                        "function_type": "RUST_WASM",
+                        "id": "cam_test",
+                        "version": "0.1",
+                        "code_file_id": json.get("id"), //get the id
+                        "outputs": [  "success_cb",
+                                      "failure_cb"
+                                   ],
+                    });
+
+                    let repo_endpoint_new: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
+                    let post_response = client.post("https://function-repository.edgeless.wlilab.eu/api/admin/function")
+                        .header(ACCEPT, "application/json")
+                        .basic_auth(repo_endpoint_new.credential.basic_auth_user, Some(repo_endpoint_new.credential.basic_auth_pass))
+                        .json(&r)
+                        .send()
+                        .await
+                        .expect("failed to get response")
+                        .text()
+                        .await
+                        .expect("failed to get body");                   
+                    println!("post_response body: {:?}", post_response);
 
                 }
             },
