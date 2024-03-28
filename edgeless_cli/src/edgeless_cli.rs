@@ -15,6 +15,7 @@ use reqwest::{multipart, Body, Client};
 use std::collections::HashMap;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
+use std::concat;
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -37,7 +38,9 @@ enum FunctionCommands {
         function_id: String,
         payload: String,
     },
-    Push {},
+    Push {
+        file_name: String,
+    },
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -316,18 +319,18 @@ async fn main() -> anyhow::Result<()> {
 
                 FunctionCommands::Push {
                     //toml file specify the function
+                    file_name,
                 } => {
-                    let filename = "endpoint.toml";
+                    let filename = file_name;
                     //read end point and credentials in a file
-
-                    let contents = fs::read_to_string(filename).expect("Failed to read Cargo.toml file");
-                    println!("contents {}", contents); // => 42.69.42.0
+                    let contents = fs::read_to_string(filename).expect("Failed to read file, please make sure the file exist and in .toml");
+                    // println!("contents {}", contents); // 
                     let repo_endpoint: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
 
                     // Print out the values to `stdout`.
-                    println!("{}", repo_endpoint.url.name); // => 42.69.42.0
-                    println!("{}", repo_endpoint.credential.basic_auth_user); // => 42
-                    println!("{}", repo_endpoint.credential.basic_auth_pass); // => 42
+                    println!("Url {}", repo_endpoint.url.name ); //
+                    println!("username {}", repo_endpoint.credential.basic_auth_user); // 
+                    println!("passwd {}", repo_endpoint.credential.basic_auth_pass); //
                     //create a curl request as follow
                     // curl -X 'POST' \
                     //    'https://function-repository.edgeless.wlilab.eu/api/admin/function/upload' \
@@ -336,7 +339,7 @@ async fn main() -> anyhow::Result<()> {
                     //    -F 'file=@function_x86'
                     //use multipart
                     let client = Client::new();
-                    let file = File::open("./function_x86").await?;
+                    let file = File::open(repo_endpoint.binary.name).await?;
 
                     // read file body stream
                     let stream = FramedRead::new(file, BytesCodec::new());
@@ -350,7 +353,7 @@ async fn main() -> anyhow::Result<()> {
                     let form = multipart::Form::new()
                         .part("file", some_file);// this is in curl -F "file"
 
-                    let response = client.post(repo_endpoint.url.name)
+                    let response = client.post(repo_endpoint.url.name.to_string() + "/api/admin/function/upload")
                         .header(ACCEPT, "application/json")
                         .basic_auth(repo_endpoint.credential.basic_auth_user, Some(repo_endpoint.credential.basic_auth_pass))
                         .multipart(form)
@@ -384,7 +387,7 @@ async fn main() -> anyhow::Result<()> {
                     let r = serde_json::json!({
 
                         "function_type": "RUST_WASM",
-                        "id": "cam_test",
+                        "id": repo_endpoint.binary.id,
                         "version": "0.1",
                         "code_file_id": json.get("id"), //get the id
                         "outputs": [  "success_cb",
@@ -393,7 +396,7 @@ async fn main() -> anyhow::Result<()> {
                     });
 
                     let repo_endpoint_new: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
-                    let post_response = client.post("https://function-repository.edgeless.wlilab.eu/api/admin/function")
+                    let post_response = client.post(repo_endpoint_new.url.name.to_string() + "/api/admin/function")
                         .header(ACCEPT, "application/json")
                         .basic_auth(repo_endpoint_new.credential.basic_auth_user, Some(repo_endpoint_new.credential.basic_auth_pass))
                         .json(&r)
@@ -404,6 +407,7 @@ async fn main() -> anyhow::Result<()> {
                         .await
                         .expect("failed to get body");                   
                     println!("post_response body: {:?}", post_response);
+                    println!("Post function successfully!");
 
                 }
             },
