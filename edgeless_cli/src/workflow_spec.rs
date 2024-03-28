@@ -41,9 +41,16 @@ pub struct WorkflowSpec {
 pub struct RepoEndpoint {
     pub url: Url,
     pub credential: Credential,
+    pub binary: Binary,
 }
 
 // Config struct holds to data from the `[config]` section.
+#[derive(Deserialize, Clone)]
+pub struct Binary {
+    pub name: String,
+    pub id: String, // the id appear in repo
+}
+
 #[derive(Deserialize, Clone)]
 pub struct Url {
     pub name: String,
