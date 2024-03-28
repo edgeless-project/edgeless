@@ -13,9 +13,9 @@ use toml;
 
 use reqwest::{multipart, Body, Client};
 use std::collections::HashMap;
+use std::concat;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use std::concat;
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -288,7 +288,6 @@ async fn main() -> anyhow::Result<()> {
                         ),
                         _ => fs::write(&out_file, &raw_result).expect("Unable to write file"),
                     }
-
                 }
                 FunctionCommands::Invoke {
                     event_type,
@@ -324,20 +323,20 @@ async fn main() -> anyhow::Result<()> {
                     let filename = file_name;
                     //read end point and credentials in a file
                     let contents = fs::read_to_string(filename).expect("Failed to read file, please make sure the file exist and in .toml");
-                    // println!("contents {}", contents); // 
+                    // println!("contents {}", contents); //
                     let repo_endpoint: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
 
                     // Print out the values to `stdout`.
-                    println!("Url {}", repo_endpoint.url.name ); //
-                    println!("username {}", repo_endpoint.credential.basic_auth_user); // 
+                    println!("Url {}", repo_endpoint.url.name); //
+                    println!("username {}", repo_endpoint.credential.basic_auth_user); //
                     println!("passwd {}", repo_endpoint.credential.basic_auth_pass); //
-                    //create a curl request as follow
-                    // curl -X 'POST' \
-                    //    'https://function-repository.edgeless.wlilab.eu/api/admin/function/upload' \
-                    //    -H 'accept: application/json' \
-                    //    -H 'Content-Type: multipart/form-data' \
-                    //    -F 'file=@function_x86'
-                    //use multipart
+                                                                                     //create a curl request as follow
+                                                                                     // curl -X 'POST' \
+                                                                                     //    'https://function-repository.edgeless.wlilab.eu/api/admin/function/upload' \
+                                                                                     //    -H 'accept: application/json' \
+                                                                                     //    -H 'Content-Type: multipart/form-data' \
+                                                                                     //    -F 'file=@function_x86'
+                                                                                     //use multipart
                     let client = Client::new();
                     let file = File::open(repo_endpoint.binary.name).await?;
 
@@ -346,14 +345,13 @@ async fn main() -> anyhow::Result<()> {
                     let file_body = Body::wrap_stream(stream);
 
                     //make form part of file
-                    let some_file = multipart::Part::stream(file_body)
-                        .file_name("function_x86"); // this is in curl -F "function_x86" in "file=@function_x86"
+                    let some_file = multipart::Part::stream(file_body).file_name("function_x86"); // this is in curl -F "function_x86" in "file=@function_x86"
 
                     //create the multipart form
-                    let form = multipart::Form::new()
-                        .part("file", some_file);// this is in curl -F "file"
+                    let form = multipart::Form::new().part("file", some_file); // this is in curl -F "file"
 
-                    let response = client.post(repo_endpoint.url.name.to_string() + "/api/admin/function/upload")
+                    let response = client
+                        .post(repo_endpoint.url.name.to_string() + "/api/admin/function/upload")
                         .header(ACCEPT, "application/json")
                         .basic_auth(repo_endpoint.credential.basic_auth_user, Some(repo_endpoint.credential.basic_auth_pass))
                         .multipart(form)
@@ -361,10 +359,8 @@ async fn main() -> anyhow::Result<()> {
                         .await
                         .expect("failed to get response");
 
-                    // println!("Response body: {:?}", response);
-
                     let json = response.json::<HashMap<String, String>>().await?;
-                    println!("code_file_id {:?}", json);
+                    println!("receive code_file_id {:?}", json);
 
                     //post to /api/admin/function
                     //example
@@ -383,7 +379,6 @@ async fn main() -> anyhow::Result<()> {
                     //   ]
                     // }'
 
-
                     let r = serde_json::json!({
 
                         "function_type": "RUST_WASM",
@@ -396,19 +391,22 @@ async fn main() -> anyhow::Result<()> {
                     });
 
                     let repo_endpoint_new: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
-                    let post_response = client.post(repo_endpoint_new.url.name.to_string() + "/api/admin/function")
+                    let post_response = client
+                        .post(repo_endpoint_new.url.name.to_string() + "/api/admin/function")
                         .header(ACCEPT, "application/json")
-                        .basic_auth(repo_endpoint_new.credential.basic_auth_user, Some(repo_endpoint_new.credential.basic_auth_pass))
+                        .basic_auth(
+                            repo_endpoint_new.credential.basic_auth_user,
+                            Some(repo_endpoint_new.credential.basic_auth_pass),
+                        )
                         .json(&r)
                         .send()
                         .await
                         .expect("failed to get response")
                         .text()
                         .await
-                        .expect("failed to get body");                   
+                        .expect("failed to get body");
                     println!("post_response body: {:?}", post_response);
                     println!("Post function successfully!");
-
                 }
             },
         },
