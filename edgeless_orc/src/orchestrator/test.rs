@@ -565,3 +565,33 @@ async fn orc_patch() {
         panic!("wrong event received");
     }
 }
+
+#[test]
+fn test_deployment_requirements() {
+    let no_reqs = DeploymentRequirements::none();
+
+    let empty_annotations = std::collections::HashMap::new();
+    assert_eq!(no_reqs, DeploymentRequirements::from_annotations(&empty_annotations));
+
+    let irrelevant_annotations =
+        std::collections::HashMap::from([("foo".to_string(), "bar".to_string()), ("mickey".to_string(), "mouse".to_string())]);
+    assert_eq!(no_reqs, DeploymentRequirements::from_annotations(&irrelevant_annotations));
+
+    let uuid1 = uuid::Uuid::new_v4();
+    let uuid2 = uuid::Uuid::new_v4();
+    let valid_annotations = std::collections::HashMap::from([
+        ("max_instances".to_string(), "42".to_string()),
+        ("node_id_match_any".to_string(), format!("{},{}", uuid1.to_string(), uuid2.to_string())),
+        ("label_match_all".to_string(), "red,blue".to_string()),
+        ("resource_match_all".to_string(), "file,redis".to_string()),
+        ("tee".to_string(), "REQuired".to_string()),
+        ("tpm".to_string(), "required".to_string()),
+    ]);
+    let reqs = DeploymentRequirements::from_annotations(&valid_annotations);
+    assert_eq!(42, reqs.max_instances);
+    assert_eq!(vec![uuid1, uuid2], reqs.node_id_match_any);
+    assert_eq!(vec!["red".to_string(), "blue".to_string()], reqs.label_match_all);
+    assert_eq!(vec!["file".to_string(), "redis".to_string()], reqs.resource_match_all);
+    assert!(std::mem::discriminant(&AffinityLevel::Required) == std::mem::discriminant(&reqs.tee));
+    assert!(std::mem::discriminant(&AffinityLevel::Required) == std::mem::discriminant(&reqs.tpm));
+}
