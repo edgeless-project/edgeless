@@ -1054,7 +1054,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::Dom
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
-        log::debug!("FunctionInstance::StartFunction() {:?}", request);
+        log::debug!("FunctionInstance::start() {:?}", request);
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
             anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>,
         >();
@@ -1074,7 +1074,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::Dom
     }
 
     async fn stop(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
-        log::debug!("FunctionInstance::StopFunction() {:?}", id);
+        log::debug!("FunctionInstance::stop() {:?}", id);
         match self.sender.send(OrchestratorRequest::STOPFUNCTION(id)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
@@ -1085,7 +1085,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::Dom
     }
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
-        log::debug!("FunctionInstance::Patch() {:?}", update);
+        log::debug!("FunctionInstance::patch() {:?}", update);
         match self.sender.send(OrchestratorRequest::PATCH(update)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
@@ -1102,7 +1102,7 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for NodeRegistrationCl
         &mut self,
         request: edgeless_api::node_registration::UpdateNodeRequest,
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
-        log::debug!("FunctionInstance::UpdateNode() {:?}", request);
+        log::debug!("NodeRegistrationAPI::update_node() {:?}", request);
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>();
         if let Err(err) = self.sender.send(OrchestratorRequest::UPDATENODE(request, reply_sender)).await {
             return Err(anyhow::anyhow!("Orchestrator channel error when updating a node: {}", err.to_string()));
@@ -1112,6 +1112,10 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for NodeRegistrationCl
             Err(err) => Err(anyhow::anyhow!("Orchestrator channel error  when updating a node: {}", err.to_string())),
         }
     }
+    async fn keep_alive(&mut self) {
+        log::debug!("NodeRegistrationAPI::keep_alive()");
+        let _ = self.sender.send(OrchestratorRequest::KEEPALIVE()).await;
+    }
 }
 
 #[async_trait::async_trait]
@@ -1120,7 +1124,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         &mut self,
         request: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
-        log::debug!("FunctionInstance::StartResource() {:?}", request);
+        log::debug!("ResourceConfigurationAPI::start() {:?}", request);
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
             anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>,
         >();
@@ -1140,7 +1144,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 
     async fn stop(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
-        log::debug!("FunctionInstance::StopResource() {:?}", id);
+        log::debug!("ResourceConfigurationAPI::stop() {:?}", id);
         match self.sender.send(OrchestratorRequest::STOPRESOURCE(id)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
@@ -1151,7 +1155,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
-        log::debug!("FunctionInstance::Patch() {:?}", update);
+        log::debug!("ResourceConfigurationAPI::patch() {:?}", update);
         match self.sender.send(OrchestratorRequest::PATCH(update)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
