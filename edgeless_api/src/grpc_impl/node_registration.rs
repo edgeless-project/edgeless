@@ -45,6 +45,7 @@ impl crate::node_registration::NodeRegistrationAPI for NodeRegistrationClient {
             Err(err) => Err(anyhow::anyhow!("Communication error while updating a node: {}", err.to_string())),
         }
     }
+    async fn keep_alive(&mut self) {}
 }
 
 #[async_trait::async_trait]

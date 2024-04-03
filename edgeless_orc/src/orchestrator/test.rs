@@ -26,6 +26,8 @@ enum MockAgentEvent {
     PatchResource(edgeless_api::common::PatchRequest),
 }
 
+static FAILING_NODES: std::sync::OnceLock<std::sync::Mutex<std::collections::HashSet<uuid::Uuid>>> = std::sync::OnceLock::new();
+
 struct MockNode {
     node_id: uuid::Uuid,
     sender: futures::channel::mpsc::UnboundedSender<MockAgentEvent>,
@@ -93,7 +95,12 @@ impl edgeless_api::node_management::NodeManagementAPI for MockAgentAPI {
     }
     async fn keep_alive(&mut self) -> anyhow::Result<()> {
         self.sender.send(MockAgentEvent::KeepAlive()).await.unwrap();
-        Ok(())
+
+        if FAILING_NODES.get().unwrap().lock().unwrap().contains(&self.node_id) {
+            Err(anyhow::anyhow!("node {} failed", self.node_id))
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -128,15 +135,24 @@ async fn test_setup(
     Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId>>,
     Box<dyn edgeless_api::node_registration::NodeRegistrationAPI>,
     std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>,
+    uuid::Uuid,
 ) {
     assert!(num_nodes > 0);
 
     let mut nodes = std::collections::HashMap::new();
     let mut clients = std::collections::HashMap::new();
     let mut resource_providers = std::collections::HashMap::new();
+    let mut stable_node_id = uuid::Uuid::nil();
     for node_i in 0..num_nodes {
         let (mock_node_sender, mock_node_receiver) = futures::channel::mpsc::unbounded::<MockAgentEvent>();
         let node_id = uuid::Uuid::new_v4();
+        let mut capabilities = edgeless_api::node_registration::NodeCapabilities::minimum();
+        if node_i == 0 {
+            stable_node_id = node_id.clone();
+            capabilities.labels.push("stable".to_string());
+        } else {
+            capabilities.labels.push("unstable".to_string());
+        }
         nodes.insert(node_id.clone(), mock_node_receiver);
         clients.insert(
             node_id.clone(),
@@ -147,7 +163,7 @@ async fn test_setup(
                     node_id: node_id.clone(),
                     sender: mock_node_sender,
                 }) as Box<dyn edgeless_api::agent::AgentAPI + Send>,
-                capabilities: edgeless_api::node_registration::NodeCapabilities::minimum(),
+                capabilities,
             },
         );
         for provider_i in 0..num_resources_per_node {
@@ -180,6 +196,7 @@ async fn test_setup(
         orchestrator.get_api_client().resource_configuration_api(),
         orchestrator.get_api_client().node_registration_api(),
         nodes,
+        stable_node_id,
     )
 }
 
@@ -285,7 +302,7 @@ fn make_start_resource_request(class_type: &str) -> edgeless_api::resource_confi
 
 #[tokio::test]
 async fn orc_single_node_function_start_stop() {
-    let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes) = test_setup(1, 0).await;
+    let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes, _) = test_setup(1, 0).await;
     assert_eq!(1, nodes.len());
     let (node_id, mock_node_receiver) = nodes.iter_mut().next().unwrap();
     assert!(!node_id.is_nil());
@@ -337,7 +354,7 @@ async fn orc_single_node_function_start_stop() {
 
 #[tokio::test]
 async fn orc_multiple_nodes_function_start_stop() {
-    let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes) = test_setup(3, 0).await;
+    let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes, _) = test_setup(3, 0).await;
     assert_eq!(3, nodes.len());
 
     // Start 100 functions.
@@ -393,7 +410,7 @@ async fn orc_multiple_nodes_function_start_stop() {
 
 #[tokio::test]
 async fn orc_multiple_resources_start_stop() {
-    let (mut _fun_client, mut res_client, mut _mgt_client, mut nodes) = test_setup(3, 3).await;
+    let (mut _fun_client, mut res_client, mut _mgt_client, mut nodes, _) = test_setup(3, 3).await;
     assert_eq!(3, nodes.len());
 
     // Start 100 resources.
@@ -461,7 +478,7 @@ async fn orc_multiple_resources_start_stop() {
 
 #[tokio::test]
 async fn orc_patch() {
-    let (mut fun_client, mut res_client, mut _mgt_client, mut nodes) = test_setup(1, 1).await;
+    let (mut fun_client, mut res_client, mut _mgt_client, mut nodes, _) = test_setup(1, 1).await;
     assert_eq!(1, nodes.len());
     let client_node_id = nodes.keys().next().unwrap().clone();
 
@@ -563,6 +580,136 @@ async fn orc_patch() {
         assert_eq!(int_function_id.unwrap(), mapping.unwrap().clone());
     } else {
         panic!("wrong event received");
+    }
+}
+
+#[tokio::test]
+async fn orc_node_disconnects() {
+    let _ = env_logger::try_init();
+
+    let (mut fun_client, mut _res_client, mut mgt_client, mut nodes, stable_node_id) = test_setup(10, 0).await;
+    assert_eq!(10, nodes.len());
+
+    // Start this workflow
+    //
+    // f1 -> f2 -> f3
+    //
+    // One node is "stable", the others will be disconnected one after another
+    //
+    // f1 & f3 are forced to be allocated on the stable noe
+    // f2 is forced to be allocated on the others
+    //
+
+    // Start f1
+    let mut spawn_req = make_spawn_function_request("f1");
+    spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
+    let ext_fid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+        edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+        edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+    };
+    let mut int_fid_1 = uuid::Uuid::nil();
+    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+        assert_eq!(node_id, stable_node_id);
+        int_fid_1 = new_instance_id.function_id;
+        assert_eq!(spawn_req, spawn_req_rcvd);
+    }
+
+    // Start f2
+    let mut spawn_req = make_spawn_function_request("f2");
+    spawn_req.annotations.insert("label_match_all".to_string(), "unstable".to_string());
+    let ext_fid_2 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+        edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+        edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+    };
+    let mut int_fid_2 = uuid::Uuid::nil();
+    let mut unstable_node_id = uuid::Uuid::nil();
+    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+        assert_ne!(node_id, stable_node_id);
+        unstable_node_id = node_id.clone();
+        int_fid_2 = new_instance_id.function_id;
+        assert_eq!(spawn_req, spawn_req_rcvd);
+    }
+
+    // Start f3
+    let mut spawn_req = make_spawn_function_request("f3");
+    spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
+    let ext_fid_3 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+        edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+        edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+    };
+    let mut int_fid_3 = uuid::Uuid::nil();
+    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+        assert_eq!(node_id, stable_node_id);
+        int_fid_3 = new_instance_id.function_id;
+        assert_eq!(spawn_req, spawn_req_rcvd);
+    }
+
+    // Patch f1->f2
+    match fun_client
+        .patch(edgeless_api::common::PatchRequest {
+            function_id: ext_fid_1.clone(),
+            output_mapping: std::collections::HashMap::from([(
+                "out".to_string(),
+                InstanceId {
+                    node_id: uuid::Uuid::nil(),
+                    function_id: ext_fid_2.clone(),
+                },
+            )]),
+        })
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            panic!("{}", err);
+        }
+    };
+    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+        assert!(patch_request.output_mapping.contains_key("out"));
+    }
+
+    // Patch f2->f3
+    match fun_client
+        .patch(edgeless_api::common::PatchRequest {
+            function_id: ext_fid_2.clone(),
+            output_mapping: std::collections::HashMap::from([(
+                "out".to_string(),
+                InstanceId {
+                    node_id: uuid::Uuid::nil(),
+                    function_id: ext_fid_3.clone(),
+                },
+            )]),
+        })
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            panic!("{}", err);
+        }
+    };
+    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+        assert!(patch_request.output_mapping.contains_key("out"));
+    }
+
+    // Disconnect the unstable node
+    {
+        FAILING_NODES.set(std::sync::Mutex::new(std::collections::HashSet::new())).unwrap();
+
+        let mut failing_nodes = FAILING_NODES.get().unwrap().lock().unwrap();
+        failing_nodes.clear();
+        failing_nodes.insert(unstable_node_id.clone());
+    }
+    let _ = mgt_client.keep_alive().await;
+
+    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+        assert_ne!(node_id, stable_node_id);
+        unstable_node_id = node_id;
+        assert_eq!("f2", spawn_req_rcvd.code.function_class_id);
+    }
+    if let (node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+        assert_eq!(node_id, stable_node_id);
+        assert!(patch_request.output_mapping.contains_key("out"));
+        assert_eq!(ext_fid_1, patch_request.function_id);
+        assert_eq!(ext_fid_2, patch_request.output_mapping.get("out").unwrap().function_id);
     }
 }
 
