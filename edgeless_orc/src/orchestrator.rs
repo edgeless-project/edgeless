@@ -159,9 +159,9 @@ enum OrchestratorRequest {
 }
 
 pub struct ResourceProvider {
-    class_type: String,
-    node_id: edgeless_api::function_instance::NodeId,
-    outputs: Vec<String>,
+    pub class_type: String,
+    pub node_id: edgeless_api::function_instance::NodeId,
+    pub outputs: Vec<String>,
 }
 
 #[derive(Clone)]
@@ -500,7 +500,8 @@ impl Orchestrator {
         // function instance by using the orchestration logic.
         // Orchestration strategy can also be changed during
         // runtime.
-        let selected_node_id = match orchestration_logic.next() {
+        let reqs = DeploymentRequirements::from_annotations(&spawn_req.annotations);
+        let selected_node_id = match orchestration_logic.next(&reqs) {
             Some(u) => u,
             None => {
                 return Err(anyhow::anyhow!(
@@ -536,7 +537,6 @@ impl Orchestrator {
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                     assert!(selected_node_id == id.node_id);
-                    let reqs = DeploymentRequirements::from_annotations(&spawn_req.annotations);
                     active_instances.insert(
                         ext_fid,
                         ActiveInstance::Function(
@@ -578,7 +578,7 @@ impl Orchestrator {
         // known agents
         // key: node_id
         let mut clients = clients;
-        orchestration_logic.update_nodes(&clients);
+        orchestration_logic.update_nodes(&clients, &resource_providers);
         for (node_id, client_desc) in &clients {
             log::info!(
                 "added function instance client: node_id {}, agent URL {}, invocation URL {}, capabilities {}",
@@ -847,7 +847,7 @@ impl Orchestrator {
 
                     if let Some(msg) = msg {
                         // Update the orchestration logic with the new set of nodes.
-                        orchestration_logic.update_nodes(&clients);
+                        orchestration_logic.update_nodes(&clients, &resource_providers);
 
                         // Update all the peers (including the node, unless it
                         // was a deregister operation).
