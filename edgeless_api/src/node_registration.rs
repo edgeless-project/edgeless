@@ -108,6 +108,7 @@ pub enum UpdateNodeResponse {
 #[async_trait::async_trait]
 pub trait NodeRegistrationAPI: NodeRegistrationAPIClone + Sync + Send {
     async fn update_node(&mut self, request: UpdateNodeRequest) -> anyhow::Result<UpdateNodeResponse>;
+    async fn keep_alive(&mut self);
 }
 
 impl std::fmt::Display for ResourceProviderSpecification {
