@@ -138,20 +138,22 @@ impl OrchestrationLogic {
             crate::OrchestrationStrategy::Random => {
                 // Select only the nodes that are feasible.
                 let mut candidates = vec![];
-                let mut high = 0.0;
+                let mut high: f32 = 0.0;
                 for i in 0..self.nodes.len() {
                     if Self::node_feasible(reqs, &self.nodes[i], &self.capabilities[i], &self.resource_providers[i]) {
                         candidates.push((i, self.weights[i]));
                         high += self.weights[i];
                     }
                 }
-                let rv = rand::distributions::Uniform::new(0.0, high);
-                let rnd = rv.sample(&mut self.rng);
-                let mut sum = 0.0_f32;
-                for i in 0..candidates.len() {
-                    sum += candidates[i].1;
-                    if sum >= rnd {
-                        return Some(self.nodes[candidates[i].0]);
+                if high > 0.0 {
+                    let rv = rand::distributions::Uniform::new(0.0, high);
+                    let rnd = rv.sample(&mut self.rng);
+                    let mut sum = 0.0_f32;
+                    for i in 0..candidates.len() {
+                        sum += candidates[i].1;
+                        if sum >= rnd {
+                            return Some(self.nodes[candidates[i].0]);
+                        }
                     }
                 }
                 None
