@@ -990,6 +990,131 @@ async fn test_orc_node_with_res_disconnects() {
     no_function_event(&mut nodes).await;
 }
 
+#[tokio::test]
+async fn test_patch_after_fun_stop() {
+    let _ = env_logger::try_init();
+
+    let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes, _stable_node_id) = test_setup(10, 0).await;
+    assert_eq!(10, nodes.len());
+
+    // Start this workflow
+    //
+    // f1 -> f3 -> f4 -> f6
+    //     /   \        /
+    // f2 /     \  f5 /
+    //
+    // then stop f3
+
+    // Start functions
+    let mut ext_fids = vec![];
+    let mut int_fids = vec![];
+    for i in 1..=6 {
+        let spawn_req = make_spawn_function_request(format!("f{}", i).as_str());
+        ext_fids.push(match fun_client.start(spawn_req.clone()).await.unwrap() {
+            edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+            edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        });
+        if let (_node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+            int_fids.push(new_instance_id.function_id);
+            assert_eq!(spawn_req, spawn_req_rcvd);
+        }
+    }
+    assert_eq!(6, ext_fids.len());
+    assert_eq!(6, int_fids.len());
+
+    // Patch functions
+    let patch_instructions = [
+        (ext_fids[0].clone(), vec![ext_fids[2].clone()]),
+        (ext_fids[1].clone(), vec![ext_fids[2].clone()]),
+        (ext_fids[2].clone(), vec![ext_fids[3].clone(), ext_fids[4].clone()]),
+        (ext_fids[3].clone(), vec![ext_fids[5].clone()]),
+        (ext_fids[4].clone(), vec![ext_fids[5].clone()]),
+    ];
+    let patch_instructions_int = [
+        (int_fids[0].clone(), vec![int_fids[2].clone()]),
+        (int_fids[1].clone(), vec![int_fids[2].clone()]),
+        (int_fids[2].clone(), vec![int_fids[3].clone(), int_fids[4].clone()]),
+        (int_fids[3].clone(), vec![int_fids[5].clone()]),
+        (int_fids[4].clone(), vec![int_fids[5].clone()]),
+    ];
+
+    for j in 0..patch_instructions.len() {
+        let ext_fid_pair = &patch_instructions[j];
+        let mut output_mapping = std::collections::HashMap::new();
+        for i in 0..ext_fid_pair.1.len() {
+            output_mapping.insert(
+                format!("out{}", i),
+                InstanceId {
+                    node_id: uuid::Uuid::nil(),
+                    function_id: ext_fid_pair.1[i],
+                },
+            );
+        }
+        match fun_client
+            .patch(edgeless_api::common::PatchRequest {
+                function_id: ext_fid_pair.0,
+                output_mapping,
+            })
+            .await
+        {
+            Ok(_) => {}
+            Err(err) => {
+                panic!("{}", err);
+            }
+        };
+        if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+            assert_eq!(patch_instructions_int[j].0, patch_request.function_id);
+            assert!(patch_request.output_mapping.contains_key("out0"));
+            assert_eq!(
+                patch_request.output_mapping.get("out0").unwrap().function_id,
+                patch_instructions_int[j].1[0]
+            );
+            if let Some(val) = patch_request.output_mapping.get("out1") {
+                assert_eq!(val.function_id, patch_instructions_int[j].1[1]);
+            }
+        }
+    }
+
+    // Make sure there are no pending events around.
+    no_function_event(&mut nodes).await;
+
+    // Stop function f3
+    match fun_client.stop(ext_fids[2]).await {
+        Ok(_) => {}
+        Err(err) => panic!("{}", err),
+    }
+
+    let mut num_events = std::collections::HashMap::new();
+    loop {
+        if let Some((_node_id, event)) = wait_for_events_if_any(&mut nodes).await {
+            if num_events.contains_key(event_to_string(&event)) {
+                *num_events.get_mut(event_to_string(&event)).unwrap() += 1;
+            } else {
+                num_events.insert(event_to_string(&event), 1);
+            }
+            match event {
+                MockAgentEvent::StopFunction(instance_id) => {
+                    log::info!("stop-resource");
+                    assert_eq!(int_fids[2], instance_id.function_id);
+                }
+                MockAgentEvent::PatchFunction(patch_request) => {
+                    log::info!("patch-function");
+                    assert!(patch_request.function_id == int_fids[0] || patch_request.function_id == int_fids[1]);
+                    assert!(patch_request.output_mapping.is_empty());
+                }
+                _ => panic!("unexpected event type: {}", event_to_string(&event)),
+            };
+        } else {
+            break;
+        }
+    }
+    assert_eq!(Some(&1), num_events.get("stop-function"));
+    assert_eq!(Some(&2), num_events.get("patch-function"));
+
+    // Make sure there are no pending events around.
+    no_function_event(&mut nodes).await;
+}
+
 #[test]
 fn test_deployment_requirements() {
     let no_reqs = DeploymentRequirements::none();
