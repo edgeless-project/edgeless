@@ -606,6 +606,7 @@ async fn orc_patch() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn orc_node_with_fun_disconnects() {
     let _ = env_logger::try_init();
 
@@ -755,7 +756,7 @@ async fn orc_node_with_fun_disconnects() {
 
     // Disconnect the unstable node
     {
-        FAILING_NODES.set(std::sync::Mutex::new(std::collections::HashSet::new())).unwrap();
+        let _ = FAILING_NODES.set(std::sync::Mutex::new(std::collections::HashSet::new()));
 
         let mut failing_nodes = FAILING_NODES.get().unwrap().lock().unwrap();
         failing_nodes.clear();
@@ -826,6 +827,7 @@ async fn orc_node_with_fun_disconnects() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn orc_node_with_res_disconnects() {
     let _ = env_logger::try_init();
 
@@ -926,7 +928,7 @@ async fn orc_node_with_res_disconnects() {
 
     // Disconnect the unstable node
     {
-        FAILING_NODES.set(std::sync::Mutex::new(std::collections::HashSet::new())).unwrap();
+        let _ = FAILING_NODES.set(std::sync::Mutex::new(std::collections::HashSet::new()));
 
         let mut failing_nodes = FAILING_NODES.get().unwrap().lock().unwrap();
         failing_nodes.clear();
