@@ -323,7 +323,7 @@ fn make_start_resource_request(class_type: &str) -> edgeless_api::resource_confi
 }
 
 #[tokio::test]
-async fn orc_single_node_function_start_stop() {
+async fn test_orc_single_node_function_start_stop() {
     let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes, _) = test_setup(1, 0).await;
     assert_eq!(1, nodes.len());
     let (node_id, mock_node_receiver) = nodes.iter_mut().next().unwrap();
@@ -375,7 +375,7 @@ async fn orc_single_node_function_start_stop() {
 }
 
 #[tokio::test]
-async fn orc_multiple_nodes_function_start_stop() {
+async fn test_orc_multiple_nodes_function_start_stop() {
     let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes, _) = test_setup(3, 0).await;
     assert_eq!(3, nodes.len());
 
@@ -431,7 +431,7 @@ async fn orc_multiple_nodes_function_start_stop() {
 }
 
 #[tokio::test]
-async fn orc_multiple_resources_start_stop() {
+async fn test_orc_multiple_resources_start_stop() {
     let (mut _fun_client, mut res_client, mut _mgt_client, mut nodes, _) = test_setup(3, 3).await;
     assert_eq!(3, nodes.len());
 
@@ -499,7 +499,7 @@ async fn orc_multiple_resources_start_stop() {
 }
 
 #[tokio::test]
-async fn orc_patch() {
+async fn test_orc_patch() {
     let (mut fun_client, mut res_client, mut _mgt_client, mut nodes, _) = test_setup(1, 1).await;
     assert_eq!(1, nodes.len());
     let client_node_id = nodes.keys().next().unwrap().clone();
@@ -607,7 +607,7 @@ async fn orc_patch() {
 
 #[tokio::test]
 #[serial_test::serial]
-async fn orc_node_with_fun_disconnects() {
+async fn test_orc_node_with_fun_disconnects() {
     let _ = env_logger::try_init();
 
     let (mut fun_client, mut _res_client, mut mgt_client, mut nodes, stable_node_id) = test_setup(10, 0).await;
@@ -828,7 +828,7 @@ async fn orc_node_with_fun_disconnects() {
 
 #[tokio::test]
 #[serial_test::serial]
-async fn orc_node_with_res_disconnects() {
+async fn test_orc_node_with_res_disconnects() {
     let _ = env_logger::try_init();
 
     let (mut fun_client, mut res_client, mut mgt_client, mut nodes, stable_node_id) = test_setup(10, 1).await;
