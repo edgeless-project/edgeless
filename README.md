@@ -62,26 +62,29 @@ for other system parameters (e.g., location, owner, price).
 Depending on the annotations, the set of active workflows, and the current
 system conditions, the ε-CON may reject the workflow creation request.
 
+The orchestration model of EDGELESS is described separately in
+[this page](documentation/orchestration.md).
+
 ### Known limitations
 
 Currently there are several known limitations, including the following ones:
 
 - the dataplane within an orchestration domain is realized through a full-mesh
-- interconnection between all the nodes and the ε-BAL;
+  interconnection between all the nodes and the ε-BAL;
 - the ε-CON only supports a single orchestration domain and does not perform
-- any kind of admission control;
+  any kind of admission control;
 - the ε-ORC only supports a single node;
 - all the workflow- and function-level annotations are ignored;
-- there are only types of resources:
+- resources supported:
   - http-ingress: to ingest of HTTP commands from external web clients;
   - http-egress: to execute HTTP commands on external web servers;
   - file-log: to save to a node-local file strings;
   - redis: to update a value on an external [Redis](https://redis.io/) server;
-- the payload of events is string-only and not encrypted;
+- the payload of events is not encrypted;
 - the configuration of the ε-CON, ε-CON, and ε-BAL is read from a file and
 cannot be modified (e.g., it is not possible to add an orchestration domain
 or a node while running);
-- there is not persistence of the soft states of the various components.
+- there is no persistence of the soft states of the various components.
 
 The full list of issues is tracked on
 [GitHub](https://github.com/edgeless-project/edgeless/issues).
