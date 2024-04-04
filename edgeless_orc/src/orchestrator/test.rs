@@ -201,7 +201,7 @@ async fn test_setup(
 }
 
 #[allow(dead_code)]
-fn event_to_string(event: MockAgentEvent) -> &'static str {
+fn event_to_string(event: &MockAgentEvent) -> &'static str {
     match event {
         MockAgentEvent::StartFunction(_) => "start-function",
         MockAgentEvent::StopFunction(_) => "stop-function",
@@ -218,7 +218,7 @@ fn event_to_string(event: MockAgentEvent) -> &'static str {
 fn msg_to_string(msg: Result<Option<MockAgentEvent>, futures::channel::mpsc::TryRecvError>) -> &'static str {
     match msg {
         Ok(val) => match val {
-            Some(val) => event_to_string(val),
+            Some(val) => event_to_string(&val),
             None => "none",
         },
         Err(_) => "error",
@@ -261,16 +261,38 @@ async fn wait_for_event_multiple(
     panic!("timeout while waiting for an event");
 }
 
-async fn no_function_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>) {
-    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-    match receiver.try_next() {
-        Ok(val) => match val {
-            Some(event) => {
-                panic!("expecting no event, but received one: {}", event_to_string(event));
+async fn wait_for_events_if_any(
+    receivers: &mut std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>,
+) -> Option<(uuid::Uuid, MockAgentEvent)> {
+    for _ in 0..100 {
+        for (node_id, receiver) in receivers.iter_mut() {
+            match receiver.try_next() {
+                Ok(val) => match val {
+                    Some(event) => {
+                        return Some((node_id.clone(), event));
+                    }
+                    None => {}
+                },
+                Err(_) => {}
             }
-            None => {}
-        },
-        Err(_) => {}
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+    }
+    None
+}
+
+async fn no_function_event(receivers: &mut std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>) {
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    for (node_id, receiver) in receivers.iter_mut() {
+        match receiver.try_next() {
+            Ok(val) => match val {
+                Some(event) => {
+                    panic!("expecting no event, but received one on node {}: {}", node_id, event_to_string(&event));
+                }
+                None => {}
+            },
+            Err(_) => {}
+        }
     }
 }
 
@@ -349,7 +371,7 @@ async fn orc_single_node_function_start_stop() {
             panic!("{}", err);
         }
     }
-    no_function_event(mock_node_receiver).await;
+    no_function_event(&mut nodes).await;
 }
 
 #[tokio::test]
@@ -592,11 +614,11 @@ async fn orc_node_disconnects() {
 
     // Start this workflow
     //
-    // f1 -> f2 -> f3
+    // f1 -> f2 -> f3 -> f4
     //
     // One node is "stable", the others will be disconnected one after another
     //
-    // f1 & f3 are forced to be allocated on the stable noe
+    // f1 & f3 & f4 are forced to be allocated on the stable noe
     // f2 is forced to be allocated on the others
     //
 
@@ -621,8 +643,8 @@ async fn orc_node_disconnects() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
-    let mut int_fid_2 = uuid::Uuid::nil();
     let mut unstable_node_id = uuid::Uuid::nil();
+    let mut int_fid_2 = uuid::Uuid::nil();
     if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
         assert_ne!(node_id, stable_node_id);
         unstable_node_id = node_id.clone();
@@ -641,6 +663,20 @@ async fn orc_node_disconnects() {
     if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
         assert_eq!(node_id, stable_node_id);
         int_fid_3 = new_instance_id.function_id;
+        assert_eq!(spawn_req, spawn_req_rcvd);
+    }
+
+    // Start f4
+    let mut spawn_req = make_spawn_function_request("f4");
+    spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
+    let ext_fid_4 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+        edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+        edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+    };
+    let mut _int_fid_4 = uuid::Uuid::nil();
+    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+        assert_eq!(node_id, stable_node_id);
+        _int_fid_4 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
@@ -690,6 +726,33 @@ async fn orc_node_disconnects() {
         assert!(patch_request.output_mapping.contains_key("out"));
     }
 
+    // Patch f3->f4
+    match fun_client
+        .patch(edgeless_api::common::PatchRequest {
+            function_id: ext_fid_3.clone(),
+            output_mapping: std::collections::HashMap::from([(
+                "out".to_string(),
+                InstanceId {
+                    node_id: uuid::Uuid::nil(),
+                    function_id: ext_fid_4.clone(),
+                },
+            )]),
+        })
+        .await
+    {
+        Ok(_) => {}
+        Err(err) => {
+            panic!("{}", err);
+        }
+    };
+
+    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+        assert!(patch_request.output_mapping.contains_key("out"));
+    }
+
+    // Make sure there are no pending events around.
+    no_function_event(&mut nodes).await;
+
     // Disconnect the unstable node
     {
         FAILING_NODES.set(std::sync::Mutex::new(std::collections::HashSet::new())).unwrap();
@@ -700,17 +763,66 @@ async fn orc_node_disconnects() {
     }
     let _ = mgt_client.keep_alive().await;
 
-    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
-        assert_ne!(node_id, stable_node_id);
-        unstable_node_id = node_id;
-        assert_eq!("f2", spawn_req_rcvd.code.function_class_id);
+    let mut num_events = std::collections::HashMap::new();
+    let mut new_node_id = uuid::Uuid::nil();
+    let mut patch_request_1 = None;
+    let mut patch_request_2 = None;
+    loop {
+        if let Some((node_id, event)) = wait_for_events_if_any(&mut nodes).await {
+            if num_events.contains_key(event_to_string(&event)) {
+                *num_events.get_mut(event_to_string(&event)).unwrap() += 1;
+            } else {
+                num_events.insert(event_to_string(&event), 1);
+            }
+            match event {
+                MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd)) => {
+                    log::info!("start-function");
+                    assert_ne!(node_id, stable_node_id);
+                    assert_eq!(node_id, new_instance_id.node_id);
+                    new_node_id = new_instance_id.node_id;
+                    int_fid_2 = new_instance_id.function_id;
+                    assert_eq!("f2", spawn_req_rcvd.code.function_class_id);
+                }
+                MockAgentEvent::PatchFunction(patch_request) => {
+                    log::info!("patch-function");
+                    assert!(patch_request.output_mapping.contains_key("out"));
+                    if node_id == stable_node_id {
+                        patch_request_1 = Some(patch_request);
+                    } else if node_id == new_node_id {
+                        patch_request_2 = Some(patch_request);
+                    }
+                }
+                MockAgentEvent::UpdatePeers(req) => {
+                    log::info!("update-peers");
+                    match req {
+                        edgeless_api::node_management::UpdatePeersRequest::Del(del_node_id) => {
+                            assert_eq!(unstable_node_id, del_node_id);
+                        }
+                        _ => panic!("wrong UpdatePeersRequest message"),
+                    }
+                }
+                MockAgentEvent::KeepAlive() => {
+                    log::info!("keep-alive");
+                }
+                _ => panic!("unexpected event type: {}", event_to_string(&event)),
+            };
+        } else {
+            break;
+        }
     }
-    if let (node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
-        assert_eq!(node_id, stable_node_id);
-        assert!(patch_request.output_mapping.contains_key("out"));
-        assert_eq!(ext_fid_1, patch_request.function_id);
-        assert_eq!(ext_fid_2, patch_request.output_mapping.get("out").unwrap().function_id);
-    }
+    assert_eq!(Some(&10), num_events.get("keep-alive"));
+    assert_eq!(Some(&9), num_events.get("update-peers"));
+    assert_eq!(Some(&2), num_events.get("patch-function"));
+    assert_eq!(Some(&1), num_events.get("start-function"));
+
+    let patch_request_1 = patch_request_1.unwrap();
+    let patch_request_2 = patch_request_2.unwrap();
+    assert_eq!(int_fid_1, patch_request_1.function_id);
+    assert_eq!(int_fid_2, patch_request_1.output_mapping.get("out").unwrap().function_id);
+    assert_eq!(int_fid_2, patch_request_2.function_id);
+    assert_eq!(int_fid_3, patch_request_2.output_mapping.get("out").unwrap().function_id);
+
+    no_function_event(&mut nodes).await;
 }
 
 #[test]
