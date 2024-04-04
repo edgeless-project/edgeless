@@ -500,6 +500,7 @@ impl Orchestrator {
         // function instance by using the orchestration logic.
         // Orchestration strategy can also be changed during
         // runtime.
+
         let reqs = DeploymentRequirements::from_annotations(&spawn_req.annotations);
         let selected_node_id = match orchestration_logic.next(&reqs) {
             Some(u) => u,
@@ -520,6 +521,7 @@ impl Orchestrator {
         }
         .api
         .function_instance_api();
+
         log::debug!(
             "Orchestrator StartFunction {:?} ext_fid {} at worker node with node_id {:?}",
             spawn_req,
@@ -921,7 +923,7 @@ impl Orchestrator {
                         }
                     });
 
-                    // Finally, update the peers of (still alive) nodes by
+                    // Update the peers of (still alive) nodes by
                     // deleting the missing-in-action peers.
                     for removed_node_id in &to_be_disconnected {
                         for (_, client_desc) in clients.iter_mut() {
@@ -938,6 +940,9 @@ impl Orchestrator {
                             }
                         }
                     }
+
+                    // Update the orchestration logic.
+                    orchestration_logic.update_nodes(&clients, &resource_providers);
 
                     //
                     // Make sure that all active logical functions are assigned
@@ -995,6 +1000,19 @@ impl Orchestrator {
                                     to_be_repatched.push(origin_ext_fid.clone());
                                     res_to_be_created.insert(origin_ext_fid.clone(), start_req.clone());
                                 }
+                            }
+                        }
+                    }
+
+                    // Also schedule to be repatch all the functions that
+                    // depend on the functions/resources modified.
+                    for (origin_ext_fid, output_mapping) in active_patches.iter() {
+                        for (_output, target_ext_fid) in output_mapping.iter() {
+                            if active_instances_to_be_updated.contains(target_ext_fid)
+                                || fun_to_be_created.contains_key(target_ext_fid)
+                                || res_to_be_created.contains_key(target_ext_fid)
+                            {
+                                to_be_repatched.push(origin_ext_fid.clone());
                             }
                         }
                     }
