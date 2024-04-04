@@ -567,6 +567,24 @@ impl Orchestrator {
         }
     }
 
+    /// Return the list of ext_fids that depend on the given one, according
+    /// to the active patches.
+    fn dependencies(
+        active_patches: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
+        ext_fid: &uuid::Uuid,
+    ) -> Vec<uuid::Uuid> {
+        let mut dependencies = vec![];
+        for (origin_ext_fid, output_mapping) in active_patches.iter() {
+            for (_output, target_ext_fid) in output_mapping.iter() {
+                if target_ext_fid == ext_fid {
+                    dependencies.push(origin_ext_fid.clone());
+                    break;
+                }
+            }
+        }
+        dependencies
+    }
+
     async fn main_task(
         receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>,
         orchestrator_settings: crate::EdgelessOrcSettings,
@@ -613,7 +631,8 @@ impl Orchestrator {
         // value: map of:
         //        key:   channel output name
         //        value: ext_fid (target function)
-        let mut active_patches = std::collections::HashMap::new();
+        let mut active_patches: std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>> =
+            std::collections::HashMap::new();
 
         // Main loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
@@ -669,7 +688,13 @@ impl Orchestrator {
                                     );
                                 }
                             };
-                            Self::apply_patches(&mut active_instances, &active_patches, &mut clients, vec![ext_fid]).await;
+                            Self::apply_patches(
+                                &mut active_instances,
+                                &active_patches,
+                                &mut clients,
+                                Self::dependencies(&active_patches, &ext_fid),
+                            )
+                            .await;
                             active_patches.remove(&ext_fid);
                         }
                         None => {
@@ -733,7 +758,13 @@ impl Orchestrator {
                                     }
                                 }
                             }
-                            Self::apply_patches(&mut active_instances, &active_patches, &mut clients, vec![ext_fid]).await;
+                            Self::apply_patches(
+                                &mut active_instances,
+                                &active_patches,
+                                &mut clients,
+                                Self::dependencies(&active_patches, &ext_fid),
+                            )
+                            .await;
                             active_patches.remove(&ext_fid);
                         }
                         None => {
