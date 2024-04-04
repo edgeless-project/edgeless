@@ -828,8 +828,7 @@ async fn test_orc_node_with_fun_disconnects() {
 }
 
 #[tokio::test]
-#[serial_test::serial]
-async fn test_orc_node_with_res_disconnects() {
+async fn orc_node_with_res_disconnects() {
     let _ = env_logger::try_init();
 
     let (mut fun_client, mut res_client, mut mgt_client, mut nodes, stable_node_id) = test_setup(10, 1).await;
