@@ -508,7 +508,7 @@ impl Orchestrator {
                 return Err(anyhow::anyhow!(
                     "Could not start a function instance for ext_fid {}: no valid node found",
                     ext_fid
-                ))
+                ));
             }
         };
 
@@ -642,6 +642,9 @@ impl Orchestrator {
                     let ext_fid = uuid::Uuid::new_v4();
 
                     // Start the function instance.
+                    // If the operation fails, then active_instances is not
+                    // updated, i.e., it is as if the request to start the
+                    // function has never been issued.
                     let res = Self::start_function(spawn_req.clone(), &mut orchestration_logic, &mut active_instances, &mut clients, ext_fid).await;
 
                     // Send back the response to the caller.
@@ -709,6 +712,9 @@ impl Orchestrator {
                     let ext_fid = uuid::Uuid::new_v4();
 
                     // Start the resource.
+                    // If the operation fails, active_instances is not updated,
+                    // i.e., it is as if the request to start the resource has
+                    // never been issued.
                     let res = Self::start_resource(
                         start_req.clone(),
                         &mut resource_providers,
@@ -925,7 +931,7 @@ impl Orchestrator {
                     }
                 }
                 OrchestratorRequest::KEEPALIVE() => {
-                    log::debug!("keep alive");
+                    log::debug!("keep-alive");
 
                     // First check if there are nodes that must be disconnected
                     // because they failed to reply to a keep-alive.
@@ -938,7 +944,7 @@ impl Orchestrator {
 
                     // Second, remove all those nodes from the map of clients.
                     for node_id in to_be_disconnected.iter() {
-                        log::info!("disconnected node not replying to keep alive: {}", &node_id);
+                        log::info!("disconnected node not replying to keep-alive: {}", &node_id);
                         let val = clients.remove(&node_id);
                         assert!(val.is_some());
                     }
@@ -1004,14 +1010,19 @@ impl Orchestrator {
                     let mut active_instances_to_be_updated = vec![];
 
                     // Find all the functions/resources affected.
+                    // Also attempt to start functions and resources that
+                    // are active but for which no active instance is present
+                    // (this happens because in the past a node with active
+                    // functions/resources has disappeared and it was not
+                    // possible to fix the situation immediately).
                     for (origin_ext_fid, instance) in active_instances.iter() {
                         match instance {
                             ActiveInstance::Function(start_req, _reqs, instances) => {
                                 let num_disconnected = instances.iter().filter(|x| to_be_disconnected.contains(&x.node_id)).count();
                                 assert!(num_disconnected <= instances.len());
-                                if num_disconnected > 0 {
+                                if instances.is_empty() || num_disconnected > 0 {
                                     to_be_repatched.push(origin_ext_fid.clone());
-                                    if num_disconnected == instances.len() {
+                                    if instances.is_empty() || num_disconnected == instances.len() {
                                         // If all the function instances
                                         // disappared, then we must enforce the
                                         // creation of (at least) a new
@@ -1027,7 +1038,7 @@ impl Orchestrator {
                                 }
                             }
                             ActiveInstance::Resource(start_req, instance) => {
-                                if to_be_disconnected.contains(&instance.node_id) {
+                                if instance.is_none() || to_be_disconnected.contains(&instance.node_id) {
                                     to_be_repatched.push(origin_ext_fid.clone());
                                     res_to_be_created.insert(origin_ext_fid.clone(), start_req.clone());
                                 }
@@ -1035,7 +1046,7 @@ impl Orchestrator {
                         }
                     }
 
-                    // Also schedule to be repatch all the functions that
+                    // Also schedule to repatch all the functions that
                     // depend on the functions/resources modified.
                     for (origin_ext_fid, output_mapping) in active_patches.iter() {
                         for (_output, target_ext_fid) in output_mapping.iter() {
@@ -1062,21 +1073,41 @@ impl Orchestrator {
                     }
 
                     // Create the functions that went missing.
+                    // If the operation fails for a function now, then the
+                    // function remains in the active_instances, but it is
+                    // assigned no function instance.
                     for (ext_fid, spawn_req) in fun_to_be_created.into_iter() {
                         match Self::start_function(spawn_req, &mut orchestration_logic, &mut active_instances, &mut clients, ext_fid).await {
                             Ok(_) => {}
                             Err(err) => {
                                 log::error!("error when creating a new function assigned with ext_fid {}: {}", ext_fid, err);
+                                match active_instances.get_mut(&ext_fid).unwrap() {
+                                    ActiveInstance::Function(_spawn_req, _reqs, instances) => instances.clear(),
+                                    ActiveInstance::Resource(_, _) => {
+                                        panic!("expecting a function to be associated with ext_fid {}, found a resource", ext_fid)
+                                    }
+                                }
                             }
                         }
                     }
 
                     // Create the resources that went missing.
+                    // If the operation fails for a resource now, then the
+                    // resource remains in the active_instances, but it is
+                    // assigned an invalid function instance.
                     for (ext_fid, start_req) in res_to_be_created.into_iter() {
                         match Self::start_resource(start_req, &mut resource_providers, &mut active_instances, &mut clients, ext_fid, &mut rng).await {
                             Ok(_) => {}
                             Err(err) => {
                                 log::error!("error when creating a new resource assigned with ext_fid {}: {}", ext_fid, err);
+                                match active_instances.get_mut(&ext_fid).unwrap() {
+                                    ActiveInstance::Function(_, _, _) => {
+                                        panic!("expecting a resource to be associated with ext_fid {}, found a function", ext_fid)
+                                    }
+                                    ActiveInstance::Resource(_start_req, instance_id) => {
+                                        *instance_id = InstanceId::none();
+                                    }
+                                }
                             }
                         }
                     }
