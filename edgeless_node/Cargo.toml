@@ -48,3 +48,4 @@ redis = "*"
 openssl = { version = "0.10", features = ["vendored"] }
 sysinfo = "0.15"
 wasmi = {version = "0.31", default-features = false , optional = true}
+rs-docker = "0.0.58"
