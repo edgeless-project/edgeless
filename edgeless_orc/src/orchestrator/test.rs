@@ -14,6 +14,7 @@ enum MockAgentEvent {
     ),
     StopFunction(edgeless_api::function_instance::InstanceId),
     PatchFunction(edgeless_api::common::PatchRequest),
+    #[allow(dead_code)]
     UpdatePeers(edgeless_api::node_management::UpdatePeersRequest),
     KeepAlive(),
     StartResource(
