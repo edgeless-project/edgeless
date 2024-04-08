@@ -199,7 +199,12 @@ impl Controller {
         while let Some(req) = receiver.next().await {
             match req {
                 ControllerRequest::START(spawn_workflow_request, reply_sender) => {
-                    log::info!("Annotations ({}) are currently ignored", spawn_workflow_request.annotations.len());
+                    if !spawn_workflow_request.annotations.is_empty() {
+                        log::warn!(
+                            "Workflow annotations ({}) are currently ignored",
+                            spawn_workflow_request.annotations.len()
+                        );
+                    }
 
                     // Assign a new identifier to the newly-created workflow.
                     let wf_id = edgeless_api::workflow_instance::WorkflowId {
@@ -233,7 +238,7 @@ impl Controller {
                         // [TODO] Issue#95
                         // The state_specification configuration should be
                         // read from the function annotations.
-                        log::warn!("state specifications currently forced to NodeLocal");
+                        log::debug!("state specifications currently forced to NodeLocal");
                         let response = fn_client
                             .start(edgeless_api::function_instance::SpawnFunctionRequest {
                                 instance_id: None,
