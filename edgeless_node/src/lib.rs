@@ -8,6 +8,7 @@ use sysinfo::{ProcessorExt, SystemExt};
 
 pub mod agent;
 pub mod base_runtime;
+pub mod container_runner;
 pub mod resources;
 pub mod state_management;
 #[cfg(feature = "wasmtime")]
