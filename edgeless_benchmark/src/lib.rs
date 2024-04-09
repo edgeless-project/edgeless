@@ -4,7 +4,7 @@
 pub mod redis_dumper;
 pub mod resources;
 
-pub async fn edgeless_metrics_collector_node_main(settings: edgeless_node::EdgelessNodeSettings) {
+pub async fn edgeless_metrics_collector_node_main(settings: edgeless_node::EdgelessNodeGeneralSettings) {
     log::info!("Starting EDGELESS metrics collector node");
     log::debug!("Settings: {:?}", settings);
 
