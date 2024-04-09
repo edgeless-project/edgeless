@@ -90,8 +90,8 @@ contains the following elements:
   * `init-payload`: the content is passed to the `handle_init()` method of the
   function instance upon construction (it is akin to the arguments of a
   constructor in object-oriented programming languages);
-  * `max_instances`: maximum number of function instances in this orchestration
-  domain. 0 means unlimited;
+  * `max_instances`: maximum number of function instances that can be spawned
+  by the ε-ORC. 0 means unlimited;
   * `node_id_match_any`: the function instance must be created on a node
   matching one of the given UUIDs, if any is given;
   * `label_match_all`: the function instance must be created on a node that

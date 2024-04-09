@@ -569,6 +569,13 @@ impl Orchestrator {
 
     /// Return the list of ext_fids that depend on the given one, according
     /// to the active patches.
+    ///
+    /// If we see the functions and output_mappings as a graph where:
+    /// - there is a vertex for every function/resource,
+    /// - there is an edge for every output_mapping between two functions/resources
+    ///
+    /// this function will return all the ingress vertices of the vertex
+    /// identified by `ext_fid`.
     fn dependencies(
         active_patches: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
         ext_fid: &uuid::Uuid,
