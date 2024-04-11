@@ -2,12 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct FunctionInstanceInit {
-    pub init_payload: String,
-    pub serialized_state: Vec<u8>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
 pub struct OutputEventData {
     pub alias: String,
     pub msg: Vec<u8>,
@@ -30,25 +24,25 @@ pub enum TelemetryLogLevel {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TelemetryLogEvent {
-    log_level: TelemetryLogLevel,
-    target: String,
-    msg: String,
+    pub log_level: TelemetryLogLevel,
+    pub target: String,
+    pub msg: String,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DelayedEventData {
-    alias: String,
-    msg: Vec<u8>,
-    delay: u64,
+    pub alias: String,
+    pub msg: Vec<u8>,
+    pub delay: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SyncData {
-    serialized_data: Vec<u8>,
+    pub serialized_data: Vec<u8>,
 }
 
 #[async_trait::async_trait]
-pub trait GuestAPIHostAPI: GuestAPIHostAPIClone + Sync + Send {
+pub trait GuestAPIHost: GuestAPIHostClone + Sync + Send {
     async fn cast(&mut self, event: OutputEventData) -> anyhow::Result<()>;
     async fn cast_raw(&mut self, event: OutputEventDataRaw) -> anyhow::Result<()>;
     async fn call(&mut self, event: OutputEventData) -> anyhow::Result<crate::guest_api_function::CallReturn>;
@@ -60,19 +54,19 @@ pub trait GuestAPIHostAPI: GuestAPIHostAPIClone + Sync + Send {
 }
 
 // https://stackoverflow.com/a/30353928
-pub trait GuestAPIHostAPIClone {
-    fn clone_box(&self) -> Box<dyn GuestAPIHostAPI>;
+pub trait GuestAPIHostClone {
+    fn clone_box(&self) -> Box<dyn GuestAPIHost>;
 }
-impl<T> GuestAPIHostAPIClone for T
+impl<T> GuestAPIHostClone for T
 where
-    T: 'static + GuestAPIHostAPI + Clone,
+    T: 'static + GuestAPIHost + Clone,
 {
-    fn clone_box(&self) -> Box<dyn GuestAPIHostAPI> {
+    fn clone_box(&self) -> Box<dyn GuestAPIHost> {
         Box::new(self.clone())
     }
 }
-impl Clone for Box<dyn GuestAPIHostAPI> {
-    fn clone(&self) -> Box<dyn GuestAPIHostAPI> {
+impl Clone for Box<dyn GuestAPIHost> {
+    fn clone(&self) -> Box<dyn GuestAPIHost> {
         self.clone_box()
     }
 }
