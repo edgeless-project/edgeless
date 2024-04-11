@@ -313,7 +313,7 @@ message FunctionInstanceInit {
     string init_payload     = 1;
 
     // The initial state. Can be empty.
-    string serialized_state = 10;
+    bytes serialized_state = 10;
 }
 
 // Argument of GuestAPIFunction::Cast() and GuestAPIFunction::Call().
@@ -322,7 +322,7 @@ message InputEventData {
     InstanceId src = 1;
     
     // The event payload. Can be empty.
-    string msg     = 2;
+    bytes msg     = 2;
 }
 
 // Types of CallReturn.
@@ -341,7 +341,7 @@ message CallReturn {
     CallRetType type  = 1;
 
     // Reply message. Can only be empty with type = Type::REPLY.
-    string msg        = 2;
+    bytes msg        = 2;
 }
 
 // Argument of GuestAPIHost::Cast() and GuestAPIHost::Call().
@@ -350,7 +350,7 @@ message OutputEventData {
     string alias = 1;
     
     // The event payload. Can be empty.
-    string msg   = 2;
+    bytes msg   = 2;
 }
 
 // Argument of GuestAPIHost::Cast() and GuestAPIHost::Call().
@@ -359,7 +359,7 @@ message OutputEventDataRaw {
     InstanceId dst = 1;
     
     // The event payload. Can be empty.
-    string msg     = 2;
+    bytes msg     = 2;
 }
 
 enum TelemetryLogLevel {
@@ -388,7 +388,7 @@ message DelayedEventData {
     string alias = 1;
     
     // The event payload. Can be empty.
-    string msg   = 2;
+    bytes msg   = 2;
 
     // The delay after which this event has to be generated, in ms.
     uint64 delay = 3;
@@ -396,5 +396,5 @@ message DelayedEventData {
 
 // Argument of GuestAPIHost::Sync().
 message SyncData {
-    string serialized_state = 1;
+    bytes serialized_state = 1;
 }
