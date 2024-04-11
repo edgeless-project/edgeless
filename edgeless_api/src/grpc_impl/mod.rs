@@ -15,6 +15,8 @@ pub mod function_instance;
 
 pub mod guest_api_function;
 
+pub mod guest_api_host;
+
 pub mod invocation;
 
 pub mod orc;
