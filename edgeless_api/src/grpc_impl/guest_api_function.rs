@@ -41,14 +41,29 @@ impl crate::guest_api_function::GuestAPIFunction for GuestAPIFunctionClient {
         }
     }
     async fn cast(&mut self, event: crate::guest_api_function::InputEventData) -> anyhow::Result<()> {
-        Ok(())
+        match self.client.cast(tonic::Request::new(serialize_input_event_data(&event))).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!("Communication error while casting an event: {}", err.to_string())),
+        }
     }
 
     async fn call(&mut self, event: crate::guest_api_function::InputEventData) -> anyhow::Result<crate::guest_api_function::CallReturn> {
-        Ok(crate::guest_api_function::CallReturn::NoRet)
+        match self.client.call(tonic::Request::new(serialize_input_event_data(&event))).await {
+            Ok(msg) => parse_call_return(&msg.into_inner()),
+            Err(err) => Err(anyhow::anyhow!(
+                "Communication error while calling a function instance: {}",
+                err.to_string()
+            )),
+        }
     }
     async fn stop(&mut self) -> anyhow::Result<()> {
-        Ok(())
+        match self.client.stop(tonic::Request::new(())).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(
+                "Communication error while stopping function instance: {}",
+                err.to_string()
+            )),
+        }
     }
 }
 
