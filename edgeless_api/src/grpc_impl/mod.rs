@@ -13,6 +13,8 @@ pub mod controller;
 
 pub mod function_instance;
 
+pub mod guest_api_function;
+
 pub mod invocation;
 
 pub mod orc;
