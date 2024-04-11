@@ -8,6 +8,10 @@ pub mod coap_impl;
 
 pub mod function_instance;
 
+pub mod guest_api_function;
+
+pub mod guest_api_host;
+
 pub mod workflow_instance;
 
 pub mod resource_configuration;
