@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
-use super::api;
-
 #[derive(Clone)]
 pub struct GuestAPIFunctionClient {
     client: crate::grpc_impl::api::guest_api_function_client::GuestApiFunctionClient<tonic::transport::Channel>,
@@ -139,11 +137,11 @@ pub fn parse_input_event_data(api_instance: &crate::grpc_impl::api::InputEventDa
 
 pub fn parse_call_return(api_instance: &crate::grpc_impl::api::CallReturn) -> anyhow::Result<crate::guest_api_function::CallReturn> {
     match api_instance.r#type {
-        x if x == crate::grpc_impl::guest_api_function::api::CallRetType::CallRetNoReply as i32 => Ok(crate::guest_api_function::CallReturn::NoRet),
-        x if x == crate::grpc_impl::guest_api_function::api::CallRetType::CallRetReply as i32 => {
+        x if x == crate::grpc_impl::api::CallRetType::CallRetNoReply as i32 => Ok(crate::guest_api_function::CallReturn::NoRet),
+        x if x == crate::grpc_impl::api::CallRetType::CallRetReply as i32 => {
             Ok(crate::guest_api_function::CallReturn::Reply(api_instance.msg.clone()))
         }
-        x if x == crate::grpc_impl::guest_api_function::api::CallRetType::CallRetErr as i32 => Ok(crate::guest_api_function::CallReturn::Err),
+        x if x == crate::grpc_impl::api::CallRetType::CallRetErr as i32 => Ok(crate::guest_api_function::CallReturn::Err),
         x => Err(anyhow::anyhow!("Ill-formed CallReturn message: unknown type {}", x)),
     }
 }
@@ -165,15 +163,15 @@ fn serialize_input_event_data(event: &crate::guest_api_function::InputEventData)
 fn serialize_call_return(ret: &crate::guest_api_function::CallReturn) -> crate::grpc_impl::api::CallReturn {
     match ret {
         crate::guest_api_function::CallReturn::NoRet => crate::grpc_impl::api::CallReturn {
-            r#type: crate::grpc_impl::guest_api_function::api::CallRetType::CallRetNoReply as i32,
+            r#type: crate::grpc_impl::api::CallRetType::CallRetNoReply as i32,
             msg: vec![],
         },
         crate::guest_api_function::CallReturn::Reply(msg) => crate::grpc_impl::api::CallReturn {
-            r#type: crate::grpc_impl::guest_api_function::api::CallRetType::CallRetReply as i32,
+            r#type: crate::grpc_impl::api::CallRetType::CallRetReply as i32,
             msg: msg.clone(),
         },
         crate::guest_api_function::CallReturn::Err => crate::grpc_impl::api::CallReturn {
-            r#type: crate::grpc_impl::guest_api_function::api::CallRetType::CallRetErr as i32,
+            r#type: crate::grpc_impl::api::CallRetType::CallRetErr as i32,
             msg: vec![],
         },
     }
