@@ -175,7 +175,7 @@ fn serialize_input_event_data(event: &crate::guest_api_function::InputEventData)
     }
 }
 
-fn serialize_call_return(ret: &crate::guest_api_function::CallReturn) -> crate::grpc_impl::api::CallReturn {
+pub fn serialize_call_return(ret: &crate::guest_api_function::CallReturn) -> crate::grpc_impl::api::CallReturn {
     match ret {
         crate::guest_api_function::CallReturn::NoRet => crate::grpc_impl::api::CallReturn {
             r#type: crate::grpc_impl::api::CallRetType::CallRetNoReply as i32,
