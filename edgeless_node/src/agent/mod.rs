@@ -38,6 +38,10 @@ impl Agent {
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
+        for class_type in runners.keys() {
+            log::info!("new runner, class_type: {}", class_type);
+        }
+
         let main_task = Box::pin(async move {
             Self::main_task(receiver, runners, resources, data_plane_provider).await;
         });
