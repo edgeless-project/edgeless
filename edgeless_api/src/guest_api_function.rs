@@ -2,6 +2,11 @@
 // SPDX-License-Identifier: MIT
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct BootData {
+    pub guest_api_host_endpoint: String,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct FunctionInstanceInit {
     pub init_payload: String,
     pub serialized_state: Vec<u8>,
@@ -22,6 +27,7 @@ pub enum CallReturn {
 
 #[async_trait::async_trait]
 pub trait GuestAPIFunction: GuestAPIFunctionClone + Sync + Send {
+    async fn boot(&mut self, boot_data: BootData) -> anyhow::Result<()>;
     async fn init(&mut self, init_data: FunctionInstanceInit) -> anyhow::Result<()>;
     async fn cast(&mut self, event: InputEventData) -> anyhow::Result<()>;
     async fn call(&mut self, event: InputEventData) -> anyhow::Result<CallReturn>;
