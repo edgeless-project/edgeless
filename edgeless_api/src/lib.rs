@@ -4,6 +4,8 @@
 #[cfg(feature = "grpc_impl")]
 pub mod grpc_impl;
 
+pub mod container_function;
+
 pub mod coap_impl;
 
 pub mod function_instance;
