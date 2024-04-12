@@ -81,6 +81,7 @@ fn parse_node_capabilities(api_instance: &crate::grpc_impl::api::NodeCapabilitie
         labels: api_instance.labels.clone(),
         is_tee_running: api_instance.is_tee_running,
         has_tpm: api_instance.has_tpm,
+        runtimes: api_instance.runtimes.clone(),
     }
 }
 
@@ -94,6 +95,7 @@ fn serialize_node_capabilities(req: &crate::node_registration::NodeCapabilities)
         labels: req.labels.clone(),
         is_tee_running: req.is_tee_running,
         has_tpm: req.has_tpm,
+        runtimes: req.runtimes.clone(),
     }
 }
 
@@ -245,6 +247,7 @@ mod test {
                     labels: vec!["red".to_string(), "powerful".to_string()],
                     is_tee_running: true,
                     has_tpm: true,
+                    runtimes: vec!["RUST_WASM".to_string()],
                 },
             ),
             UpdateNodeRequest::Registration(

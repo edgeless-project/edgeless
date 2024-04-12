@@ -20,10 +20,28 @@ pub mod wasmi_runner;
 pub struct EdgelessNodeSettings {
     /// General settings.
     pub general: EdgelessNodeGeneralSettings,
+    /// WASM run-time settings. Disabled if not present.
+    pub wasm_runtime: Option<EdgelessNodeWasmRuntimeSettings>,
+    /// Container run-time settings.  Disabled if not present.
+    pub container_runtime: Option<EdgelessNodeContainerRuntimeSettings>,
     /// Resource settings.
     pub resources: Option<EdgelessNodeResourceSettings>,
     /// User-specific capabilities.
     pub user_node_capabilities: Option<NodeCapabilitiesUser>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct EdgelessNodeWasmRuntimeSettings {
+    /// True if WASM is enabled.
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct EdgelessNodeContainerRuntimeSettings {
+    /// True if the container run-time is enabled.
+    pub enabled: bool,
+    /// End-point of the gRPC server to use for the GuestAPIHost interface.
+    pub guest_api_host_url: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -94,7 +112,8 @@ impl NodeCapabilitiesUser {
 }
 
 impl EdgelessNodeSettings {
-    /// Create settings for a node with no resources binding the given ports on the same address.
+    /// Create settings for a node with WASM run-time and no resources
+    /// binding the given ports on the same address.
     pub fn new_without_resources(orchestrator_url: &str, node_address: &str, agent_port: u16, invocation_port: u16, metrics_port: u16) -> Self {
         let agent_url = format!("http://{}:{}", node_address, agent_port);
         let invocation_url = format!("http://{}:{}", node_address, invocation_port);
@@ -108,13 +127,15 @@ impl EdgelessNodeSettings {
                 metrics_url: format!("http://{}:{}", node_address, metrics_port),
                 orchestrator_url: orchestrator_url.to_string(),
             },
+            wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
+            container_runtime: None,
             resources: None,
             user_node_capabilities: None,
         }
     }
 }
 
-fn get_capabilities(user_node_capabilities: NodeCapabilitiesUser) -> edgeless_api::node_registration::NodeCapabilities {
+fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilitiesUser) -> edgeless_api::node_registration::NodeCapabilities {
     let s = sysinfo::System::new();
     let mut model_name_set = std::collections::HashSet::new();
     let mut clock_freq_cpu_set = std::collections::HashSet::new();
@@ -145,6 +166,7 @@ fn get_capabilities(user_node_capabilities: NodeCapabilitiesUser) -> edgeless_ap
         labels: user_node_capabilities.labels.unwrap_or(vec![]),
         is_tee_running: user_node_capabilities.is_tee_running.unwrap_or(false),
         has_tpm: user_node_capabilities.has_tpm.unwrap_or(false),
+        runtimes,
     }
 }
 
@@ -314,43 +336,53 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     let mut runners = std::collections::HashMap::<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>::new();
 
-    // Create the WebAssembly (Wasmtime) runner.
-    #[allow(unused_variables)]
-    #[cfg(feature = "wasmtime")]
-    let rust_runtime_task = {
-        let (wasmtime_runtime_client, mut wasmtime_runtime_task_s) =
-            base_runtime::runtime::create::<wasm_runner::function_instance::WASMFunctionInstance>(
-                data_plane.clone(),
-                state_manager.clone(),
-                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                    ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
-                    ("WASM_RUNTIME".to_string(), "wasmtime".to_string()),
-                    ("NODE_ID".to_string(), settings.general.node_id.to_string()),
-                ]))),
-            );
-        runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
-        tokio::spawn(async move {
-            wasmtime_runtime_task_s.run().await;
-        })
-    };
+    let rust_runtime_task = match settings.wasm_runtime {
+        Some(wasm_runtime_settings) => {
+            match wasm_runtime_settings.enabled {
+                true => {
+                    // Create the WebAssembly (Wasmtime) runner.
+                    #[allow(unused_variables)]
+                    #[cfg(feature = "wasmtime")]
+                    {
+                        let (wasmtime_runtime_client, mut wasmtime_runtime_task_s) =
+                            base_runtime::runtime::create::<wasm_runner::function_instance::WASMFunctionInstance>(
+                                data_plane.clone(),
+                                state_manager.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
+                                    ("WASM_RUNTIME".to_string(), "wasmtime".to_string()),
+                                    ("NODE_ID".to_string(), settings.general.node_id.to_string()),
+                                ]))),
+                            );
+                        runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
+                        tokio::spawn(async move {
+                            wasmtime_runtime_task_s.run().await;
+                        })
+                    }
 
-    // Create the WebAssembly (Wasmi) runner.
-    #[allow(unused_variables)]
-    #[cfg(feature = "wasmi")]
-    let rust_runtime_task = {
-        let (wasmi_runtime_client, mut wasmi_runtime_task_s) = base_runtime::runtime::create::<wasmi_runner::WASMIFunctionInstance>(
-            data_plane.clone(),
-            state_manager.clone(),
-            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
-                ("WASM_RUNTIME".to_string(), "wasmi".to_string()),
-                ("NODE_ID".to_string(), settings.node_id.to_string()),
-            ]))),
-        );
-        runners.insert("RUST_WASM".to_string(), Box::new(wasmi_runtime_client.clone()));
-        tokio::spawn(async move {
-            wasmi_runtime_task_s.run().await;
-        })
+                    // Create the WebAssembly (Wasmi) runner.
+                    #[allow(unused_variables)]
+                    #[cfg(feature = "wasmi")]
+                    {
+                        let (wasmi_runtime_client, mut wasmi_runtime_task_s) = base_runtime::runtime::create::<wasmi_runner::WASMIFunctionInstance>(
+                            data_plane.clone(),
+                            state_manager.clone(),
+                            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
+                                ("WASM_RUNTIME".to_string(), "wasmi".to_string()),
+                                ("NODE_ID".to_string(), settings.node_id.to_string()),
+                            ]))),
+                        );
+                        runners.insert("RUST_WASM".to_string(), Box::new(wasmi_runtime_client.clone()));
+                        tokio::spawn(async move {
+                            wasmi_runtime_task_s.run().await;
+                        })
+                    }
+                }
+                false => tokio::spawn(async {}),
+            }
+        }
+        None => tokio::spawn(async {}),
     };
 
     // Create the resources.
@@ -364,6 +396,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     .await;
 
     // Create the agent.
+    let runtimes = runners.keys().map(|x| x.to_string()).collect::<Vec<String>>();
     let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.general.node_id.clone(), data_plane.clone());
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
 
@@ -374,14 +407,14 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         agent_api_server,
         register_node(
             settings.general,
-            get_capabilities(settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
+            get_capabilities(runtimes, settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
             resource_provider_specifications
         )
     );
 }
 
 pub fn edgeless_node_default_conf() -> String {
-    let caps = get_capabilities(NodeCapabilitiesUser::empty());
+    let caps = get_capabilities(vec!["RUST_WASM".to_string()], NodeCapabilitiesUser::empty());
 
     format!(
         "{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}",
@@ -393,6 +426,13 @@ invocation_url = "http://127.0.0.1:7002"
 invocation_url_announced = ""
 metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://127.0.0.1:7011"
+
+[wasm_runtime]
+enabled = true
+
+[container_runtime]
+enabled = false
+guest_api_host_url = "http://127.0.0.1:7100"
 
 [resources]
 http_ingress_url = "http://127.0.0.1:7035"
