@@ -11,6 +11,8 @@ pub mod common;
 
 pub mod container_function;
 
+pub mod container_runtime;
+
 pub mod controller;
 
 pub mod function_instance;
