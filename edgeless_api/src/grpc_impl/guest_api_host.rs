@@ -90,22 +90,6 @@ impl crate::guest_api_host::GuestAPIHost for GuestAPIHostClient {
 
 #[async_trait::async_trait]
 impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHostService {
-    // async fn init(&self, init_data: tonic::Request<crate::grpc_impl::api::FunctionInstanceInit>) -> Result<tonic::Response<()>, tonic::Status> {
-    //     let parsed_request = match parse_function_instance_init(&init_data.into_inner()) {
-    //         Ok(parsed_request) => parsed_request,
-    //         Err(err) => {
-    //             return Err(tonic::Status::invalid_argument(format!(
-    //                 "Error when parsing an FunctionInstanceInit message: {}",
-    //                 err
-    //             )));
-    //         }
-    //     };
-    //     match self.guest_api_host.lock().await.init(parsed_request).await {
-    //         Ok(_) => Ok(tonic::Response::new(())),
-    //         Err(err) => Err(tonic::Status::internal(format!("Error when initializing a function: {}", err))),
-    //     }
-    // }
-
     async fn cast(&self, event: tonic::Request<crate::grpc_impl::api::OutputEventData>) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match parse_output_event_data(&event.into_inner()) {
             Ok(parsed_request) => parsed_request,
