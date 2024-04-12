@@ -9,6 +9,8 @@ pub mod api {
 
 pub mod common;
 
+pub mod container_function;
+
 pub mod controller;
 
 pub mod function_instance;
