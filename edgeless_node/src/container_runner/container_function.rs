@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::container_function::ContainerFunctionAPI;
+use edgeless_api::container_runtime::ContainerRuntimeAPI;
 use futures::{Future, SinkExt, StreamExt};
 
 pub struct ContainerFunction {
@@ -19,8 +19,17 @@ enum ContainerFunctionRequest {
     STOP(),
 }
 
+enum FiniteStateMachine {
+    PreBoot,
+    Booted,
+    Initialized,
+    Stopped,
+    Error,
+}
+
 impl ContainerFunction {
     pub fn new() -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
+        log::debug!("new container function created");
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
@@ -33,27 +42,45 @@ impl ContainerFunction {
     async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<ContainerFunctionRequest>) {
         let mut receiver = receiver;
 
+        // Initialized in BOOT
         let mut host_client;
-        let mut host_client_api = None;
+        let mut host_client_api;
+
+        let mut fsm = FiniteStateMachine::PreBoot;
 
         // Main loop that reacts to messages on the receiver channel
         while let Some(req) = receiver.next().await {
             match req {
                 ContainerFunctionRequest::BOOT(boot_data) => {
                     log::debug!("boot, remote node URL {}", boot_data.guest_api_host_endpoint);
-                    if host_client_api.is_none() {
-                        log::error!("received another boot command: ignored");
-                        continue;
-                    }
-
-                    match edgeless_api::grpc_impl::container_function::ContainerFunctionAPIClient::new(&boot_data.guest_api_host_endpoint, Some(1))
+                    if std::mem::discriminant(&fsm) != std::mem::discriminant(&FiniteStateMachine::PreBoot) {
+                        log::error!("received boot command while not in a pre-boot state: ignored");
+                    } else {
+                        match edgeless_api::grpc_impl::container_runtime::ContainerRuntimeAPIClient::new(
+                            format!("http://{}/", boot_data.guest_api_host_endpoint).as_str(),
+                            None,
+                        )
                         .await
-                    {
-                        Ok(client) => {
-                            host_client = Some(client);
-                            host_client_api = Some(host_client.unwrap().guest_api_function());
+                        {
+                            Ok(client) => {
+                                host_client = Some(client);
+                                host_client_api = Some(host_client.unwrap().guest_api_host());
+                                match host_client_api.as_mut().unwrap().slf().await {
+                                    Ok(instance_id) => {
+                                        log::info!("booted from node_id {} function_id {}", instance_id.node_id, instance_id.function_id);
+                                        fsm = FiniteStateMachine::Booted;
+                                    }
+                                    Err(err) => {
+                                        log::error!("communication with host failed: {}", err);
+                                        fsm = FiniteStateMachine::Error;
+                                    }
+                                }
+                            }
+                            Err(err) => {
+                                log::error!("container function boot error: {}", err);
+                                fsm = FiniteStateMachine::Error;
+                            }
                         }
-                        Err(err) => log::error!("container function boot error: {}", err),
                     }
                 }
                 ContainerFunctionRequest::INIT(init_data) => {
@@ -62,25 +89,34 @@ impl ContainerFunction {
                         init_data.init_payload,
                         init_data.serialized_state.len()
                     );
-                    if host_client_api.is_none() {
-                        log::error!("init called on a non-booted container function: ignored");
-                        continue;
+                    if std::mem::discriminant(&fsm) != std::mem::discriminant(&FiniteStateMachine::Booted) {
+                        log::error!("received init command while not in a booted state: ignored");
+                    } else {
+                        // Add init logic here.
+                        fsm = FiniteStateMachine::Initialized;
                     }
                 }
                 ContainerFunctionRequest::CAST(event) => {
                     log::debug!("cast, src {}, msg {} bytes", event.src, event.msg.len());
-                    if host_client_api.is_none() {
-                        log::error!("cast called on a non-booted container function: ignored");
-                        continue;
+                    if std::mem::discriminant(&fsm) != std::mem::discriminant(&FiniteStateMachine::Initialized) {
+                        log::error!("received cast command while not in an initialized state: ignored");
+                    } else {
+                        // Add cast logic here.
                     }
                 }
                 ContainerFunctionRequest::CALL(event, reply_sender) => {
                     log::debug!("call, src {}, msg {} bytes", event.src, event.msg.len());
-                    if host_client_api.is_none() {
-                        log::error!("call called on a non-booted container function: ignored");
-                        continue;
-                    }
-                    match reply_sender.send(Ok(edgeless_api::guest_api_function::CallReturn::NoRet)) {
+                    let res = match std::mem::discriminant(&fsm) == std::mem::discriminant(&FiniteStateMachine::Initialized) {
+                        false => {
+                            log::error!("received call command while not in an initialized state: ignored");
+                            edgeless_api::guest_api_function::CallReturn::Err
+                        }
+                        true => {
+                            // Add call logic here.
+                            edgeless_api::guest_api_function::CallReturn::Reply(event.msg)
+                        }
+                    };
+                    match reply_sender.send(Ok(res)) {
                         Ok(_) => {}
                         Err(err) => {
                             log::error!("Unhandled: {:?}", err);
@@ -89,9 +125,11 @@ impl ContainerFunction {
                 }
                 ContainerFunctionRequest::STOP() => {
                     log::debug!("stop");
-                    if host_client_api.is_none() {
-                        log::error!("stop called on a non-booted container function: ignored");
-                        continue;
+                    if std::mem::discriminant(&fsm) != std::mem::discriminant(&FiniteStateMachine::Initialized) {
+                        log::error!("received stop command while not in an initialized state: ignored");
+                    } else {
+                        // Add stop logic here.
+                        fsm = FiniteStateMachine::Stopped;
                     }
                 }
             }
