@@ -16,6 +16,10 @@ path = "src/lib.rs"
 name = "edgeless_node_d"
 path = "src/bin/edgeless_node_d.rs"
 
+[[bin]]
+name = "edgeless_container_function_d"
+path = "src/bin/edgeless_container_function_d.rs"
+
 [features]
 default = ["wasmtime"]
 
