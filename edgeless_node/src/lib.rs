@@ -334,8 +334,11 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
             &settings.general.metrics_url
         ));
 
+    // List of runners supported by this node to be filled below depending on
+    // the node's configuration.
     let mut runners = std::collections::HashMap::<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>::new();
 
+    // Create the WASM run-time, if needed.
     let rust_runtime_task = match settings.wasm_runtime {
         Some(wasm_runtime_settings) => {
             match wasm_runtime_settings.enabled {
@@ -385,6 +388,29 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         None => tokio::spawn(async {}),
     };
 
+    // Create the container run-time, if needed.
+    let container_runtime_task = match settings.container_runtime {
+        Some(container_runtime_settings) => match container_runtime_settings.enabled {
+            true => {
+                let (container_runtime_client, mut container_runtime_task_s) =
+                    base_runtime::runtime::create::<container_runner::function_instance::ContainerFunctionInstance>(
+                        data_plane.clone(),
+                        state_manager.clone(),
+                        Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                            ("FUNCTION_TYPE".to_string(), "CONTAINER".to_string()),
+                            ("NODE_ID".to_string(), settings.general.node_id.to_string()),
+                        ]))),
+                    );
+                runners.insert("CONTAINER".to_string(), Box::new(container_runtime_client.clone()));
+                tokio::spawn(async move {
+                    container_runtime_task_s.run().await;
+                })
+            }
+            false => tokio::spawn(async {}),
+        },
+        None => tokio::spawn(async {}),
+    };
+
     // Create the resources.
     let mut resource_provider_specifications = vec![];
     let resources = fill_resources(
@@ -403,6 +429,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     // Wait for all the tasks to complete.
     let _ = futures::join!(
         rust_runtime_task,
+        container_runtime_task,
         agent_task,
         agent_api_server,
         register_node(
