@@ -309,6 +309,12 @@ message ResponseError {
     optional string detail = 2;
 }
 
+// Argument of GuestAPIFunction::Boot().
+message BootData {
+    // End-point of the GuestAPIHost.
+    string guest_api_host_endpoint = 1;
+}
+
 // Argument of GuestAPIFunction::Init().
 message FunctionInstanceInit {
     // The initializaton string. Can be empty.

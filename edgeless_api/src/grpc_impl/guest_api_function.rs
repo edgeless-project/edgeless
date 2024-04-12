@@ -31,11 +31,21 @@ impl GuestAPIFunctionClient {
 
 #[async_trait::async_trait]
 impl crate::guest_api_function::GuestAPIFunction for GuestAPIFunctionClient {
+    async fn boot(&mut self, boot_data: crate::guest_api_function::BootData) -> anyhow::Result<()> {
+        match self.client.boot(tonic::Request::new(serialize_boot_data(&boot_data))).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(
+                "Communication error while booting a function instance: {}",
+                err.to_string()
+            )),
+        }
+    }
+
     async fn init(&mut self, init_data: crate::guest_api_function::FunctionInstanceInit) -> anyhow::Result<()> {
         match self.client.init(tonic::Request::new(serialize_function_instance_init(&init_data))).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
-                "Communication error while initializing function instance: {}",
+                "Communication error while initializing a function instance: {}",
                 err.to_string()
             )),
         }
@@ -69,6 +79,19 @@ impl crate::guest_api_function::GuestAPIFunction for GuestAPIFunctionClient {
 
 #[async_trait::async_trait]
 impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for GuestAPIFunctionService {
+    async fn boot(&self, boot_data: tonic::Request<crate::grpc_impl::api::BootData>) -> Result<tonic::Response<()>, tonic::Status> {
+        let parsed_request = match parse_boot_data(&boot_data.into_inner()) {
+            Ok(parsed_request) => parsed_request,
+            Err(err) => {
+                return Err(tonic::Status::invalid_argument(format!("Error when parsing a BootData message: {}", err)));
+            }
+        };
+        match self.guest_api_function.lock().await.boot(parsed_request).await {
+            Ok(_) => Ok(tonic::Response::new(())),
+            Err(err) => Err(tonic::Status::internal(format!("Error when booting a function instance: {}", err))),
+        }
+    }
+
     async fn init(&self, init_data: tonic::Request<crate::grpc_impl::api::FunctionInstanceInit>) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match parse_function_instance_init(&init_data.into_inner()) {
             Ok(parsed_request) => parsed_request,
@@ -81,7 +104,7 @@ impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for Gues
         };
         match self.guest_api_function.lock().await.init(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when initializing a function: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!("Error when initializing a function instance: {}", err))),
         }
     }
 
@@ -128,6 +151,12 @@ impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for Gues
     }
 }
 
+pub fn parse_boot_data(api_instance: &crate::grpc_impl::api::BootData) -> anyhow::Result<crate::guest_api_function::BootData> {
+    Ok(crate::guest_api_function::BootData {
+        guest_api_host_endpoint: api_instance.guest_api_host_endpoint.clone(),
+    })
+}
+
 pub fn parse_function_instance_init(
     api_instance: &crate::grpc_impl::api::FunctionInstanceInit,
 ) -> anyhow::Result<crate::guest_api_function::FunctionInstanceInit> {
@@ -158,6 +187,12 @@ pub fn parse_call_return(api_instance: &crate::grpc_impl::api::CallReturn) -> an
         }
         x if x == crate::grpc_impl::api::CallRetType::CallRetErr as i32 => Ok(crate::guest_api_function::CallReturn::Err),
         x => Err(anyhow::anyhow!("Ill-formed CallReturn message: unknown type {}", x)),
+    }
+}
+
+fn serialize_boot_data(boot_data: &crate::guest_api_function::BootData) -> crate::grpc_impl::api::BootData {
+    crate::grpc_impl::api::BootData {
+        guest_api_host_endpoint: boot_data.guest_api_host_endpoint.clone(),
     }
 }
 
@@ -195,10 +230,29 @@ pub fn serialize_call_return(ret: &crate::guest_api_function::CallReturn) -> cra
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::guest_api_function::BootData;
     use crate::guest_api_function::CallReturn;
     use crate::guest_api_function::FunctionInstanceInit;
     use crate::guest_api_function::InputEventData;
     use edgeless_api_core::instance_id::InstanceId;
+
+    #[test]
+    fn serialize_deserialize_boot_data() {
+        let messages = vec![
+            BootData {
+                guest_api_host_endpoint: "".to_string(),
+            },
+            BootData {
+                guest_api_host_endpoint: "localhost:12345".to_string(),
+            },
+        ];
+        for msg in messages {
+            match parse_boot_data(&serialize_boot_data(&msg)) {
+                Ok(val) => assert_eq!(msg, val),
+                Err(err) => panic!("{}", err),
+            }
+        }
+    }
 
     #[test]
     fn serialize_deserialize_function_instance_init() {
