@@ -16,5 +16,4 @@ std = []
 default = ["std"]
 
 [dependencies]
-wit-bindgen = "0.8"
 log = "0.4"

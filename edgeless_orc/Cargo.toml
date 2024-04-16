@@ -28,3 +28,4 @@ serde = "1.0"
 clap = { version = "4.3", features=["derive"] }
 toml = "0.7"
 rand = "0.8.5"
+serial_test = { version = "3" }

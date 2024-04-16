@@ -45,6 +45,7 @@ impl crate::node_registration::NodeRegistrationAPI for NodeRegistrationClient {
             Err(err) => Err(anyhow::anyhow!("Communication error while updating a node: {}", err.to_string())),
         }
     }
+    async fn keep_alive(&mut self) {}
 }
 
 #[async_trait::async_trait]
@@ -77,6 +78,9 @@ fn parse_node_capabilities(api_instance: &crate::grpc_impl::api::NodeCapabilitie
         clock_freq_cpu: api_instance.clock_freq_cpu,
         num_cores: api_instance.num_cores,
         mem_size: api_instance.mem_size,
+        labels: api_instance.labels.clone(),
+        is_tee_running: api_instance.is_tee_running,
+        has_tpm: api_instance.has_tpm,
     }
 }
 
@@ -87,6 +91,9 @@ fn serialize_node_capabilities(req: &crate::node_registration::NodeCapabilities)
         clock_freq_cpu: req.clock_freq_cpu,
         num_cores: req.num_cores,
         mem_size: req.mem_size,
+        labels: req.labels.clone(),
+        is_tee_running: req.is_tee_running,
+        has_tpm: req.has_tpm,
     }
 }
 
@@ -235,6 +242,9 @@ mod test {
                     clock_freq_cpu: 62.50,
                     num_cores: 20,
                     mem_size: 15827,
+                    labels: vec!["red".to_string(), "powerful".to_string()],
+                    is_tee_running: true,
+                    has_tpm: true,
                 },
             ),
             UpdateNodeRequest::Registration(

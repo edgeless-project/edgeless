@@ -451,7 +451,7 @@ async fn main() -> anyhow::Result<()> {
     }
     if wf_type.metrics_collector() {
         let _ = tokio::spawn(async move {
-            edgeless_benchmark::edgeless_metrics_collector_node_main(edgeless_node::EdgelessNodeSettings {
+            edgeless_benchmark::edgeless_metrics_collector_node_main(edgeless_node::EdgelessNodeGeneralSettings {
                 node_id: uuid::Uuid::new_v4(),
                 agent_url: format!("http://{}:7121/", args.bind_address),
                 agent_url_announced: "".to_string(),
@@ -459,7 +459,6 @@ async fn main() -> anyhow::Result<()> {
                 invocation_url_announced: "".to_string(),
                 metrics_url: format!("http://{}:7103/", args.bind_address),
                 orchestrator_url: args.orchestrator_url,
-                resources: None,
             })
             .await
         });

@@ -46,13 +46,15 @@ mod tests {
             for node_i in 0..num_nodes_per_domain {
                 let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(match node_i {
                     0 => edgeless_node::EdgelessNodeSettings {
-                        node_id: uuid::Uuid::new_v4(),
-                        agent_url: format!("http://{}:{}", address, next_port()),
-                        agent_url_announced: "".to_string(),
-                        invocation_url: format!("http://{}:{}", address, next_port()),
-                        invocation_url_announced: "".to_string(),
-                        metrics_url: format!("http://{}:{}", address, next_port()),
-                        orchestrator_url: orchestrator_url.to_string(),
+                        general: edgeless_node::EdgelessNodeGeneralSettings {
+                            node_id: uuid::Uuid::new_v4(),
+                            agent_url: format!("http://{}:{}", address, next_port()),
+                            agent_url_announced: "".to_string(),
+                            invocation_url: format!("http://{}:{}", address, next_port()),
+                            invocation_url_announced: "".to_string(),
+                            metrics_url: format!("http://{}:{}", address, next_port()),
+                            orchestrator_url: orchestrator_url.to_string(),
+                        },
                         resources: Some(edgeless_node::EdgelessNodeResourceSettings {
                             http_ingress_url: None,
                             http_ingress_provider: None,
@@ -60,6 +62,7 @@ mod tests {
                             file_log_provider: Some("file-log-1".to_string()),
                             redis_provider: None,
                         }),
+                        user_node_capabilities: None,
                     },
                     _ => {
                         edgeless_node::EdgelessNodeSettings::new_without_resources(&orchestrator_url, address, next_port(), next_port(), next_port())

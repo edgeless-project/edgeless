@@ -43,7 +43,7 @@ impl edgeless_node::base_runtime::FunctionInstance for DummyFunctionInstance {
     }
 }
 
-pub async fn edgeless_metrics_collector_node_main(settings: edgeless_node::EdgelessNodeSettings) {
+pub async fn edgeless_metrics_collector_node_main(settings: edgeless_node::EdgelessNodeGeneralSettings) {
     log::info!("Starting EDGELESS metrics collector node");
     log::debug!("Settings: {:?}", settings);
 
@@ -95,7 +95,7 @@ pub async fn edgeless_metrics_collector_node_main(settings: edgeless_node::Edgel
     // Create the agent.
     let mut runners = std::collections::HashMap::<String, Box<dyn edgeless_node::base_runtime::RuntimeAPI + Send>>::new();
     runners.insert("RUST_WASM".to_string(), Box::new(rust_runtime_client.clone()));
-    let (mut agent, agent_task) = edgeless_node::agent::Agent::new(runners, resources, settings.clone(), data_plane.clone());
+    let (mut agent, agent_task) = edgeless_node::agent::Agent::new(runners, resources, settings.node_id.clone(), data_plane.clone());
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.agent_url.clone());
 
     // Wait for all the tasks to complete.
@@ -104,7 +104,7 @@ pub async fn edgeless_metrics_collector_node_main(settings: edgeless_node::Edgel
         agent_task,
         agent_api_server,
         edgeless_node::register_node(
-            &settings,
+            settings,
             edgeless_api::node_registration::NodeCapabilities::empty(),
             resource_provider_specifications
         )

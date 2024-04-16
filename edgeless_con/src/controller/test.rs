@@ -117,6 +117,7 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for MockNodeRegistrati
         self.sender.send(MockFunctionInstanceEvent::UpdateNode(request)).await.unwrap();
         Ok(edgeless_api::node_registration::UpdateNodeResponse::Accepted)
     }
+    async fn keep_alive(&mut self) {}
 }
 
 async fn test_setup() -> (
