@@ -10,16 +10,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "filter_in_range"
-version = "0.1.0"
-dependencies = [
- "edgeless_function",
- "log",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -54,6 +44,16 @@ name = "ryu"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ad4cc8da4ef723ed60bced201181d83791ad433213d8c24efffda1eec85d741"
+
+[[package]]
+name = "sensor_simulator"
+version = "0.1.0"
+dependencies = [
+ "edgeless_function",
+ "log",
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "serde"
