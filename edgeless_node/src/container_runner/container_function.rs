@@ -57,7 +57,7 @@ impl ContainerFunction {
                         log::error!("received boot command while not in a pre-boot state: ignored");
                     } else {
                         match edgeless_api::grpc_impl::container_runtime::ContainerRuntimeAPIClient::new(
-                            format!("http://{}/", boot_data.guest_api_host_endpoint).as_str(),
+                            boot_data.guest_api_host_endpoint.as_str(),
                             None,
                         )
                         .await

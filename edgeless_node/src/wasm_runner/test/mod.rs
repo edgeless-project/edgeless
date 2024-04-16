@@ -64,6 +64,10 @@ impl crate::state_management::StateHandleAPI for MockStateHandle {
     }
 }
 
+fn mock_runtime() -> std::sync::Arc<std::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>> {
+    std::sync::Arc::new(std::sync::Mutex::new(Box::new(super::runtime::WasmRuntime::new())))
+}
+
 #[tokio::test]
 async fn basic_lifecycle() {
     let node_id = uuid::Uuid::new_v4();
@@ -80,8 +84,12 @@ async fn basic_lifecycle() {
         sender: telemetry_mock_sender,
     });
 
-    let (mut client, mut rt_task) =
-        crate::base_runtime::runtime::create::<super::function_instance::WASMFunctionInstance>(dataplane_provider, state_manager, telemetry_handle);
+    let (mut client, mut rt_task) = crate::base_runtime::runtime::create::<super::function_instance::WASMFunctionInstance>(
+        dataplane_provider,
+        state_manager,
+        telemetry_handle,
+        mock_runtime(),
+    );
 
     tokio::spawn(async move { rt_task.run().await });
 
@@ -216,8 +224,12 @@ async fn messaging_test_setup() -> (
         sender: telemetry_mock_sender,
     });
 
-    let (mut client, mut rt_task) =
-        crate::base_runtime::runtime::create::<super::function_instance::WASMFunctionInstance>(dataplane_provider, state_manager, telemetry_handle);
+    let (mut client, mut rt_task) = crate::base_runtime::runtime::create::<super::function_instance::WASMFunctionInstance>(
+        dataplane_provider,
+        state_manager,
+        telemetry_handle,
+        mock_runtime(),
+    );
 
     tokio::spawn(async move { rt_task.run().await });
 
@@ -529,6 +541,7 @@ async fn state_management() {
         dataplane_provider,
         mock_state_manager,
         telemetry_handle,
+        mock_runtime(),
     );
 
     tokio::spawn(async move { rt_task.run().await });

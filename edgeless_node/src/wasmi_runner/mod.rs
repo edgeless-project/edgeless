@@ -5,6 +5,7 @@ use wasmi::AsContextMut;
 
 pub mod guest_api_binding;
 mod helpers;
+pub mod runtime;
 
 #[cfg(test)]
 pub mod test;
@@ -49,14 +50,19 @@ pub struct WASMIFunctionInstance {
 #[async_trait::async_trait]
 impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
     async fn instantiate(
-        guest_api_host: crate::base_runtime::guest_api::GuestAPIHost,
+        guest_api_host: Option<crate::base_runtime::guest_api::GuestAPIHost>,
         code: &[u8],
     ) -> Result<Box<Self>, crate::base_runtime::FunctionInstanceError> {
         let _comfig = wasmi::Config::default();
 
         let engine = wasmi::Engine::default();
         let module = wasmi::Module::new(&engine, &code[..]).map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
-        let mut store = wasmi::Store::new(&engine, guest_api_binding::GuestAPI { host: guest_api_host });
+        let mut store = wasmi::Store::new(
+            &engine,
+            guest_api_binding::GuestAPI {
+                host: guest_api_host.take().expect("the impossible happened: no GuestAPIHost"),
+            },
+        );
         let mut linker = wasmi::Linker::<guest_api_binding::GuestAPI>::new(&engine);
 
         linker
