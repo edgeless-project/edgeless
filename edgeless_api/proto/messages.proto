@@ -107,15 +107,21 @@ message UpdateNodeRequest {
 // Node capabilities exposed to the orchestrator.
 message NodeCapabilities {
     // Number of (actual or virtual) CPUs associated with the edge node.
-    uint32 num_cpus       = 10;
+    uint32 num_cpus         = 10;
     // Name of the CPU model.
-    string model_name_cpu = 11;
+    string model_name_cpu   = 11;
     // Clock frequency of the CPU, in BogoMIPS.
-    float clock_freq_cpu  = 12;
+    float clock_freq_cpu    = 12;
     // Number of cores for each CPU.
-    uint32 num_cores      = 13;
+    uint32 num_cores        = 13;
     // Size of memory available to applications running on the edge node, in MB.
-    uint32 mem_size       = 14;
+    uint32 mem_size         = 14;
+    // List of labels assigned to this node.
+    repeated string labels  = 20;
+    // True if the node is running inside a Trusted Execution Environment.
+    bool is_tee_running     = 30;
+    // True if the node has a Trusted Platform Module for authenticated registration.
+    bool has_tpm            = 40;
 }
 
 // Response message of FunctionInstance::UpdateNode().
@@ -301,3 +307,94 @@ message ResponseError {
     optional string detail = 2;
 }
 
+// Argument of GuestAPIFunction::Init().
+message FunctionInstanceInit {
+    // The initializaton string. Can be empty.
+    string init_payload     = 1;
+
+    // The initial state. Can be empty.
+    string serialized_state = 10;
+}
+
+// Argument of GuestAPIFunction::Cast() and GuestAPIFunction::Call().
+message InputEventData {
+    // The function instance that generated the event.
+    InstanceId src = 1;
+    
+    // The event payload. Can be empty.
+    string msg     = 2;
+}
+
+// Types of CallReturn.
+enum CallRetType {
+    // The return value does not contain a reply message.
+    CALL_RET_NO_REPLY = 0;
+    // The return value contains a reply message.
+    CALL_RET_REPLY    = 1;
+    // There was an error when invoking Call().
+    CALL_RET_ERR      = 2;
+}
+
+// Return value of GuestAPIFunction::Call() and GuestAPIHost::Call().
+message CallReturn {
+    // Return type.
+    CallRetType type  = 1;
+
+    // Reply message. Can only be empty with type = Type::REPLY.
+    string msg        = 2;
+}
+
+// Argument of GuestAPIHost::Cast() and GuestAPIHost::Call().
+message OutputEventData {
+    // The alias of the function instance recipient of this event.
+    string alias = 1;
+    
+    // The event payload. Can be empty.
+    string msg   = 2;
+}
+
+// Argument of GuestAPIHost::Cast() and GuestAPIHost::Call().
+message OutputEventDataRaw {
+    // The function instance recipient of this event.
+    InstanceId dst = 1;
+    
+    // The event payload. Can be empty.
+    string msg     = 2;
+}
+
+enum TelemetryLogLevel {
+    LOG_ERROR = 0;
+    LOG_WARN  = 1;
+    LOG_INFO  = 2;
+    LOG_DEBUG = 3;
+    LOG_TRACE = 4;
+}
+
+// Argument of GuestAPIHost::TelemetryLog().
+message TelemetryLogEvent {
+    // The log level.
+    TelemetryLogLevel log_level = 1;
+
+    // The target.
+    string target               = 2;
+
+    // The message.
+    string msg                  = 3;
+}
+
+// Argument of GuestAPIHost::DelayedCast().
+message DelayedEventData {
+    // The alias of the function instance recipient of this event.
+    string alias = 1;
+    
+    // The event payload. Can be empty.
+    string msg   = 2;
+
+    // The delay after which this event has to be generated, in ms.
+    uint64 delay = 3;
+}
+
+// Argument of GuestAPIHost::Sync().
+message SyncData {
+    string serialized_state = 1;
+}

@@ -62,6 +62,14 @@ impl InstanceId {
             function_id: FUNCTION_ID_NONE,
         }
     }
+
+    pub fn is_none(&self) -> bool {
+        if self.node_id == NODE_ID_NONE && self.function_id == FUNCTION_ID_NONE {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[cfg(test)]

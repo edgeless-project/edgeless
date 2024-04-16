@@ -20,6 +20,12 @@ pub struct NodeCapabilities {
     pub num_cores: u32,
     // Size of memory available to applications running on the edge node, in MB.
     pub mem_size: u32,
+    // List of labels assigned to this node.
+    pub labels: Vec<String>,
+    // True if the node is running inside a Trusted Execution Environment.
+    pub is_tee_running: bool,
+    // True if the node has a Trusted Platform Module for authenticated registration.
+    pub has_tpm: bool,
 }
 
 impl NodeCapabilities {
@@ -31,6 +37,9 @@ impl NodeCapabilities {
             clock_freq_cpu: 0.0,
             num_cores: 0,
             mem_size: 0,
+            labels: vec![],
+            is_tee_running: false,
+            has_tpm: false,
         }
     }
 
@@ -42,6 +51,9 @@ impl NodeCapabilities {
             clock_freq_cpu: 0.0,
             num_cores: 1,
             mem_size: 0,
+            labels: vec![],
+            is_tee_running: false,
+            has_tpm: false,
         }
     }
 
@@ -55,8 +67,21 @@ impl std::fmt::Display for NodeCapabilities {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{} {} CPU(s) at {} BogoMIPS, {} core(s), {} MB memory",
-            self.num_cpus, self.model_name_cpu, self.clock_freq_cpu, self.num_cores, self.mem_size,
+            "{} {} CPU(s) at {} BogoMIPS, {} core(s), {} MB memory, labels [{}]{}{}",
+            self.num_cpus,
+            self.model_name_cpu,
+            self.clock_freq_cpu,
+            self.num_cores,
+            self.mem_size,
+            self.labels.join(","),
+            match self.is_tee_running {
+                true => ", TEE",
+                false => "",
+            },
+            match self.has_tpm {
+                true => ", TPM",
+                false => "",
+            }
         )
     }
 }
@@ -83,6 +108,7 @@ pub enum UpdateNodeResponse {
 #[async_trait::async_trait]
 pub trait NodeRegistrationAPI: NodeRegistrationAPIClone + Sync + Send {
     async fn update_node(&mut self, request: UpdateNodeRequest) -> anyhow::Result<UpdateNodeResponse>;
+    async fn keep_alive(&mut self);
 }
 
 impl std::fmt::Display for ResourceProviderSpecification {
