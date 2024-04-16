@@ -4,7 +4,6 @@
 use futures::{Future, SinkExt, StreamExt};
 
 pub struct ContainerRuntime {
-    sender: futures::channel::mpsc::UnboundedSender<ContainerRuntimeRequest>,
     guest_api_hosts: std::collections::HashMap<edgeless_api::function_instance::InstanceId, crate::base_runtime::guest_api::GuestAPIHost>,
     configuration: std::collections::HashMap<String, String>,
 }
@@ -66,18 +65,15 @@ impl ContainerRuntime {
             Self::main_task(receiver).await;
         });
 
-        let runtime_api = Box::new(ContainerRuntimeClient {
-            container_runtime_client: Box::new(GuestAPIRuntimeClient { sender: sender.clone() }),
-        });
-
         (
             std::sync::Arc::new(std::sync::Mutex::new(Box::new(Self {
-                sender,
                 guest_api_hosts: std::collections::HashMap::new(),
                 configuration,
             }))),
             main_task,
-            runtime_api,
+            Box::new(ContainerRuntimeClient {
+                container_runtime_client: Box::new(GuestAPIRuntimeClient { sender }),
+            }),
         )
     }
 
@@ -145,12 +141,6 @@ impl ContainerRuntime {
                 }
             }
         }
-    }
-
-    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::container_runtime::ContainerRuntimeAPI + Send> {
-        Box::new(ContainerRuntimeClient {
-            container_runtime_client: Box::new(GuestAPIRuntimeClient { sender: self.sender.clone() }),
-        })
     }
 }
 
