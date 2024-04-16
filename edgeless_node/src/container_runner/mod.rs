@@ -7,7 +7,5 @@ pub mod container_runtime;
 
 pub mod function_instance;
 
-pub mod guest_api_binding;
-
 #[cfg(test)]
 mod test;
