@@ -14,7 +14,9 @@
             "output_mapping": {
                 "output": "filter_in_range"
             },
-            "annotations": {}
+            "annotations": {
+                "init-payload": "period=100,min-value=-100,max-value=100,seed=42"
+            }
         },
         {
             "name": "filter_in_range",
