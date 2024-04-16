@@ -5,6 +5,8 @@ use futures::{Future, SinkExt, StreamExt};
 
 pub struct ContainerRuntime {
     sender: futures::channel::mpsc::UnboundedSender<ContainerRuntimeRequest>,
+    guest_api_hosts: std::collections::HashMap<edgeless_api::function_instance::InstanceId, crate::base_runtime::guest_api::GuestAPIHost>,
+    configuration: std::collections::HashMap<String, String>,
 }
 
 enum ContainerRuntimeRequest {
@@ -24,8 +26,39 @@ enum ContainerRuntimeRequest {
     SYNC(edgeless_api::guest_api_host::SyncData),
 }
 
+impl crate::base_runtime::runtime::GuestAPIHostRegister for ContainerRuntime {
+    fn needs_to_register(&mut self) -> bool {
+        true
+    }
+    fn register_guest_api_host(
+        &mut self,
+        instance_id: &edgeless_api::function_instance::InstanceId,
+        guest_api_host: crate::base_runtime::guest_api::GuestAPIHost,
+    ) {
+        if let Some(_) = self.guest_api_hosts.insert(*instance_id, guest_api_host) {
+            log::warn!("ContainerRuntime: overwrote container function: {}", instance_id);
+        }
+    }
+
+    fn deregister_guest_api_host(&mut self, instance_id: &edgeless_api::function_instance::InstanceId) {
+        if let None = self.guest_api_hosts.remove(&instance_id) {
+            log::warn!("ContainerRunTime: trying to deregister non-existing container function {}", instance_id);
+        }
+    }
+
+    fn configuration(&mut self) -> std::collections::HashMap<String, String> {
+        self.configuration.clone()
+    }
+}
+
 impl ContainerRuntime {
-    pub fn new() -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
+    pub fn new(
+        configuration: std::collections::HashMap<String, String>,
+    ) -> (
+        std::sync::Arc<std::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>>,
+        std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
+        Box<dyn edgeless_api::container_runtime::ContainerRuntimeAPI + Send>,
+    ) {
         log::debug!("new container runtime created");
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
@@ -33,7 +66,19 @@ impl ContainerRuntime {
             Self::main_task(receiver).await;
         });
 
-        (Self { sender }, main_task)
+        let runtime_api = Box::new(ContainerRuntimeClient {
+            container_runtime_client: Box::new(GuestAPIRuntimeClient { sender: sender.clone() }),
+        });
+
+        (
+            std::sync::Arc::new(std::sync::Mutex::new(Box::new(Self {
+                sender,
+                guest_api_hosts: std::collections::HashMap::new(),
+                configuration,
+            }))),
+            main_task,
+            runtime_api,
+        )
     }
 
     async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<ContainerRuntimeRequest>) {
@@ -44,6 +89,7 @@ impl ContainerRuntime {
             match req {
                 ContainerRuntimeRequest::CAST(event) => {
                     log::debug!("cast, alias {}, msg {} bytes", event.alias, event.msg.len());
+                    log::info!("XXX");
                 }
                 ContainerRuntimeRequest::CASTRAW(event) => {
                     log::debug!("cast-raw, dst {}, msg {} bytes", event.dst, event.msg.len());

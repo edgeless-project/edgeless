@@ -356,6 +356,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                                     ("WASM_RUNTIME".to_string(), "wasmtime".to_string()),
                                     ("NODE_ID".to_string(), settings.general.node_id.to_string()),
                                 ]))),
+                                std::sync::Arc::new(std::sync::Mutex::new(Box::new(crate::wasm_runner::runtime::WasmRuntime::new()))),
                             );
                         runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
                         tokio::spawn(async move {
@@ -373,8 +374,9 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                             Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
                                 ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
                                 ("WASM_RUNTIME".to_string(), "wasmi".to_string()),
-                                ("NODE_ID".to_string(), settings.node_id.to_string()),
+                                ("NODE_ID".to_string(), settings.general.node_id.to_string()),
                             ]))),
+                            std::sync::Arc::new(std::sync::Mutex::new(Box::new(crate::wasmi_runner::runtime::WasmiRuntime::new()))),
                         );
                         runners.insert("RUST_WASM".to_string(), Box::new(wasmi_runtime_client.clone()));
                         tokio::spawn(async move {
@@ -392,6 +394,14 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let container_runtime_task = match settings.container_runtime {
         Some(container_runtime_settings) => match container_runtime_settings.enabled {
             true => {
+                let (container_runtime, container_runtime_task, container_runtime_api) = container_runner::container_runtime::ContainerRuntime::new(
+                    std::collections::HashMap::from([("guest_api_host_url".to_string(), container_runtime_settings.guest_api_host_url.clone())]),
+                );
+                let server_task = edgeless_api::grpc_impl::container_runtime::GuestAPIHostServer::run(
+                    container_runtime_api,
+                    container_runtime_settings.guest_api_host_url,
+                );
+
                 let (container_runtime_client, mut container_runtime_task_s) =
                     base_runtime::runtime::create::<container_runner::function_instance::ContainerFunctionInstance>(
                         data_plane.clone(),
@@ -400,10 +410,11 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                             ("FUNCTION_TYPE".to_string(), "CONTAINER".to_string()),
                             ("NODE_ID".to_string(), settings.general.node_id.to_string()),
                         ]))),
+                        container_runtime.clone(),
                     );
                 runners.insert("CONTAINER".to_string(), Box::new(container_runtime_client.clone()));
                 tokio::spawn(async move {
-                    container_runtime_task_s.run().await;
+                    futures::join!(container_runtime_task_s.run(), container_runtime_task, server_task);
                 })
             }
             false => tokio::spawn(async {}),
