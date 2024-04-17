@@ -64,8 +64,8 @@ impl crate::state_management::StateHandleAPI for MockStateHandle {
     }
 }
 
-fn mock_runtime() -> std::sync::Arc<std::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>> {
-    std::sync::Arc::new(std::sync::Mutex::new(Box::new(super::runtime::WasmRuntime::new())))
+fn mock_runtime() -> std::sync::Arc<tokio::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>> {
+    std::sync::Arc::new(tokio::sync::Mutex::new(Box::new(super::runtime::WasmRuntime::new())))
 }
 
 #[tokio::test]

@@ -15,6 +15,11 @@ pub trait GuestAPIHostRegister {
 
     fn deregister_guest_api_host(&mut self, instance_id: &edgeless_api::function_instance::InstanceId) -> ();
 
+    fn guest_api_host(
+        &mut self,
+        instance_id: &edgeless_api::function_instance::InstanceId,
+    ) -> Option<&mut crate::base_runtime::guest_api::GuestAPIHost>;
+
     fn configuration(&mut self) -> std::collections::HashMap<String, String>;
 }
 
@@ -28,7 +33,7 @@ pub struct RuntimeTask<FunctionInstanceType: super::FunctionInstance> {
     data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     state_manager: Box<dyn crate::state_management::StateManagerAPI>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    guest_api_host_register: std::sync::Arc<std::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
+    guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
     slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
     functions: std::collections::HashMap<uuid::Uuid, super::function_instance_runner::FunctionInstanceRunner<FunctionInstanceType>>,
 }
@@ -45,7 +50,7 @@ pub fn create<FunctionInstanceType: super::FunctionInstance>(
     data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     state_manager: Box<dyn crate::state_management::StateManagerAPI>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    guest_api_host_register: std::sync::Arc<std::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
+    guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
 ) -> (RuntimeClient, RuntimeTask<FunctionInstanceType>) {
     let (sender, receiver) = futures::channel::mpsc::unbounded();
     let task: RuntimeTask<FunctionInstanceType> = RuntimeTask::new(
@@ -68,7 +73,7 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
         state_manager: Box<dyn crate::state_management::StateManagerAPI>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-        guest_api_host_register: std::sync::Arc<std::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
+        guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
         slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
     ) -> Self {
         Self {

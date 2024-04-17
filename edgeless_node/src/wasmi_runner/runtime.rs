@@ -26,6 +26,13 @@ impl crate::base_runtime::runtime::GuestAPIHostRegister for WasmiRuntime {
 
     fn deregister_guest_api_host(&mut self, _instance_id: edgeless_api::function_instance::InstanceId) {}
 
+    fn guest_api_host(
+        &mut self,
+        _instance_id: &edgeless_api::function_instance::InstanceId,
+    ) -> Option<&mut crate::base_runtime::guest_api::GuestAPIHost> {
+        None
+    }
+
     fn configuration(&mut self) -> std::collections::HashMap<String, String> {
         self._configuration.clone()
     }

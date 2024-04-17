@@ -356,7 +356,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                                     ("WASM_RUNTIME".to_string(), "wasmtime".to_string()),
                                     ("NODE_ID".to_string(), settings.general.node_id.to_string()),
                                 ]))),
-                                std::sync::Arc::new(std::sync::Mutex::new(Box::new(crate::wasm_runner::runtime::WasmRuntime::new()))),
+                                std::sync::Arc::new(tokio::sync::Mutex::new(Box::new(crate::wasm_runner::runtime::WasmRuntime::new()))),
                             );
                         runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
                         tokio::spawn(async move {
