@@ -154,6 +154,13 @@ impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for Gues
 pub fn parse_boot_data(api_instance: &crate::grpc_impl::api::BootData) -> anyhow::Result<crate::guest_api_function::BootData> {
     Ok(crate::guest_api_function::BootData {
         guest_api_host_endpoint: api_instance.guest_api_host_endpoint.clone(),
+        instance_id: match &api_instance.instance_id {
+            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+                Ok(originator) => originator,
+                Err(err) => return Err(anyhow::anyhow!("invalid instance_id field: {}", err)),
+            },
+            None => return Err(anyhow::anyhow!("missing instance_id field")),
+        },
     })
 }
 
@@ -193,6 +200,7 @@ pub fn parse_call_return(api_instance: &crate::grpc_impl::api::CallReturn) -> an
 fn serialize_boot_data(boot_data: &crate::guest_api_function::BootData) -> crate::grpc_impl::api::BootData {
     crate::grpc_impl::api::BootData {
         guest_api_host_endpoint: boot_data.guest_api_host_endpoint.clone(),
+        instance_id: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&boot_data.instance_id)),
     }
 }
 
@@ -241,9 +249,11 @@ mod test {
         let messages = vec![
             BootData {
                 guest_api_host_endpoint: "".to_string(),
+                instance_id: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
             },
             BootData {
                 guest_api_host_endpoint: "localhost:12345".to_string(),
+                instance_id: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
             },
         ];
         for msg in messages {

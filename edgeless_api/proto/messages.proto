@@ -313,6 +313,9 @@ message ResponseError {
 message BootData {
     // End-point of the GuestAPIHost.
     string guest_api_host_endpoint = 1;
+
+    // Instance ID of the function to be booted.
+    InstanceId instance_id         = 2;
 }
 
 // Argument of GuestAPIFunction::Init().
@@ -354,20 +357,26 @@ message CallReturn {
 
 // Argument of GuestAPIHost::Cast() and GuestAPIHost::Call().
 message OutputEventData {
+    // The event originator (to identify the function instance on the host).
+    InstanceId originator = 1;
+
     // The alias of the function instance recipient of this event.
-    string alias = 1;
+    string alias          = 2;
     
     // The event payload. Can be empty.
-    bytes msg   = 2;
+    bytes msg             = 3;
 }
 
 // Argument of GuestAPIHost::Cast() and GuestAPIHost::Call().
 message OutputEventDataRaw {
+    // The event originator (to identify the function instance on the host).
+    InstanceId originator = 1;
+
     // The function instance recipient of this event.
-    InstanceId dst = 1;
+    InstanceId dst        = 2;
     
     // The event payload. Can be empty.
-    bytes msg     = 2;
+    bytes msg             = 3;
 }
 
 enum TelemetryLogLevel {
@@ -380,29 +389,39 @@ enum TelemetryLogLevel {
 
 // Argument of GuestAPIHost::TelemetryLog().
 message TelemetryLogEvent {
+    // The command originator (to identify the function instance on the host).
+    InstanceId originator       = 1;
+
     // The log level.
-    TelemetryLogLevel log_level = 1;
+    TelemetryLogLevel log_level = 2;
 
     // The target.
-    string target               = 2;
+    string target               = 3;
 
     // The message.
-    string msg                  = 3;
+    string msg                  = 4;
 }
 
 // Argument of GuestAPIHost::DelayedCast().
 message DelayedEventData {
+    // The event originator (to identify the function instance on the host).
+    InstanceId originator = 1;
+
     // The alias of the function instance recipient of this event.
-    string alias = 1;
+    string alias          = 2;
     
     // The event payload. Can be empty.
-    bytes msg   = 2;
+    bytes msg             = 3;
 
     // The delay after which this event has to be generated, in ms.
-    uint64 delay = 3;
+    uint64 delay          = 4;
 }
 
 // Argument of GuestAPIHost::Sync().
 message SyncData {
-    bytes serialized_state = 1;
+    // The command originator (to identify the function instance on the host).
+    InstanceId originator  = 1;
+
+    // The function instance state to be serialized (opaque to the platform).
+    bytes serialized_state = 2;
 }

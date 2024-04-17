@@ -158,7 +158,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             runtime_configuration = register.configuration();
         }
 
-        self.function_instance = Some(FunctionInstanceType::instantiate(runtime_configuration, &mut self.guest_api_host.take(), &self.code).await?);
+        self.function_instance =
+            Some(FunctionInstanceType::instantiate(&self.instance_id, runtime_configuration, &mut self.guest_api_host.take(), &self.code).await?);
 
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInstantiate(start.elapsed()),

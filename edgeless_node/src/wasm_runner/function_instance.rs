@@ -45,6 +45,7 @@ pub struct WASMFunctionInstance {
 #[async_trait::async_trait]
 impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
     async fn instantiate(
+        _instance_id: &edgeless_api::function_instance::InstanceId,
         _runtime_configuration: std::collections::HashMap<String, String>,
         guest_api_host: &mut Option<crate::base_runtime::guest_api::GuestAPIHost>,
         code: &[u8],
