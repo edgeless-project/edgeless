@@ -41,3 +41,4 @@ http-body-util = "0.1.0-rc.3"
 redis = "*"
 openssl = { version = "0.10", features = ["vendored"] }
 sysinfo = "0.15"
+elasticsearch = "8.5.0-alpha.1"
