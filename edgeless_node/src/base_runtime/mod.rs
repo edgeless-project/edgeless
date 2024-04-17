@@ -19,6 +19,7 @@ pub trait RuntimeAPI {
 #[async_trait::async_trait]
 pub trait FunctionInstance: Send + 'static {
     async fn instantiate(
+        instance_id: &edgeless_api::function_instance::InstanceId,
         runtime_configuration: std::collections::HashMap<String, String>,
         guest_api_host: &mut Option<crate::base_runtime::guest_api::GuestAPIHost>,
         code: &[u8],

@@ -217,6 +217,13 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
 
 pub fn parse_output_event_data(api_instance: &crate::grpc_impl::api::OutputEventData) -> anyhow::Result<crate::guest_api_host::OutputEventData> {
     Ok(crate::guest_api_host::OutputEventData {
+        originator: match &api_instance.originator {
+            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+                Ok(originator) => originator,
+                Err(err) => return Err(anyhow::anyhow!("invalid originator field: {}", err)),
+            },
+            None => return Err(anyhow::anyhow!("missing originator field")),
+        },
         alias: api_instance.alias.clone(),
         msg: api_instance.msg.clone(),
     })
@@ -228,10 +235,17 @@ pub fn parse_output_event_data_raw(
     match &api_instance.dst {
         Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
             Ok(dst) => Ok(crate::guest_api_host::OutputEventDataRaw {
+                originator: match &api_instance.originator {
+                    Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+                        Ok(originator) => originator,
+                        Err(err) => return Err(anyhow::anyhow!("invalid originator field: {}", err)),
+                    },
+                    None => return Err(anyhow::anyhow!("missing originator field")),
+                },
                 dst,
                 msg: api_instance.msg.clone(),
             }),
-            Err(e) => Err(e),
+            Err(err) => Err(err),
         },
         None => Err(anyhow::anyhow!("dst is missing")),
     }
@@ -241,6 +255,13 @@ pub fn parse_telemetry_log_event(
     api_instance: &crate::grpc_impl::api::TelemetryLogEvent,
 ) -> anyhow::Result<crate::guest_api_host::TelemetryLogEvent> {
     Ok(crate::guest_api_host::TelemetryLogEvent {
+        originator: match &api_instance.originator {
+            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+                Ok(originator) => originator,
+                Err(err) => return Err(anyhow::anyhow!("invalid originator field: {}", err)),
+            },
+            None => return Err(anyhow::anyhow!("missing originator field")),
+        },
         log_level: match api_instance.log_level {
             x if x == crate::grpc_impl::api::TelemetryLogLevel::LogError as i32 => crate::guest_api_host::TelemetryLogLevel::Error,
             x if x == crate::grpc_impl::api::TelemetryLogLevel::LogWarn as i32 => crate::guest_api_host::TelemetryLogLevel::Warn,
@@ -256,6 +277,13 @@ pub fn parse_telemetry_log_event(
 
 pub fn parse_delayed_event_data(api_instance: &crate::grpc_impl::api::DelayedEventData) -> anyhow::Result<crate::guest_api_host::DelayedEventData> {
     Ok(crate::guest_api_host::DelayedEventData {
+        originator: match &api_instance.originator {
+            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+                Ok(originator) => originator,
+                Err(err) => return Err(anyhow::anyhow!("invalid originator field: {}", err)),
+            },
+            None => return Err(anyhow::anyhow!("missing originator field")),
+        },
         delay: api_instance.delay,
         alias: api_instance.alias.clone(),
         msg: api_instance.msg.clone(),
@@ -264,12 +292,20 @@ pub fn parse_delayed_event_data(api_instance: &crate::grpc_impl::api::DelayedEve
 
 pub fn parse_sync_data(api_instance: &crate::grpc_impl::api::SyncData) -> anyhow::Result<crate::guest_api_host::SyncData> {
     Ok(crate::guest_api_host::SyncData {
+        originator: match &api_instance.originator {
+            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+                Ok(originator) => originator,
+                Err(err) => return Err(anyhow::anyhow!("invalid originator field: {}", err)),
+            },
+            None => return Err(anyhow::anyhow!("missing originator field")),
+        },
         serialized_data: api_instance.serialized_state.clone(),
     })
 }
 
 fn serialize_output_event_data(event: &crate::guest_api_host::OutputEventData) -> crate::grpc_impl::api::OutputEventData {
     crate::grpc_impl::api::OutputEventData {
+        originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         alias: event.alias.clone(),
         msg: event.msg.clone(),
     }
@@ -277,6 +313,7 @@ fn serialize_output_event_data(event: &crate::guest_api_host::OutputEventData) -
 
 fn serialize_output_event_data_raw(event: &crate::guest_api_host::OutputEventDataRaw) -> crate::grpc_impl::api::OutputEventDataRaw {
     crate::grpc_impl::api::OutputEventDataRaw {
+        originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         dst: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.dst)),
         msg: event.msg.clone(),
     }
@@ -284,6 +321,7 @@ fn serialize_output_event_data_raw(event: &crate::guest_api_host::OutputEventDat
 
 fn serialize_telemetry_log_event(event: &crate::guest_api_host::TelemetryLogEvent) -> crate::grpc_impl::api::TelemetryLogEvent {
     crate::grpc_impl::api::TelemetryLogEvent {
+        originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         log_level: match event.log_level {
             crate::guest_api_host::TelemetryLogLevel::Error => crate::grpc_impl::api::TelemetryLogLevel::LogError as i32,
             crate::guest_api_host::TelemetryLogLevel::Warn => crate::grpc_impl::api::TelemetryLogLevel::LogWarn as i32,
@@ -298,6 +336,7 @@ fn serialize_telemetry_log_event(event: &crate::guest_api_host::TelemetryLogEven
 
 fn serialize_delayed_event_data(event: &crate::guest_api_host::DelayedEventData) -> crate::grpc_impl::api::DelayedEventData {
     crate::grpc_impl::api::DelayedEventData {
+        originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         delay: event.delay,
         alias: event.alias.clone(),
         msg: event.msg.clone(),
@@ -306,6 +345,7 @@ fn serialize_delayed_event_data(event: &crate::guest_api_host::DelayedEventData)
 
 fn serialize_sync_data(event: &crate::guest_api_host::SyncData) -> crate::grpc_impl::api::SyncData {
     crate::grpc_impl::api::SyncData {
+        originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         serialized_state: event.serialized_data.clone(),
     }
 }
@@ -325,10 +365,12 @@ mod test {
     fn serialize_deserialize_output_event_data() {
         let messages = vec![
             OutputEventData {
+                originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 alias: "".to_string(),
                 msg: vec![],
             },
             OutputEventData {
+                originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 alias: "my-fun".to_string(),
                 msg: vec![0, 42, 0, 42, 99],
             },
@@ -345,10 +387,12 @@ mod test {
     fn serialize_deserialize_output_event_data_raw() {
         let messages = vec![
             OutputEventDataRaw {
+                originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 dst: InstanceId::none(),
                 msg: vec![],
             },
             OutputEventDataRaw {
+                originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 dst: InstanceId::new(uuid::Uuid::new_v4()),
                 msg: vec![0, 42, 0, 42, 99],
             },
@@ -372,11 +416,13 @@ mod test {
             TelemetryLogLevel::Trace,
         ] {
             messages.push(TelemetryLogEvent {
+                originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 log_level: log_level.clone(),
                 msg: "".to_string(),
                 target: "".to_string(),
             });
             messages.push(TelemetryLogEvent {
+                originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 log_level,
                 msg: "my-event".to_string(),
                 target: "my-target".to_string(),
@@ -394,11 +440,13 @@ mod test {
     fn serialize_deserialize_delayed_event_data() {
         let messages = vec![
             DelayedEventData {
+                originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 delay: 0_u64,
                 alias: "".to_string(),
                 msg: vec![],
             },
             DelayedEventData {
+                originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 delay: 42_u64,
                 alias: "my-fun".to_string(),
                 msg: vec![0, 42, 0, 42, 99],
@@ -415,8 +463,12 @@ mod test {
     #[test]
     fn serialize_deserialize_sync_data() {
         let messages = vec![
-            SyncData { serialized_data: vec![] },
             SyncData {
+                originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
+                serialized_data: vec![],
+            },
+            SyncData {
+                originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 serialized_data: vec![0, 42, 0, 42, 99],
             },
         ];

@@ -4,6 +4,7 @@
 #[derive(Debug, Clone, PartialEq)]
 pub struct BootData {
     pub guest_api_host_endpoint: String,
+    pub instance_id: edgeless_api_core::instance_id::InstanceId,
 }
 
 #[derive(Debug, Clone, PartialEq)]
