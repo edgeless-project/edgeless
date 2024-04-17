@@ -11,7 +11,7 @@ struct Args {
 }
 
 async fn edgeless_container_function_main(endpoint: String) {
-    let (mut container_function, container_function_task) = edgeless_node::container_runner::container_function::ContainerFunction::new();
+    let (mut container_function, container_function_task) = edgeless_container_function::container_function::ContainerFunction::new();
     let server_task = edgeless_api::grpc_impl::container_function::GuestAPIFunctionServer::run(container_function.get_api_client(), endpoint);
     futures::join!(container_function_task, server_task);
 }
