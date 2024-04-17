@@ -44,7 +44,7 @@ impl ContainerFunction {
 
         // Initialized in BOOT
         let mut host_client;
-        let mut host_client_api;
+        let mut host_client_api = None;
 
         let mut fsm = FiniteStateMachine::PreBoot;
 
@@ -102,6 +102,21 @@ impl ContainerFunction {
                         log::error!("received cast command while not in an initialized state: ignored");
                     } else {
                         // Add cast logic here.
+
+                        // This is just an example: the application waits for 1 second then forwards the
+                        // event to its output channel called "output".
+                        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+                        if let Some(ref mut host_client_api) = host_client_api {
+                            if let Err(err) = host_client_api
+                                .cast(edgeless_api::guest_api_host::OutputEventData {
+                                    alias: "output".to_string(),
+                                    msg: event.msg,
+                                })
+                                .await
+                            {
+                                log::error!("error when casting an event to alias \"output\": {}", err);
+                            }
+                        }
                     }
                 }
                 ContainerFunctionRequest::CALL(event, reply_sender) => {
