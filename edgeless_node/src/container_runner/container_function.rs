@@ -46,13 +46,21 @@ impl ContainerFunction {
         let mut host_client;
         let mut host_client_api = None;
 
+        // InstanceID assigned to this function, initialized in BOOT
+        let mut instance_id = None;
+
+        // Finite state machine of the function
         let mut fsm = FiniteStateMachine::PreBoot;
 
         // Main loop that reacts to messages on the receiver channel
         while let Some(req) = receiver.next().await {
             match req {
                 ContainerFunctionRequest::BOOT(boot_data) => {
-                    log::debug!("boot, remote node URL {}", boot_data.guest_api_host_endpoint);
+                    log::info!(
+                        "boot, remote node URL {}, instance_id {}",
+                        boot_data.guest_api_host_endpoint,
+                        boot_data.instance_id
+                    );
                     if std::mem::discriminant(&fsm) != std::mem::discriminant(&FiniteStateMachine::PreBoot) {
                         log::error!("received boot command while not in a pre-boot state: ignored");
                     } else {
@@ -65,16 +73,8 @@ impl ContainerFunction {
                             Ok(client) => {
                                 host_client = Some(client);
                                 host_client_api = Some(host_client.unwrap().guest_api_host());
-                                match host_client_api.as_mut().unwrap().slf().await {
-                                    Ok(instance_id) => {
-                                        log::info!("booted from node_id {} function_id {}", instance_id.node_id, instance_id.function_id);
-                                        fsm = FiniteStateMachine::Booted;
-                                    }
-                                    Err(err) => {
-                                        log::error!("communication with host failed: {}", err);
-                                        fsm = FiniteStateMachine::Error;
-                                    }
-                                }
+                                instance_id = Some(boot_data.instance_id);
+                                fsm = FiniteStateMachine::Booted;
                             }
                             Err(err) => {
                                 log::error!("container function boot error: {}", err);
@@ -84,7 +84,7 @@ impl ContainerFunction {
                     }
                 }
                 ContainerFunctionRequest::INIT(init_data) => {
-                    log::debug!(
+                    log::info!(
                         "init, init_data {}, serialized_state {} bytes",
                         init_data.init_payload,
                         init_data.serialized_state.len()
@@ -97,7 +97,7 @@ impl ContainerFunction {
                     }
                 }
                 ContainerFunctionRequest::CAST(event) => {
-                    log::debug!("cast, src {}, msg {} bytes", event.src, event.msg.len());
+                    log::info!("cast, src {}, msg {} bytes", event.src, event.msg.len());
                     if std::mem::discriminant(&fsm) != std::mem::discriminant(&FiniteStateMachine::Initialized) {
                         log::error!("received cast command while not in an initialized state: ignored");
                     } else {
@@ -109,18 +109,22 @@ impl ContainerFunction {
                         if let Some(ref mut host_client_api) = host_client_api {
                             if let Err(err) = host_client_api
                                 .cast(edgeless_api::guest_api_host::OutputEventData {
+                                    originator: instance_id.unwrap(),
                                     alias: "output".to_string(),
                                     msg: event.msg,
                                 })
                                 .await
                             {
+                                fsm = FiniteStateMachine::Error;
                                 log::error!("error when casting an event to alias \"output\": {}", err);
+                            } else {
+                                log::info!("event recasted successfully to \"output\"");
                             }
                         }
                     }
                 }
                 ContainerFunctionRequest::CALL(event, reply_sender) => {
-                    log::debug!("call, src {}, msg {} bytes", event.src, event.msg.len());
+                    log::info!("call, src {}, msg {} bytes", event.src, event.msg.len());
                     let res = match std::mem::discriminant(&fsm) == std::mem::discriminant(&FiniteStateMachine::Initialized) {
                         false => {
                             log::error!("received call command while not in an initialized state: ignored");
@@ -134,12 +138,13 @@ impl ContainerFunction {
                     match reply_sender.send(Ok(res)) {
                         Ok(_) => {}
                         Err(err) => {
-                            log::error!("Unhandled: {:?}", err);
+                            fsm = FiniteStateMachine::Error;
+                            log::error!("internal communication error on call command: {:?}", err);
                         }
                     }
                 }
                 ContainerFunctionRequest::STOP() => {
-                    log::debug!("stop");
+                    log::info!("stop");
                     if std::mem::discriminant(&fsm) != std::mem::discriminant(&FiniteStateMachine::Initialized) {
                         log::error!("received stop command while not in an initialized state: ignored");
                     } else {

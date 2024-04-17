@@ -15,6 +15,7 @@ pub struct ContainerFunctionInstance {
 #[async_trait::async_trait]
 impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
     async fn instantiate(
+        instance_id: &edgeless_api::function_instance::InstanceId,
         runtime_configuration: std::collections::HashMap<String, String>,
         _guest_api_host: &mut Option<crate::base_runtime::guest_api::GuestAPIHost>,
         code: &[u8],
@@ -39,6 +40,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
                             match function_client_api
                                 .boot(edgeless_api::guest_api_function::BootData {
                                     guest_api_host_endpoint: url.clone(),
+                                    instance_id: instance_id.clone(),
                                 })
                                 .await
                             {
@@ -86,7 +88,6 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
 
     async fn cast(&mut self, src: &edgeless_api::function_instance::InstanceId, msg: &str) -> Result<(), crate::base_runtime::FunctionInstanceError> {
         log::debug!("container run-time: cast, src {}, msg {} bytes", src, msg.len());
-        log::info!("XXX container run-time: cast, src {}, msg {}", src, msg);
         self.function_client_api
             .cast(edgeless_api::guest_api_function::InputEventData {
                 src: src.clone(),

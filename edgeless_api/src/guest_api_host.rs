@@ -3,12 +3,14 @@
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OutputEventData {
+    pub originator: edgeless_api_core::instance_id::InstanceId,
     pub alias: String,
     pub msg: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OutputEventDataRaw {
+    pub originator: edgeless_api_core::instance_id::InstanceId,
     pub dst: edgeless_api_core::instance_id::InstanceId,
     pub msg: Vec<u8>,
 }
@@ -24,6 +26,7 @@ pub enum TelemetryLogLevel {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TelemetryLogEvent {
+    pub originator: edgeless_api_core::instance_id::InstanceId,
     pub log_level: TelemetryLogLevel,
     pub target: String,
     pub msg: String,
@@ -31,6 +34,7 @@ pub struct TelemetryLogEvent {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DelayedEventData {
+    pub originator: edgeless_api_core::instance_id::InstanceId,
     pub alias: String,
     pub msg: Vec<u8>,
     pub delay: u64,
@@ -38,6 +42,7 @@ pub struct DelayedEventData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SyncData {
+    pub originator: edgeless_api_core::instance_id::InstanceId,
     pub serialized_data: Vec<u8>,
 }
 

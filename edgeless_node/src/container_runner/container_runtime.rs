@@ -99,37 +99,28 @@ impl ContainerRuntime {
             match req {
                 ContainerRuntimeRequest::CAST(event) => {
                     log::debug!("cast, alias {}, msg {} bytes", event.alias, event.msg.len());
-                    log::info!("XXX");
-                    if let Some(runtime) = container_runtime
-                        .lock()
-                        .await
-                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
-                    {
+                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
                         if let Err(_) = runtime.cast_alias(&event.alias, String::from_utf8(event.msg).unwrap().as_str()).await {
                             log::error!("error occurred when casting an event towards alias {}: dropped", event.alias);
                         }
                     } else {
                         log::warn!(
                             "no function instance with matching ID {} when casting an event towards alias {}: dropped",
-                            edgeless_api::function_instance::InstanceId::none(),
+                            event.originator,
                             event.alias
                         );
                     }
                 }
                 ContainerRuntimeRequest::CASTRAW(event) => {
                     log::debug!("cast-raw, dst {}, msg {} bytes", event.dst, event.msg.len());
-                    if let Some(runtime) = container_runtime
-                        .lock()
-                        .await
-                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
-                    {
+                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
                         if let Err(_) = runtime.cast_raw(event.dst, String::from_utf8(event.msg).unwrap().as_str()).await {
                             log::error!("error occurred when raw-casting an event towards {}", event.dst);
                         }
                     } else {
                         log::warn!(
                             "no function instance with matching ID {} when raw-casting an event towards {}: dropped",
-                            edgeless_api::function_instance::InstanceId::none(),
+                            event.originator,
                             event.dst
                         );
                     }
@@ -137,11 +128,7 @@ impl ContainerRuntime {
                 ContainerRuntimeRequest::CALL(event, reply_sender) => {
                     log::debug!("call, alias {}, msg {} bytes", event.alias, event.msg.len());
                     let mut res = edgeless_api::guest_api_function::CallReturn::Err;
-                    if let Some(runtime) = container_runtime
-                        .lock()
-                        .await
-                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
-                    {
+                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
                         match runtime.call_alias(&event.alias, String::from_utf8(event.msg).unwrap().as_str()).await {
                             Ok(ret) => {
                                 res = match ret {
@@ -159,7 +146,7 @@ impl ContainerRuntime {
                     } else {
                         log::warn!(
                             "no function instance with matching ID {} when calling an event towards alias {}: dropped",
-                            edgeless_api::function_instance::InstanceId::none(),
+                            event.originator,
                             event.alias
                         );
                     }
@@ -173,11 +160,7 @@ impl ContainerRuntime {
                 ContainerRuntimeRequest::CALLRAW(event, reply_sender) => {
                     log::debug!("call-raw, dst {}, msg {} bytes", event.dst, event.msg.len());
                     let mut res = edgeless_api::guest_api_function::CallReturn::Err;
-                    if let Some(runtime) = container_runtime
-                        .lock()
-                        .await
-                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
-                    {
+                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
                         match runtime.call_raw(event.dst, String::from_utf8(event.msg).unwrap().as_str()).await {
                             Ok(ret) => {
                                 res = match ret {
@@ -195,7 +178,7 @@ impl ContainerRuntime {
                     } else {
                         log::warn!(
                             "no function instance with matching ID {} when raw-calling an event towards {}: dropped",
-                            edgeless_api::function_instance::InstanceId::none(),
+                            event.originator,
                             event.dst
                         );
                     }
@@ -213,11 +196,7 @@ impl ContainerRuntime {
                         event.target,
                         event.msg
                     );
-                    if let Some(runtime) = container_runtime
-                        .lock()
-                        .await
-                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
-                    {
+                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
                         runtime
                             .telemetry_log(
                                 match event.log_level {
@@ -244,7 +223,7 @@ impl ContainerRuntime {
                     } else {
                         log::warn!(
                             "no function instance with matching ID {} when issuing a telemetry_log with target {}: ignored",
-                            edgeless_api::function_instance::InstanceId::none(),
+                            event.originator,
                             event.target
                         );
                     }
@@ -252,21 +231,10 @@ impl ContainerRuntime {
                 ContainerRuntimeRequest::SLF(reply_sender) => {
                     log::debug!("slf");
 
-                    let mut res = edgeless_api::function_instance::InstanceId::none();
-                    if let Some(runtime) = container_runtime
-                        .lock()
-                        .await
-                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
-                    {
-                        res = runtime.slf().await;
-                    } else {
-                        log::warn!(
-                            "no function instance with matching ID {} when querying slf: returning none",
-                            edgeless_api::function_instance::InstanceId::none()
-                        );
-                    }
-
-                    match reply_sender.send(Ok(res)) {
+                    // This method should never be called by a container
+                    // function instance, since it is supposed to learn its
+                    // Instance ID at boot.
+                    match reply_sender.send(Ok(edgeless_api::function_instance::InstanceId::none())) {
                         Ok(_) => {}
                         Err(err) => {
                             log::error!("Unhandled: {:?}", err);
@@ -280,11 +248,7 @@ impl ContainerRuntime {
                         event.alias,
                         event.msg.len()
                     );
-                    if let Some(runtime) = container_runtime
-                        .lock()
-                        .await
-                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
-                    {
+                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
                         if let Err(_) = runtime
                             .delayed_cast(event.delay, &event.alias, String::from_utf8(event.msg).unwrap().as_str())
                             .await
@@ -298,7 +262,7 @@ impl ContainerRuntime {
                     } else {
                         log::warn!(
                             "no function instance with matching ID {} when casting an event with delay {} towards alias {}: dropped",
-                            edgeless_api::function_instance::InstanceId::none(),
+                            event.originator,
                             event.delay,
                             event.alias
                         );
@@ -306,21 +270,14 @@ impl ContainerRuntime {
                 }
                 ContainerRuntimeRequest::SYNC(sync_data) => {
                     log::debug!("sync, serialized-data {} bytes", sync_data.serialized_data.len());
-                    if let Some(runtime) = container_runtime
-                        .lock()
-                        .await
-                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
-                    {
+                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&sync_data.originator) {
                         if let Err(_) = runtime.sync(String::from_utf8(sync_data.serialized_data).unwrap().as_str()).await {
-                            log::error!(
-                                "error occurred when synchronizing state of {}: ignored",
-                                edgeless_api::function_instance::InstanceId::none()
-                            );
+                            log::error!("error occurred when synchronizing state of {}: ignored", sync_data.originator);
                         }
                     } else {
                         log::warn!(
                             "no function instance with matching ID {} when synchronizing state: ignored",
-                            edgeless_api::function_instance::InstanceId::none()
+                            sync_data.originator
                         );
                     }
                 }
