@@ -45,6 +45,13 @@ impl crate::base_runtime::runtime::GuestAPIHostRegister for ContainerRuntime {
         }
     }
 
+    fn guest_api_host(
+        &mut self,
+        instance_id: &edgeless_api::function_instance::InstanceId,
+    ) -> Option<&mut crate::base_runtime::guest_api::GuestAPIHost> {
+        self.guest_api_hosts.get_mut(&instance_id)
+    }
+
     fn configuration(&mut self) -> std::collections::HashMap<String, String> {
         self.configuration.clone()
     }
@@ -54,22 +61,26 @@ impl ContainerRuntime {
     pub fn new(
         configuration: std::collections::HashMap<String, String>,
     ) -> (
-        std::sync::Arc<std::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>>,
+        std::sync::Arc<tokio::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>>,
         std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
         Box<dyn edgeless_api::container_runtime::ContainerRuntimeAPI + Send>,
     ) {
         log::debug!("new container runtime created");
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
+        let container_runtime: std::sync::Arc<tokio::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>> =
+            std::sync::Arc::new(tokio::sync::Mutex::new(Box::new(Self {
+                guest_api_hosts: std::collections::HashMap::new(),
+                configuration,
+            })));
+
+        let container_runtime_clone = container_runtime.clone();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver).await;
+            Self::main_task(receiver, container_runtime_clone).await;
         });
 
         (
-            std::sync::Arc::new(std::sync::Mutex::new(Box::new(Self {
-                guest_api_hosts: std::collections::HashMap::new(),
-                configuration,
-            }))),
+            container_runtime,
             main_task,
             Box::new(ContainerRuntimeClient {
                 container_runtime_client: Box::new(GuestAPIRuntimeClient { sender }),
@@ -77,7 +88,10 @@ impl ContainerRuntime {
         )
     }
 
-    async fn main_task(receiver: futures::channel::mpsc::UnboundedReceiver<ContainerRuntimeRequest>) {
+    async fn main_task(
+        receiver: futures::channel::mpsc::UnboundedReceiver<ContainerRuntimeRequest>,
+        container_runtime: std::sync::Arc<tokio::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>>,
+    ) {
         let mut receiver = receiver;
 
         // Main loop that reacts to messages on the receiver channel
@@ -86,13 +100,69 @@ impl ContainerRuntime {
                 ContainerRuntimeRequest::CAST(event) => {
                     log::debug!("cast, alias {}, msg {} bytes", event.alias, event.msg.len());
                     log::info!("XXX");
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
+                    {
+                        if let Err(_) = runtime.cast_alias(&event.alias, String::from_utf8(event.msg).unwrap().as_str()).await {
+                            log::error!("error occurred when casting an event towards alias {}: dropped", event.alias);
+                        }
+                    } else {
+                        log::warn!(
+                            "no function instance with matching ID {} when casting an event towards alias {}: dropped",
+                            edgeless_api::function_instance::InstanceId::none(),
+                            event.alias
+                        );
+                    }
                 }
                 ContainerRuntimeRequest::CASTRAW(event) => {
                     log::debug!("cast-raw, dst {}, msg {} bytes", event.dst, event.msg.len());
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
+                    {
+                        if let Err(_) = runtime.cast_raw(event.dst, String::from_utf8(event.msg).unwrap().as_str()).await {
+                            log::error!("error occurred when raw-casting an event towards {}", event.dst);
+                        }
+                    } else {
+                        log::warn!(
+                            "no function instance with matching ID {} when raw-casting an event towards {}: dropped",
+                            edgeless_api::function_instance::InstanceId::none(),
+                            event.dst
+                        );
+                    }
                 }
                 ContainerRuntimeRequest::CALL(event, reply_sender) => {
                     log::debug!("call, alias {}, msg {} bytes", event.alias, event.msg.len());
-                    let res = edgeless_api::guest_api_function::CallReturn::Err;
+                    let mut res = edgeless_api::guest_api_function::CallReturn::Err;
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
+                    {
+                        match runtime.call_alias(&event.alias, String::from_utf8(event.msg).unwrap().as_str()).await {
+                            Ok(ret) => {
+                                res = match ret {
+                                    edgeless_dataplane::core::CallRet::NoReply => edgeless_api::guest_api_function::CallReturn::NoRet,
+                                    edgeless_dataplane::core::CallRet::Reply(msg) => {
+                                        edgeless_api::guest_api_function::CallReturn::Reply(msg.as_bytes().to_vec())
+                                    }
+                                    edgeless_dataplane::core::CallRet::Err => edgeless_api::guest_api_function::CallReturn::Err,
+                                }
+                            }
+                            Err(_) => {
+                                log::error!("error occurred when calling an event towards alias {}", event.alias)
+                            }
+                        }
+                    } else {
+                        log::warn!(
+                            "no function instance with matching ID {} when calling an event towards alias {}: dropped",
+                            edgeless_api::function_instance::InstanceId::none(),
+                            event.alias
+                        );
+                    }
                     match reply_sender.send(Ok(res)) {
                         Ok(_) => {}
                         Err(err) => {
@@ -102,7 +172,33 @@ impl ContainerRuntime {
                 }
                 ContainerRuntimeRequest::CALLRAW(event, reply_sender) => {
                     log::debug!("call-raw, dst {}, msg {} bytes", event.dst, event.msg.len());
-                    let res = edgeless_api::guest_api_function::CallReturn::Err;
+                    let mut res = edgeless_api::guest_api_function::CallReturn::Err;
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
+                    {
+                        match runtime.call_raw(event.dst, String::from_utf8(event.msg).unwrap().as_str()).await {
+                            Ok(ret) => {
+                                res = match ret {
+                                    edgeless_dataplane::core::CallRet::NoReply => edgeless_api::guest_api_function::CallReturn::NoRet,
+                                    edgeless_dataplane::core::CallRet::Reply(msg) => {
+                                        edgeless_api::guest_api_function::CallReturn::Reply(msg.as_bytes().to_vec())
+                                    }
+                                    edgeless_dataplane::core::CallRet::Err => edgeless_api::guest_api_function::CallReturn::Err,
+                                }
+                            }
+                            Err(_) => {
+                                log::error!("error occurred when raw-calling an event towards {}", event.dst)
+                            }
+                        }
+                    } else {
+                        log::warn!(
+                            "no function instance with matching ID {} when raw-calling an event towards {}: dropped",
+                            edgeless_api::function_instance::InstanceId::none(),
+                            event.dst
+                        );
+                    }
                     match reply_sender.send(Ok(res)) {
                         Ok(_) => {}
                         Err(err) => {
@@ -117,10 +213,59 @@ impl ContainerRuntime {
                         event.target,
                         event.msg
                     );
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
+                    {
+                        runtime
+                            .telemetry_log(
+                                match event.log_level {
+                                    edgeless_api::guest_api_host::TelemetryLogLevel::Error => {
+                                        edgeless_telemetry::telemetry_events::TelemetryLogLevel::Error
+                                    }
+                                    edgeless_api::guest_api_host::TelemetryLogLevel::Warn => {
+                                        edgeless_telemetry::telemetry_events::TelemetryLogLevel::Warn
+                                    }
+                                    edgeless_api::guest_api_host::TelemetryLogLevel::Info => {
+                                        edgeless_telemetry::telemetry_events::TelemetryLogLevel::Info
+                                    }
+                                    edgeless_api::guest_api_host::TelemetryLogLevel::Debug => {
+                                        edgeless_telemetry::telemetry_events::TelemetryLogLevel::Debug
+                                    }
+                                    edgeless_api::guest_api_host::TelemetryLogLevel::Trace => {
+                                        edgeless_telemetry::telemetry_events::TelemetryLogLevel::Trace
+                                    }
+                                },
+                                &event.target,
+                                &event.msg,
+                            )
+                            .await;
+                    } else {
+                        log::warn!(
+                            "no function instance with matching ID {} when issuing a telemetry_log with target {}: ignored",
+                            edgeless_api::function_instance::InstanceId::none(),
+                            event.target
+                        );
+                    }
                 }
                 ContainerRuntimeRequest::SLF(reply_sender) => {
                     log::debug!("slf");
-                    let res = edgeless_api::function_instance::InstanceId::none();
+
+                    let mut res = edgeless_api::function_instance::InstanceId::none();
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
+                    {
+                        res = runtime.slf().await;
+                    } else {
+                        log::warn!(
+                            "no function instance with matching ID {} when querying slf: returning none",
+                            edgeless_api::function_instance::InstanceId::none()
+                        );
+                    }
+
                     match reply_sender.send(Ok(res)) {
                         Ok(_) => {}
                         Err(err) => {
@@ -134,10 +279,50 @@ impl ContainerRuntime {
                         event.delay,
                         event.alias,
                         event.msg.len()
-                    )
+                    );
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
+                    {
+                        if let Err(_) = runtime
+                            .delayed_cast(event.delay, &event.alias, String::from_utf8(event.msg).unwrap().as_str())
+                            .await
+                        {
+                            log::error!(
+                                "error occurred when casting an event with delay {} towards alias {}: dropped",
+                                event.delay,
+                                event.alias
+                            );
+                        }
+                    } else {
+                        log::warn!(
+                            "no function instance with matching ID {} when casting an event with delay {} towards alias {}: dropped",
+                            edgeless_api::function_instance::InstanceId::none(),
+                            event.delay,
+                            event.alias
+                        );
+                    }
                 }
                 ContainerRuntimeRequest::SYNC(sync_data) => {
                     log::debug!("sync, serialized-data {} bytes", sync_data.serialized_data.len());
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&edgeless_api::function_instance::InstanceId::none())
+                    {
+                        if let Err(_) = runtime.sync(String::from_utf8(sync_data.serialized_data).unwrap().as_str()).await {
+                            log::error!(
+                                "error occurred when synchronizing state of {}: ignored",
+                                edgeless_api::function_instance::InstanceId::none()
+                            );
+                        }
+                    } else {
+                        log::warn!(
+                            "no function instance with matching ID {} when synchronizing state: ignored",
+                            edgeless_api::function_instance::InstanceId::none()
+                        );
+                    }
                 }
             }
         }
