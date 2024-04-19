@@ -10,6 +10,9 @@ pub struct ContainerFunctionInstance {
     _function_client: edgeless_api::grpc_impl::container_function::ContainerFunctionAPIClient,
     /// Protocol-neutral API to interact with the container function.
     function_client_api: Box<dyn edgeless_api::guest_api_function::GuestAPIFunction>,
+    /// ID of the Docker container created.
+    /// Not defined if plain gRPC was used.
+    id: Option<String>,
 }
 
 #[async_trait::async_trait]
@@ -24,14 +27,38 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
         log::info!("container run-time: instantiate {}", fun_spec);
 
         // Assume the fun_spec is one of (examples):
-        // - container:hello-world
+        // - container:edgeless_function:latest
         // - grpc:http://127.0.0.1:1234
         if let Some((fun_type, fun_addr)) = fun_spec.split_once(':') {
-            if fun_type != "grpc" {
+            if fun_type != "grpc" && fun_type != "container" {
                 log::error!("container function type not implemented: {}", fun_type);
                 return Err(crate::base_runtime::FunctionInstanceError::BadCode);
             }
-            match edgeless_api::grpc_impl::container_function::ContainerFunctionAPIClient::new(fun_addr, None).await {
+
+            let mut grpc_address = fun_addr.to_string();
+            let mut id = None;
+            if fun_type == "container" {
+                let mut docker = match super::docker_utils::Docker::connect() {
+                    Ok(docker) => docker,
+                    Err(err) => {
+                        log::error!("could not connect to Docker: {}", err);
+                        return Err(crate::base_runtime::FunctionInstanceError::InternalError);
+                    }
+                };
+
+                let (fun_id, public_port) = match super::docker_utils::Docker::start(&mut docker, fun_addr.to_string()) {
+                    Ok((id, port)) => (id, port),
+                    Err(err) => {
+                        log::error!("could not create container with image {}: {}", fun_addr, err);
+                        return Err(crate::base_runtime::FunctionInstanceError::InternalError);
+                    }
+                };
+
+                id = Some(fun_id);
+                grpc_address = format!("http://127.0.0.1:{}/", public_port);
+            }
+
+            match edgeless_api::grpc_impl::container_function::ContainerFunctionAPIClient::new(&grpc_address, None).await {
                 Ok(mut _function_client) => {
                     let mut function_client_api = _function_client.guest_api_function();
 
@@ -47,6 +74,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
                                 Ok(_) => Ok(Box::new(Self {
                                     _function_client,
                                     function_client_api,
+                                    id,
                                 })),
                                 Err(err) => {
                                     log::error!("could not boot the container function instance: {}", err);
@@ -61,7 +89,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
                     }
                 }
                 Err(err) => {
-                    log::error!("could not connect to the function instance at {}: {}", fun_addr, err);
+                    log::error!("could not connect to the function instance at {}: {}", grpc_address, err);
                     Err(crate::base_runtime::FunctionInstanceError::InternalError)
                 }
             }
@@ -124,9 +152,27 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
 
     async fn stop(&mut self) -> Result<(), crate::base_runtime::FunctionInstanceError> {
         log::debug!("container run-time: stop");
-        self.function_client_api
-            .stop()
-            .await
-            .or(Err(crate::base_runtime::FunctionInstanceError::InternalError))
+        if let Err(err) = self.function_client_api.stop().await {
+            log::error!("error when stopping container function: {}", err);
+            return Err(crate::base_runtime::FunctionInstanceError::InternalError);
+        }
+
+        if let Some(id) = &self.id {
+            // we have to stop the container that was started in instantiate()
+            let mut docker = match super::docker_utils::Docker::connect() {
+                Ok(docker) => docker,
+                Err(err) => {
+                    log::error!("could not connect to Docker: {}", err);
+                    return Err(crate::base_runtime::FunctionInstanceError::InternalError);
+                }
+            };
+
+            if let Err(err) = super::docker_utils::Docker::stop(&mut docker, id.clone()) {
+                log::error!("could not stop container with ID {}: {}", id, err);
+                return Err(crate::base_runtime::FunctionInstanceError::InternalError);
+            };
+        }
+
+        Ok(())
     }
 }
