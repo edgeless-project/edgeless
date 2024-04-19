@@ -20,6 +20,20 @@ fn test_docker_basic() {
         }
     };
 
+    let images = match docker.get_images(false) {
+        Ok(images) => images,
+        Err(e) => {
+            panic!("{}", e);
+        }
+    };
+
+    println!("the current images are available locally:");
+    for image in images {
+        if !image.RepoTags.is_empty() {
+            println!("\t{}", image.RepoTags.first().unwrap());
+        }
+    }
+
     let containers = match docker.get_containers(false) {
         Ok(containers) => containers,
         Err(e) => {
@@ -29,23 +43,31 @@ fn test_docker_basic() {
 
     println!("the current containers are running:");
     for container in containers {
-        println!("{}", container.Image);
+        println!("\t{}", container.Image);
     }
 
     let name = uuid::Uuid::new_v4();
+    let image_name = "edgeless_function".to_string();
 
     match docker.create_container(
         name.to_string(),
         rs_docker::container::ContainerCreate {
-            Image: "hello-world".to_string(),
+            Image: image_name.clone(),
             Labels: None,
             ExposedPorts: None,
-            HostConfig: None,
+            HostConfig: Some(rs_docker::container::HostConfigCreate {
+                NetworkMode: None,
+                PublishAllPorts: Some(true),
+                PortBindings: None,
+            }),
         },
     ) {
         Ok(val) => println!("{}", val),
         Err(_e) => {
-            println!("could not create the container, this likely means that the hello-world image is not available locally\nplease run: docker image pull hello-world");
+            println!(
+                "could not create the container, this likely means that the image is not available locally\nplease run: docker image pull {}",
+                image_name
+            );
             return;
         }
     };
@@ -56,6 +78,44 @@ fn test_docker_basic() {
             panic!("{}", e);
         }
     };
+
+    let containers = match docker.get_containers(false) {
+        Ok(containers) => containers,
+        Err(e) => {
+            panic!("{}", e);
+        }
+    };
+
+    let container = containers
+        .iter()
+        .find(|x| {
+            if let Some(name_found) = x.Names.first() {
+                if *name_found == format!("/{}", name.to_string()) {
+                    return true;
+                }
+            }
+            false
+        })
+        .unwrap();
+    let port = container
+        .Ports
+        .iter()
+        .find(|x| {
+            if let Some(ip) = &x.IP {
+                if ip == "0.0.0.0" {
+                    return true;
+                }
+            }
+            false
+        })
+        .unwrap();
+    println!(
+        "port: {}:{}->{}/{}",
+        port.IP.as_ref().unwrap_or(&"".to_string()),
+        port.PrivatePort,
+        port.PublicPort.unwrap_or_default(),
+        port.Type
+    );
 
     match docker.stop_container(&name.to_string()) {
         Ok(val) => println!("{}", val),
@@ -70,4 +130,27 @@ fn test_docker_basic() {
             panic!("{}", e);
         }
     };
+}
+
+#[test]
+fn test_docker_basic_with_utils() {
+    let mut docker = match crate::container_runner::docker_utils::Docker::connect() {
+        Ok(docker) => docker,
+        Err(err) => {
+            println!("could not connect to Docker, which may fine: {}", err);
+            return;
+        }
+    };
+
+    let image_name = "edgeless_function".to_string();
+
+    let (id, port) = match crate::container_runner::docker_utils::Docker::start(&mut docker, image_name) {
+        Ok((id, port)) => (id, port),
+        Err(err) => {
+            println!("could not create container, which may be fine: {}", err);
+            return;
+        }
+    };
+    println!("container ID: {}, port: {}", id, port);
+    crate::container_runner::docker_utils::Docker::stop(&mut docker, id).expect("we should be able to stop a container that started flawlessly");
 }

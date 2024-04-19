@@ -3,6 +3,8 @@
 
 pub mod container_runtime;
 
+pub mod docker_utils;
+
 pub mod function_instance;
 
 #[cfg(test)]
