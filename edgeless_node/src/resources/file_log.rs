@@ -26,10 +26,11 @@ impl Drop for FileLogResource {
 }
 
 impl FileLogResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, filename: &str) -> anyhow::Result<Self> {
+    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, filename: &str, add_timestamp: bool) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
 
         let mut outfile = std::fs::OpenOptions::new().create(true).write(true).append(true).open(filename)?;
+        let add_timestamp = add_timestamp;
 
         log::info!("FileLogResource created, writing to file: {}", filename);
 
@@ -52,9 +53,14 @@ impl FileLogResource {
                     }
                 };
 
-                log::debug!("{}", message_data);
-                if let Err(e) = writeln!(outfile, "{}", message_data) {
-                    log::error!("Could not write to file the message '{}': {}", message_data, e);
+                let line = match add_timestamp {
+                    true => format!("{} {}", chrono::Utc::now().to_rfc3339(), message_data),
+                    false => message_data,
+                };
+
+                log::debug!("{}", line);
+                if let Err(e) = writeln!(outfile, "{}", line) {
+                    log::error!("Could not write to file the message '{}': {}", line, e);
                 }
 
                 if need_reply {
@@ -96,7 +102,13 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
 
-            match FileLogResource::new(dataplane_handle, filename).await {
+            match FileLogResource::new(
+                dataplane_handle,
+                filename,
+                instance_specification.configuration.contains_key("add-timestamp"),
+            )
+            .await
+            {
                 Ok(resource) => {
                     lck.instances.insert(new_id.clone(), resource);
                     return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
