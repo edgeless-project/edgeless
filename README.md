@@ -12,7 +12,7 @@ under active development within the project [EDGELESS](https://edgeless-project.
 EDGELESS is a framework that enables _serverless edge computing_, which is
 intended especially for edge nodes with limited capabilities.
 
-![](documentation/diagrams-high-level.png)
+![](documentation/architecture-arch-2.0.png)
 
 An EDGELESS cluster consists of one or more _orchestration domains_ (three in
 the example figure above) managed by an ε-CON (controller).
@@ -25,6 +25,8 @@ _Functions_ live entirely within the realm of the EDGELESS run-time, while
 _resources_ may interact with the external environment, e.g., handling events
 in a resource may have a side effect, such as updating an entry on an external
 in-memory database or reading the value of a physical sensor.
+
+![](documentation/architecture-workflow.png)
 
 Functions are _stateful_: a given function instance is assigned to exactly one
 workflow, thus the function developer may assume that data will generally
@@ -51,9 +53,11 @@ resources within its domain;
   instance in another orchestration domain;
   2) configuration and management of the resources;
 - one or more nodes, which can host the execution of function instances of a
-given workflow in a [WebAssembly](https://webassembly.org/) run-time environment.
+given workflow in a [WebAssembly](https://webassembly.org/) run-time environment
+or as a Docker container.
 
-The byte code of the function instance is provided by the user when requesting
+The byte code of the WASM function instance or the name of the Docker
+container to be started is provided by the user when requesting
 the creation of a workflow, which also includes _annotations_ to specify the
 Quality of Service requirements (e.g., maximum completion time) and workload
 characteristics (e.g, average invocation rate), as well as affinity of
@@ -73,8 +77,7 @@ Currently there are several known limitations, including the following ones:
   interconnection between all the nodes and the ε-BAL;
 - the ε-CON only supports a single orchestration domain and does not perform
   any kind of admission control;
-- the ε-ORC only supports a single node;
-- all the workflow- and function-level annotations are ignored;
+- no workflow-level annotations are supported; 
 - resources supported:
   - http-ingress: to ingest of HTTP commands from external web clients;
   - http-egress: to execute HTTP commands on external web servers;
