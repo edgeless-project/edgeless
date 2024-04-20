@@ -6,9 +6,9 @@ pub struct ContainerFunctionAPIClient {
 }
 
 impl ContainerFunctionAPIClient {
-    pub async fn new(api_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
+    pub async fn new(api_addr: &str, timeout: std::time::Duration) -> anyhow::Result<Self> {
         Ok(Self {
-            guest_api_function: match crate::grpc_impl::guest_api_function::GuestAPIFunctionClient::new(api_addr, retry_interval).await {
+            guest_api_function: match crate::grpc_impl::guest_api_function::GuestAPIFunctionClient::new(api_addr, timeout).await {
                 Ok(val) => Box::new(val),
                 Err(err) => return Err(err),
             },
