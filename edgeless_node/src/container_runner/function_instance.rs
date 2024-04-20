@@ -54,31 +54,45 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
                     }
                 };
 
-                id = Some(fun_id);
                 grpc_address = format!("http://127.0.0.1:{}/", public_port);
+                log::info!("started container image {} ID {} GuestAPIFunction URL {}", fun_addr, fun_id, grpc_address);
+                id = Some(fun_id);
             }
 
-            match edgeless_api::grpc_impl::container_function::ContainerFunctionAPIClient::new(&grpc_address, None).await {
+            // TODO(ccicconetti) timeout is hard-coded to 30 seconds, which might
+            // not be enough with big containers
+            match edgeless_api::grpc_impl::container_function::ContainerFunctionAPIClient::new(&grpc_address, std::time::Duration::from_secs(30))
+                .await
+            {
                 Ok(mut _function_client) => {
                     let mut function_client_api = _function_client.guest_api_function();
 
                     match runtime_configuration.get("guest_api_host_url") {
                         Some(url) => {
-                            match function_client_api
-                                .boot(edgeless_api::guest_api_function::BootData {
-                                    guest_api_host_endpoint: url.clone(),
-                                    instance_id: instance_id.clone(),
-                                })
-                                .await
-                            {
-                                Ok(_) => Ok(Box::new(Self {
-                                    _function_client,
-                                    function_client_api,
-                                    id,
-                                })),
-                                Err(err) => {
-                                    log::error!("could not boot the container function instance: {}", err);
-                                    Err(crate::base_runtime::FunctionInstanceError::InternalError)
+                            let ts = std::time::Instant::now();
+                            loop {
+                                match function_client_api
+                                    .boot(edgeless_api::guest_api_function::BootData {
+                                        guest_api_host_endpoint: url.clone(),
+                                        instance_id: instance_id.clone(),
+                                    })
+                                    .await
+                                {
+                                    Ok(_) => {
+                                        return Ok(Box::new(Self {
+                                            _function_client,
+                                            function_client_api,
+                                            id,
+                                        }))
+                                    }
+                                    Err(err) => {
+                                        if ts.elapsed() >= std::time::Duration::from_secs(30) {
+                                            log::error!("could not boot the container function instance: {}", err);
+                                            return Err(crate::base_runtime::FunctionInstanceError::InternalError);
+                                        } else {
+                                            let _ = tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+                                        }
+                                    }
                                 }
                             }
                         }
