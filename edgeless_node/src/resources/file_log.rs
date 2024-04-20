@@ -30,7 +30,6 @@ impl FileLogResource {
         let mut dataplane_handle = dataplane_handle;
 
         let mut outfile = std::fs::OpenOptions::new().create(true).write(true).append(true).open(filename)?;
-        let add_timestamp = add_timestamp;
 
         log::info!("FileLogResource created, writing to file: {}", filename);
 
