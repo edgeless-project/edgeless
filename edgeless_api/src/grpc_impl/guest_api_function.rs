@@ -11,19 +11,19 @@ pub struct GuestAPIFunctionService {
 }
 
 impl GuestAPIFunctionClient {
-    pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
+    pub async fn new(server_addr: &str, timeout: std::time::Duration) -> anyhow::Result<Self> {
+        let ts = std::time::Instant::now();
         loop {
             match crate::grpc_impl::api::guest_api_function_client::GuestApiFunctionClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
                     return Ok(Self { client });
                 }
-                Err(err) => match retry_interval {
-                    Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
-                    None => {
+                Err(err) => {
+                    if ts.elapsed() >= timeout {
                         return Err(anyhow::anyhow!("Error when connecting to {}: {}", server_addr, err));
                     }
-                },
+                }
             }
         }
     }
