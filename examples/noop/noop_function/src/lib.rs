@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 pub use edgeless_function::*;
 
+#[derive(Debug, Default)]
 struct NoopFunction;
 
 impl EdgeFunction for NoopFunction {
@@ -34,4 +35,11 @@ impl EdgeFunction for NoopFunction {
     }
 }
 
+#[cfg(target_arch = "wasm")]
 edgeless_function::export!(NoopFunction);
+
+//#[cfg(target_arch = "x86_64")]
+//edgeless_function::export_x86!(NoopFunction, NoopFunction::default);
+
+#[cfg(target_arch = "x86_64")]
+edgeless_function::export_x86a!(NoopFunction);

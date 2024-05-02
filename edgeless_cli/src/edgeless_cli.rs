@@ -101,6 +101,15 @@ impl Platform {
             Self::ARM => String::from("Arm"),
         }
     }
+
+    fn from_string(platform: &str) -> Self {
+        match platform {
+            "wasm" => Self::WASM,
+            "x86" => Self::X86,
+            "arm" => Self::ARM,
+            _ => Self::WASM,
+        }
+    }
 }
 
 pub fn edgeless_cli_default_conf() -> String {
@@ -226,12 +235,7 @@ async fn main() -> anyhow::Result<()> {
 
                     let pack = ws.current()?;
 
-                    let platform = match architecture.as_str() {
-                        "wasm" => Platform::WASM,
-                        "x86" => Platform::X86,
-                        "arm" => Platform::ARM,
-                        _ => Platform::WASM,
-                    };
+                    let platform = Platform::from_string(architecture.as_str());
 
                     println!("Building for architecture {} using {} target.", platform.name(), platform.target());
 
