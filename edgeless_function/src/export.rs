@@ -74,3 +74,35 @@ macro_rules! export {
         }
     };
 }
+
+/// Declare an EdgeFunction type and its constructor.
+///
+/// # Notes
+///
+/// This works by automatically generating an `extern "C"` function with a
+/// pre-defined signature and symbol name. Therefore you will only be able to
+/// declare one plugin per library.
+#[macro_export]
+macro_rules! export_x86 {
+    ($plugin_type:ty, $constructor:path) => {
+        #[no_mangle]
+        pub unsafe extern "C" fn _plugin_create() -> *mut $crate::EdgeFunction {
+            // make sure the constructor is the correct type.
+            let constructor: fn() -> $plugin_type = $constructor;
+
+            let object = constructor();
+            let boxed: Box<$crate::EdgeFunction> = Box::new(object);
+            Box::into_raw(boxed)
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! export_x86a {
+    ( $fun:ident ) => {
+        #[no_mangle]
+        pub unsafe extern "C" fn handle_stop_asm() {
+            $fun::handle_stop()
+        }
+    };
+}

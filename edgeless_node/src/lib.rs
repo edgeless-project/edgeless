@@ -15,6 +15,8 @@ pub mod wasm_runner;
 #[cfg(feature = "wasmi")]
 pub mod wasmi_runner;
 
+pub mod x86_runner;
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
     /// General settings.
@@ -312,6 +314,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         ));
 
     let mut runners = std::collections::HashMap::<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>::new();
+    let mut runners_ft = std::collections::HashMap::<edgeless_api::function_instance::FunctionType, Box<dyn crate::base_runtime::RuntimeAPI + Send>>::new();
 
     // Create the WebAssembly (Wasmtime) runner.
     #[allow(unused_variables)]
@@ -328,6 +331,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                 ]))),
             );
         runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
+        runners_ft.insert(edgeless_api::function_instance::FunctionType::from_string("RUST_WASM"), Box::new(wasmtime_runtime_client.clone()));
         tokio::spawn(async move {
             wasmtime_runtime_task_s.run().await;
         })
@@ -350,6 +354,25 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         tokio::spawn(async move {
             wasmi_runtime_task_s.run().await;
         })
+    };
+
+    // Create the x86 runner.
+    let x86_runtime_task = {
+        let (x86_runtime_client, mut x86_runtime_task_s) = 
+            base_runtime::runtime::create::<x86_runner::function_instance::X86FunctionInstance>(
+                data_plane.clone(),
+                state_manager.clone(),
+                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                    ("FUNCTION_TYPE".to_string(), "RUST_X86".to_string()),
+                    ("X86_RUNTIME".to_string(), "x86runtime".to_string()),
+                    ("NODE_ID".to_string(), settings.general.node_id.to_string()),
+                ]))),
+            );
+            runners.insert("RUST_X86".to_string(), Box::new(x86_runtime_client.clone()));
+            runners_ft.insert(edgeless_api::function_instance::FunctionType::from_string("RUST_X86"), Box::new(x86_runtime_client.clone()));
+            tokio::spawn(async move{
+                x86_runtime_task_s.run().await;
+            })
     };
 
     // Create the resources.
