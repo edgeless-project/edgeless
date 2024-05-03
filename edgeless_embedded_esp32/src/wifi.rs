@@ -20,17 +20,17 @@ macro_rules! singleton {
 
 pub async fn init(
     spawner: embassy_executor::Spawner,
-    timer: esp_wifi::EspWifiTimer,
-    rng: hal::Rng,
+    timer: hal::timer::Timer<hal::timer::TimerX<hal::peripherals::TIMG1>, hal::Blocking>,
+    rng: hal::rng::Rng,
     radio_clock_control: hal::system::RadioClockControl,
     clocks: hal::clock::Clocks<'static>,
-    radio: hal::peripherals::RADIO,
-) -> &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static>> {
+    radio: hal::peripherals::WIFI,
+) -> &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>> {
     let init = esp_wifi::initialize(esp_wifi::EspWifiInitFor::Wifi, timer, rng.clone(), radio_clock_control, &clocks).unwrap();
 
-    let (wifi, _) = radio.split();
+    let wifi = radio;
 
-    let (wifi_interface, controller) = esp_wifi::wifi::new_with_mode(&init, wifi, esp_wifi::wifi::WifiMode::Sta).unwrap();
+    let (wifi_interface, controller) = esp_wifi::wifi::new_with_mode(&init, wifi, esp_wifi::wifi::WifiStaDevice).unwrap();
 
     let net_config = embassy_net::Config::dhcpv4(Default::default());
 
@@ -49,7 +49,7 @@ pub async fn init(
 }
 
 #[embassy_executor::task]
-async fn network_watchdog(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static>>) {
+async fn network_watchdog(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>>) {
     loop {
         if stack.is_link_up() {
             break;
@@ -78,10 +78,10 @@ async fn connection(mut controller: esp_wifi::wifi::WifiController<'static>) {
             _ => {}
         }
         if !matches!(controller.is_started(), Ok(true)) {
-            let client_config = embedded_svc::wifi::Configuration::Client(embedded_svc::wifi::ClientConfiguration {
-                ssid: SSID.into(),
-                password: PASSWORD.into(),
-                auth_method: embedded_svc::wifi::AuthMethod::WPA2Personal,
+            let client_config = esp_wifi::wifi::Configuration::Client(esp_wifi::wifi::ClientConfiguration {
+                ssid: SSID.try_into().unwrap(),
+                password: PASSWORD.try_into().unwrap(),
+                auth_method: esp_wifi::wifi::AuthMethod::WPA2Personal,
                 ..Default::default()
             });
             controller.set_configuration(&client_config).unwrap();
@@ -101,6 +101,6 @@ async fn connection(mut controller: esp_wifi::wifi::WifiController<'static>) {
 }
 
 #[embassy_executor::task]
-async fn net_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static>>) {
+async fn net_task(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>>) {
     stack.run().await
 }

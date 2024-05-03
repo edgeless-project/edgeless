@@ -18,7 +18,7 @@ impl EPaperDisplay {
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<EPaperDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
-        if data.provider_id == "epaper-display-1" {
+        if data.class_type == "epaper-display-1" {
             let mut config: Option<[u8; 128]> = None;
             for configuration_item in data.configuration {
                 if let Some((key, val)) = configuration_item {

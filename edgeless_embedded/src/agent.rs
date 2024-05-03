@@ -135,7 +135,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         let inner = self.inner.borrow_mut();
         let mut lck = inner.lock().await;
         for r in lck.iter_mut() {
-            if r.provider_id() == instance_specification.provider_id {
+            if r.provider_id() == instance_specification.class_type {
                 return r.start(instance_specification).await;
             }
         }

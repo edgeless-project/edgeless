@@ -11,7 +11,7 @@ impl MockDisplay {
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<MockDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
-        if data.provider_id == "mock-display-1" {
+        if data.class_type == "mock-display-1" {
             Ok(MockDisplayInstanceConfiguration {})
         } else {
             return Err(edgeless_api_core::common::ErrorResponse {
