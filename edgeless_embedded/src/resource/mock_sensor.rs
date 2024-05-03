@@ -22,7 +22,7 @@ impl MockSensor {
     ) -> Result<MockSensorConfiguration, edgeless_api_core::common::ErrorResponse> {
         let mut out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
 
-        if data.provider_id != "mock-scd30-sensor-1" {
+        if data.class_type != "mock-scd30-sensor-1" {
             return Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Wrong Resource ProviderId",
                 detail: None,

@@ -5,7 +5,6 @@
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]
-#![feature(async_fn_in_trait)]
 
 extern crate alloc;
 
@@ -24,10 +23,12 @@ use edgeless_embedded::resource::epaper_display::EPaper;
 #[cfg(feature = "epaper_2_13")]
 use epd_waveshare::prelude::*;
 
+use embedded_hal::delay::DelayNs;
+
 #[global_allocator]
 static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
 
-static RNG: once_cell::sync::OnceCell<hal::Rng> = once_cell::sync::OnceCell::new();
+static RNG: once_cell::sync::OnceCell<hal::rng::Rng> = once_cell::sync::OnceCell::new();
 
 const ESP_GETRANDOM_ERROR: u32 = getrandom::Error::CUSTOM_START + 1;
 
@@ -68,30 +69,27 @@ fn main() -> ! {
 
     let peripherals = hal::peripherals::Peripherals::take();
     #[allow(unused_variables)]
-    let io = hal::IO::new(peripherals.GPIO, peripherals.IO_MUX);
+    let io = hal::gpio::IO::new(peripherals.GPIO, peripherals.IO_MUX);
     let system = peripherals.SYSTEM.split();
 
     let clocks = hal::clock::ClockControl::max(system.clock_control).freeze();
-    let timer_group0 = hal::timer::TimerGroup::new(peripherals.TIMG0, &clocks);
-    let timer_group1 = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks);
+    let timer_group0 = hal::timer::TimerGroup::new_async(peripherals.TIMG0, &clocks);
+    let timer_group1 = hal::timer::TimerGroup::new(peripherals.TIMG1, &clocks, None);
 
-    let rng = hal::Rng::new(peripherals.RNG);
+    let rng = hal::rng::Rng::new(peripherals.RNG);
     assert!(RNG.set(rng.clone()).is_ok());
 
-    hal::embassy::init(&clocks, timer_group0.timer0);
+    hal::embassy::init(&clocks, timer_group0);
 
     #[cfg(feature = "epaper_2_13")]
     let display: Option<&'static mut dyn edgeless_embedded::resource::epaper_display::EPaper> = {
-        let spi = static_cell::make_static!(hal::spi::SpiBusController::from_spi(hal::spi::Spi::new_no_cs_no_miso(
-            peripherals.SPI2,
-            io.pins.gpio18,
-            io.pins.gpio23,
-            100u32.kHz(),
-            hal::spi::SpiMode::Mode0,
-            &clocks
-        )));
+        let spi = static_cell::make_static!(
+            hal::spi::master::Spi::new(peripherals.SPI2, 100u32.kHz(), hal::spi::SpiMode::Mode0, &clocks)
+                .with_sck(io.pins.gpio18)
+                .with_mosi(io.pins.gpio23)
+        );
 
-        let mut spi_dev = spi.add_device(io.pins.gpio5);
+        let mut spi_dev = embedded_hal_bus::spi::ExclusiveDevice::new_no_delay(spi, io.pins.gpio5.into_push_pull_output()).unwrap();
         let busy_pin = io.pins.gpio4.into_floating_input();
         let dc_pin = io.pins.gpio17.into_push_pull_output();
         let rst_pin = io.pins.gpio16.into_push_pull_output();
@@ -117,7 +115,15 @@ fn main() -> ! {
 
     #[cfg(feature = "scd30")]
     let scd30: Option<&'static mut dyn edgeless_embedded::resource::scd30_sensor::Sensor> = {
-        let i2c = hal::i2c::I2C::new(peripherals.I2C0, io.pins.gpio33, io.pins.gpio32, 50u32.kHz(), &clocks);
+        let i2c = hal::i2c::I2C::new_with_timeout(
+            peripherals.I2C0,
+            io.pins.gpio33,
+            io.pins.gpio32,
+            50u32.kHz(),
+            &clocks,
+            Some(0xFFFFF),
+            None,
+        );
 
         let mut i2c_delay = hal::delay::Delay::new(&clocks);
         i2c_delay.delay_ms(2000u32);
@@ -138,7 +144,7 @@ fn main() -> ! {
             rng,
             system.radio_clock_control,
             clocks,
-            peripherals.RADIO,
+            peripherals.WIFI,
             display,
             scd30,
         ));
@@ -151,11 +157,11 @@ fn main() -> ! {
 #[embassy_executor::task]
 async fn edgeless(
     spawner: embassy_executor::Spawner,
-    timer: esp_wifi::EspWifiTimer,
-    rng: hal::Rng,
+    timer: hal::timer::Timer<hal::timer::TimerX<hal::peripherals::TIMG1>, hal::Blocking>,
+    rng: hal::rng::Rng,
     radio_clock_control: hal::system::RadioClockControl,
     clocks: hal::clock::Clocks<'static>,
-    radio: hal::peripherals::RADIO,
+    wifi: hal::peripherals::WIFI,
     display: Option<&'static mut dyn edgeless_embedded::resource::epaper_display::EPaper>,
     scd30: Option<&'static mut dyn edgeless_embedded::resource::scd30_sensor::Sensor>,
 ) {
@@ -166,7 +172,7 @@ async fn edgeless(
     let tx_buf = static_cell::make_static!([0 as u8; 5000]);
     let tx_meta = static_cell::make_static!([embassy_net::udp::PacketMetadata::EMPTY; 10]);
 
-    let stack = wifi::init(spawner.clone(), timer, rng, radio_clock_control, clocks, radio).await;
+    let stack = wifi::init(spawner.clone(), timer, rng, radio_clock_control, clocks, wifi).await;
     let sock = embassy_net::udp::UdpSocket::new(stack, rx_meta, rx_buf, tx_meta, tx_buf);
 
     let sensor_scd30 = if let Some(scd30) = scd30 {

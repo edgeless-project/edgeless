@@ -22,21 +22,17 @@ debug = true
 opt-level = 3
 lto = "off"
 
-[patch.crates-io]
-esp32-hal = { path = "../vendor/esp-hal/esp32-hal" }
-esp32s3-hal = { path = "../vendor/esp-hal/esp32s3-hal" }
-
 [dependencies]
 log = { version = "0.4", default-features = false }
-embedded-hal = "1.0.0-rc.1"
-
+embedded-hal = "1"
+embedded-hal-bus = "0.2"
 esp-alloc = { version = "0.3.0" }
 
 
-embassy-executor = { version = "0.3.0", features = ["nightly"] }
-embassy-sync = { version = "0.3" }
-embassy-time = { version = "0.1",  features = ["nightly"] }
-embassy-net = { git="https://github.com/embassy-rs/embassy.git", tag="embassy-net-v0.2.0", features = ["tcp", "udp", "dhcpv4", "medium-ethernet"] }
+embassy-executor = { version = "0.5.0", features = ["nightly"] }
+embassy-sync = { version = "0.5" }
+embassy-time = { version = "0.3", features = ["tick-hz-1_000_000", "generic-queue"]}
+embassy-net = { version = "0.4", features = ["tcp", "udp", "dhcpv4", "medium-ethernet", "proto-ipv4"] }
 embassy-futures = { version =  "0.1" }
 
 static_cell = { version = "1.2.0", features = ["nightly"] }
@@ -52,32 +48,32 @@ edgeless_embedded = {path = "../edgeless_embedded" }
 edgeless_api_core = {path = "../edgeless_api_core" }
 
 
-smoltcp = { version = "0.10.0", default-features = false, features = [
+smoltcp = { version = "0.11.0", default-features = false, features = [
   "socket",
   "async",
 ] }
 
-epd-waveshare = { path = "../vendor/epd-waveshare", features = ["graphics", "epd2in13_v3"], default-features = false}
+epd-waveshare = { git = "https://github.com/edgeless-project/epd-waveshare.git", branch = "edgeless_fork", features = ["graphics", "epd2in13_v3"], default-features = false}
 embedded-graphics = { version = "0.8"}
-sensor-scd30 = {path="../vendor/rust-sensor-scd30", default-features=false}
+sensor-scd30 = { git = "https://github.com/edgeless-project/rust-sensor-scd30.git", branch = "edgeless_fork", default-features=false }
 
 [target.xtensa-esp32-none-elf.dependencies]
-hal = { package = "esp32-hal", version="0.15", features = ["async", "embassy", "embassy-executor-thread", "embassy-time-timg0", "eh1"] }
+hal = { package = "esp-hal", version="0.17", features = ["async", "embassy", "embassy-executor-thread", "embassy-time-timg0" ] }
 esp-backtrace = { version = "0.8.0", features = ["esp32", "panic-handler", "exception-handler", "print-uart"] }
 esp-println = { version = "0.6.0", default-features=false, features = ["esp32", "uart", "log", "critical-section"] }
-esp-wifi = { path = "../vendor/esp-wifi/esp-wifi", package ="esp-wifi", default-features = false,  features = ["esp32", "utils", "async", "wifi", "embassy-net"] }
+esp-wifi = { version = "0.5.1", features = ["esp32", "utils", "async", "wifi", "embassy-net"] }
 
 [target.xtensa-esp32s3-none-elf.dependencies]
-hal = { package = "esp32s3-hal", version="0.12", features = ["async", "embassy", "embassy-executor-thread", "embassy-time-timg0", "eh1"] }
+hal = { package = "esp-hal", version="0.17", features = ["async", "embassy", "embassy-executor-thread", "embassy-time-timg0"] }
 esp-backtrace = { version = "0.8.0", features = ["esp32s3", "panic-handler", "exception-handler", "print-uart"] }
 esp-println = { version = "0.6.0", default-features=false, features = ["esp32s3", "uart", "log", "critical-section"] }
-esp-wifi = { path = "../vendor/esp-wifi/esp-wifi", package ="esp-wifi", default-features = false,  features = ["esp32s3", "utils", "async", "wifi", "embassy-net"] }
+esp-wifi = { version = "0.5.1", features = ["esp32s3", "utils", "async", "wifi", "embassy-net"] }
 
 [features]
 # GDEH0213B73
 epaper_2_13 = []
 scd30 = []
-Technical University of Munich, Chair of Connected Mobility_node_2_13 = ["epaper_2_13", "scd30"]
+tum_node_2_13 = ["epaper_2_13", "scd30"]
 
 [build-dependencies]
 embuild = "0.31.2"
