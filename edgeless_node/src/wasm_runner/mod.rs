@@ -8,6 +8,8 @@ pub mod function_instance;
 /// Bridge between the guest_api_host and the interface defined in the wit binding
 pub mod guest_api_binding;
 
+pub mod runtime;
+
 mod helpers;
 
 #[cfg(test)]

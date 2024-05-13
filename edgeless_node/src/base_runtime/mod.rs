@@ -18,7 +18,12 @@ pub trait RuntimeAPI {
 /// As suggested by the name, it contains a single instance of a function.
 #[async_trait::async_trait]
 pub trait FunctionInstance: Send + 'static {
-    async fn instantiate(guest_api_host: crate::base_runtime::guest_api::GuestAPIHost, code: &[u8]) -> Result<Box<Self>, FunctionInstanceError>;
+    async fn instantiate(
+        instance_id: &edgeless_api::function_instance::InstanceId,
+        runtime_configuration: std::collections::HashMap<String, String>,
+        guest_api_host: &mut Option<crate::base_runtime::guest_api::GuestAPIHost>,
+        code: &[u8],
+    ) -> Result<Box<Self>, FunctionInstanceError>;
     async fn init(&mut self, init_payload: Option<&str>, serialized_state: Option<&str>) -> Result<(), FunctionInstanceError>;
     async fn cast(&mut self, src: &edgeless_api::function_instance::InstanceId, msg: &str) -> Result<(), FunctionInstanceError>;
     async fn call(

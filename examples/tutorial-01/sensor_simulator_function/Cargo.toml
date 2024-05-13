@@ -13,13 +13,13 @@ codegen-units = 1
 strip = true
 
 [package]
-name = "filter_in_range"
+name = "sensor_simulator"
 version = "0.1.0"
 authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it>"]
 edition = "2021"
 
 [lib]
-name = "filter_in_range"
+name = "sensor_simulator"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 

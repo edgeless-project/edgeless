@@ -4,9 +4,17 @@
 #[cfg(feature = "grpc_impl")]
 pub mod grpc_impl;
 
+pub mod container_function;
+
+pub mod container_runtime;
+
 pub mod coap_impl;
 
 pub mod function_instance;
+
+pub mod guest_api_function;
+
+pub mod guest_api_host;
 
 pub mod workflow_instance;
 

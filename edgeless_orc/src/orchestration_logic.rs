@@ -86,14 +86,19 @@ impl OrchestrationLogic {
         };
     }
 
-    /// Return true if it is possible to assign a function with given
-    /// deployment requirements to a node with given UUID and capabilities.
+    /// Return true if it is possible to assign a function requesting a given
+    /// run-time and with given deployment requirements to a node with
+    /// given UUID and capabilities.
     pub fn node_feasible(
+        runtime: &str,
         reqs: &crate::orchestrator::DeploymentRequirements,
         node_id: &uuid::Uuid,
         capabilities: &edgeless_api::node_registration::NodeCapabilities,
         resource_providers: &std::collections::HashSet<String>,
     ) -> bool {
+        if !capabilities.runtimes.iter().any(|x| x == runtime) {
+            return false;
+        }
         if !reqs.node_id_match_any.is_empty() && !reqs.node_id_match_any.contains(node_id) {
             return false;
         }
@@ -130,17 +135,24 @@ impl OrchestrationLogic {
     /// based on a general orchestration strategy as defined in the settings.
     /// Always match the deployment requirements specified with the nodes'
     /// capabilities.
-    pub fn next(&mut self, reqs: &crate::orchestrator::DeploymentRequirements) -> Option<uuid::Uuid> {
+    pub fn next(&mut self, spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest) -> Option<uuid::Uuid> {
         if self.nodes.is_empty() {
             return None;
         }
+        let reqs = crate::orchestrator::DeploymentRequirements::from_annotations(&spawn_req.annotations);
         match self.orchestration_strategy {
             crate::OrchestrationStrategy::Random => {
                 // Select only the nodes that are feasible.
                 let mut candidates = vec![];
                 let mut high: f32 = 0.0;
                 for i in 0..self.nodes.len() {
-                    if Self::node_feasible(reqs, &self.nodes[i], &self.capabilities[i], &self.resource_providers[i]) {
+                    if Self::node_feasible(
+                        &spawn_req.code.function_class_type,
+                        &reqs,
+                        &self.nodes[i],
+                        &self.capabilities[i],
+                        &self.resource_providers[i],
+                    ) {
                         candidates.push((i, self.weights[i]));
                         high += self.weights[i];
                     }
@@ -169,7 +181,8 @@ impl OrchestrationLogic {
                     self.round_robin_current_index += 1;
 
                     if Self::node_feasible(
-                        reqs,
+                        &spawn_req.code.function_class_type,
+                        &reqs,
                         &self.nodes[cand_ndx],
                         &self.capabilities[cand_ndx],
                         &self.resource_providers[cand_ndx],

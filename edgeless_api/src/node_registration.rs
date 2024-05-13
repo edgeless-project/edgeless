@@ -26,6 +26,8 @@ pub struct NodeCapabilities {
     pub is_tee_running: bool,
     // True if the node has a Trusted Platform Module for authenticated registration.
     pub has_tpm: bool,
+    // List of run-times supported by the node.
+    pub runtimes: Vec<String>,
 }
 
 impl NodeCapabilities {
@@ -40,6 +42,7 @@ impl NodeCapabilities {
             labels: vec![],
             is_tee_running: false,
             has_tpm: false,
+            runtimes: vec![],
         }
     }
 
@@ -54,6 +57,7 @@ impl NodeCapabilities {
             labels: vec![],
             is_tee_running: false,
             has_tpm: false,
+            runtimes: vec!["RUST_WASM".to_string()],
         }
     }
 
@@ -67,7 +71,7 @@ impl std::fmt::Display for NodeCapabilities {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{} {} CPU(s) at {} BogoMIPS, {} core(s), {} MB memory, labels [{}]{}{}",
+            "{} {} CPU(s) at {} BogoMIPS, {} core(s), {} MB memory, labels [{}]{}{}, runtimes [{}]",
             self.num_cpus,
             self.model_name_cpu,
             self.clock_freq_cpu,
@@ -81,7 +85,8 @@ impl std::fmt::Display for NodeCapabilities {
             match self.has_tpm {
                 true => ", TPM",
                 false => "",
-            }
+            },
+            self.runtimes.join(",")
         )
     }
 }

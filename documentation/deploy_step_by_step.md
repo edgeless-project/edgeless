@@ -143,6 +143,7 @@ In another shell, create the default configuration of the node:
 The configuration file is the following:
 
 ```toml
+[general]
 node_id = "fda6ce79-46df-4f96-a0d2-456f720f606c"
 agent_url = "http://127.0.0.1:7021"
 agent_url_announced = ""
@@ -151,22 +152,58 @@ invocation_url_announced = ""
 metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://127.0.0.1:7011"
 
+[wasm_runtime]
+enabled = true
+
+[container_runtime]
+enabled = false
+guest_api_host_url = ""
+
 [resources]
 http_ingress_url = "http://127.0.0.1:7035"
 http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"
 file_log_provider = "file-log-1"
 redis_provider = "redis-1"
+
+[user_node_capabilities]
+num_cpus = 40
+model_name_cpu = "Intel(R) Xeon(R) Silver 4410T"
+clock_freq_cpu = 2971
+num_cores = 1
+mem_size = 0
+labels = []
+is_tee_running = false
+has_tpm = false
 ```
 
 and it contains:
-- the UUID of this node, which must be unique within the orchestration domain
-- some URLs that are exposed by the node for different purposes:
-  - the agent URL is used by the ε-ORC to manage the lifecycle of functions/resources hosted by this node
-  - the invocation URL is used by the EDGELESS data plane to consume events addressed to function instances and resources of this node
-  - the metrics URL shows telemetry data about the node run-time
-- the URL of the ε-ORC, to which this connects
-- the name (and configuration, where needed) of the resource providers offered by this node; if the name is left empty, then the corresponding provider is not created; in the example all the providers are assigned a name, thus the node will offer HTTP ingress/egress, file logging, and Redis writing resources
+- in the `[general]` section:
+  - the UUID of this node, which must be unique within the orchestration domain
+  - some URLs that are exposed by the node for different purposes:
+    - the agent URL is used by the ε-ORC to manage the lifecycle of functions/resources hosted by this node
+    - the invocation URL is used by the EDGELESS data plane to consume events addressed to function instances and resources of this node
+    - the metrics URL shows telemetry data about the node run-time
+  - the URL of the ε-ORC, to which this connects
+- in the `[wasm_runtime]` section:
+  - whether this node accepts WebAssembly function instances
+- in the `[container_runtime]` section:
+  - whether this node accepts Docker function instances; if yes then the
+  URL of the gRPC server exposed by the node should be specified (must be
+  on an address that is reachable from the containers, so it cannot be
+  localhost) -- see more details in the
+  [container's example documentation](../examples/container/README.md)
+- in the `[resources]` section:
+  - the name (and configuration, where needed) of the resource providers offered by this node; if the name is left empty, then the corresponding provider is not created; in the example all the providers are assigned a name, thus the node will offer HTTP ingress/egress, file logging, and Redis writing resources
+- in the `[user_node_capabitilies]` section:
+  - the values of the node capabilities that are exposed to the ε-ORC (some of)
+  the values are automatically inferred when the `edgeless_node` application
+  starts, but overwritten by the values specified in the configuration file,
+  if any 
+  - the labels assigned to this node, which can be used to force some nodes
+  to be selected as candidates by the ε-ORC (see the
+  [orchestration documentation](orchestration.md) for more
+  details)
 
 Then, deploy the node:
 

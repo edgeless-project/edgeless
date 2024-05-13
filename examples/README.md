@@ -3,6 +3,7 @@
 Here you can find a bunch of examples of workflows / functions written for the
 Edgeless MVP platform. 
 
+- `container`: shows how to deploy a mixed workflow consisting of a function instance running in WASM, another as a container, and a resource
 - `file_log`: shows how to use a resource that appends the function arguments to a file local to the node
 - `http_egress`: shows the HTTP egress feature of the e-Balancer by periodically issuing a GET to an external server
 - `http_ingress`: shows the HTTP ingress feature of the e-Balancer by waiting for POST commands, to which the function replies with an OK message with fixed body, see [tutorial](http_ingress/README.md)

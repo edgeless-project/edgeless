@@ -23,6 +23,7 @@ enum MockFunctionInstanceEvent {
     ),
     StopResource(edgeless_api::orc::DomainManagedInstanceId),
     Patch(edgeless_api::common::PatchRequest),
+    #[allow(dead_code)]
     UpdateNode(edgeless_api::node_registration::UpdateNodeRequest),
 }
 

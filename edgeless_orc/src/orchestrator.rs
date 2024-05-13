@@ -167,13 +167,8 @@ pub struct ResourceProvider {
 #[derive(Clone)]
 enum ActiveInstance {
     // 0: request
-    // 1: deployment requirements
-    // 2: [ (node_id, int_fid) ]
-    Function(
-        edgeless_api::function_instance::SpawnFunctionRequest,
-        DeploymentRequirements,
-        Vec<InstanceId>,
-    ),
+    // 1: [ (node_id, int_fid) ]
+    Function(edgeless_api::function_instance::SpawnFunctionRequest, Vec<InstanceId>),
 
     // 0: request
     // 1: (node_id, int_fid)
@@ -183,7 +178,7 @@ enum ActiveInstance {
 impl std::fmt::Display for ActiveInstance {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ActiveInstance::Function(_req, _reqs, instances) => write!(
+            ActiveInstance::Function(_req, instances) => write!(
                 f,
                 "function, instances {}",
                 instances
@@ -307,7 +302,7 @@ impl Orchestrator {
     fn ext_to_int(active_instances: &std::collections::HashMap<ComponentId, ActiveInstance>, ext_fid: &ComponentId) -> Vec<IntFid> {
         match active_instances.get(ext_fid) {
             Some(active_instance) => match active_instance {
-                ActiveInstance::Function(_req, _reqs, instances) => instances
+                ActiveInstance::Function(_req, instances) => instances
                     .iter()
                     .map(|x| {
                         IntFid::Function(InstanceId {
@@ -501,8 +496,7 @@ impl Orchestrator {
         // Orchestration strategy can also be changed during
         // runtime.
 
-        let reqs = DeploymentRequirements::from_annotations(&spawn_req.annotations);
-        let selected_node_id = match orchestration_logic.next(&reqs) {
+        let selected_node_id = match orchestration_logic.next(&spawn_req) {
             Some(u) => u,
             None => {
                 return Err(anyhow::anyhow!(
@@ -543,7 +537,6 @@ impl Orchestrator {
                         ext_fid,
                         ActiveInstance::Function(
                             spawn_req,
-                            reqs,
                             vec![InstanceId {
                                 node_id: selected_node_id,
                                 function_id: id.function_id,
@@ -665,7 +658,7 @@ impl Orchestrator {
                     match active_instances.remove(&ext_fid) {
                         Some(active_instance) => {
                             match active_instance {
-                                ActiveInstance::Function(_req, _reqs, instances) => {
+                                ActiveInstance::Function(_req, instances) => {
                                     // Stop all the instances of this function.
                                     for instance in instances {
                                         match clients.get_mut(&instance.node_id) {
@@ -743,7 +736,7 @@ impl Orchestrator {
                     match active_instances.remove(&ext_fid) {
                         Some(active_instance) => {
                             match active_instance {
-                                ActiveInstance::Function(_, _, _) => {
+                                ActiveInstance::Function(_, _) => {
                                     log::error!(
                                         "Request to stop a resource but the ext_fid is associated with a function: ext_fid {}",
                                         ext_fid
@@ -1024,7 +1017,7 @@ impl Orchestrator {
                     // possible to fix the situation immediately).
                     for (origin_ext_fid, instance) in active_instances.iter() {
                         match instance {
-                            ActiveInstance::Function(start_req, _reqs, instances) => {
+                            ActiveInstance::Function(start_req, instances) => {
                                 let num_disconnected = instances.iter().filter(|x| to_be_disconnected.contains(&x.node_id)).count();
                                 assert!(num_disconnected <= instances.len());
                                 if instances.is_empty() || num_disconnected > 0 {
@@ -1074,7 +1067,7 @@ impl Orchestrator {
                             None => panic!("ext_fid {} just disappeared", ext_fid),
                             Some(active_instance) => match active_instance {
                                 ActiveInstance::Resource(_, _) => panic!("expecting a function, found a resource for ext_fid {}", ext_fid),
-                                ActiveInstance::Function(_, _, instances) => instances.retain(|x| !to_be_disconnected.contains(&x.node_id)),
+                                ActiveInstance::Function(_, instances) => instances.retain(|x| !to_be_disconnected.contains(&x.node_id)),
                             },
                         }
                     }
@@ -1089,7 +1082,7 @@ impl Orchestrator {
                             Err(err) => {
                                 log::error!("error when creating a new function assigned with ext_fid {}: {}", ext_fid, err);
                                 match active_instances.get_mut(&ext_fid).unwrap() {
-                                    ActiveInstance::Function(_spawn_req, _reqs, instances) => instances.clear(),
+                                    ActiveInstance::Function(_spawn_req, instances) => instances.clear(),
                                     ActiveInstance::Resource(_, _) => {
                                         panic!("expecting a function to be associated with ext_fid {}, found a resource", ext_fid)
                                     }
@@ -1108,7 +1101,7 @@ impl Orchestrator {
                             Err(err) => {
                                 log::error!("error when creating a new resource assigned with ext_fid {}: {}", ext_fid, err);
                                 match active_instances.get_mut(&ext_fid).unwrap() {
-                                    ActiveInstance::Function(_, _, _) => {
+                                    ActiveInstance::Function(_, _) => {
                                         panic!("expecting a resource to be associated with ext_fid {}, found a function", ext_fid)
                                     }
                                     ActiveInstance::Resource(_start_req, instance_id) => {
