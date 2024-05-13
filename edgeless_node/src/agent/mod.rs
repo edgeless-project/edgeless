@@ -5,6 +5,9 @@ use edgeless_api::node_management::UpdatePeersRequest;
 use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
 use futures::{Future, SinkExt, StreamExt};
 
+#[cfg(test)]
+pub mod test;
+
 enum AgentRequest {
     Spawn(edgeless_api::function_instance::SpawnFunctionRequest),
     SpawnResource(
@@ -18,7 +21,8 @@ enum AgentRequest {
     ),
     Patch(edgeless_api::common::PatchRequest),
     PatchResource(edgeless_api::common::PatchRequest, futures::channel::oneshot::Sender<anyhow::Result<()>>),
-    UPDATEPEERS(edgeless_api::node_management::UpdatePeersRequest),
+    UpdatePeers(edgeless_api::node_management::UpdatePeersRequest),
+    HealthStatus(futures::channel::oneshot::Sender<anyhow::Result<edgeless_api::node_management::HealthStatus>>),
 }
 
 pub struct Agent {
@@ -74,6 +78,10 @@ impl Agent {
         // When stopping, only the stop_function_id is provided which does not allow to know which runner it is
         // currently deployed on. Here, we implement a instance_id -> function_class HashMap
         let mut component_id_to_class_map = std::collections::HashMap::<edgeless_api::function_instance::ComponentId, String>::new();
+
+        // Internal data structures to query system/process information.
+        let mut sys = sysinfo::System::new();
+        let my_pid = sysinfo::Pid::from_u32(std::process::id());
 
         log::info!("Starting Edgeless Agent");
         while let Some(req) = receiver.next().await {
@@ -175,7 +183,7 @@ impl Agent {
                         }
                     }
                 }
-                AgentRequest::UPDATEPEERS(request) => {
+                AgentRequest::UpdatePeers(request) => {
                     log::debug!("Agent UpdatePeers {:?}", request);
                     match request {
                         UpdatePeersRequest::Add(node_id, invocation_url) => {
@@ -279,6 +287,27 @@ impl Agent {
                         )))
                         .unwrap_or_else(|_| log::warn!("Responder Send Error"));
                 }
+                AgentRequest::HealthStatus(responder) => {
+                    // Refresh system/process information.
+                    sys.refresh_cpu();
+                    sys.refresh_memory();
+                    sys.refresh_process(my_pid);
+
+                    let to_kb = |x| (x / 1024) as i32;
+                    let proc = sys.process(my_pid).unwrap();
+                    let health_status = edgeless_api::node_management::HealthStatus {
+                        cpu_usage: sys.global_cpu_info().cpu_usage() as i32,
+                        cpu_load: sys.cpus().iter().map(|x| x.cpu_usage() / 100_f32).sum::<f32>() as i32,
+                        mem_free: to_kb(sys.free_memory()),
+                        mem_used: to_kb(sys.used_memory()),
+                        mem_total: to_kb(sys.total_memory()),
+                        mem_available: to_kb(sys.available_memory()),
+                        proc_cpu_usage: proc.cpu_usage() as i32,
+                        proc_memory: to_kb(proc.memory()),
+                        proc_vmemory: to_kb(proc.virtual_memory()),
+                    };
+                    responder.send(Ok(health_status)).unwrap_or_else(|_| log::warn!("Responder Send Error"));
+                }
             }
         }
     }
@@ -366,7 +395,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
 #[async_trait::async_trait]
 impl edgeless_api::node_management::NodeManagementAPI for NodeManagementClient {
     async fn update_peers(&mut self, request: edgeless_api::node_management::UpdatePeersRequest) -> anyhow::Result<()> {
-        match self.sender.send(AgentRequest::UPDATEPEERS(request)).await {
+        match self.sender.send(AgentRequest::UpdatePeers(request)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Agent channel error when updating the peers of a node: {}",
@@ -375,8 +404,16 @@ impl edgeless_api::node_management::NodeManagementAPI for NodeManagementClient {
         }
     }
 
-    async fn keep_alive(&mut self) -> anyhow::Result<()> {
-        Ok(())
+    async fn keep_alive(&mut self) -> anyhow::Result<edgeless_api::node_management::HealthStatus> {
+        let (rsp_sender, rsp_receiver) = futures::channel::oneshot::channel::<anyhow::Result<edgeless_api::node_management::HealthStatus>>();
+        let _ = self
+            .sender
+            .send(AgentRequest::HealthStatus(rsp_sender))
+            .await
+            .map_err(|err| anyhow::anyhow!("Agent channel error when querying health status: {}", err.to_string()))?;
+        rsp_receiver
+            .await
+            .map_err(|err| anyhow::anyhow!("Agent channel error when querying health status: {}", err.to_string()))?
     }
 }
 
