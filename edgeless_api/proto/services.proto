@@ -98,6 +98,11 @@ service ResourceConfiguration {
 
 // API exposed by a function to manage the lifecycle and run-time of a function instance.
 service GuestAPIFunction {
+    // Create the function instance.
+    // Input: the end-point of the GuestAPIHost.
+    // Output: none.
+    rpc Boot (BootData) returns (google.protobuf.Empty);
+
     // Initialize the function instance.
     // Input: the payload and saved state of the function instance.
     // Output: none.

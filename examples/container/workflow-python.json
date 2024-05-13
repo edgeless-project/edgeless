@@ -1,0 +1,48 @@
+{
+    "functions": [
+        {
+            "name": "sensor_simulator",
+            "class_specification": {
+                "id": "sensor_simulator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../examples/tutorial-01/sensor_simulator_function/sensor_simulator.wasm",
+                "outputs": [
+                    "output"
+                ]
+            },
+            "output_mapping": {
+                "output": "delay"
+            },
+            "annotations": {
+                "init-payload": "period=1000,min-value=-10,max-value=10,seed=42"
+            }
+        },
+        {
+            "name": "delay",
+            "class_specification": {
+                "id": "delay",
+                "function_type": "CONTAINER",
+                "version": "0.1",
+                "code": "container:python-function:latest",
+                "outputs": []
+            },
+            "output_mapping": {
+                "output": "my-log"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "my-log",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "my-local-file.log",
+                "add-timestamp": "true"
+            }
+        }
+    ],
+    "annotations": {}
+}
