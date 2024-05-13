@@ -4,7 +4,6 @@
 // SPDX-License-Identifier: MIT
 
 use edgeless_api::orc::OrchestratorAPI;
-use sysinfo::{ProcessorExt, SystemExt};
 
 pub mod agent;
 pub mod base_runtime;
@@ -139,9 +138,9 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
     let s = sysinfo::System::new();
     let mut model_name_set = std::collections::HashSet::new();
     let mut clock_freq_cpu_set = std::collections::HashSet::new();
-    for processor in s.get_processors() {
-        model_name_set.insert(processor.get_brand());
-        clock_freq_cpu_set.insert(processor.get_frequency());
+    for processor in s.cpus() {
+        model_name_set.insert(processor.brand());
+        clock_freq_cpu_set.insert(processor.frequency());
     }
     let model_name_cpu = match model_name_set.iter().next() {
         Some(val) => val.to_string(),
@@ -158,11 +157,11 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         log::debug!("CPUs have different frequencies, using: {}", clock_freq_cpu);
     }
     edgeless_api::node_registration::NodeCapabilities {
-        num_cpus: user_node_capabilities.num_cpus.unwrap_or(s.get_processors().len() as u32),
+        num_cpus: user_node_capabilities.num_cpus.unwrap_or(s.cpus().len() as u32),
         model_name_cpu: user_node_capabilities.model_name_cpu.unwrap_or(model_name_cpu),
         clock_freq_cpu: user_node_capabilities.clock_freq_cpu.unwrap_or(clock_freq_cpu),
         num_cores: user_node_capabilities.num_cores.unwrap_or(1),
-        mem_size: user_node_capabilities.mem_size.unwrap_or(s.get_total_memory() as u32 / 1024),
+        mem_size: user_node_capabilities.mem_size.unwrap_or(s.total_memory() as u32 / 1024),
         labels: user_node_capabilities.labels.unwrap_or(vec![]),
         is_tee_running: user_node_capabilities.is_tee_running.unwrap_or(false),
         has_tpm: user_node_capabilities.has_tpm.unwrap_or(false),
