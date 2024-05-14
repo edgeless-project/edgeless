@@ -112,7 +112,7 @@ message NodeCapabilities {
     string model_name_cpu    = 11;
     // Clock frequency of the CPU, in BogoMIPS.
     float clock_freq_cpu     = 12;
-    // Number of cores for each CPU.
+    // Number of physical cores.
     uint32 num_cores         = 13;
     // Size of memory available to applications running on the edge node, in MB.
     uint32 mem_size          = 14;
