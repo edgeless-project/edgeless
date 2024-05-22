@@ -13,7 +13,6 @@ use toml;
 
 use reqwest::{multipart, Body, Client};
 use std::collections::HashMap;
-use std::concat;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
 
@@ -41,6 +40,10 @@ enum FunctionCommands {
     Push {
         file_name: String,
     },
+    Get {
+        file_name: String,
+        id: String,
+    }
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -407,6 +410,46 @@ async fn main() -> anyhow::Result<()> {
                         .expect("failed to get body");
                     println!("post_response body: {:?}", post_response);
                     println!("Post function successfully!");
+                }
+
+                FunctionCommands::Get {
+                    file_name, //config file name
+                    id,  // wordline id, actually function name
+                } => {
+                    let filename = file_name;
+                    //read end point and credentials in a file
+                    let contents = fs::read_to_string(filename).expect("Failed to read file, please make sure the file exist and in .toml");
+                    // println!("contents {}", contents); //
+                    let repo_endpoint: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
+
+                    // Print out the values to `stdout`.
+                    println!("Url {}", repo_endpoint.url.name); //
+                    println!("username {}", repo_endpoint.credential.basic_auth_user); //
+                    println!("passwd {}", repo_endpoint.credential.basic_auth_pass); //
+                                                                                     //create a curl request as follow
+                                                                                     // curl -X 'POST' \
+                                                                                     //    'https://function-repository.edgeless.wlilab.eu/api/admin/function/upload' \
+                                                                                     //    -H 'accept: application/json' \
+                                                                                     //    -H 'Content-Type: multipart/form-data' \
+                                                                                     //    -F 'file=@function_x86'
+                                                                                     //use multipart
+                    let client = Client::new();
+                    let response = client
+                        .get(repo_endpoint.url.name.to_string() + "/api/admin/function/" + id.as_str())
+                        .header(ACCEPT, "application/json")
+                        .basic_auth(repo_endpoint.credential.basic_auth_user, Some(repo_endpoint.credential.basic_auth_pass))
+                        .send()
+                        .await
+                        .expect("failed to get response")
+                        .text()
+                        .await
+                        .expect("failed to get payload");
+                        
+
+                    println!("Successfully get function {}", response);
+                   
+
+
                 }
             },
         },
