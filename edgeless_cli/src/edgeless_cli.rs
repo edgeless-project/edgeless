@@ -43,7 +43,7 @@ enum FunctionCommands {
     Get {
         file_name: String,
         id: String,
-    }
+    },
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -414,7 +414,7 @@ async fn main() -> anyhow::Result<()> {
 
                 FunctionCommands::Get {
                     file_name, //config file name
-                    id,  // wordline id, actually function name
+                    id,        // wordline id, actually function name
                 } => {
                     let filename = file_name;
                     //read end point and credentials in a file
@@ -424,8 +424,8 @@ async fn main() -> anyhow::Result<()> {
                     // Print out the values to `stdout`.
                     println!("Url {}", repo_endpoint.url.name); //
                     println!("username {}", repo_endpoint.credential.basic_auth_user);
-                    println!("passwd {}", repo_endpoint.credential.basic_auth_pass); 
-                                                                                 
+                    println!("passwd {}", repo_endpoint.credential.basic_auth_pass);
+
                     let client = Client::new();
                     let response = client
                         .get(repo_endpoint.url.name.to_string() + "/api/admin/function/" + id.as_str())
@@ -437,12 +437,8 @@ async fn main() -> anyhow::Result<()> {
                         .text()
                         .await
                         .expect("failed to get payload");
-                        
 
                     println!("Successfully get function {}", response);
-                   
-
-
                 }
             },
         },
