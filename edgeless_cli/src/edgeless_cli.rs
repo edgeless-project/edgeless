@@ -419,20 +419,13 @@ async fn main() -> anyhow::Result<()> {
                     let filename = file_name;
                     //read end point and credentials in a file
                     let contents = fs::read_to_string(filename).expect("Failed to read file, please make sure the file exist and in .toml");
-                    // println!("contents {}", contents); //
                     let repo_endpoint: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
 
                     // Print out the values to `stdout`.
                     println!("Url {}", repo_endpoint.url.name); //
-                    println!("username {}", repo_endpoint.credential.basic_auth_user); //
-                    println!("passwd {}", repo_endpoint.credential.basic_auth_pass); //
-                                                                                     //create a curl request as follow
-                                                                                     // curl -X 'POST' \
-                                                                                     //    'https://function-repository.edgeless.wlilab.eu/api/admin/function/upload' \
-                                                                                     //    -H 'accept: application/json' \
-                                                                                     //    -H 'Content-Type: multipart/form-data' \
-                                                                                     //    -F 'file=@function_x86'
-                                                                                     //use multipart
+                    println!("username {}", repo_endpoint.credential.basic_auth_user);
+                    println!("passwd {}", repo_endpoint.credential.basic_auth_pass); 
+                                                                                 
                     let client = Client::new();
                     let response = client
                         .get(repo_endpoint.url.name.to_string() + "/api/admin/function/" + id.as_str())
