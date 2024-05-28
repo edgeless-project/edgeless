@@ -6,7 +6,7 @@
                 "id": "sensor_simulator",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./sensor_simulator_function/sensor_simulator.wasm",
+                "code": "./sensor_simulator_function/sensor_simulator.wasm",
                 "outputs": [
                     "output"
                 ]
@@ -14,7 +14,9 @@
             "output_mapping": {
                 "output": "filter_in_range"
             },
-            "annotations": {}
+            "annotations": {
+                "init-payload": "period=100,min-value=-100,max-value=100,seed=42"
+            }
         },
         {
             "name": "filter_in_range",
@@ -22,7 +24,7 @@
                 "id": "filter_in_range",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./filter_in_range_function/filter_in_range.wasm",
+                "code": "./filter_in_range_function/filter_in_range.wasm",
                 "outputs": [
                     "output",
                     "error"
@@ -42,7 +44,7 @@
                 "id": "moving_avg",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./moving_avg_function/moving_avg.wasm",
+                "code": "./moving_avg_function/moving_avg.wasm",
                 "outputs": [
                     "output",
                     "error"

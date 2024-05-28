@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use clap::Parser;
 use edgeless_con::EdgelessConOrcConfig;
 use edgeless_inabox::InABoxConfig;
-use edgeless_node::EdgelessNodeSettings;
+use edgeless_node::{EdgelessNodeGeneralSettings, EdgelessNodeResourceSettings, EdgelessNodeSettings};
 use std::fs;
 use uuid::Uuid;
 
@@ -120,33 +120,40 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     let mut first_node = true;
     for node_id in node_invocation_urls.keys() {
         node_confs.push(EdgelessNodeSettings {
-            node_id: *node_id,
-            agent_url: node_orc_agent_urls.get(node_id).expect("").clone(), // we are sure that it is there
-            agent_url_announced: "".to_string(),
-            invocation_url: node_invocation_urls.get(node_id).expect("").clone(), // we are sure that it is there
-            invocation_url_announced: "".to_string(),
-            metrics_url: next_url(),
-            orchestrator_url: orc_conf.orchestrator_url.clone(),
-            http_ingress_url: match first_node {
-                true => next_url(),
-                false => "".to_string(),
+            general: EdgelessNodeGeneralSettings {
+                node_id: *node_id,
+                agent_url: node_orc_agent_urls.get(node_id).expect("").clone(), // we are sure that it is there
+                agent_url_announced: "".to_string(),
+                invocation_url: node_invocation_urls.get(node_id).expect("").clone(), // we are sure that it is there
+                invocation_url_announced: "".to_string(),
+                metrics_url: next_url(),
+                orchestrator_url: orc_conf.orchestrator_url.clone(),
             },
-            http_ingress_provider: match first_node {
-                true => "http-ingress-1".to_string(),
-                false => "".to_string(),
-            },
-            http_egress_provider: match first_node {
-                true => "http-egress-1".to_string(),
-                false => "".to_string(),
-            },
-            file_log_provider: match first_node {
-                true => "file-log-1".to_string(),
-                false => "".to_string(),
-            },
-            redis_provider: match first_node {
-                true => "redis-1".to_string(),
-                false => "".to_string(),
-            },
+            wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
+            container_runtime: None,
+            resources: Some(EdgelessNodeResourceSettings {
+                http_ingress_url: match first_node {
+                    true => Some(next_url()),
+                    false => None,
+                },
+                http_ingress_provider: match first_node {
+                    true => Some("http-ingress-1".to_string()),
+                    false => None,
+                },
+                http_egress_provider: match first_node {
+                    true => Some("http-egress-1".to_string()),
+                    false => None,
+                },
+                file_log_provider: match first_node {
+                    true => Some("file-log-1".to_string()),
+                    false => None,
+                },
+                redis_provider: match first_node {
+                    true => Some("redis-1".to_string()),
+                    false => None,
+                },
+            }),
+            user_node_capabilities: None,
         });
         first_node = false;
     }

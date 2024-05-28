@@ -13,17 +13,18 @@ use super::{FunctionInstance, FunctionInstanceError};
 pub struct FunctionInstanceRunner<FunctionInstanceType: FunctionInstance> {
     task_handle: Option<tokio::task::JoinHandle<()>>,
     alias_mapping: super::alias_mapping::AliasMapping,
-    poison_pill_sender: Option<futures::channel::oneshot::Sender<()>>,
+    poison_pill_sender: tokio::sync::broadcast::Sender<()>,
     _instance: PhantomData<FunctionInstanceType>,
 }
 
 /// This is a runnable object (with all required state) actually executing a function.
 /// It is managed/owned by a FunctionInstanceRunner, which also runs it using a tokio task.
 struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
-    poison_pill_receiver: Option<futures::channel::oneshot::Receiver<()>>,
+    poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
     function_instance: Option<Box<FunctionInstanceType>>,
     guest_api_host: Option<super::guest_api::GuestAPIHost>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+    guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
     code: Vec<u8>,
     data_plane: edgeless_dataplane::handle::DataplaneHandle,
     serialized_state: Option<String>,
@@ -39,6 +40,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
         state_handle: Box<dyn crate::state_management::StateHandleAPI>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
     ) -> Self {
         let instance_id = spawn_req.instance_id.unwrap();
         let mut telemetry_handle = telemetry_handle;
@@ -46,23 +48,25 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
 
         let alias_mapping = super::alias_mapping::AliasMapping::new();
         // alias_mapping.update(spawn_req.output_mapping).await;
-        let (poison_pill_sender, poison_pill_receiver) = futures::channel::oneshot::channel::<()>();
+        let (poison_pill_sender, poison_pill_receiver) = tokio::sync::broadcast::channel::<()>(1);
         let serialized_state = state_handle.get().await;
 
         let guest_api_host = crate::base_runtime::guest_api::GuestAPIHost {
             instance_id: instance_id.clone(),
             data_plane: data_plane.clone(),
             callback_table: alias_mapping.clone(),
-            state_handle: state_handle,
+            state_handle,
             telemetry_handle: telemetry_handle.fork(std::collections::BTreeMap::new()),
+            poison_pill_receiver: poison_pill_sender.subscribe(),
         };
 
         let task = Box::new(
             FunctionInstanceTask::<FunctionInstanceType>::new(
                 poison_pill_receiver,
                 telemetry_handle,
+                guest_api_host_register,
                 guest_api_host,
-                spawn_req.code.function_class_inlude_code.clone(),
+                spawn_req.code.function_class_code.clone(),
                 data_plane,
                 serialized_state,
                 spawn_req.annotations.get("init-payload").map(|x| x.clone()),
@@ -79,16 +83,15 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
 
         Self {
             task_handle: Some(task_handle),
-            alias_mapping: alias_mapping,
-            poison_pill_sender: Some(poison_pill_sender),
+            alias_mapping,
+            poison_pill_sender,
             _instance: PhantomData {},
         }
     }
 
     pub async fn stop(&mut self) {
-        if let Some(poison_pill_sender) = self.poison_pill_sender.take() {
-            poison_pill_sender.send(()).unwrap();
-        }
+        self.poison_pill_sender.send(()).unwrap();
+
         if let Some(handle) = self.task_handle.take() {
             handle.await.unwrap();
         }
@@ -101,8 +104,9 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
 
 impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstanceType> {
     pub async fn new(
-        poison_pill_receiver: futures::channel::oneshot::Receiver<()>,
+        poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
         guest_api_host: super::guest_api::GuestAPIHost,
         code: Vec<u8>,
         data_plane: edgeless_dataplane::handle::DataplaneHandle,
@@ -112,16 +116,17 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         instance_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {
-            poison_pill_receiver: Some(poison_pill_receiver),
+            poison_pill_receiver,
             function_instance: None,
             guest_api_host: Some(guest_api_host),
-            telemetry_handle: telemetry_handle,
-            code: code,
-            data_plane: data_plane,
-            serialized_state: serialized_state,
+            telemetry_handle,
+            guest_api_host_register,
+            code,
+            data_plane,
+            serialized_state,
             init_payload: init_param,
-            runtime_api: runtime_api,
-            instance_id: instance_id,
+            runtime_api,
+            instance_id,
         }
     }
 
@@ -129,21 +134,32 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     /// Always calls the exit handler (with the exit status)
     pub async fn run(&mut self) {
         let mut res = self.instantiate().await;
+        assert!(self.guest_api_host.is_none());
         if res.is_ok() {
             res = self.init().await;
         }
         if res.is_ok() {
             res = self.processing_loop().await;
         }
+        self.guest_api_host_register.lock().await.deregister_guest_api_host(&self.instance_id);
         self.exit(res).await;
     }
 
     async fn instantiate(&mut self) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
 
-        self.function_instance = Some(
-            FunctionInstanceType::instantiate(self.guest_api_host.take().ok_or(super::FunctionInstanceError::InternalError)?, &self.code).await?,
-        );
+        let runtime_configuration;
+        {
+            // Register this function instance, if needed by the runtime.
+            let mut register = self.guest_api_host_register.lock().await;
+            if register.needs_to_register() {
+                register.register_guest_api_host(&self.instance_id, self.guest_api_host.take().unwrap());
+            }
+            runtime_configuration = register.configuration();
+        }
+
+        self.function_instance =
+            Some(FunctionInstanceType::instantiate(&self.instance_id, runtime_configuration, &mut self.guest_api_host.take(), &self.code).await?);
 
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInstantiate(start.elapsed()),
@@ -174,11 +190,11 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     }
 
     async fn processing_loop(&mut self) -> Result<(), super::FunctionInstanceError> {
-        let mut poison_pill_recv = Box::pin(self.poison_pill_receiver.take().ok_or(super::FunctionInstanceError::InternalError)?).fuse();
+        // let mut poison_pill_recv = Box::pin(self.poison_pill_receiver.recv()).fuse();
         loop {
             futures::select! {
                 // Given each function instance is an independent task, the runtime needs to send a poison pill to cleanly stop it (processed here)
-                _ = poison_pill_recv => {
+                _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
                     return self.stop().await;
                 },
                 // Receive a normal event from the dataplane and invoke the function instance

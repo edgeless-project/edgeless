@@ -37,9 +37,9 @@ Install the dependencies:
 
 ```bash
 source "$HOME/.cargo/env"
-sudo apt update && sudo apt install gcc libssl-dev pkg-config protobuf-compiler make -y
+sudo apt update && sudo apt install gcc libssl-dev pkg-config protobuf-compiler make g++ -y
 rustup target add wasm32-unknown-unknown
-cargo install wasm-tools
+cargo install wasm-opt
 ```
 
 Clone the repo and build the system:
@@ -111,10 +111,10 @@ Install the dependencies and target architectures:
 
 ```bash
 source "$HOME/.cargo/env"
-sudo apt update && sudo apt install gcc libssl-dev pkg-config unzip gcc-aarch64-linux-gnu make -y
+sudo apt update && sudo apt install gcc libssl-dev pkg-config unzip gcc-aarch64-linux-gnu make g++ -y
 rustup target add wasm32-unknown-unknown
 rustup target add aarch64-unknown-linux-gnu
-cargo install wasm-tools
+cargo install wasm-opt
 ```
 
 Install the protobuf binaries:
@@ -146,6 +146,6 @@ brew install protobuf
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source "$HOME/.cargo/env"
 rustup target add wasm32-unknown-unknown
-cargo install wasm-tools
+cargo install wasm-opt
 cargo build
 ```

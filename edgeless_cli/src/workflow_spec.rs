@@ -6,7 +6,7 @@ pub struct WorkflowSpecFunctionClass {
     pub id: String,
     pub function_type: String,
     pub version: String,
-    pub include_code_file: Option<String>,
+    pub code: Option<String>,
     pub build: Option<String>,
     pub outputs: Vec<String>,
 }

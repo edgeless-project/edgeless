@@ -94,18 +94,26 @@ async fn main() -> anyhow::Result<()> {
                                     .functions
                                     .into_iter()
                                     .map(|func_spec| {
-                                        let p = std::path::Path::new(&spec_file)
-                                            .parent()
-                                            .unwrap()
-                                            .join(func_spec.class_specification.include_code_file.unwrap());
+                                        let function_class_code = match func_spec.class_specification.function_type.as_str() {
+                                            "RUST_WASM" => std::fs::read(
+                                                std::path::Path::new(&spec_file)
+                                                    .parent()
+                                                    .unwrap()
+                                                    .join(func_spec.class_specification.code.unwrap()),
+                                            )
+                                            .unwrap(),
+                                            "CONTAINER" => func_spec.class_specification.code.unwrap().as_bytes().to_vec(),
+                                            _ => panic!("unknown function class type: {}", func_spec.class_specification.function_type),
+                                        };
+
                                         edgeless_api::workflow_instance::WorkflowFunction {
                                             name: func_spec.name,
                                             function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
                                                 function_class_id: func_spec.class_specification.id,
                                                 function_class_type: func_spec.class_specification.function_type,
                                                 function_class_version: func_spec.class_specification.version,
-                                                function_class_inlude_code: std::fs::read(p).unwrap(),
-                                                outputs: func_spec.class_specification.outputs,
+                                                function_class_code,
+                                                function_class_outputs: func_spec.class_specification.outputs,
                                             },
                                             output_mapping: func_spec.output_mapping,
                                             annotations: func_spec.annotations,
@@ -223,8 +231,8 @@ async fn main() -> anyhow::Result<()> {
 
                     println!(
                         "{:?}",
-                        std::process::Command::new("wasm-tools")
-                            .args(["component", "new", &raw_result, "-o", &out_file])
+                        std::process::Command::new("wasm-opt")
+                            .args(["-Oz", &raw_result, "-o", &out_file])
                             .status()?
                     );
                 }
