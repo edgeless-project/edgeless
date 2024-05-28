@@ -17,10 +17,12 @@ pub struct OrchestrationLogic {
     rng: rand::rngs::StdRng,
     /// Vector of the nodes that can be selected.
     nodes: Vec<uuid::Uuid>,
+    /// Capabilities of the nodes.
+    capabilities: Vec<edgeless_api::node_registration::NodeCapabilities>,
+    /// Resource providers of the nodes.
+    resource_providers: Vec<std::collections::HashSet<String>>,
     /// Used by Random, pair of (weight, node_id).
     weights: Vec<f32>,
-    /// Used by Random.
-    weight_dist: rand::distributions::Uniform<f32>,
 }
 
 impl OrchestrationLogic {
@@ -35,14 +37,21 @@ impl OrchestrationLogic {
             round_robin_current_index: 0,
             rng: rand::rngs::StdRng::from_entropy(),
             nodes: vec![],
+            capabilities: vec![],
+            resource_providers: vec![],
             weights: vec![],
-            weight_dist: rand::distributions::Uniform::new(0.0, 1.0),
         }
     }
 
-    pub fn update_nodes(&mut self, clients: &std::collections::HashMap<uuid::Uuid, crate::orchestrator::ClientDesc>) {
+    pub fn update_nodes(
+        &mut self,
+        clients: &std::collections::HashMap<uuid::Uuid, crate::orchestrator::ClientDesc>,
+        resource_providers: &std::collections::HashMap<String, crate::orchestrator::ResourceProvider>,
+    ) {
         // Refresh the nodes and weights data structures with the current set of nodes and their capabilities.
         self.nodes.clear();
+        self.capabilities.clear();
+        self.resource_providers.clear();
         self.weights.clear();
         for (node, desc) in clients {
             if desc.capabilities.do_not_use() {
@@ -50,6 +59,14 @@ impl OrchestrationLogic {
                 continue;
             }
             self.nodes.push(*node);
+            self.capabilities.push(desc.capabilities.clone());
+            self.resource_providers.push(
+                resource_providers
+                    .iter()
+                    .filter(|(_, info)| info.node_id == *node)
+                    .map(|(name, _)| name.clone())
+                    .collect(),
+            );
             let mut weight = desc.capabilities.num_cores as f32 * desc.capabilities.num_cpus as f32 * desc.capabilities.clock_freq_cpu;
             if weight == 0.0 {
                 // Force a vanishing weight to an arbitrary value.
@@ -57,53 +74,123 @@ impl OrchestrationLogic {
             }
             self.weights.push(weight);
         }
+        assert!(self.nodes.len() == self.capabilities.len());
+        assert!(self.nodes.len() == self.resource_providers.len());
         assert!(self.nodes.len() == self.weights.len());
         assert!(self.nodes.len() <= clients.len());
 
         // Initialize the orchestration variables depending on the strategy
         match self.orchestration_strategy {
-            crate::OrchestrationStrategy::Random => {
-                let high = match self.nodes.is_empty() {
-                    true => 1.0,
-                    false => self.weights.iter().sum::<f32>(),
-                };
-                self.weight_dist = rand::distributions::Uniform::new(0.0, high);
-            }
+            crate::OrchestrationStrategy::Random => {}
             crate::OrchestrationStrategy::RoundRobin => self.round_robin_current_index = 0,
         };
     }
-}
 
-/// This iterator can be used to select the next node on which a function
-/// instance should be spawned, based on a general orchestration strategy as
-/// defined in the settings.
-impl Iterator for OrchestrationLogic {
-    type Item = uuid::Uuid;
+    /// Return true if it is possible to assign a function requesting a given
+    /// run-time and with given deployment requirements to a node with
+    /// given UUID and capabilities.
+    pub fn node_feasible(
+        runtime: &str,
+        reqs: &crate::orchestrator::DeploymentRequirements,
+        node_id: &uuid::Uuid,
+        capabilities: &edgeless_api::node_registration::NodeCapabilities,
+        resource_providers: &std::collections::HashSet<String>,
+    ) -> bool {
+        if !capabilities.runtimes.iter().any(|x| x == runtime) {
+            return false;
+        }
+        if !reqs.node_id_match_any.is_empty() && !reqs.node_id_match_any.contains(node_id) {
+            return false;
+        }
+        for label in reqs.label_match_all.iter() {
+            if !capabilities.labels.contains(label) {
+                return false;
+            }
+        }
+        for provider in reqs.resource_match_all.iter() {
+            if !resource_providers.contains(provider) {
+                return false;
+            }
+        }
+        match reqs.tee {
+            crate::orchestrator::AffinityLevel::Required => {
+                if !capabilities.is_tee_running {
+                    return false;
+                }
+            }
+            crate::orchestrator::AffinityLevel::NotRequired => {}
+        }
+        match reqs.tpm {
+            crate::orchestrator::AffinityLevel::Required => {
+                if !capabilities.has_tpm {
+                    return false;
+                }
+            }
+            crate::orchestrator::AffinityLevel::NotRequired => {}
+        }
+        true
+    }
 
-    fn next(&mut self) -> Option<Self::Item> {
+    /// Select the next node on which a function instance should be spawned,
+    /// based on a general orchestration strategy as defined in the settings.
+    /// Always match the deployment requirements specified with the nodes'
+    /// capabilities.
+    pub fn next(&mut self, spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest) -> Option<uuid::Uuid> {
         if self.nodes.is_empty() {
             return None;
         }
+        let reqs = crate::orchestrator::DeploymentRequirements::from_annotations(&spawn_req.annotations);
         match self.orchestration_strategy {
             crate::OrchestrationStrategy::Random => {
-                assert!(self.nodes.len() == self.weights.len());
-                let rnd = self.weight_dist.sample(&mut self.rng);
-                let mut sum = 0.0_f32;
+                // Select only the nodes that are feasible.
+                let mut candidates = vec![];
+                let mut high: f32 = 0.0;
                 for i in 0..self.nodes.len() {
-                    sum += self.weights[i];
-                    if sum >= rnd {
-                        return Some(self.nodes[i]);
+                    if Self::node_feasible(
+                        &spawn_req.code.function_class_type,
+                        &reqs,
+                        &self.nodes[i],
+                        &self.capabilities[i],
+                        &self.resource_providers[i],
+                    ) {
+                        candidates.push((i, self.weights[i]));
+                        high += self.weights[i];
                     }
                 }
-                self.nodes.last().cloned()
+                if high > 0.0 {
+                    let rv = rand::distributions::Uniform::new(0.0, high);
+                    let rnd = rv.sample(&mut self.rng);
+                    let mut sum = 0.0_f32;
+                    for i in 0..candidates.len() {
+                        sum += candidates[i].1;
+                        if sum >= rnd {
+                            return Some(self.nodes[candidates[i].0]);
+                        }
+                    }
+                }
+                None
             }
             crate::OrchestrationStrategy::RoundRobin => {
-                if self.round_robin_current_index >= self.nodes.len() {
-                    self.round_robin_current_index = 0;
+                for _ in 0..self.nodes.len() {
+                    // prevent infinite loop
+                    if self.round_robin_current_index >= self.nodes.len() {
+                        self.round_robin_current_index = 0;
+                    }
+
+                    let cand_ndx = self.round_robin_current_index;
+                    self.round_robin_current_index += 1;
+
+                    if Self::node_feasible(
+                        &spawn_req.code.function_class_type,
+                        &reqs,
+                        &self.nodes[cand_ndx],
+                        &self.capabilities[cand_ndx],
+                        &self.resource_providers[cand_ndx],
+                    ) {
+                        return Some(self.nodes[cand_ndx]);
+                    }
                 }
-                let next_node = Some(self.nodes[self.round_robin_current_index]);
-                self.round_robin_current_index += 1;
-                next_node
+                None
             }
         }
     }

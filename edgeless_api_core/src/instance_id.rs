@@ -43,6 +43,12 @@ impl<C> minicbor::Decode<'_, C> for InstanceId {
     }
 }
 
+impl core::fmt::Display for InstanceId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "InstanceId(node_id: {}, function_id: {})", self.node_id, self.function_id)
+    }
+}
+
 impl InstanceId {
     pub fn new(node_id: uuid::Uuid) -> Self {
         Self {
@@ -54,6 +60,14 @@ impl InstanceId {
         Self {
             node_id: NODE_ID_NONE,
             function_id: FUNCTION_ID_NONE,
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        if self.node_id == NODE_ID_NONE && self.function_id == FUNCTION_ID_NONE {
+            true
+        } else {
+            false
         }
     }
 }

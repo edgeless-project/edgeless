@@ -6,7 +6,7 @@
                 "id": "http_processor",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "include_code_file": "./processing_function/http_processor.wasm",
+                "code": "./processing_function/http_processor.wasm",
                 "outputs": []
             },
             "output_mapping": {},

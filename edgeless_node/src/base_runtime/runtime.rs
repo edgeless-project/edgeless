@@ -4,6 +4,25 @@
 /// Split into the active component `RuntimeTask` and the cloneable `RuntimeClient` allowing to interact with the runtime.
 use futures::{SinkExt, StreamExt};
 
+pub trait GuestAPIHostRegister {
+    fn needs_to_register(&mut self) -> bool;
+
+    fn register_guest_api_host(
+        &mut self,
+        instance_id: &edgeless_api::function_instance::InstanceId,
+        guest_api_host: crate::base_runtime::guest_api::GuestAPIHost,
+    ) -> ();
+
+    fn deregister_guest_api_host(&mut self, instance_id: &edgeless_api::function_instance::InstanceId) -> ();
+
+    fn guest_api_host(
+        &mut self,
+        instance_id: &edgeless_api::function_instance::InstanceId,
+    ) -> Option<&mut crate::base_runtime::guest_api::GuestAPIHost>;
+
+    fn configuration(&mut self) -> std::collections::HashMap<String, String>;
+}
+
 #[derive(Clone)]
 pub struct RuntimeClient {
     sender: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
@@ -14,6 +33,7 @@ pub struct RuntimeTask<FunctionInstanceType: super::FunctionInstance> {
     data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     state_manager: Box<dyn crate::state_management::StateManagerAPI>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+    guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
     slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
     functions: std::collections::HashMap<uuid::Uuid, super::function_instance_runner::FunctionInstanceRunner<FunctionInstanceType>>,
 }
@@ -30,9 +50,17 @@ pub fn create<FunctionInstanceType: super::FunctionInstance>(
     data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     state_manager: Box<dyn crate::state_management::StateManagerAPI>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+    guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
 ) -> (RuntimeClient, RuntimeTask<FunctionInstanceType>) {
     let (sender, receiver) = futures::channel::mpsc::unbounded();
-    let task = RuntimeTask::new(receiver, data_plane_provider, state_manager, telemetry_handle, sender.clone());
+    let task: RuntimeTask<FunctionInstanceType> = RuntimeTask::new(
+        receiver,
+        data_plane_provider,
+        state_manager,
+        telemetry_handle,
+        guest_api_host_register,
+        sender.clone(),
+    );
 
     let client = RuntimeClient::new(sender);
 
@@ -45,14 +73,16 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
         state_manager: Box<dyn crate::state_management::StateManagerAPI>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
         slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
     ) -> Self {
         Self {
-            receiver: receiver,
-            data_plane_provider: data_plane_provider,
-            state_manager: state_manager,
+            receiver,
+            data_plane_provider,
+            state_manager,
             telemetry_handle,
-            slf_channel: slf_channel,
+            guest_api_host_register,
+            slf_channel,
             functions: std::collections::HashMap::new(),
         }
     }
@@ -98,6 +128,7 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
                 "FUNCTION_ID".to_string(),
                 instance_id.function_id.to_string(),
             )])),
+            self.guest_api_host_register.clone(),
         )
         .await;
         self.functions.insert(instance_id.function_id.clone(), instance);

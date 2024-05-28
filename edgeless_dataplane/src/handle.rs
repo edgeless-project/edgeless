@@ -41,18 +41,14 @@ impl DataplaneHandle {
                     message,
                 }) = receiver.next().await
                 {
-                    if let Some(sender) = clone_overwrites.lock().await.temporary_receivers.get_mut(&channel_id) {
-                        if let Some(sender) = sender.take() {
-                            match sender.send((source_id, message.clone())) {
-                                Ok(_) => {
-                                    continue;
-                                }
-                                Err(_) => {
-                                    log::error!("Tried to use expired overwrite send handle.");
-                                }
+                    if let Some(sender) = clone_overwrites.lock().await.temporary_receivers.remove(&channel_id) {
+                        match sender.send((source_id, message.clone())) {
+                            Ok(_) => {
+                                continue;
                             }
-                        } else {
-                            log::error!("Tried to use expired overwrite send handle.");
+                            Err(_) => {
+                                log::error!("Tried to use expired overwrite send handle.");
+                            }
                         }
                     }
                     match main_sender
@@ -113,12 +109,13 @@ impl DataplaneHandle {
     // Send a `call` event and wait for the return event.
     // Internally, this sets up a receiver override to handle the message before it would be sent to the `receive_next` function.
     pub async fn call(&mut self, target: edgeless_api::function_instance::InstanceId, msg: String) -> CallRet {
-        let (send, rec) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
+        let (sender, receiver) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
         let channel_id = self.next_id;
         self.next_id += 1;
-        self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, Some(send));
+        // Potential Leak: This is only received if a message is received (or the handle is dropped)
+        self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
         self.send_inner(target, Message::Call(msg), channel_id).await;
-        match rec.await {
+        match receiver.await {
             Ok((_src, msg)) => match msg {
                 Message::CallRet(ret) => CallRet::Reply(ret),
                 Message::CallNoRet => CallRet::NoReply,
@@ -157,8 +154,7 @@ impl DataplaneHandle {
 }
 
 struct TemporaryReceivers {
-    temporary_receivers:
-        std::collections::HashMap<u64, Option<futures::channel::oneshot::Sender<(edgeless_api::function_instance::InstanceId, Message)>>>,
+    temporary_receivers: std::collections::HashMap<u64, futures::channel::oneshot::Sender<(edgeless_api::function_instance::InstanceId, Message)>>,
 }
 
 #[derive(Clone)]

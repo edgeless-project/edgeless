@@ -10,6 +10,10 @@ edition = "2021"
 name = "edgeless_function"
 path = "src/lib.rs"
 
+[features]
+std = []
+# alloc= []
+default = ["std"]
+
 [dependencies]
-wit-bindgen = "0.8"
 log = "0.4"

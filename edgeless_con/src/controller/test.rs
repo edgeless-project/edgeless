@@ -23,6 +23,7 @@ enum MockFunctionInstanceEvent {
     ),
     StopResource(edgeless_api::orc::DomainManagedInstanceId),
     Patch(edgeless_api::common::PatchRequest),
+    #[allow(dead_code)]
     UpdateNode(edgeless_api::node_registration::UpdateNodeRequest),
 }
 
@@ -117,6 +118,7 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for MockNodeRegistrati
         self.sender.send(MockFunctionInstanceEvent::UpdateNode(request)).await.unwrap();
         Ok(edgeless_api::node_registration::UpdateNodeResponse::Accepted)
     }
+    async fn keep_alive(&mut self) {}
 }
 
 async fn test_setup() -> (
@@ -154,8 +156,8 @@ async fn single_function_start_stop() {
         function_class_id: "fc1".to_string(),
         function_class_type: "RUST_WASM".to_string(),
         function_class_version: "0.1".to_string(),
-        function_class_inlude_code: vec![],
-        outputs: vec![],
+        function_class_code: vec![],
+        function_class_outputs: vec![],
     };
     let start_workflow_request = edgeless_api::workflow_instance::SpawnWorkflowRequest {
         workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
@@ -220,8 +222,8 @@ async fn resource_to_function_start_stop() {
                     function_class_id: "fc1".to_string(),
                     function_class_type: "RUST_WASM".to_string(),
                     function_class_version: "0.1".to_string(),
-                    function_class_inlude_code: vec![],
-                    outputs: vec![],
+                    function_class_code: vec![],
+                    function_class_outputs: vec![],
                 },
                 output_mapping: std::collections::HashMap::new(),
                 annotations: std::collections::HashMap::new(),
@@ -308,8 +310,8 @@ async fn function_link_loop_start_stop() {
                         function_class_id: "fc1".to_string(),
                         function_class_type: "RUST_WASM".to_string(),
                         function_class_version: "0.1".to_string(),
-                        function_class_inlude_code: vec![],
-                        outputs: vec!["output-1".to_string()],
+                        function_class_code: vec![],
+                        function_class_outputs: vec!["output-1".to_string()],
                     },
                     output_mapping: std::collections::HashMap::from([("output-1".to_string(), "f2".to_string())]),
                     annotations: std::collections::HashMap::new(),
@@ -320,8 +322,8 @@ async fn function_link_loop_start_stop() {
                         function_class_id: "fc2".to_string(),
                         function_class_type: "RUST_WASM".to_string(),
                         function_class_version: "0.1".to_string(),
-                        function_class_inlude_code: vec![],
-                        outputs: vec!["output-2".to_string()],
+                        function_class_code: vec![],
+                        function_class_outputs: vec!["output-2".to_string()],
                     },
                     output_mapping: std::collections::HashMap::from([("output-2".to_string(), "f1".to_string())]),
                     annotations: std::collections::HashMap::new(),
