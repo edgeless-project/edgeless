@@ -9,12 +9,14 @@ use clap::Parser;
 use edgeless_api::{controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
 use reqwest::header::ACCEPT;
 use std::fs;
+use std::io::Cursor;
 use toml;
 
+use mailparse::{parse_content_disposition, parse_header};
 use reqwest::{multipart, Body, Client};
 use std::collections::HashMap;
 use tokio::fs::File;
-use tokio_util::codec::{BytesCodec, FramedRead};
+use tokio_util::codec::{BytesCodec, FramedRead}; // for parse
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -43,6 +45,10 @@ enum FunctionCommands {
     Get {
         file_name: String,
         id: String,
+    },
+    Download {
+        config_file: String,
+        code_file_id: String,
     },
 }
 
@@ -439,6 +445,49 @@ async fn main() -> anyhow::Result<()> {
                         .expect("failed to get payload");
 
                     println!("Successfully get function {}", response);
+                }
+
+                FunctionCommands::Download {
+                    config_file,  //config file name
+                    code_file_id, // file id
+                } => {
+                    let config = config_file;
+                    //read end point and credentials in a file
+                    let contents = fs::read_to_string(config).expect("Failed to read config file, please make sure the file exist and in .toml");
+                    let repo_endpoint: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
+
+                    // Print out the values to `stdout`.
+                    println!("Url {}", repo_endpoint.url.name); //
+                    println!("username {}", repo_endpoint.credential.basic_auth_user);
+                    println!("passwd {}", repo_endpoint.credential.basic_auth_pass);
+
+                    let client = Client::new();
+                    let response = client
+                        .get(repo_endpoint.url.name.to_string() + "/api/admin/function/download/" + code_file_id.as_str())
+                        .header(ACCEPT, "*/*")
+                        .basic_auth(repo_endpoint.credential.basic_auth_user, Some(repo_endpoint.credential.basic_auth_pass))
+                        .send()
+                        .await
+                        .expect("failed to get header");
+                    let status = response.status();
+                    println!("status code {}", status);
+                    let header = response.headers().get("content-disposition").unwrap();
+
+                    let header_str = format!("{}{}", "Content-Disposition: ", header.to_str().unwrap());
+                    let (parsed, _) = parse_header(header_str.as_bytes()).unwrap();
+                    let dis = parse_content_disposition(&parsed.get_value());
+
+                    let downloadfilename = dis.params.get("filename").unwrap();
+
+                    println!("filename:\n{:?}", downloadfilename);
+
+                    let body = response.bytes().await.expect("failed to download payload");
+                    //parse filename from header
+                    let mut file = std::fs::File::create(downloadfilename)?;
+                    let mut content = Cursor::new(body);
+                    std::io::copy(&mut content, &mut file)?;
+
+                    println!("File downloaded successfully.");
                 }
             },
         },
