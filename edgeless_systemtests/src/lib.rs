@@ -63,6 +63,8 @@ mod tests {
                             http_egress_provider: None,
                             file_log_provider: Some("file-log-1".to_string()),
                             redis_provider: None,
+                            kafka_provider: None,
+                            kafka_broker_url: None,
                         }),
                         user_node_capabilities: None,
                     },

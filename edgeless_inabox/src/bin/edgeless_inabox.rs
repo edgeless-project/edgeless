@@ -152,6 +152,14 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                     true => Some("redis-1".to_string()),
                     false => None,
                 },
+                kafka_provider: match first_node {
+                    true => Some("kafka".to_string()),
+                    false => None,
+                },
+                kafka_broker_url: match first_node {
+                    true => Some("kafka://kafka.example.com:9092".to_string()),
+                    false => None,
+                },
             }),
             user_node_capabilities: None,
         });

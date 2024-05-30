@@ -82,6 +82,11 @@ pub struct EdgelessNodeResourceSettings {
     /// value of a given given, as specified in the resource configuration
     /// at run-time.
     pub redis_provider: Option<String>,
+    /// If not empty, a Kafka resource with the given name is created.
+    /// The resource will connect to a remote Kafka broker to produce/consume messages.
+    pub kafka_provider: Option<String>,
+    /// URL of the Kafka broker.
+    pub kafka_broker_url: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -310,6 +315,26 @@ async fn fill_resources(
                 });
             }
         }
+        if let Some(provider_id) = &settings.kafka_provider {
+            if !provider_id.is_empty() {
+                log::info!("Creating resource '{}'", provider_id);
+                ret.insert(
+                    provider_id.clone(),
+                    Box::new(
+                        resources::kafka::KafkaResourceProvider::new(
+                            data_plane.clone(),
+                            edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                        )
+                        .await,
+                    ),
+                );
+                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id: provider_id.clone(),
+                    class_type: "kafka".to_string(),
+                    outputs: vec![],
+                });
+            }
+        }
     }
 
     ret
@@ -478,6 +503,7 @@ http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"
 file_log_provider = "file-log-1"
 redis_provider = "redis-1"
+kafka_provider = "kafka-1"
 
 [user_node_capabilities]
 "##,
