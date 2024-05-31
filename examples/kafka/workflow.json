@@ -6,11 +6,11 @@
                 "id": "counter",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./counter/counter.wasm",
+                "code": "../redis/counter/counter.wasm",
                 "outputs": []
             },
             "output_mapping": {
-                "output": "my-redis"
+                "output": "my-kafka"
             },
             "annotations": {
                 "init-payload": "42"
@@ -19,12 +19,12 @@
     ],
     "resources": [
         {
-            "name": "my-redis",
-            "class_type": "redis",
+            "name": "my-kafka",
+            "class_type": "kafka",
             "output_mapping": {},
             "configurations": {
-                "url": "redis://127.0.0.1:6379/",
-                "key": "example-redis"
+                "brokers": "localhost:9092",
+                "topic": "test-topic"
             }
         }
     ],
