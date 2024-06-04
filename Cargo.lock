@@ -1365,6 +1365,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio 1.36.0",
+ "tokio-util",
  "toml 0.7.8",
  "uuid",
 ]
@@ -1481,6 +1482,7 @@ dependencies = [
  "http-body-util",
  "hyper 1.2.0",
  "hyper-util",
+ "libloading",
  "log",
  "openssl",
  "redis",
@@ -3459,12 +3461,12 @@ dependencies = [
 
 [[package]]
 name = "libloading"
-version = "0.8.1"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c571b676ddfc9a8c12f1f3d3085a7b163966a8fd8098a90640953ce5f6170161"
+checksum = "0c2a198fb6b0eada2a8df47933734e6d35d350665a33a3593d7164fa52c75c19"
 dependencies = [
  "cfg-if 1.0.0",
- "windows-sys 0.48.0",
+ "windows-targets 0.52.3",
 ]
 
 [[package]]
@@ -6187,19 +6189,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b9e3fb0c8fbddd78aa6095b850dfeedbc7506cf5f81e633f69cf8f2333ab84b9"
 dependencies = [
  "leb128",
-]
-
-[[package]]
-name = "wasm-metadata"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36e5156581ff4a302405c44ca7c85347563ca431d15f1a773f12c9c7b9a6cdc9"
-dependencies = [
- "anyhow",
- "indexmap 1.9.3",
- "serde",
- "wasm-encoder 0.29.0",
- "wasmparser 0.107.0",
 ]
 
 [[package]]
