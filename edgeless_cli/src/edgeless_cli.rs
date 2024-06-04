@@ -160,6 +160,13 @@ async fn main() -> anyhow::Result<()> {
                                             )
                                             .unwrap(),
                                             "CONTAINER" => func_spec.class_specification.code.unwrap().as_bytes().to_vec(),
+                                            "RUST_NATIVE" => std::fs::read(
+                                                std::path::Path::new(&spec_file)
+                                                    .parent()
+                                                    .unwrap()
+                                                    .join(func_spec.class_specification.code.unwrap()),
+                                            )
+                                            .unwrap(),
                                             _ => panic!("unknown function class type: {}", func_spec.class_specification.function_type),
                                         };
 

@@ -131,6 +131,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
             },
             wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: None,
+            native_runtime: Some(edgeless_node::EdgelessNodeNativeRuntimeSettings { enabled: true }),
             resources: Some(EdgelessNodeResourceSettings {
                 http_ingress_url: match first_node {
                     true => Some(next_url()),

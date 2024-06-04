@@ -16,7 +16,7 @@ pub mod wasm_runner;
 #[cfg(feature = "wasmi")]
 pub mod wasmi_runner;
 
-pub mod x86_runner;
+pub mod native_runner;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
@@ -26,6 +26,8 @@ pub struct EdgelessNodeSettings {
     pub wasm_runtime: Option<EdgelessNodeWasmRuntimeSettings>,
     /// Container run-time settings.  Disabled if not present.
     pub container_runtime: Option<EdgelessNodeContainerRuntimeSettings>,
+    /// Native run-time settings (e.g., x86, ARM). Disabled if not present. 
+    pub native_runtime: Option<EdgelessNodeNativeRuntimeSettings>,
     /// Resource settings.
     pub resources: Option<EdgelessNodeResourceSettings>,
     /// User-specific capabilities.
@@ -44,6 +46,12 @@ pub struct EdgelessNodeContainerRuntimeSettings {
     pub enabled: bool,
     /// End-point of the gRPC server to use for the GuestAPIHost interface.
     pub guest_api_host_url: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct EdgelessNodeNativeRuntimeSettings {
+    // True if the native run-time is enabled.
+    pub enabled: bool,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -131,6 +139,7 @@ impl EdgelessNodeSettings {
             },
             wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: None,
+            native_runtime: Some(EdgelessNodeNativeRuntimeSettings { enabled: true}),
             resources: None,
             user_node_capabilities: None,
         }
@@ -341,27 +350,6 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let mut runners = std::collections::HashMap::<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>::new();
     let mut runners_ft = std::collections::HashMap::<edgeless_api::function_instance::FunctionType, Box<dyn crate::base_runtime::RuntimeAPI + Send>>::new();
 
-<<<<<<< HEAD
-    // Create the WebAssembly (Wasmtime) runner.
-    #[allow(unused_variables)]
-    #[cfg(feature = "wasmtime")]
-    let rust_runtime_task = {
-        let (wasmtime_runtime_client, mut wasmtime_runtime_task_s) =
-            base_runtime::runtime::create::<wasm_runner::function_instance::WASMFunctionInstance>(
-                data_plane.clone(),
-                state_manager.clone(),
-                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                    ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
-                    ("WASM_RUNTIME".to_string(), "wasmtime".to_string()),
-                    ("NODE_ID".to_string(), settings.general.node_id.to_string()),
-                ]))),
-            );
-        runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
-        runners_ft.insert(edgeless_api::function_instance::FunctionType::from_string("RUST_WASM"), Box::new(wasmtime_runtime_client.clone()));
-        tokio::spawn(async move {
-            wasmtime_runtime_task_s.run().await;
-        })
-=======
     // Create the WASM run-time, if needed.
     let rust_runtime_task = match settings.wasm_runtime {
         Some(wasm_runtime_settings) => {
@@ -383,6 +371,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                                 std::sync::Arc::new(tokio::sync::Mutex::new(Box::new(crate::wasm_runner::runtime::WasmRuntime::new()))),
                             );
                         runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
+                        runners_ft.insert(edgeless_api::function_instance::FunctionType::from_string("RUST_WASM"), Box::new(wasmtime_runtime_client.clone()));
                         tokio::spawn(async move {
                             wasmtime_runtime_task_s.run().await;
                         })
@@ -412,7 +401,6 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
             }
         }
         None => tokio::spawn(async {}),
->>>>>>> main
     };
 
     // Create the container run-time, if needed.
@@ -447,23 +435,30 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         None => tokio::spawn(async {}),
     };
 
-    // Create the x86 runner.
-    let x86_runtime_task = {
-        let (x86_runtime_client, mut x86_runtime_task_s) = 
-            base_runtime::runtime::create::<x86_runner::function_instance::X86FunctionInstance>(
-                data_plane.clone(),
-                state_manager.clone(),
-                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                    ("FUNCTION_TYPE".to_string(), "RUST_X86".to_string()),
-                    ("X86_RUNTIME".to_string(), "x86runtime".to_string()),
-                    ("NODE_ID".to_string(), settings.general.node_id.to_string()),
-                ]))),
-            );
-            runners.insert("RUST_X86".to_string(), Box::new(x86_runtime_client.clone()));
-            runners_ft.insert(edgeless_api::function_instance::FunctionType::from_string("RUST_X86"), Box::new(x86_runtime_client.clone()));
-            tokio::spawn(async move{
-                x86_runtime_task_s.run().await;
-            })
+    // Create native run-time engine, if needed.
+    let native_runtime_task = match settings.native_runtime {
+        Some(native_runtime_settings) => match native_runtime_settings.enabled {
+            true => {
+                let (native_runtime_client, mut native_runtime_task_s) = 
+                    base_runtime::runtime::create::<native_runner::function_instance::NativeFunctionInstance>(
+                        data_plane.clone(),
+                        state_manager.clone(),
+                        Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                            ("FUNCTION_TYPE".to_string(), "RUST_NATIVE".to_string()),
+                            ("NATIVE_RUNTIME".to_string(), "native".to_string()),
+                            ("NODE_ID".to_string(), settings.general.node_id.to_string()),
+                        ]))),
+                        std::sync::Arc::new(tokio::sync::Mutex::new(Box::new(crate::native_runner::runtime::NativeRuntime::new()))),
+                    );
+                    runners.insert("RUST_NATIVE".to_string(), Box::new(native_runtime_client.clone()));
+                    runners_ft.insert(edgeless_api::function_instance::FunctionType::from_string("RUST_NATIVE"), Box::new(native_runtime_client.clone()));
+                    tokio::spawn(async move{
+                        native_runtime_task_s.run().await;
+                    })
+            }
+            false => tokio::spawn(async {}),
+        },
+        None => tokio::spawn(async {}),
     };
 
     // Create the resources.
@@ -485,6 +480,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let _ = futures::join!(
         rust_runtime_task,
         container_runtime_task,
+        native_runtime_task,
         agent_task,
         agent_api_server,
         register_node(
@@ -515,6 +511,9 @@ enabled = true
 [container_runtime]
 enabled = false
 guest_api_host_url = "http://127.0.0.1:7100"
+
+[native_runtime]
+enabled = true
 
 [resources]
 http_ingress_url = "http://127.0.0.1:7035"
