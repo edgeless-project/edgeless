@@ -35,11 +35,11 @@ impl EdgeFunction for NoopFunction {
     }
 }
 
-#[cfg(target_arch = "wasm")]
-edgeless_function::export!(NoopFunction);
+//#[cfg(target_arch = "wasm")]
+//edgeless_function::export!(NoopFunction);
 
 //#[cfg(target_arch = "x86_64")]
 //edgeless_function::export_x86!(NoopFunction, NoopFunction::default);
 
-#[cfg(target_arch = "x86_64")]
+//#[cfg(target_arch = "x86_64")]
 edgeless_function::export_x86a!(NoopFunction);

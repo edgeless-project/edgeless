@@ -50,3 +50,4 @@ sysinfo = "0.15"
 wasmi = {version = "0.31", default-features = false , optional = true}
 rs-docker = "0.0.58"
 chrono = "0.4.38"
+libloading = "0.8.3"

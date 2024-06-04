@@ -91,6 +91,8 @@ impl Agent {
                         spawn_req.instance_id.clone().unwrap().function_id,
                         spawn_req.code.function_class_type.clone(),
                     );
+                    
+                    log::info!("Component id to class map {}: {}", spawn_req.instance_id.unwrap().function_id, spawn_req.code.function_class_type);
 
                     // Get runner for function_class of spawn_req
                     match runners.get_mut(&spawn_req.code.function_class_type) {
@@ -99,7 +101,7 @@ impl Agent {
                             match r.start(spawn_req).await {
                                 Ok(_) => {}
                                 Err(err) => {
-                                    log::error!("Unhandled Start Error: {}", err);
+                                    log::error!("Unhandled Start Error 1: {}", err);
                                     continue;
                                 }
                             }
