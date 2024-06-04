@@ -46,7 +46,7 @@ reqwest = { version = "0.11" }
 http-body-util = "0.1.0-rc.3" 
 redis = "*"
 openssl = { version = "0.10", features = ["vendored"] }
-sysinfo = "0.15"
+sysinfo = "0.30.12"
 wasmi = {version = "0.31", default-features = false , optional = true}
 rs-docker = "0.0.58"
 chrono = "0.4.38"

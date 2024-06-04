@@ -50,7 +50,9 @@ pub struct WASMIFunctionInstance {
 #[async_trait::async_trait]
 impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
     async fn instantiate(
-        guest_api_host: Option<crate::base_runtime::guest_api::GuestAPIHost>,
+        _instance_id: &edgeless_api::function_instance::InstanceId,
+        _runtime_configuration: std::collections::HashMap<String, String>,
+        guest_api_host: &mut Option<crate::base_runtime::guest_api::GuestAPIHost>,
         code: &[u8],
     ) -> Result<Box<Self>, crate::base_runtime::FunctionInstanceError> {
         let _comfig = wasmi::Config::default();

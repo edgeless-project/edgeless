@@ -253,6 +253,7 @@ pub struct ClientDesc {
     pub invocation_url: String,
     pub api: Box<dyn edgeless_api::agent::AgentAPI + Send>,
     pub capabilities: edgeless_api::node_registration::NodeCapabilities,
+    pub health_status: edgeless_api::node_management::HealthStatus,
 }
 
 enum IntFid {
@@ -863,6 +864,7 @@ impl Orchestrator {
                                         invocation_url: invocation_url.clone(),
                                         api: Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&agent_url).await),
                                         capabilities,
+                                        health_status: edgeless_api::node_management::HealthStatus::invalid(),
                                     },
                                 );
                                 Some(edgeless_api::node_management::UpdatePeersRequest::Add(node_id, invocation_url))
@@ -937,9 +939,15 @@ impl Orchestrator {
                     // because they failed to reply to a keep-alive.
                     let mut to_be_disconnected = std::collections::HashSet::new();
                     for (node_id, client_desc) in &mut clients {
-                        if let Err(_) = client_desc.api.node_management_api().keep_alive().await {
-                            to_be_disconnected.insert(*node_id);
-                        }
+                        match client_desc.api.node_management_api().keep_alive().await {
+                            Ok(health_status) => {
+                                log::debug!("node uuid {} health status {}", node_id, health_status);
+                                client_desc.health_status = health_status;
+                            }
+                            Err(_) => {
+                                to_be_disconnected.insert(*node_id);
+                            }
+                        };
                     }
 
                     // Second, remove all those nodes from the map of clients.

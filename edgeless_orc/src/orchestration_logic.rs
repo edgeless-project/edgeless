@@ -67,7 +67,7 @@ impl OrchestrationLogic {
                     .map(|(name, _)| name.clone())
                     .collect(),
             );
-            let mut weight = desc.capabilities.num_cores as f32 * desc.capabilities.num_cpus as f32 * desc.capabilities.clock_freq_cpu;
+            let mut weight = (std::cmp::max(desc.capabilities.num_cores, desc.capabilities.num_cpus) as f32) * desc.capabilities.clock_freq_cpu;
             if weight == 0.0 {
                 // Force a vanishing weight to an arbitrary value.
                 weight = 1.0;

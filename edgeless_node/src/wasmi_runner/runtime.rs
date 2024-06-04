@@ -5,7 +5,7 @@ pub struct WasmiRuntime {
     _configuration: std::collections::HashMap<String, String>,
 }
 
-impl WasmRuntime {
+impl WasmiRuntime {
     pub fn new() -> Self {
         Self {
             _configuration: std::collections::HashMap::new(),
@@ -24,7 +24,7 @@ impl crate::base_runtime::runtime::GuestAPIHostRegister for WasmiRuntime {
     ) {
     }
 
-    fn deregister_guest_api_host(&mut self, _instance_id: edgeless_api::function_instance::InstanceId) {}
+    fn deregister_guest_api_host(&mut self, _instance_id: &edgeless_api::function_instance::InstanceId) {}
 
     fn guest_api_host(
         &mut self,

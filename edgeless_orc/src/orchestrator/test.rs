@@ -94,13 +94,13 @@ impl edgeless_api::node_management::NodeManagementAPI for MockAgentAPI {
         self.sender.send(MockAgentEvent::UpdatePeers(request)).await.unwrap();
         Ok(())
     }
-    async fn keep_alive(&mut self) -> anyhow::Result<()> {
+    async fn keep_alive(&mut self) -> anyhow::Result<edgeless_api::node_management::HealthStatus> {
         self.sender.send(MockAgentEvent::KeepAlive()).await.unwrap();
 
         if FAILING_NODES.get().unwrap().lock().unwrap().contains(&self.node_id) {
             Err(anyhow::anyhow!("node {} failed", self.node_id))
         } else {
-            Ok(())
+            Ok(edgeless_api::node_management::HealthStatus::empty())
         }
     }
 }
@@ -165,6 +165,7 @@ async fn test_setup(
                     sender: mock_node_sender,
                 }) as Box<dyn edgeless_api::agent::AgentAPI + Send>,
                 capabilities,
+                health_status: edgeless_api::node_management::HealthStatus::empty(),
             },
         );
         for provider_i in 0..num_resources_per_node {
