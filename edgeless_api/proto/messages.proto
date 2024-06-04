@@ -112,7 +112,7 @@ message NodeCapabilities {
     string model_name_cpu    = 11;
     // Clock frequency of the CPU, in BogoMIPS.
     float clock_freq_cpu     = 12;
-    // Number of cores for each CPU.
+    // Number of physical cores.
     uint32 num_cores         = 13;
     // Size of memory available to applications running on the edge node, in MB.
     uint32 mem_size          = 14;
@@ -152,7 +152,24 @@ message UpdatePeersRequest {
 
 // Response message of FunctionInstance::KeepAlive().
 message HealthStatus {
-    // health status info to be added (include node/service monitoring?)
+    // Global CPU usage, in percentage.
+    int32 cpu_usage      = 10;
+    // Load, as the sum of usage of all the CPUs.
+    int32 cpu_load       = 11;
+    // Free memory, in kbytes.
+    int32 mem_free       = 20;
+    // Used memory, in kbytes.
+    int32 mem_used       = 21;
+    // Total memory, in kbytes.
+    int32 mem_total      = 22;
+    // Available memory, in kbytes
+    int32 mem_available  = 23;
+    // CPU usage of the current process, in percentage.
+    int32 proc_cpu_usage = 30;
+    // Memory occupied by this process, in kbytes.
+    int32 proc_memory    = 31;
+    // Virtual memory occupied by this process, in kbytes.
+    int32 proc_vmemory   = 32;
 }
 
 // Message to request the update of a function instance.
