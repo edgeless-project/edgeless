@@ -57,18 +57,18 @@ impl DDAResource {
         log::info!("DDA singleton resource created, connected to the DDA sidecar at url={}", dda_url);
 
         // SETUP exemplary subscription for temperature to DDA
-        // TODO: integrate subscription management for functions 
+        // TODO: integrate subscription management for functions
 
         let mut dda_subscription_filter = dda_com::SubscriptionFilter::default();
         dda_subscription_filter.r#type = "com.edgeless.temperature".to_string();
 
         // let mut current_temperature = "0";
-        
+
         let mut dda_temp_subcription_stream = match dda_client.subscribe_event(dda_subscription_filter).await {
             Ok(dda_resp) => {
                 log::info!("Subscription successfull");
                 dda_resp.into_inner()
-            },
+            }
             Err(err) => {
                 log::error!("Subscription failed {}", err);
                 panic!("Subscription failed {}", err);
@@ -85,17 +85,16 @@ impl DDAResource {
                                 //current_temperature = str.clone();
                                 log::info!("Temperature from subscription {}", str);
                                 // TODO set current temperature current_temperature = from_utf8(str).expect("String for temperature");
-                            },
+                            }
                             Err(_) => {
                                 log::error!("Subscription event parser error");
                             }
                         };
-                    },
+                    }
                     Err(_) => {
                         log::error!("Subscription event parser error");
                     }
                 };
-                
             }
         });
         // END SETUP SOME SUBSCRIPTIONS TO DDA
@@ -138,7 +137,6 @@ impl DDAResource {
                         dataplane_handle
                             .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("too_hot".to_string()))
                             .await;
-
                     }
                     // Example for a DDA request/response pattern using Action
                     "dda_move_arm" => {
