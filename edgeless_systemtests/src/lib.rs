@@ -63,6 +63,8 @@ mod tests {
                             http_egress_provider: None,
                             file_log_provider: Some("file-log-1".to_string()),
                             redis_provider: None,
+                            dda_url: None,
+                            dda_provider: None,
                         }),
                         user_node_capabilities: None,
                     },

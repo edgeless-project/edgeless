@@ -152,6 +152,14 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                     true => Some("redis-1".to_string()),
                     false => None,
                 },
+                dda_url: match first_node {
+                    true => Some(next_url()),
+                    false => None,
+                },
+                dda_provider: match first_node {
+                    true => Some("dda-1".to_string()),
+                    false => None,
+                },
             }),
             user_node_capabilities: None,
         });

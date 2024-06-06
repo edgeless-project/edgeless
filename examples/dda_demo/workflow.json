@@ -1,0 +1,66 @@
+{
+    "functions": [
+        {
+            "name": "check_temperature",
+            "class_specification": {
+                "id": "check_temperature",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "./functions/check_temperature/check_temperature.wasm",
+                "outputs": [
+                    "dda",
+                    "move_arm",
+                    "log_output"
+                ]
+            },
+            "output_mapping": {
+                "dda": "dda-1",
+                "move_arm": "move_arm",
+                "log_output": "my-log"
+            },
+            "annotations": {}
+        },
+        {
+            "name": "move_arm",
+            "class_specification": {
+                "id": "move_arm",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "./functions/move_arm/move_arm.wasm",
+                "outputs": [
+                    "dda",
+                    "log_output"
+                ]
+            },
+            "output_mapping": {
+                "dda": "dda-1",
+                "log_output": "my-log"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "dda-1",
+            "class_type": "dda",
+            "output_mapping": {
+                "check_temperature": "check_temperature",
+                "move_arm": "move_arm"
+            },
+            "configurations": {
+                "dda_url": "http://127.0.0.1:12000",
+                "dda_com_subscription_mapping" : "[{\"ddatopic\": \"com.edgeless.temperature\", \"ddapattern\": \"event\", \"cast_mapping\": \"check_temperature\"}, {\"ddatopic\": \"com.edgeless.someddatopic\", \"ddapattern\": \"action\", \"cast_mapping\": \"some_functioncall\"}]",
+                "dda_com_publication_mapping": "[{\"pubid\":\"dda_move_arm\", \"ddatopic\": \"com.edgeless.moveRobotArm\"}]"
+            }
+        },
+        {
+            "name": "my-log",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "dda.log"
+            }
+        }
+    ],
+    "annotations": {}
+}
