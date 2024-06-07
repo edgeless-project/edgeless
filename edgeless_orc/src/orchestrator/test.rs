@@ -181,9 +181,7 @@ async fn test_setup(
     }
 
     let (mut orchestrator, orchestrator_task) = Orchestrator::new_with_clients(
-        crate::EdgelessOrcSettings {
-            domain_id: "".to_string(),        // unused
-            orchestrator_url: "".to_string(), // unused
+        crate::EdgelessOrcBaselineSettings {
             orchestration_strategy: crate::OrchestrationStrategy::Random,
             keep_alive_interval_secs: 0 as u64, // unused
         },

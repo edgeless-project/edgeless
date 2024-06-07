@@ -34,10 +34,18 @@ mod tests {
             });
 
             let (task, handle) = futures::future::abortable(edgeless_orc::edgeless_orc_main(edgeless_orc::EdgelessOrcSettings {
-                domain_id: domain_id.to_string(),
-                orchestrator_url: orchestrator_url.to_string(),
-                orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
-                keep_alive_interval_secs: 1,
+                general: edgeless_orc::EdgelessOrcGeneralSettings {
+                    domain_id: domain_id.to_string(),
+                    orchestrator_url: orchestrator_url.to_string(),
+                },
+                baseline: edgeless_orc::EdgelessOrcBaselineSettings {
+                    orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
+                    keep_alive_interval_secs: 1,
+                },
+                proxy: edgeless_orc::EdgelessOrcProxySettings {
+                    proxy_type: "None".to_string(),
+                    redis_url: None,
+                },
             }));
             tokio::spawn(task);
             handles.push(handle);
