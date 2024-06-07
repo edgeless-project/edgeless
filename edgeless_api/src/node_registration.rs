@@ -8,7 +8,7 @@ pub struct ResourceProviderSpecification {
     pub outputs: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct NodeCapabilities {
     // Number of (actual or virtual) CPUs associated with the edge node.
     pub num_cpus: u32,
