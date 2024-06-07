@@ -47,6 +47,8 @@ DDA needs a MQTT broker to publish and subscribe to actions and events. So we ne
    2. None EDGELESS comoponents and services like for instance the two mock services in `examples/dda_demo/mock-services/mock-robot-arm` and `examples/dda_demo/mock-services/mock-temperature-sensor`. 
 3. DDA has a dependency on `go`. So make sure that `go` is installed and path is accessible in environment.
 4. Run the EDGLESS DDA sidecar by running `020_run_dda.sh`.
+5. In case you get the following error `./020_run_dda.sh: line 10: dda: command not found`, this is because `dda` is installed but it is not accessible in the current environment path. To solve this, run `export PATH=$PATH:$(go env GOPATH)/bin`.
+6. If you still get the same error, the `dda` resource has been installed elsewhere. Add that location to the `PATH` variable in environment.
 
 ### Run EDGELESS controller, orchestrator and Edgeless node
 
