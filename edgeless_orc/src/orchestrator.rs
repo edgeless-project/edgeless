@@ -273,10 +273,20 @@ impl IntFid {
 }
 
 impl Orchestrator {
-    pub async fn new(settings: crate::EdgelessOrcSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
+    pub async fn new(
+        settings: crate::EdgelessOrcBaselineSettings,
+        proxy: Box<dyn super::proxy::Proxy>,
+    ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, settings, std::collections::HashMap::new(), std::collections::HashMap::new()).await;
+            Self::main_task(
+                receiver,
+                settings,
+                std::collections::HashMap::new(),
+                std::collections::HashMap::new(),
+                proxy,
+            )
+            .await;
         });
 
         (Orchestrator { sender }, main_task)
@@ -284,13 +294,13 @@ impl Orchestrator {
 
     #[cfg(test)]
     pub async fn new_with_clients(
-        settings: crate::EdgelessOrcSettings,
+        settings: crate::EdgelessOrcBaselineSettings,
         clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
         resource_providers: std::collections::HashMap<String, ResourceProvider>,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, settings, clients, resource_providers).await;
+            Self::main_task(receiver, settings, clients, resource_providers, Box::new(super::proxy_none::ProxyNone {})).await;
         });
 
         (Orchestrator { sender }, main_task)
@@ -588,19 +598,20 @@ impl Orchestrator {
 
     async fn main_task(
         receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>,
-        orchestrator_settings: crate::EdgelessOrcSettings,
-        clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        orchestrator_settings: crate::EdgelessOrcBaselineSettings,
+        nodes: std::collections::HashMap<uuid::Uuid, ClientDesc>,
         resource_providers: std::collections::HashMap<String, ResourceProvider>,
+        mut proxy: Box<dyn super::proxy::Proxy>,
     ) {
         let mut receiver = receiver;
         let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy);
         let mut rng = rand::rngs::StdRng::from_entropy();
 
-        // known agents
+        // known nodes
         // key: node_id
-        let mut clients = clients;
-        orchestration_logic.update_nodes(&clients, &resource_providers);
-        for (node_id, client_desc) in &clients {
+        let mut nodes = nodes;
+        orchestration_logic.update_nodes(&nodes, &resource_providers);
+        for (node_id, client_desc) in &nodes {
             log::info!(
                 "added function instance client: node_id {}, agent URL {}, invocation URL {}, capabilities {}",
                 node_id,
@@ -609,8 +620,9 @@ impl Orchestrator {
                 client_desc.capabilities
             );
         }
+        proxy.update_nodes(&nodes);
 
-        // known resources providers as notified by nodes upon registration
+        // known resources providers as advertised by the nodes upon registration
         // key: provider_id
         let mut resource_providers = resource_providers;
         for (provider, resource_provider) in &resource_providers {
@@ -623,11 +635,11 @@ impl Orchestrator {
             );
         }
 
-        // instances that the orchestrator promised to keep active
+        // instances that the orchestrator promises to keep active
         // key: ext_fid
         let mut active_instances = std::collections::HashMap::new();
 
-        // active patches to which the orchestrator committed
+        // active patches to which the orchestrator commits
         // key:   ext_fid (origin function)
         // value: map of:
         //        key:   channel output name
@@ -635,7 +647,7 @@ impl Orchestrator {
         let mut active_patches: std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>> =
             std::collections::HashMap::new();
 
-        // Main loop that reacts to events on the receiver channel
+        // main orchestration loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
             match req {
                 OrchestratorRequest::STARTFUNCTION(spawn_req, reply_channel) => {
@@ -646,7 +658,7 @@ impl Orchestrator {
                     // If the operation fails, then active_instances is not
                     // updated, i.e., it is as if the request to start the
                     // function has never been issued.
-                    let res = Self::start_function(spawn_req.clone(), &mut orchestration_logic, &mut active_instances, &mut clients, ext_fid).await;
+                    let res = Self::start_function(spawn_req.clone(), &mut orchestration_logic, &mut active_instances, &mut nodes, ext_fid).await;
 
                     // Send back the response to the caller.
                     if let Err(err) = reply_channel.send(res) {
@@ -662,7 +674,7 @@ impl Orchestrator {
                                 ActiveInstance::Function(_req, instances) => {
                                     // Stop all the instances of this function.
                                     for instance in instances {
-                                        match clients.get_mut(&instance.node_id) {
+                                        match nodes.get_mut(&instance.node_id) {
                                             Some(c) => match c.api.function_instance_api().stop(instance).await {
                                                 Ok(_) => {
                                                     log::info!(
@@ -695,7 +707,7 @@ impl Orchestrator {
                             Self::apply_patches(
                                 &mut active_instances,
                                 &active_patches,
-                                &mut clients,
+                                &mut nodes,
                                 Self::dependencies(&active_patches, &ext_fid),
                             )
                             .await;
@@ -720,7 +732,7 @@ impl Orchestrator {
                         start_req.clone(),
                         &mut resource_providers,
                         &mut active_instances,
-                        &mut clients,
+                        &mut nodes,
                         ext_fid,
                         &mut rng,
                     )
@@ -745,7 +757,7 @@ impl Orchestrator {
                                 }
                                 ActiveInstance::Resource(_req, instance) => {
                                     // Stop the instance of this resource.
-                                    match clients.get_mut(&instance.node_id) {
+                                    match nodes.get_mut(&instance.node_id) {
                                         Some(node_client) => match node_client.api.resource_configuration_api().stop(instance).await {
                                             Ok(_) => {
                                                 log::info!(
@@ -768,7 +780,7 @@ impl Orchestrator {
                             Self::apply_patches(
                                 &mut active_instances,
                                 &active_patches,
-                                &mut clients,
+                                &mut nodes,
                                 Self::dependencies(&active_patches, &ext_fid),
                             )
                             .await;
@@ -797,7 +809,7 @@ impl Orchestrator {
                     active_patches.insert(origin_ext_fid, output_mapping);
 
                     // Apply the patch.
-                    Self::apply_patches(&active_instances, &active_patches, &mut clients, vec![origin_ext_fid]).await;
+                    Self::apply_patches(&active_instances, &active_patches, &mut nodes, vec![origin_ext_fid]).await;
                 }
                 OrchestratorRequest::UPDATENODE(request, reply_channel) => {
                     // Update the map of clients and, at the same time, prepare
@@ -814,7 +826,7 @@ impl Orchestrator {
                             capabilities,
                         ) => {
                             let mut dup_entry = false;
-                            if let Some(client_desc) = clients.get(&node_id) {
+                            if let Some(client_desc) = nodes.get(&node_id) {
                                 if client_desc.agent_url == agent_url && client_desc.invocation_url == invocation_url {
                                     dup_entry = true;
                                 }
@@ -857,7 +869,7 @@ impl Orchestrator {
                                     invocation_url,
                                     capabilities
                                 );
-                                clients.insert(
+                                nodes.insert(
                                     node_id,
                                     ClientDesc {
                                         agent_url: agent_url.clone(),
@@ -871,11 +883,11 @@ impl Orchestrator {
                             }
                         }
                         edgeless_api::node_registration::UpdateNodeRequest::Deregistration(node_id) => {
-                            if let None = clients.get(&node_id) {
+                            if let None = nodes.get(&node_id) {
                                 // There is no client with that node_id
                                 None
                             } else {
-                                clients.remove(&node_id);
+                                nodes.remove(&node_id);
                                 Some(edgeless_api::node_management::UpdatePeersRequest::Del(node_id))
                             }
                         }
@@ -887,13 +899,14 @@ impl Orchestrator {
                     let mut response = edgeless_api::node_registration::UpdateNodeResponse::Accepted;
 
                     if let Some(msg) = msg {
-                        // Update the orchestration logic with the new set of nodes.
-                        orchestration_logic.update_nodes(&clients, &resource_providers);
+                        // Update the orchestration logic & proxy with the new set of nodes.
+                        orchestration_logic.update_nodes(&nodes, &resource_providers);
+                        proxy.update_nodes(&nodes);
 
                         // Update all the peers (including the node, unless it
                         // was a deregister operation).
                         let mut num_failures: u32 = 0;
-                        for (_node_id, client) in clients.iter_mut() {
+                        for (_node_id, client) in nodes.iter_mut() {
                             if let Err(_) = client.api.node_management_api().update_peers(msg.clone()).await {
                                 num_failures += 1;
                             }
@@ -902,8 +915,8 @@ impl Orchestrator {
                         // Only with registration, we also update the new node
                         // by adding as peers all the existing nodes.
                         if let Some(this_node_id) = this_node_id {
-                            let mut new_node_client = clients.get_mut(&this_node_id).unwrap().api.node_management_api();
-                            for (other_node_id, client_desc) in clients.iter_mut() {
+                            let mut new_node_client = nodes.get_mut(&this_node_id).unwrap().api.node_management_api();
+                            for (other_node_id, client_desc) in nodes.iter_mut() {
                                 if other_node_id.eq(&this_node_id) {
                                     continue;
                                 }
@@ -938,7 +951,7 @@ impl Orchestrator {
                     // First check if there are nodes that must be disconnected
                     // because they failed to reply to a keep-alive.
                     let mut to_be_disconnected = std::collections::HashSet::new();
-                    for (node_id, client_desc) in &mut clients {
+                    for (node_id, client_desc) in &mut nodes {
                         match client_desc.api.node_management_api().keep_alive().await {
                             Ok(health_status) => {
                                 log::debug!("node uuid {} health status {}", node_id, health_status);
@@ -953,7 +966,7 @@ impl Orchestrator {
                     // Second, remove all those nodes from the map of clients.
                     for node_id in to_be_disconnected.iter() {
                         log::info!("disconnected node not replying to keep-alive: {}", &node_id);
-                        let val = clients.remove(&node_id);
+                        let val = nodes.remove(&node_id);
                         assert!(val.is_some());
                     }
 
@@ -971,7 +984,7 @@ impl Orchestrator {
                     // Update the peers of (still alive) nodes by
                     // deleting the missing-in-action peers.
                     for removed_node_id in &to_be_disconnected {
-                        for (_, client_desc) in clients.iter_mut() {
+                        for (_, client_desc) in nodes.iter_mut() {
                             match client_desc
                                 .api
                                 .node_management_api()
@@ -986,8 +999,9 @@ impl Orchestrator {
                         }
                     }
 
-                    // Update the orchestration logic.
-                    orchestration_logic.update_nodes(&clients, &resource_providers);
+                    // Update the orchestration logic and proxy.
+                    orchestration_logic.update_nodes(&nodes, &resource_providers);
+                    proxy.update_nodes(&nodes);
 
                     //
                     // Make sure that all active logical functions are assigned
@@ -1085,7 +1099,7 @@ impl Orchestrator {
                     // function remains in the active_instances, but it is
                     // assigned no function instance.
                     for (ext_fid, spawn_req) in fun_to_be_created.into_iter() {
-                        match Self::start_function(spawn_req, &mut orchestration_logic, &mut active_instances, &mut clients, ext_fid).await {
+                        match Self::start_function(spawn_req, &mut orchestration_logic, &mut active_instances, &mut nodes, ext_fid).await {
                             Ok(_) => {}
                             Err(err) => {
                                 log::error!("error when creating a new function assigned with ext_fid {}: {}", ext_fid, err);
@@ -1104,7 +1118,7 @@ impl Orchestrator {
                     // resource remains in the active_instances, but it is
                     // assigned an invalid function instance.
                     for (ext_fid, start_req) in res_to_be_created.into_iter() {
-                        match Self::start_resource(start_req, &mut resource_providers, &mut active_instances, &mut clients, ext_fid, &mut rng).await {
+                        match Self::start_resource(start_req, &mut resource_providers, &mut active_instances, &mut nodes, ext_fid, &mut rng).await {
                             Ok(_) => {}
                             Err(err) => {
                                 log::error!("error when creating a new resource assigned with ext_fid {}: {}", ext_fid, err);
@@ -1121,7 +1135,7 @@ impl Orchestrator {
                     }
 
                     // Repatch everything that needs to be repatched.
-                    Self::apply_patches(&mut active_instances, &active_patches, &mut clients, to_be_repatched).await;
+                    Self::apply_patches(&mut active_instances, &active_patches, &mut nodes, to_be_repatched).await;
                 }
             }
         }
