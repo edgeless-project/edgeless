@@ -31,7 +31,7 @@ After completing this you should have the following executables in the directory
 
 ### Configure Edgeless
 
-All components available need there respective configuration files. For conenvience you find in `examples/dda_demo/scripts` a script `./010_create_edgeless_configs.sh` to generate the config files for the DDA Demo(s).
+All components available need there respective configuration files. For convenience you find in `examples/dda_demo/scripts` a script `./010_create_edgeless_configs.sh` to generate the config files for the DDA Demo(s).
 
 ## Setting up the demo
 
@@ -42,11 +42,11 @@ We assume that the [prerequisites](#prerequisites) are already available. To set
 DDA needs a MQTT broker to publish and subscribe to actions and events. So we need to setup a MQTT broker and configure access to the broker in all dependent functions.
 
 1. Setup and run a MQTT Broker, for ex `Mosquitto`
-2. Configure MQTT Broker for all DDAs in the demo setup:
+2. Configure MQTT Broker for all DDAs in the demo setup by adding the MQTT address in the following configs:
    1. DDA sidecar configuration for the DDA EDGELESS resource: `dda.yaml` in the parent folder `examples/dda_demo/dda.yaml`.
-   2. None EDGELESS comoponents and services like for instance the two mock services in `examples/dda_demo/mock-services/mock-robot-arm` and `examples/dda_demo/mock-services/mock-temperature-sensor`. 
+   2. Non-EDGELESS components and services like for instance the two mock services in `examples/dda_demo/mock-services/mock-robot-arm` and `examples/dda_demo/mock-services/mock-temperature-sensor`.
 3. DDA has a dependency on `go`. So make sure that `go` is installed and path is accessible in environment.
-4. Run the EDGLESS DDA sidecar by running `020_run_dda.sh`.
+4. Run the EDGELESS DDA sidecar by running `020_run_dda.sh`.
 5. In case you get the following error `./020_run_dda.sh: line 10: dda: command not found`, this is because `dda` is installed but it is not accessible in the current environment path. To solve this, run `export PATH=$PATH:$(go env GOPATH)/bin`.
 6. If you still get the same error, the `dda` resource has been installed elsewhere. Add that location to the `PATH` variable in environment.
 
@@ -65,13 +65,13 @@ You are now ready to deploy workflows and functions via the EDGELESS cli.
 ### Demo Flow
 
 1. The Demo consists of:
-   - two mock services - a. a mock temperature service, which continously issues temperature data via its DDA using the event pattern, and b. a mock robot arm, which can be moved based on action commands received via its DDA.
-   - an EDGELESS workflow, consisting of a DDA resources and two functions a. a check temperature function which checks if a temeprature is in a certain range, and b. a function which generates a movement command based on the data received from the check temperature function.
+   - two mock services - a. a mock temperature service, which continuously issues temperature data via its DDA using the event pattern, and b. a mock robot arm, which can be moved based on action commands received via its DDA.
+   - an EDGELESS workflow, consisting of a DDA resources and two functions a. a check temperature function which checks if a temperature is in a certain range, and b. a function which generates a movement command based on the data received from the check temperature function.
 1. The DDA subscribes to temperature events according its configuration in the workflow.
 1. As soon as a temperature event is received by the DDA, it issues a cast event to the check temperature function according its internal mapping of topics to casts on the dataplane.
 1. The check temperature function process the data of the event, and depending on the result a cast to the move arm function is issued on the dataplane with a corresponding parameter.
 1. The move arm function processes the event and the data, and calculates a command for the robot arm. The command is issued as Action pattern via the DDA resource.
-1. The mock robot arm receives the event via the DDA, moves the arm according the command up or down and ackknowlegdes the Action pattern via the DDA back to the move arm function.
+1. The mock robot arm receives the event via the DDA, moves the arm according the command up or down and acknowledges the Action pattern via the DDA back to the move arm function.
 
 ### Run the mock services
 
@@ -85,8 +85,8 @@ The two mock services use each use a DDA by means of an integrated DDA library t
 
 In the `dda_demo/functions` folder you can find two previously described EDGELESS functions necessary for the workflow:
 
-1. `check_temperature` - Check temperature functions waits for temperature events from DDA resource. When it receives a temperature, it checks it against a predefined range. If the temperature is higher than the threshold of 60 or lower than 40, it invokes the `move_arm` function, and sends the differnence to the range as additional parameter.
-2. `move_arm` - The move arm function is triggered as an action in response to the temperature anomaly identified in `check_temperature` function. The function calcalutes a control parameter (10% of the temperature difference) and uses this to invoke  the `mock_robot_arm` external mock services via the DDA as action command.
+1. `check_temperature` - Check temperature functions waits for temperature events from DDA resource. When it receives a temperature, it checks it against a predefined range. If the temperature is higher than the threshold of 60 or lower than 40, it invokes the `move_arm` function, and sends the difference to the range as additional parameter.
+2. `move_arm` - The move arm function is triggered as an action in response to the temperature anomaly identified in `check_temperature` function. The function calculates a control parameter (10% of the temperature difference) and uses this to invoke  the `mock_robot_arm` external mock services via the DDA as action command.
 
 The functions can be build by calling `./060_build_demo_functions.sh` both for the check temperature function and the move_arm function. 
 
@@ -98,7 +98,7 @@ Now that we have all the dependencies up and running, let's run the demo.
 
 You should see in
 
-1. `edgless node` console (the one where `./032_run_edgeless_node.sh` is running) ![image info](./docs/images/edgeless_node.png)
+1. `edgeless node` console (the one where `./032_run_edgeless_node.sh` is running) ![image info](./docs/images/edgeless_node.png)
 2. `mock_temperature_sensor` console (the one where `./050_run_mock_sensor.sh` is running) ![image info](./docs/images/mock_sensor.png)
 3. `mock_robot_arm` console (the one where `./040_run_mock_actor.sh` is running) ![image info](./docs/images/mock_actor.png)
 
@@ -106,7 +106,7 @@ You should see in
 
 The configuration of a `dda resource` in edgeless is done in the corresponding`workflow.json`. Inside the `workflow.json`, configuration for dda topics to be subscribed and dda publications to be performed are passed in form of a JSON string.
 
-This can be done by modifying the two dollowing fields that need to be updated to be used in other settings.
+This can be done by modifying the two following fields that need to be updated to be used in other settings.
 
 1. `dda_com_subscription_mapping`: The subscription array is an array of json objects that define which topics to subscribe to and what to do when an event is encountered. It contains following fields
    1. `ddatopic`: This is the topic name to which DDA should subscribe to.
@@ -116,7 +116,7 @@ This can be done by modifying the two dollowing fields that need to be updated t
    1. `pubid`: Defined which dataplane messages should the dda resource be listening for.
    2. `ddatopic`: Defines which ddatopic the cast/call should be mapped to. In the current implementation, it only performs `publish action` pattern. In future, it will be extended to other patterns as well.
 
-Please be advised that currently the local store features, and the state synchronisation via RAFT as further core features of the DDA are not yet implemented. These features will be made availble in future.
+Please be advised that currently the local store features, and the state synchronization via RAFT as further core features of the DDA are not yet implemented. These features will be made available in future.
 
 ## License
 

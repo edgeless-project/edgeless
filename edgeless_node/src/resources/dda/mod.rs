@@ -80,7 +80,8 @@ impl DDAResource {
         let dda_sub_array = match dcs {
             Ok(dda_array) => dda_array,
             Err(err) => {
-                eprintln!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
+                log::error!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
+                //eprintln!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
                 process::exit(1);
             }
         };
@@ -90,7 +91,8 @@ impl DDAResource {
         let dda_pub_array = match dcp {
             Ok(dda_array) => dda_array,
             Err(err) => {
-                eprintln!("Error parsing input dda_com_publication_mapping JSON: {}", err);
+                log::error!("Error parsing input dda_com_publication_mapping JSON: {}", err);
+                //eprintln!("Error parsing input dda_com_publication_mapping JSON: {}", err);
                 process::exit(1);
             }
         };
