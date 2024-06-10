@@ -506,8 +506,10 @@ async fn main() -> anyhow::Result<()> {
                 Event::WfNew(_) => {
                     // do not schedule any more workflows after the warm-up period is finished
                     // for IncrAndKeep arrival model
-                    if now >= to_microseconds(args.warmup) {
-                        continue;
+                    if let ArrivalModel::IncrAndKeep = arrival_model {
+                        if now >= to_microseconds(args.warmup) {
+                            continue;
+                        }
                     }
 
                     wf_requested += 1;
