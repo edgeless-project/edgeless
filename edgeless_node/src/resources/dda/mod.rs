@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 use edgeless_api::{function_instance::InstanceId, resource_configuration::ResourceConfigurationAPI};
-use edgeless_dataplane::handle::DataplaneProvider;
 use serde::Deserialize;
 use serde_json::Error;
-use std::{collections::HashMap, process, str::from_utf8, sync::Arc};
+use std::{collections::HashMap, str::from_utf8, sync::Arc};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -23,7 +22,7 @@ pub struct DDAResourceProvider {
 }
 
 impl DDAResourceProvider {
-    pub async fn new(dataplane_provider: DataplaneProvider, resource_provider_id: InstanceId) -> Self {
+    pub async fn new(dataplane_provider: edgeless_dataplane::handle::DataplaneProvider, resource_provider_id: InstanceId) -> Self {
         Self {
             inner: Arc::new(Mutex::new(DDAResourceProviderInner {
                 resource_provider_id,
