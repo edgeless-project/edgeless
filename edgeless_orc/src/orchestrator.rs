@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use edgeless_api::function_instance::{ComponentId, InstanceId};
+use serde::ser::{Serialize, SerializeTupleVariant, Serializer};
 
 use futures::{Future, SinkExt, StreamExt};
 use rand::seq::SliceRandom;
@@ -158,6 +159,7 @@ enum OrchestratorRequest {
     KEEPALIVE(),
 }
 
+#[derive(serde::Serialize)]
 pub struct ResourceProvider {
     pub class_type: String,
     pub node_id: edgeless_api::function_instance::NodeId,
@@ -165,7 +167,7 @@ pub struct ResourceProvider {
 }
 
 #[derive(Clone)]
-enum ActiveInstance {
+pub enum ActiveInstance {
     // 0: request
     // 1: [ (node_id, int_fid) ]
     Function(edgeless_api::function_instance::SpawnFunctionRequest, Vec<InstanceId>),
@@ -173,6 +175,28 @@ enum ActiveInstance {
     // 0: request
     // 1: (node_id, int_fid)
     Resource(edgeless_api::resource_configuration::ResourceInstanceSpecification, InstanceId),
+}
+
+impl Serialize for ActiveInstance {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            ActiveInstance::Function(ref req, ref ids) => {
+                let mut tv = serializer.serialize_tuple_variant("ActiveInstance", 0, "Function", 2)?;
+                tv.serialize_field(req)?;
+                tv.serialize_field::<Vec<String>>(ids.iter().map(|x| x.to_string()).collect::<Vec<String>>().as_ref())?;
+                tv.end()
+            }
+            ActiveInstance::Resource(ref req, ref id) => {
+                let mut tv = serializer.serialize_tuple_variant("ActiveInstance", 1, "Resource", 2)?;
+                tv.serialize_field(req)?;
+                tv.serialize_field(id.to_string().as_str())?;
+                tv.end()
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for ActiveInstance {
@@ -335,12 +359,12 @@ impl Orchestrator {
 
     async fn apply_patches(
         active_instances: &std::collections::HashMap<ComponentId, ActiveInstance>,
-        active_patches: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
+        dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
         clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
         origin_ext_fids: Vec<ComponentId>,
     ) {
         for origin_ext_fid in origin_ext_fids.iter() {
-            let ext_output_mapping = match active_patches.get(origin_ext_fid) {
+            let ext_output_mapping = match dependency_graph.get(origin_ext_fid) {
                 Some(x) => x,
                 None => continue,
             };
@@ -581,11 +605,11 @@ impl Orchestrator {
     /// this function will return all the ingress vertices of the vertex
     /// identified by `ext_fid`.
     fn dependencies(
-        active_patches: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
+        dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
         ext_fid: &uuid::Uuid,
     ) -> Vec<uuid::Uuid> {
         let mut dependencies = vec![];
-        for (origin_ext_fid, output_mapping) in active_patches.iter() {
+        for (origin_ext_fid, output_mapping) in dependency_graph.iter() {
             for (_output, target_ext_fid) in output_mapping.iter() {
                 if target_ext_fid == ext_fid {
                     dependencies.push(origin_ext_fid.clone());
@@ -634,18 +658,20 @@ impl Orchestrator {
                 resource_provider.outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
             );
         }
+        let mut resource_providers_changed = false;
 
         // instances that the orchestrator promises to keep active
         // key: ext_fid
         let mut active_instances = std::collections::HashMap::new();
+        let mut active_instances_changed = false;
 
         // active patches to which the orchestrator commits
         // key:   ext_fid (origin function)
         // value: map of:
         //        key:   channel output name
         //        value: ext_fid (target function)
-        let mut active_patches: std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>> =
-            std::collections::HashMap::new();
+        let mut dependency_graph = std::collections::HashMap::new();
+        let mut dependency_graph_changed = false;
 
         // main orchestration loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
@@ -664,6 +690,8 @@ impl Orchestrator {
                     if let Err(err) = reply_channel.send(res) {
                         log::error!("Orchestrator channel error in SPAWN: {:?}", err);
                     }
+
+                    active_instances_changed = true;
                 }
                 OrchestratorRequest::STOPFUNCTION(ext_fid) => {
                     log::debug!("Orchestrator StopFunction {:?}", ext_fid);
@@ -706,17 +734,20 @@ impl Orchestrator {
                             };
                             Self::apply_patches(
                                 &mut active_instances,
-                                &active_patches,
+                                &dependency_graph,
                                 &mut nodes,
-                                Self::dependencies(&active_patches, &ext_fid),
+                                Self::dependencies(&dependency_graph, &ext_fid),
                             )
                             .await;
-                            active_patches.remove(&ext_fid);
+                            dependency_graph.remove(&ext_fid);
+                            dependency_graph_changed = true;
                         }
                         None => {
                             log::error!("Request to stop a function that is not known: ext_fid {}", ext_fid);
                         }
                     }
+
+                    active_instances_changed = true;
                 }
                 OrchestratorRequest::STARTRESOURCE(start_req, reply_channel) => {
                     log::debug!("Orchestrator StartResource {:?}", &start_req);
@@ -742,6 +773,8 @@ impl Orchestrator {
                     if let Err(err) = reply_channel.send(res) {
                         log::error!("Orchestrator channel error in STARTRESOURCE: {:?}", err);
                     }
+
+                    active_instances_changed = true;
                 }
                 OrchestratorRequest::STOPRESOURCE(ext_fid) => {
                     log::debug!("Orchestrator StopResource {:?}", ext_fid);
@@ -779,17 +812,20 @@ impl Orchestrator {
                             }
                             Self::apply_patches(
                                 &mut active_instances,
-                                &active_patches,
+                                &dependency_graph,
                                 &mut nodes,
-                                Self::dependencies(&active_patches, &ext_fid),
+                                Self::dependencies(&dependency_graph, &ext_fid),
                             )
                             .await;
-                            active_patches.remove(&ext_fid);
+                            dependency_graph.remove(&ext_fid);
+                            dependency_graph_changed = true;
                         }
                         None => {
                             log::error!("Request to stop a resource that is not known: ext_fid {}", ext_fid);
                         }
                     }
+
+                    active_instances_changed = true;
                 }
                 OrchestratorRequest::PATCH(update) => {
                     log::debug!("Orchestrator Patch {:?}", update);
@@ -806,10 +842,11 @@ impl Orchestrator {
                     // Save the patch request into an internal data structure,
                     // keeping track only of the ext_fid for both origin
                     // and target (logical) functions.
-                    active_patches.insert(origin_ext_fid, output_mapping);
+                    dependency_graph.insert(origin_ext_fid, output_mapping);
+                    dependency_graph_changed = true;
 
                     // Apply the patch.
-                    Self::apply_patches(&active_instances, &active_patches, &mut nodes, vec![origin_ext_fid]).await;
+                    Self::apply_patches(&active_instances, &dependency_graph, &mut nodes, vec![origin_ext_fid]).await;
                 }
                 OrchestratorRequest::UPDATENODE(request, reply_channel) => {
                     // Update the map of clients and, at the same time, prepare
@@ -858,6 +895,7 @@ impl Orchestrator {
                                                 outputs: resource.outputs.clone(),
                                             },
                                         );
+                                        resource_providers_changed = true;
                                     }
                                 }
 
@@ -975,6 +1013,7 @@ impl Orchestrator {
                     resource_providers.retain(|_k, v| {
                         if to_be_disconnected.contains(&v.node_id) {
                             log::info!("removed resource from disconnected node: {}", v);
+                            resource_providers_changed = true;
                             false
                         } else {
                             true
@@ -1070,7 +1109,7 @@ impl Orchestrator {
 
                     // Also schedule to repatch all the functions that
                     // depend on the functions/resources modified.
-                    for (origin_ext_fid, output_mapping) in active_patches.iter() {
+                    for (origin_ext_fid, output_mapping) in dependency_graph.iter() {
                         for (_output, target_ext_fid) in output_mapping.iter() {
                             if active_instances_to_be_updated.contains(target_ext_fid)
                                 || fun_to_be_created.contains_key(target_ext_fid)
@@ -1087,10 +1126,13 @@ impl Orchestrator {
                     for ext_fid in active_instances_to_be_updated.iter() {
                         match active_instances.get_mut(ext_fid) {
                             None => panic!("ext_fid {} just disappeared", ext_fid),
-                            Some(active_instance) => match active_instance {
-                                ActiveInstance::Resource(_, _) => panic!("expecting a function, found a resource for ext_fid {}", ext_fid),
-                                ActiveInstance::Function(_, instances) => instances.retain(|x| !to_be_disconnected.contains(&x.node_id)),
-                            },
+                            Some(active_instance) => {
+                                active_instances_changed = true;
+                                match active_instance {
+                                    ActiveInstance::Resource(_, _) => panic!("expecting a function, found a resource for ext_fid {}", ext_fid),
+                                    ActiveInstance::Function(_, instances) => instances.retain(|x| !to_be_disconnected.contains(&x.node_id)),
+                                }
+                            }
                         }
                     }
 
@@ -1111,6 +1153,7 @@ impl Orchestrator {
                                 }
                             }
                         }
+                        active_instances_changed = true;
                     }
 
                     // Create the resources that went missing.
@@ -1132,10 +1175,25 @@ impl Orchestrator {
                                 }
                             }
                         }
+                        active_instances_changed = true;
                     }
 
                     // Repatch everything that needs to be repatched.
-                    Self::apply_patches(&mut active_instances, &active_patches, &mut nodes, to_be_repatched).await;
+                    Self::apply_patches(&mut active_instances, &dependency_graph, &mut nodes, to_be_repatched).await;
+
+                    // Update the proxy, if necessary.
+                    if resource_providers_changed {
+                        proxy.update_resource_providers(&resource_providers);
+                        resource_providers_changed = false;
+                    }
+                    if active_instances_changed {
+                        proxy.update_active_instances(&active_instances);
+                        active_instances_changed = false;
+                    }
+                    if dependency_graph_changed {
+                        proxy.update_dependency_graph(&dependency_graph);
+                        dependency_graph_changed = false;
+                    }
                 }
             }
         }
