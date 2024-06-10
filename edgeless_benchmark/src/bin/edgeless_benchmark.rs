@@ -144,17 +144,6 @@ enum WorkflowType {
     VectorMulChain(u32, u32, u32, u32, String),
 }
 
-impl WorkflowType {
-    fn metrics_collector(&self) -> bool {
-        match self {
-            Self::None => true,
-            Self::Single(_, _) => false,
-            Self::MatrixMulChain(_, _, _, _, _, _) => true,
-            Self::VectorMulChain(_, _, _, _, _) => true,
-        }
-    }
-}
-
 fn workflow_type(wf_type: &str) -> anyhow::Result<WorkflowType> {
     let tokens: Vec<&str> = wf_type.split(';').collect();
     if !tokens.is_empty() && tokens[0] == "none" {
@@ -449,23 +438,6 @@ async fn main() -> anyhow::Result<()> {
     if redis_client.is_ok() {
         log::info!("connected to Redis at {}", &args.redis_url);
     }
-    if wf_type.metrics_collector() {
-        let _ = tokio::spawn(async move {
-            edgeless_benchmark::edgeless_metrics_collector_node_main(edgeless_node::EdgelessNodeGeneralSettings {
-                node_id: uuid::Uuid::new_v4(),
-                agent_url: format!("http://{}:7121/", args.bind_address),
-                agent_url_announced: "".to_string(),
-                invocation_url: format!("http://{}:7102/", args.bind_address),
-                invocation_url_announced: "".to_string(),
-                metrics_url: format!("http://{}:7103/", args.bind_address),
-                orchestrator_url: args.orchestrator_url,
-            })
-            .await
-        });
-        if let Err(err) = &redis_client {
-            log::warn!("could not connect to Redis at {}: {}", &args.redis_url, err);
-        }
-    }
 
     // Create an e-ORC client
     let mut client_interface = ClientInterface::new(&args.controller_url, &args.redis_url, wf_type).await;
@@ -557,7 +529,7 @@ async fn main() -> anyhow::Result<()> {
                 }
                 Event::WfWarmUpEnd(_) => {
                     if let Ok(client) = &mut redis_client {
-                        let _ = client.flushdb();
+                        let _ = client.clean_metrics();
                     }
                 }
             }

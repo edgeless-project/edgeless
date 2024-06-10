@@ -27,8 +27,14 @@ impl RedisDumper {
         }
     }
 
-    pub fn flushdb(&mut self) -> redis::RedisResult<()> {
-        let _ = redis::cmd("FLUSHDB").query(&mut self.connection)?;
+    /// Remove all the metrics regarding function and workflow.
+    pub fn clean_metrics(&mut self) -> redis::RedisResult<()> {
+        let patterns = vec!["function", "worflow"];
+        for pattern in patterns {
+            for key in self.connection.keys::<&str, Vec<String>>(format!("{}:*", pattern).as_str())? {
+                let _ = self.connection.del::<&str, usize>(&key);
+            }
+        }
         Ok(())
     }
 
