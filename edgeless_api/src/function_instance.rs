@@ -1,9 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-pub use edgeless_api_core::instance_id::*;
 
-use crate::common::PatchRequest;
+pub use edgeless_api_core::instance_id::*;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum StatePolicy {
@@ -32,11 +31,14 @@ pub struct FunctionClassSpecification {
     pub function_class_outputs: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct SpawnFunctionRequest {
+    #[serde(skip_serializing)]
     pub instance_id: Option<InstanceId>,
+    #[serde(skip_serializing)]
     pub code: FunctionClassSpecification,
     pub annotations: std::collections::HashMap<String, String>,
+    #[serde(skip_serializing)]
     pub state_specification: StateSpecification,
 }
 
@@ -44,7 +46,7 @@ pub struct SpawnFunctionRequest {
 pub trait FunctionInstanceAPI<FunctionIdType: Clone>: FunctionInstanceAPIClone<FunctionIdType> + Sync + Send {
     async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse<FunctionIdType>>;
     async fn stop(&mut self, id: FunctionIdType) -> anyhow::Result<()>;
-    async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()>;
+    async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()>;
 }
 
 // https://stackoverflow.com/a/30353928
