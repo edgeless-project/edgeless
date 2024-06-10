@@ -81,8 +81,10 @@ impl DDAResource {
             Ok(dda_array) => dda_array,
             Err(err) => {
                 log::error!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
+                panic!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
                 //eprintln!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
-                process::exit(1);
+                //ToDo: After discussion clarify if process exit is the right way to react..
+                //process::exit(1);
             }
         };
 
@@ -92,8 +94,9 @@ impl DDAResource {
             Ok(dda_array) => dda_array,
             Err(err) => {
                 log::error!("Error parsing input dda_com_publication_mapping JSON: {}", err);
+                panic!("Error parsing input dda_com_publication_mapping JSON: {}", err);
                 //eprintln!("Error parsing input dda_com_publication_mapping JSON: {}", err);
-                process::exit(1);
+                //process::exit(1);
             }
         };
 
