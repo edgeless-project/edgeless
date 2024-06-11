@@ -48,6 +48,10 @@ mod tests {
                     proxy_type: "None".to_string(),
                     redis_url: None,
                 },
+                collector: edgeless_orc::EdgelessOrcCollectorSettings {
+                    collector_type: "None".to_string(),
+                    redis_url: None,
+                },
             }));
             tokio::spawn(task);
             handles.push(handle);
