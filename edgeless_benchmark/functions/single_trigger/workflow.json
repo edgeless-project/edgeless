@@ -6,18 +6,16 @@
                 "id": "vector_mul",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./vector_mul.wasm",
+                "code": "single_trigger.wasm",
                 "outputs": [
-                    "metric",
                     "out"
                 ]
             },
             "output_mapping": {
-                "metric": "metrics-collector",
-                "out": "client"
+                "out": "metrics-collector"
             },
             "annotations": {
-                "init-payload": "seed=42,is_client=true,input_size=10000"
+                "init-payload": "reset:0"
             }
         }
     ],
@@ -26,10 +24,7 @@
             "name": "metrics-collector",
             "class_type": "metrics-collector",
             "output_mapping": {},
-            "configurations": {
-                "alpha": "0.9",
-                "wf_name": "wf_single"
-            }
+            "configurations": {}
         }
     ],
     "annotations": {}
