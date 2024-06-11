@@ -17,6 +17,7 @@ pub struct EdgelessOrcSettings {
     pub general: EdgelessOrcGeneralSettings,
     pub baseline: EdgelessOrcBaselineSettings,
     pub proxy: EdgelessOrcProxySettings,
+    pub collector: EdgelessOrcCollectorSettings,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -46,6 +47,15 @@ pub struct EdgelessOrcProxySettings {
     /// of the orchestrator and to receive orchestration directives.
     pub proxy_type: String,
     /// If proxy_type is "Redis" then this is the URL of the Redis server.
+    pub redis_url: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct EdgelessOrcCollectorSettings {
+    /// Type of the metrics collector that is used to store run-time
+    /// measurements from function instances.
+    pub collector_type: String,
+    /// If collector_type is "Redis" then this is the URL of the Redis server.
     pub redis_url: Option<String>,
 }
 
@@ -80,22 +90,49 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     let data_plane = edgeless_dataplane::handle::DataplaneProvider::new(node_id.clone(), settings.general.invocation_url.clone()).await;
 
     // Create the metrics collector resource.
-    let resource_provider_specifications = vec![edgeless_api::node_registration::ResourceProviderSpecification {
-        provider_id: "metrics-collector".to_string(),
-        class_type: "metrics-collector".to_string(),
-        outputs: vec![],
-    }];
+    let mut resource_provider_specifications = vec![];
     let mut resources: std::collections::HashMap<
         String,
         Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
     > = std::collections::HashMap::new();
-    resources.insert(
-        "metrics-collector".to_string(),
-        Box::new(
-            metrics_collector::MetricsCollectorResourceProvider::new(data_plane.clone(), edgeless_api::function_instance::InstanceId::new(node_id))
-                .await,
-        ),
-    );
+
+    match settings.collector.collector_type.to_lowercase().as_str() {
+        "redis" => match settings.collector.redis_url {
+            Some(redis_url) => {
+                match redis::Client::open(redis_url.clone()) {
+                    Ok(client) => match client.get_connection() {
+                        Ok(redis_connection) => {
+                            resource_provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                                provider_id: "metrics-collector".to_string(),
+                                class_type: "metrics-collector".to_string(),
+                                outputs: vec![],
+                            });
+                            resources.insert(
+                                "metrics-collector".to_string(),
+                                Box::new(
+                                    metrics_collector::MetricsCollectorResourceProvider::new(
+                                        data_plane.clone(),
+                                        edgeless_api::function_instance::InstanceId::new(node_id),
+                                        redis_connection,
+                                    )
+                                    .await,
+                                ),
+                            );
+                            log::info!("metrics collector connected to Redis at {}", redis_url);
+                        }
+                        Err(err) => log::error!("error when connecting to Redis at {}: {}", redis_url, err),
+                    },
+                    Err(err) => log::error!("error when creating a Redis client at {}: {}", redis_url, err),
+                };
+            }
+            None => {
+                log::warn!("redis_url not specified for a Redis metrics collector");
+            }
+        },
+        _ => {
+            log::info!("no metrics collector is used");
+        }
+    }
 
     // Create the agent of the node embedded in the orchestrator.
     let (mut agent, agent_task) = edgeless_node::agent::Agent::new(std::collections::HashMap::new(), resources, node_id, data_plane.clone());
@@ -155,6 +192,10 @@ keep_alive_interval_secs = 2
 
 [proxy]
 proxy_type = "None"
+redis_url = ""
+
+[collector]
+collector_type = "None"
 redis_url = ""
 "##,
     )
