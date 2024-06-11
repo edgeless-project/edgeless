@@ -17,7 +17,7 @@ pub fn es_create_client() -> Result<Elasticsearch, Box<dyn std::error::Error>> {
     //define ES endpoint configs
 
     let url = Url::parse("elastic_endpoint_url")?; //contant Panagiotis Antoniou(Aegis) for details
-    let credentials = Credentials::Basic("username".into(), "password".into()); //contact Panagiotis Antoniou(Aegis)) for details
+    let credentials = Credentials::Basic("username".into(), "password".into()); //contact Panagiotis Antoniou(Aegis) for details
     let conn_pool = SingleNodeConnectionPool::new(url);
     let transport = TransportBuilder::new(conn_pool).auth(credentials).build()?;
 
