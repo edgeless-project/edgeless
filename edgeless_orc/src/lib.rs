@@ -32,6 +32,10 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     let (mut orchestrator, orchestrator_task) = orchestrator::Orchestrator::new(settings.clone()).await;
 
     let orchestrator_server = edgeless_api::grpc_impl::orc::OrchestratorAPIServer::run(orchestrator.get_api_client(), settings.orchestrator_url);
+    let orchestrator_coap_server = edgeless_api::coap_impl::orchestration::CoapOrchestrationServer::run(
+        orchestrator.get_api_client().node_registration_api(),
+        std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), 7051),
+    );
 
     if settings.keep_alive_interval_secs == 0 {
         log::info!("node keep-alive disabled");
@@ -46,7 +50,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
         });
     }
 
-    join!(orchestrator_task, orchestrator_server);
+    join!(orchestrator_task, orchestrator_server, orchestrator_coap_server);
 }
 
 pub fn edgeless_orc_default_conf() -> String {

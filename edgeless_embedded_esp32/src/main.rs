@@ -15,6 +15,7 @@ pub mod epaper_display_impl;
 #[cfg(feature = "scd30")]
 pub mod scd30_sensor_impl;
 
+use edgeless_embedded::agent::EmbeddedAgent;
 use esp_backtrace as _;
 use hal::prelude::*;
 
@@ -126,7 +127,7 @@ fn main() -> ! {
         );
 
         let mut i2c_delay = hal::delay::Delay::new(&clocks);
-        i2c_delay.delay_ms(2000u32);
+        i2c_delay.delay_ms(5000u32);
 
         let scd = sensor_scd30::Scd30::new(i2c, i2c_delay).unwrap();
 
@@ -152,6 +153,16 @@ fn main() -> ! {
 
     #[allow(unreachable_code)]
     loop {}
+}
+
+#[embassy_executor::task]
+async fn registration(agent: EmbeddedAgent) {
+    let mut agent = agent;
+    let mut delay = embassy_time::Delay {};
+    loop {
+        delay.delay_ms(2000);
+        agent.register().await;
+    }
 }
 
 #[embassy_executor::task]
@@ -189,11 +200,13 @@ async fn edgeless(
 
     let resources = static_cell::make_static!([display, sensor_scd30]);
 
-    let resource_registry = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), resources).await;
+    let resource_registry = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), resources, "coap://192.168.2.60").await;
 
     spawner.spawn(edgeless_embedded::coap::coap_task(
         sock,
         resource_registry.upstream_receiver().unwrap(),
         resource_registry.clone(),
     ));
+
+    spawner.spawn(registration(resource_registry.clone()));
 }

@@ -20,20 +20,18 @@ impl EPaperDisplay {
     ) -> Result<EPaperDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
         if data.class_type == "epaper-display-1" {
             let mut config: Option<[u8; 128]> = None;
-            for configuration_item in data.configuration {
-                if let Some((key, val)) = configuration_item {
-                    if key == "header_text" {
-                        let mut header_data: [u8; 128] = [0; 128];
-                        let mut i: usize = 0;
-                        for b in val.bytes() {
-                            header_data[i] = b;
-                            i = i + 1;
-                            if i == 128 {
-                                break;
-                            }
+            for (key, val) in data.configuration {
+                if key == "header_text" {
+                    let mut header_data: [u8; 128] = [0; 128];
+                    let mut i: usize = 0;
+                    for b in val.bytes() {
+                        header_data[i] = b;
+                        i = i + 1;
+                        if i == 128 {
+                            break;
                         }
-                        config = Some(header_data);
                     }
+                    config = Some(header_data);
                 }
             }
 
@@ -50,6 +48,14 @@ impl EPaperDisplay {
 impl crate::resource::Resource for EPaperDisplay {
     fn provider_id(&self) -> &'static str {
         return "epaper-display-1";
+    }
+
+    fn resource_class(&self) -> &'static str {
+        return "epaper-display";
+    }
+
+    fn outputs(&self) -> &'static [&'static str] {
+        return &[];
     }
 
     async fn has_instance(&self, id: &edgeless_api_core::instance_id::InstanceId) -> bool {
@@ -129,5 +135,12 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
         }
 
         Ok(self.instance_id.unwrap())
+    }
+
+    async fn patch(
+        &mut self,
+        resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+        Ok(())
     }
 }
