@@ -86,10 +86,31 @@ impl OrchestrationLogic {
         };
     }
 
+    /// Filter only the nodes on which the given function can be deployed.
+    pub fn feasible_nodes(&self, spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest, nodes: &Vec<uuid::Uuid>) -> Vec<uuid::Uuid> {
+        let mut candidates = vec![];
+
+        for candidate in nodes {
+            if let Some(ndx) = self.nodes.iter().position(|&x| x == *candidate) {
+                if OrchestrationLogic::is_node_feasible(
+                    &spawn_req.code.function_class_type,
+                    &crate::orchestrator::DeploymentRequirements::from_annotations(&spawn_req.annotations),
+                    &self.nodes[ndx],
+                    &self.capabilities[ndx],
+                    &self.resource_providers[ndx],
+                ) {
+                    candidates.push(self.nodes[ndx].clone());
+                }
+            }
+        }
+
+        candidates
+    }
+
     /// Return true if it is possible to assign a function requesting a given
     /// run-time and with given deployment requirements to a node with
     /// given UUID and capabilities.
-    pub fn node_feasible(
+    pub fn is_node_feasible(
         runtime: &str,
         reqs: &crate::orchestrator::DeploymentRequirements,
         node_id: &uuid::Uuid,
@@ -146,7 +167,7 @@ impl OrchestrationLogic {
                 let mut candidates = vec![];
                 let mut high: f32 = 0.0;
                 for i in 0..self.nodes.len() {
-                    if Self::node_feasible(
+                    if Self::is_node_feasible(
                         &spawn_req.code.function_class_type,
                         &reqs,
                         &self.nodes[i],
@@ -180,7 +201,7 @@ impl OrchestrationLogic {
                     let cand_ndx = self.round_robin_current_index;
                     self.round_robin_current_index += 1;
 
-                    if Self::node_feasible(
+                    if Self::is_node_feasible(
                         &spawn_req.code.function_class_type,
                         &reqs,
                         &self.nodes[cand_ndx],
