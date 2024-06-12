@@ -85,6 +85,125 @@ impl COAPEncoder {
         ((data, endpoint), tail)
     }
 
+    pub fn encode_patch_request<'a, Endpoint>(
+        endpoint: Endpoint,
+        patch_request: crate::resource_configuration::EncodedPatchRequest,
+        token: u8,
+        out_buf: &'a mut [u8],
+    ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
+        req.set_method(coap_lite::RequestType::Post);
+        req.set_path("resources/patch");
+        req.message.set_token(vec![token]);
+        let mut buffer = [0 as u8; 1024];
+        minicbor::encode(&patch_request, &mut buffer[..]).unwrap();
+        let len = minicbor::len(&patch_request);
+        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
+        req.message.payload = data2;
+        let out = req.message.to_bytes().unwrap();
+        let (data, tail) = out_buf.split_at_mut(out.len());
+        data.clone_from_slice(&out);
+        ((data, endpoint), tail)
+    }
+
+    pub fn encode_node_registration<'a, Endpoint>(
+        endpoint: Endpoint,
+        node_registration: &crate::node_registration::EncodedNodeRegistration,
+        token: u8,
+        out_buf: &'a mut [u8],
+    ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
+        req.set_method(coap_lite::RequestType::Post);
+        req.set_path("registration/register");
+        req.message.set_token(vec![token]);
+        let mut buffer = [0 as u8; 2048];
+        minicbor::encode(&node_registration, &mut buffer[..]).unwrap();
+        let len = minicbor::len(&node_registration);
+        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
+        req.message.payload = data2;
+        let out = req.message.to_bytes().unwrap();
+        let (data, tail) = out_buf.split_at_mut(out.len());
+        data.clone_from_slice(&out);
+        ((data, endpoint), tail)
+    }
+
+    pub fn encode_node_deregistration<'a, Endpoint>(
+        endpoint: Endpoint,
+        node_id: crate::node_registration::NodeId,
+        token: u8,
+        out_buf: &'a mut [u8],
+    ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
+        req.set_method(coap_lite::RequestType::Post);
+        req.set_path("registration/deregister");
+        req.message.set_token(vec![token]);
+        let mut buffer = [0 as u8; 2048];
+        minicbor::encode(&node_id, &mut buffer[..]).unwrap();
+        let len = minicbor::len(&node_id);
+        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
+        req.message.payload = data2;
+        let out = req.message.to_bytes().unwrap();
+        let (data, tail) = out_buf.split_at_mut(out.len());
+        data.clone_from_slice(&out);
+        ((data, endpoint), tail)
+    }
+
+    pub fn encode_peer_add<'a, 'b, Endpoint>(
+        endpoint: Endpoint,
+        node_id: &'b crate::node_registration::NodeId,
+        node_ip: [u8; 4],
+        port: u16,
+        token: u8,
+        out_buf: &'a mut [u8],
+    ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
+        req.set_method(coap_lite::RequestType::Post);
+        req.set_path("peers/add");
+        req.message.set_token(vec![token]);
+        let mut buffer = [0 as u8; 2048];
+        minicbor::encode((node_id, node_ip, port), &mut buffer[..]).unwrap();
+        let len = minicbor::len((node_id, node_ip, port));
+        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
+        req.message.payload = data2;
+        let out = req.message.to_bytes().unwrap();
+        let (data, tail) = out_buf.split_at_mut(out.len());
+        data.clone_from_slice(&out);
+        ((data, endpoint), tail)
+    }
+
+    pub fn encode_peer_remove<'a, Endpoint>(
+        endpoint: Endpoint,
+        node_id: &crate::node_registration::NodeId,
+        token: u8,
+        out_buf: &'a mut [u8],
+    ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
+        req.set_method(coap_lite::RequestType::Post);
+        req.set_path("peers/remove");
+        req.message.set_token(vec![token]);
+        let mut buffer = [0 as u8; 2048];
+        minicbor::encode(node_id, &mut buffer[..]).unwrap();
+        let len = minicbor::len(node_id);
+        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
+        req.message.payload = data2;
+        let out = req.message.to_bytes().unwrap();
+        let (data, tail) = out_buf.split_at_mut(out.len());
+        data.clone_from_slice(&out);
+        ((data, endpoint), tail)
+    }
+
+    pub fn encode_keepalive<'a, Endpoint>(endpoint: Endpoint, token: u8, out_buf: &'a mut [u8]) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
+        req.set_method(coap_lite::RequestType::Post);
+        req.set_path("keepalive");
+        req.message.set_token(vec![token]);
+        req.message.payload = alloc::vec::Vec::new();
+        let out = req.message.to_bytes().unwrap();
+        let (data, tail) = out_buf.split_at_mut(out.len());
+        data.clone_from_slice(&out);
+        ((data, endpoint), tail)
+    }
+
     pub fn encode_response<'a, Endpoint>(
         endpoint: Endpoint,
         data: &[u8],
@@ -125,6 +244,12 @@ pub enum CoapMessage<'a> {
     Invocation(crate::invocation::Event<&'a [u8]>),
     ResourceStart(crate::resource_configuration::EncodedResourceInstanceSpecification<'a>),
     ResourceStop(crate::instance_id::InstanceId),
+    ResourcePatch(crate::resource_configuration::EncodedPatchRequest<'a>),
+    KeepAlive,
+    PeerAdd((crate::instance_id::NodeId, [u8; 4], u16)),
+    PeerRemove(crate::instance_id::NodeId),
+    NodeRegistration(crate::node_registration::EncodedNodeRegistration<'a>),
+    NodeDeregistration(crate::node_registration::NodeId),
     Response(&'a [u8], bool),
 }
 
@@ -182,6 +307,27 @@ impl CoapDecoder {
             "resources/stop" => {
                 let resource_id: crate::instance_id::InstanceId = minicbor::decode(body_ref).unwrap();
                 Ok((CoapMessage::ResourceStop(resource_id), packet.get_token()[0]))
+            }
+            "resources/patch" => {
+                let patch_request: crate::resource_configuration::EncodedPatchRequest = minicbor::decode(body_ref).unwrap();
+                Ok((CoapMessage::ResourcePatch(patch_request), packet.get_token()[0]))
+            }
+            "keepalive" => Ok((CoapMessage::KeepAlive, packet.get_token()[0])),
+            "peers/add" => {
+                let (node_id, addr, port): (crate::node_registration::NodeId, [u8; 4], u16) = minicbor::decode(body_ref).unwrap();
+                Ok((CoapMessage::PeerAdd((node_id.0, addr, port)), packet.get_token()[0]))
+            }
+            "peers/remove" => {
+                let node_id: crate::node_registration::NodeId = minicbor::decode(body_ref).unwrap();
+                Ok((CoapMessage::PeerRemove(node_id.0), packet.get_token()[0]))
+            }
+            "registration/register" => {
+                let registration: crate::node_registration::EncodedNodeRegistration = minicbor::decode(body_ref).unwrap();
+                Ok((CoapMessage::NodeRegistration(registration), packet.get_token()[0]))
+            }
+            "registration/deregister" => {
+                let resource_id: crate::node_registration::NodeId = minicbor::decode(body_ref).unwrap();
+                Ok((CoapMessage::NodeDeregistration(resource_id), packet.get_token()[0]))
             }
             _ => Err(()),
         }

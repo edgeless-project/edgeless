@@ -1061,16 +1061,28 @@ impl Orchestrator {
                                     invocation_url,
                                     capabilities
                                 );
+
+                                let (proto, host, port) = edgeless_api::util::parse_http_host(&agent_url).unwrap();
+                                let api: Box<dyn edgeless_api::agent::AgentAPI + Send> = match proto {
+                                    edgeless_api::util::Proto::COAP => {
+                                        let addr = std::net::SocketAddrV4::new(host.parse().unwrap(), port);
+                                        Box::new(edgeless_api::coap_impl::CoapClient::new(addr).await)
+                                    }
+                                    _ => Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&agent_url).await),
+                                };
+                                log::info!("got api");
+
                                 nodes.insert(
                                     node_id,
                                     ClientDesc {
                                         agent_url: agent_url.clone(),
                                         invocation_url: invocation_url.clone(),
-                                        api: Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&agent_url).await),
+                                        api: api,
                                         capabilities,
                                         health_status: edgeless_api::node_management::HealthStatus::invalid(),
                                     },
                                 );
+
                                 Some(edgeless_api::node_management::UpdatePeersRequest::Add(node_id, invocation_url))
                             }
                         }
@@ -1103,6 +1115,8 @@ impl Orchestrator {
                                 num_failures += 1;
                             }
                         }
+
+                        log::info!("updated peers");
 
                         // Only with registration, we also update the new node
                         // by adding as peers all the existing nodes.
@@ -1138,8 +1152,6 @@ impl Orchestrator {
                     }
                 }
                 OrchestratorRequest::KEEPALIVE() => {
-                    log::debug!("keep-alive");
-
                     // First check if there are nodes that must be disconnected
                     // because they failed to reply to a keep-alive.
                     let mut to_be_disconnected = std::collections::HashSet::new();
