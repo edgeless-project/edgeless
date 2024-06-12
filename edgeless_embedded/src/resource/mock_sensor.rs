@@ -8,7 +8,7 @@ pub struct MockSensorInner {
 }
 
 pub struct MockSensorConfiguration {
-    pub data_out_id: edgeless_api_core::instance_id::InstanceId,
+    pub data_out_id: Option<edgeless_api_core::instance_id::InstanceId>,
     pub delay_s: u8,
 }
 
@@ -29,34 +29,30 @@ impl MockSensor {
             });
         }
 
-        for output_callback in data.output_mapping {
-            if let Some((key, val)) = output_callback {
-                if key == "data_out" {
-                    out_id = Some(val);
-                    break;
-                }
+        for (key, val) in data.output_mapping {
+            if key == "data_out" {
+                out_id = Some(val);
+                break;
             }
         }
 
-        let out_id = match out_id {
-            Some(val) => val,
-            None => {
-                return Err(edgeless_api_core::common::ErrorResponse {
-                    summary: "Output Configuration Missing",
-                    detail: None,
-                })
-            }
-        };
+        // let out_id = match out_id {
+        //     Some(val) => val,
+        //     None => {
+        //         return Err(edgeless_api_core::common::ErrorResponse {
+        //             summary: "Output Configuration Missing",
+        //             detail: None,
+        //         })
+        //     }
+        // };
 
-        let mut delay: u8 = 10;
-        for configuration_option in data.configuration {
-            if let Some((key, val)) = configuration_option {
-                if key == "delay" {
-                    if let Ok(new_delay) = val.parse() {
-                        delay = new_delay;
-                    }
-                    break;
+        let mut delay: u8 = 1;
+        for (key, val) in data.configuration {
+            if key == "delay" {
+                if let Ok(new_delay) = val.parse() {
+                    delay = new_delay;
                 }
+                break;
             }
         }
 
@@ -79,6 +75,14 @@ impl MockSensor {
 impl crate::resource::Resource for MockSensor {
     fn provider_id(&self) -> &'static str {
         return "mock-scd30-sensor-1";
+    }
+
+    fn resource_class(&self) -> &'static str {
+        return "scd30-sensor";
+    }
+
+    fn outputs(&self) -> &'static [&'static str] {
+        return &["data_out"];
     }
 
     async fn has_instance(&self, instance_id: &edgeless_api_core::instance_id::InstanceId) -> bool {
@@ -145,7 +149,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
         let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone());
 
         lck.instance_id = Some(instance_id.clone());
-        lck.data_out_id = Some(instance_specification.data_out_id);
+        lck.data_out_id = instance_specification.data_out_id;
         lck.delay = instance_specification.delay_s;
         Ok(instance_id)
     }
@@ -165,6 +169,25 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
                 summary: "Wrong Resource InstanceId",
                 detail: None,
             });
+        }
+
+        Ok(())
+    }
+
+    async fn patch(
+        &mut self,
+        patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+        let tmp = self.inner.borrow_mut();
+        let mut lck = tmp.lock().await;
+
+        for output_callback in patch_req.output_mapping {
+            if let Some((key, val)) = output_callback {
+                if key == "data_out" {
+                    lck.data_out_id = Some(val);
+                    break;
+                }
+            }
         }
 
         Ok(())

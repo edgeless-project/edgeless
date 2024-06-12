@@ -177,7 +177,7 @@ impl DataplaneProvider {
 
         log::info!("coap port {}", port);
 
-        let _coap_server = tokio::spawn(edgeless_api::coap_impl::CoapInvocationServer::run(
+        let _coap_server = tokio::spawn(edgeless_api::coap_impl::invocation::CoapInvocationServer::run(
             clone_provider.lock().await.incomming_api().await,
             std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
         ));
