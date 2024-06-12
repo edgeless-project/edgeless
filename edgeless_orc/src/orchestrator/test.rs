@@ -128,14 +128,13 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 }
 
-async fn test_setup(
+fn test_create_clients_resources(
     num_nodes: u32,
     num_resources_per_node: u32,
 ) -> (
-    Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId>>,
-    Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId>>,
-    Box<dyn edgeless_api::node_registration::NodeRegistrationAPI>,
     std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>,
+    std::collections::HashMap<uuid::Uuid, ClientDesc>,
+    std::collections::HashMap<String, ResourceProvider>,
     uuid::Uuid,
 ) {
     assert!(num_nodes > 0);
@@ -179,6 +178,21 @@ async fn test_setup(
             );
         }
     }
+
+    (nodes, clients, resource_providers, stable_node_id)
+}
+
+async fn test_setup(
+    num_nodes: u32,
+    num_resources_per_node: u32,
+) -> (
+    Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId>>,
+    Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId>>,
+    Box<dyn edgeless_api::node_registration::NodeRegistrationAPI>,
+    std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>,
+    uuid::Uuid,
+) {
+    let (nodes, clients, resource_providers, stable_node_id) = test_create_clients_resources(num_nodes, num_resources_per_node);
 
     let (mut orchestrator, orchestrator_task) = Orchestrator::new_with_clients(
         crate::EdgelessOrcBaselineSettings {
@@ -1335,7 +1349,7 @@ fn test_deployment_requirements() {
 }
 
 #[test]
-fn test_node_feasible() {
+fn test_orchestration_logic_is_node_feasible() {
     let node_id = uuid::Uuid::new_v4();
     let mut reqs = DeploymentRequirements::none();
     let mut caps = edgeless_api::node_registration::NodeCapabilities::minimum();
@@ -1343,67 +1357,98 @@ fn test_node_feasible() {
     let mut runtime = "RUST_WASM".to_string();
 
     // Empty requirements
-    assert!(OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     // Match any node_id
     reqs.node_id_match_any.push(node_id.clone());
-    assert!(OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     reqs.node_id_match_any.push(uuid::Uuid::new_v4());
-    assert!(OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     reqs.node_id_match_any.clear();
     reqs.node_id_match_any.push(uuid::Uuid::new_v4());
-    assert!(!OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
     reqs.node_id_match_any.clear();
 
     // Match all labels
     reqs.label_match_all.push("red".to_string());
     caps.labels.push("green".to_string());
-    assert!(!OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     caps.labels.push("red".to_string());
-    assert!(OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     reqs.label_match_all.push("blue".to_string());
-    assert!(!OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     caps.labels.push("blue".to_string());
-    assert!(OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     // Match all providers
     reqs.resource_match_all.push("file-1".to_string());
-    assert!(!OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     providers.insert("file-1".to_string());
-    assert!(OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     providers.insert("file-2".to_string());
     providers.insert("file-3".to_string());
-    assert!(OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     reqs.resource_match_all.push("file-9".to_string());
-    assert!(!OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     providers.insert("file-9".to_string());
-    assert!(OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     // Match TEE and TPM
     reqs.tee = AffinityLevel::Required;
-    assert!(!OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
     caps.is_tee_running = true;
-    assert!(OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     reqs.tpm = AffinityLevel::Required;
-    assert!(!OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
     caps.has_tpm = true;
-    assert!(OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
 
     // Match runtime
     runtime = "CONTAINER".to_string();
-    assert!(!OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
     runtime = "".to_string();
-    assert!(!OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
     runtime = "RUST_WASM".to_string();
-    assert!(OrchestrationLogic::node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+}
+
+#[test]
+fn test_orchestration_feasible_nodes() {
+    let mut logic = OrchestrationLogic::new(crate::OrchestrationStrategy::Random);
+
+    // No nodes
+    let mut fun1_req = make_spawn_function_request("fun");
+
+    assert!(logic.feasible_nodes(&fun1_req, &vec![]).is_empty());
+    assert!(logic
+        .feasible_nodes(&fun1_req, &vec![uuid::Uuid::new_v4(), uuid::Uuid::new_v4(), uuid::Uuid::new_v4()])
+        .is_empty());
+
+    // Add nodes
+    let (_nodes, clients, resource_providers, _stable_node_id) = test_create_clients_resources(5, 0);
+    logic.update_nodes(&clients, &resource_providers);
+    let all_nodes = clients.keys().cloned().collect::<Vec<uuid::Uuid>>();
+    assert!(clients.len() == 5);
+
+    // No annotations, all nodes are good
+    assert_eq!(5, logic.feasible_nodes(&fun1_req, &all_nodes).len());
+
+    // Pin-point to a node.
+    fun1_req
+        .annotations
+        .insert("node_id_match_any".to_string(), all_nodes.first().unwrap().to_string());
+
+    // Wrong run-time
+    fun1_req.code.function_class_type = "non-existing-runtime".to_string();
+    assert!(logic.feasible_nodes(&fun1_req, &all_nodes).is_empty());
 }
