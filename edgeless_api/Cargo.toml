@@ -5,6 +5,7 @@ name = "edgeless_api"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
+rust-version = "1.78"
 
 [lib]
 name = "edgeless_api"
@@ -26,6 +27,8 @@ prost = {version = "0.11", optional = true}
 regex = "1.8"
 serde = {version = "1", features=["derive"]}
 minicbor =  {version = "0.19", default-features = false, features = ["derive"]}
+heapless = { version = "0.8" }
+
 
 [build-dependencies]
 tonic-build = {version = "0.9", optional = true}

@@ -7,6 +7,10 @@ pub trait ResourceConfigurationAPI {
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification,
     ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse>;
     async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse>;
+    async fn patch(
+        &mut self,
+        resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse>;
 }
 
 // https://rust-lang.github.io/async-fundamentals-initiative/evaluation/case-studies/builder-provider-api.html#dynamic-dispatch-behind-the-api
@@ -23,6 +27,10 @@ pub trait ResourceConfigurationAPIDyn {
         &mut self,
         resource_id: edgeless_api_core::instance_id::InstanceId,
     ) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>> + '_>>;
+    fn patch<'a>(
+        &'a mut self,
+        patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
+    ) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>> + 'a>>;
 }
 
 impl<T: ResourceConfigurationAPI> ResourceConfigurationAPIDyn for T {
@@ -41,5 +49,11 @@ impl<T: ResourceConfigurationAPI> ResourceConfigurationAPIDyn for T {
         resource_id: edgeless_api_core::instance_id::InstanceId,
     ) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>> + '_>> {
         alloc::boxed::Box::pin(<Self as ResourceConfigurationAPI>::stop(self, resource_id))
+    }
+    fn patch<'a>(
+        &'a mut self,
+        patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
+    ) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>> + 'a>> {
+        alloc::boxed::Box::pin(<Self as ResourceConfigurationAPI>::patch(self, patch_req))
     }
 }

@@ -34,6 +34,14 @@ impl crate::resource::Resource for MockDisplay {
         return "mock-display-1";
     }
 
+    fn resource_class(&self) -> &'static str {
+        return "epaper-display";
+    }
+
+    fn outputs(&self) -> &'static [&'static str] {
+        return &[];
+    }
+
     async fn has_instance(&self, id: &edgeless_api_core::instance_id::InstanceId) -> bool {
         if self.instance_id == Some(*id) {
             return true;
@@ -94,5 +102,12 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
         self.instance_id = Some(id);
 
         Ok(id)
+    }
+
+    async fn patch(
+        &mut self,
+        resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+        Ok(())
     }
 }
