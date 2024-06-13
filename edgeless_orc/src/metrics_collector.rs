@@ -101,8 +101,9 @@ impl Event {
 }
 
 enum RedisCommand {
+    // key, value, timestamp
+    Push(String, i64, std::time::SystemTime),
     // key, value
-    Push(String, i64),
     Set(String, f64),
     // warmup period (in ms)
     Reset(u64),
@@ -115,12 +116,17 @@ impl RedisCommand {
             _ => false,
         }
     }
+
+    fn timestamp(instant: &std::time::SystemTime) -> String {
+        let duration = instant.duration_since(std::time::UNIX_EPOCH).unwrap();
+        format!("{}.{}", duration.as_secs(), duration.subsec_millis())
+    }
 }
 
 impl std::fmt::Display for RedisCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            RedisCommand::Push(key, value) => write!(f, "({},{})", key, value),
+            RedisCommand::Push(key, value, instant) => write!(f, "({},{},{})", key, value, RedisCommand::timestamp(instant)),
             RedisCommand::Set(key, value) => write!(f, "({},{})", key, value),
             RedisCommand::Reset(warmup) => write!(f, "(reset {} ms)", warmup),
         }
@@ -197,7 +203,13 @@ impl MetricsCollectorResource {
                             } else {
                                 if let Some(ts) = timestamps.remove(&key) {
                                     let current = ts.elapsed().as_millis() as i64;
-                                    let _ = sender.send(RedisCommand::Push(format!("{}:{}:samples", event.full(), id), current)).await;
+                                    let _ = sender
+                                        .send(RedisCommand::Push(
+                                            format!("{}:{}:samples", event.full(), id),
+                                            current,
+                                            std::time::SystemTime::now(),
+                                        ))
+                                        .await;
                                     let average = match averages.get(&avg_key) {
                                         Some(prev_value) => current as f64 * alpha + (1.0_f64 - alpha) * prev_value,
                                         None => current as f64,
@@ -249,9 +261,11 @@ impl MetricsCollectorResourceProvider {
                 }
 
                 let res = match &command {
-                    RedisCommand::Push(key, value) => {
+                    RedisCommand::Push(key, value, instant) => {
                         keys.insert(key.to_string());
-                        redis_connection.lpush::<&str, i64, usize>(&key, *value).err()
+                        redis_connection
+                            .lpush::<&str, String, usize>(&key, format!("{},{}", *value, RedisCommand::timestamp(instant)))
+                            .err()
                     }
                     RedisCommand::Set(key, value) => {
                         keys.insert(key.to_string());
@@ -350,7 +364,9 @@ mod tests {
         let handle_sender_push = tokio::spawn(async move {
             println!("started sender-push");
             for cnt in 0..10 {
-                let _ = sender_push.send(RedisCommand::Push("my-push".to_string(), cnt)).await;
+                let _ = sender_push
+                    .send(RedisCommand::Push("my-push".to_string(), cnt, std::time::SystemTime::now()))
+                    .await;
             }
         });
         let mut sender_set = sender.clone();
