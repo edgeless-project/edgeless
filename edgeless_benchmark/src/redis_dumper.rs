@@ -36,22 +36,22 @@ impl RedisDumper {
     /// >>> import pandas as pd
     /// >>> df = pd.read_csv('out.csv')
     /// >>> df[df["entity"] == "w"]["value"].mean()
-    /// 192.82978723404256
+    /// 142.66666666666666
     /// >>> df
-    ///      seed entity                                  name  value
-    /// 0      42      f  2ff32f77-5103-454a-972c-930f416b782c     43
-    /// 1      42      f  2ff32f77-5103-454a-972c-930f416b782c     65
-    /// 2      42      f  2ff32f77-5103-454a-972c-930f416b782c     43
-    /// 3      42      f  2ff32f77-5103-454a-972c-930f416b782c     54
-    /// 4      42      f  2ff32f77-5103-454a-972c-930f416b782c     75
-    /// ..    ...    ...                                   ...    ...
-    /// 234    42      f  16dcb090-077f-4bbf-bd9a-143b85564183     40
-    /// 235    42      f  16dcb090-077f-4bbf-bd9a-143b85564183     41
-    /// 236    42      f  16dcb090-077f-4bbf-bd9a-143b85564183     41
-    /// 237    42      f  16dcb090-077f-4bbf-bd9a-143b85564183     40
-    /// 238    42      f  16dcb090-077f-4bbf-bd9a-143b85564183     41
+    ///      seed entity                                  name  value     timestamp
+    /// 0      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     32  1.718281e+09
+    /// 1      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     47  1.718281e+09
+    /// 2      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     31  1.718281e+09
+    /// 3      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     29  1.718281e+09
+    /// 4      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     31  1.718281e+09
+    /// ..    ...    ...                                   ...    ...           ...
+    /// 115    42      w                                   wf0    142  1.718281e+09
+    /// 116    42      w                                   wf0    142  1.718281e+09
+    /// 117    42      w                                   wf0    141  1.718281e+09
+    /// 118    42      w                                   wf0    134  1.718281e+09
+    /// 119    42      w                                   wf0    145  1.718281e+09
     ///
-    /// [239 rows x 4 columns]
+    /// [120 rows x 5 columns]
     /// ```
     pub fn dump_csv(&mut self, output: &str, append: bool) -> anyhow::Result<()> {
         let header = !append
@@ -67,7 +67,7 @@ impl RedisDumper {
             .open(output)?;
 
         if header {
-            writeln!(&mut f, "{},entity,name,value", self.additional_header)?;
+            writeln!(&mut f, "{},entity,name,value,timestamp", self.additional_header)?;
         }
 
         for key_in in self.connection.keys::<&str, Vec<String>>("*:*:samples")? {
