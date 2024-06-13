@@ -13,7 +13,7 @@
                 "output": "my-log"
             },
             "annotations": {
-                "init-payload": "hello world"
+                "init-payload": "message=hello world,period=1000"
             }
         }
     ],
@@ -23,7 +23,8 @@
             "class_type": "file-log",
             "output_mapping": {},
             "configurations": {
-                "filename": "my-local-file.log"
+                "filename": "my-local-file.log",
+                "add-timestamp": "true"
             }
         }
     ],
