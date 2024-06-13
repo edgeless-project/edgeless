@@ -337,7 +337,7 @@ impl ClientInterface {
                             },
                         ),
                     )]);
-                    log::debug!("XXX name {}, annotations {:?} mapping {:?}", name, annotations, output_mapping);
+                    log::debug!("name {}, annotations {:?} mapping {:?}", name, annotations, output_mapping);
 
                     functions.push(WorkflowFunction {
                         name,

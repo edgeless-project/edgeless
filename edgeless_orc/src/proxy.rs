@@ -14,4 +14,7 @@ pub trait Proxy: Sync + Send {
 
     /// Update the dependency graph.
     fn update_dependency_graph(&mut self, dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>);
+
+    /// Retrieve the pending deploy intents.
+    fn retrieve_deploy_intents(&mut self) -> Vec<super::orchestrator::DeployIntent>;
 }

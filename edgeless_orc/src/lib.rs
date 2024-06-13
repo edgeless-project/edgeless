@@ -10,6 +10,7 @@ mod proxy;
 mod proxy_none;
 mod proxy_redis;
 
+use edgeless_node::agent;
 use futures::join;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -72,7 +73,7 @@ pub enum OrchestrationStrategy {
 pub fn make_proxy(settings: EdgelessOrcProxySettings) -> Box<dyn proxy::Proxy> {
     match settings.proxy_type.to_lowercase().as_str() {
         "none" => {}
-        "redis" => match proxy_redis::ProxyRedis::new(&settings.redis_url.unwrap_or_default()) {
+        "redis" => match proxy_redis::ProxyRedis::new(&settings.redis_url.unwrap_or_default(), true) {
             Ok(proxy_redis) => return Box::new(proxy_redis),
             Err(err) => log::error!("error when connecting to Redis: {}", err),
         },
@@ -91,10 +92,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
 
     // Create the metrics collector resource.
     let mut resource_provider_specifications = vec![];
-    let mut resources: std::collections::HashMap<
-        String,
-        Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
-    > = std::collections::HashMap::new();
+    let mut resources: std::collections::HashMap<String, agent::ResourceDesc> = std::collections::HashMap::new();
 
     match settings.collector.collector_type.to_lowercase().as_str() {
         "redis" => match settings.collector.redis_url {
@@ -102,21 +100,26 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
                 match redis::Client::open(redis_url.clone()) {
                     Ok(client) => match client.get_connection() {
                         Ok(redis_connection) => {
+                            let provider_id = "metrics-collector".to_string();
+                            let class_type = "metrics-collector".to_string();
                             resource_provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                                provider_id: "metrics-collector".to_string(),
-                                class_type: "metrics-collector".to_string(),
+                                provider_id: provider_id.clone(),
+                                class_type: class_type.clone(),
                                 outputs: vec![],
                             });
                             resources.insert(
-                                "metrics-collector".to_string(),
-                                Box::new(
-                                    metrics_collector::MetricsCollectorResourceProvider::new(
-                                        data_plane.clone(),
-                                        edgeless_api::function_instance::InstanceId::new(node_id),
-                                        redis_connection,
-                                    )
-                                    .await,
-                                ),
+                                provider_id,
+                                agent::ResourceDesc {
+                                    class_type,
+                                    client: Box::new(
+                                        metrics_collector::MetricsCollectorResourceProvider::new(
+                                            data_plane.clone(),
+                                            edgeless_api::function_instance::InstanceId::new(node_id),
+                                            redis_connection,
+                                        )
+                                        .await,
+                                    ),
+                                },
                             );
                             log::info!("metrics collector connected to Redis at {}", redis_url);
                         }

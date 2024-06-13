@@ -9,4 +9,7 @@ impl super::proxy::Proxy for ProxyNone {
     fn update_resource_providers(&mut self, _resource_providers: &std::collections::HashMap<String, super::orchestrator::ResourceProvider>) {}
     fn update_active_instances(&mut self, _active_instances: &std::collections::HashMap<uuid::Uuid, super::orchestrator::ActiveInstance>) {}
     fn update_dependency_graph(&mut self, _dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>) {}
+    fn retrieve_deploy_intents(&mut self) -> Vec<super::orchestrator::DeployIntent> {
+        vec![]
+    }
 }
