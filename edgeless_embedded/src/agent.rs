@@ -23,20 +23,31 @@ impl EmbeddedAgent {
         resources: &'static mut [&'static mut dyn crate::resource::ResourceDyn],
         orchestrator_url: &'static str,
     ) -> &'static mut EmbeddedAgent {
-        let channel = static_cell::make_static!(embassy_sync::channel::Channel::<
-            embassy_sync::blocking_mutex::raw::NoopRawMutex,
-            AgentEvent,
-            2,
-        >::new());
+        static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>> =
+            static_cell::StaticCell::new();
+        let channel =
+            CHANNEL_RAW.init_with(|| embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>::new());
+
         let sender = channel.sender();
         let receiver = channel.receiver();
 
-        let slf = static_cell::make_static!(EmbeddedAgent {
+        static SLF_INNER_RAW: static_cell::StaticCell<
+            core::cell::RefCell<
+                embassy_sync::mutex::Mutex<
+                    embassy_sync::blocking_mutex::raw::NoopRawMutex,
+                    &'static mut [&'static mut dyn crate::resource::ResourceDyn],
+                >,
+            >,
+        > = static_cell::StaticCell::new();
+        let slf_inner = SLF_INNER_RAW.init_with(|| core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(&mut resources[..])));
+
+        static SLF_RAW: static_cell::StaticCell<EmbeddedAgent> = static_cell::StaticCell::new();
+        let slf = SLF_RAW.init_with(|| EmbeddedAgent {
             own_node_id: node_id.clone(),
             upstream_sender: sender,
             upstream_receiver: Some(receiver),
-            inner: static_cell::make_static!(core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(&mut resources[..]))),
-            orchestrator_url: orchestrator_url
+            inner: slf_inner,
+            orchestrator_url: orchestrator_url,
         });
 
         {

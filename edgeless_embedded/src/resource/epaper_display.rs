@@ -70,10 +70,11 @@ impl crate::resource::Resource for EPaperDisplay {
 
 impl EPaperDisplay {
     pub async fn new(display: &'static mut dyn EPaper) -> &'static mut dyn crate::resource::ResourceDyn {
-        static_cell::make_static!(EPaperDisplay {
+        static SLF_RAW: static_cell::StaticCell<EPaperDisplay> = static_cell::StaticCell::new();
+        SLF_RAW.init_with(|| EPaperDisplay {
             header: None,
             instance_id: None,
-            display: display
+            display: display,
         })
     }
 }

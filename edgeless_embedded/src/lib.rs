@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 #![no_std]
-#![no_main]
-#![feature(type_alias_impl_trait)]
 
 extern crate alloc;
 
