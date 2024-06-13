@@ -29,13 +29,13 @@ embedded-hal-bus = "0.2"
 esp-alloc = { version = "0.3.0" }
 
 
-embassy-executor = { version = "0.5.0", features = ["nightly"] }
+embassy-executor = { version = "0.5.0" }
 embassy-sync = { version = "0.5" }
 embassy-time = { version = "0.3", features = ["tick-hz-1_000_000", "generic-queue"]}
 embassy-net = { version = "0.4", features = ["tcp", "udp", "dhcpv4", "medium-ethernet", "proto-ipv4"] }
 embassy-futures = { version =  "0.1" }
 
-static_cell = { version = "1.2.0", features = ["nightly"] }
+static_cell = { version = "1.2.0" }
 heapless = "0.7"
 once_cell = {version = "1.18", default-features = false, features = ["critical-section"]}
 

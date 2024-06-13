@@ -1,6 +1,5 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
-#![feature(type_alias_impl_trait)]
 
 use embassy_net::{Ipv4Address, Ipv4Cidr};
 use embassy_net_tuntap::TunTapDevice;
@@ -11,7 +10,8 @@ const NODE_ID: uuid::Uuid = uuid::uuid!("0827240a-3050-4604-bf3e-564c41c77106");
 fn main() -> ! {
     env_logger::init();
 
-    let executor = static_cell::make_static!(embassy_executor::Executor::new());
+    static EXECUTOR_RAW: static_cell::StaticCell<embassy_executor::Executor> = static_cell::StaticCell::new();
+    let executor = EXECUTOR_RAW.init_with(|| embassy_executor::Executor::new());
 
     executor.run(|spawner| {
         spawner.spawn(edgeless(spawner)).unwrap();
@@ -41,10 +41,14 @@ async fn registration(agent: edgeless_embedded::agent::EmbeddedAgent) {
 async fn edgeless(spawner: embassy_executor::Spawner) {
     log::info!("Edgeless Embedded Async Main");
 
-    let rx_buf = static_cell::make_static!([0 as u8; 5000]);
-    let rx_meta = static_cell::make_static!([embassy_net::udp::PacketMetadata::EMPTY; 10]);
-    let tx_buf = static_cell::make_static!([0 as u8; 5000]);
-    let tx_meta = static_cell::make_static!([embassy_net::udp::PacketMetadata::EMPTY; 10]);
+    static RX_BUF_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
+    let rx_buf = RX_BUF_RAW.init_with(|| [0 as u8; 5000]);
+    static RX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
+    let rx_meta = RX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
+    static TX_BUF_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
+    let tx_buf = TX_BUF_RAW.init_with(|| [0 as u8; 5000]);
+    static TX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
+    let tx_meta = TX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
 
     let device = embassy_net_tuntap::TunTapDevice::new("tap0").unwrap();
     let config = embassy_net::Config::ipv4_static(embassy_net::StaticConfigV4 {
@@ -52,12 +56,17 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
         dns_servers: heapless::Vec::new(),
         gateway: None,
     });
-    let stack = static_cell::make_static!(embassy_net::Stack::new(
-        device,
-        config,
-        static_cell::make_static!(embassy_net::StackResources::<3>::new()),
-        1234
-    ));
+
+    static STACK_RESOURCES_RAW: static_cell::StaticCell<embassy_net::StackResources<3>> = static_cell::StaticCell::new();
+    static STACK_RAW: static_cell::StaticCell<embassy_net::Stack<embassy_net_tuntap::TunTapDevice>> = static_cell::StaticCell::new();
+    let stack = STACK_RAW.init_with(|| {
+        embassy_net::Stack::new(
+            device,
+            config,
+            STACK_RESOURCES_RAW.init_with(|| embassy_net::StackResources::<3>::new()),
+            1234,
+        )
+    });
 
     spawner.spawn(net_task(stack)).unwrap();
 
@@ -67,7 +76,8 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
 
     let display = edgeless_embedded::resource::mock_display::MockDisplay::new().await;
 
-    let resources = static_cell::make_static!([display, sensor_scd30]);
+    static RESOURCES_RAW: static_cell::StaticCell<[&'static mut dyn edgeless_embedded::resource::ResourceDyn; 2]> = static_cell::StaticCell::new();
+    let resources = RESOURCES_RAW.init_with(|| [display, sensor_scd30]);
 
     let resource_registry = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), resources, "").await;
 

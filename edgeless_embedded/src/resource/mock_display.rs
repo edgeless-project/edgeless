@@ -22,9 +22,10 @@ impl MockDisplay {
     }
 
     pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
-        static_cell::make_static!(MockDisplay {
+        static SLF_RAW: static_cell::StaticCell<MockDisplay> = static_cell::StaticCell::new();
+        SLF_RAW.init_with(|| MockDisplay {
             instance_id: None,
-            active: false
+            active: false,
         })
     }
 }
