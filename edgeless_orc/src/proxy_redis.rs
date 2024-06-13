@@ -26,14 +26,16 @@ pub struct ProxyRedis {
 }
 
 impl ProxyRedis {
-    pub fn new(redis_url: &str) -> anyhow::Result<Self> {
+    pub fn new(redis_url: &str, flushdb: bool) -> anyhow::Result<Self> {
         log::info!("creating Redis orchestrator proxy at URL {}", redis_url);
 
         // create the connection with the Redis server
         let mut connection = redis::Client::open(redis_url)?.get_connection()?;
 
-        // flush the in-memory database upon construction
-        let _ = redis::cmd("FLUSHDB").query(&mut connection)?;
+        if flushdb {
+            // flush the in-memory database upon construction
+            let _ = redis::cmd("FLUSHDB").query(&mut connection)?;
+        }
 
         Ok(Self {
             connection,
@@ -129,5 +131,88 @@ impl super::proxy::Proxy for ProxyRedis {
 
         // update the list of active instance ext fids
         self.dependency_uuids = new_dependency_uuids;
+    }
+
+    fn retrieve_deploy_intents(&mut self) -> Vec<super::orchestrator::DeployIntent> {
+        let mut intents = vec![];
+        loop {
+            let lpop_res = self.connection.lpop::<&str, Option<String>>("intents", None);
+
+            match lpop_res {
+                Ok(intent_key) => {
+                    if let Some(intent_key) = intent_key {
+                        let get_res = self.connection.get::<&str, Option<String>>(&intent_key);
+                        match get_res {
+                            Ok(intent_value) => match intent_value {
+                                Some(intent_value) => match crate::orchestrator::DeployIntent::new(&intent_key, &intent_value) {
+                                    Ok(intent) => intents.push(intent),
+                                    Err(err) => log::warn!("invalid intent value '{}': {}", intent_value, err),
+                                },
+                                None => log::warn!("empty intent key '{}'", intent_key),
+                            },
+                            Err(err) => log::warn!("could not read intent '{}': {}", intent_key, err),
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                Err(err) => log::warn!("could not pop from intents: {}", err),
+            }
+        }
+        intents
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::{orchestrator::DeployIntent, proxy::Proxy};
+
+    use super::*;
+
+    #[test]
+    #[ignore]
+    fn test_redis_retrieve_intents() {
+        let redis_url = "redis://127.0.0.1:6379";
+
+        // create the proxy, also flushing the db
+        let mut proxy = ProxyRedis::new(redis_url, true).unwrap();
+
+        // fill intents
+        let component1 = uuid::Uuid::new_v4();
+        let component2 = uuid::Uuid::new_v4();
+        let component3 = uuid::Uuid::new_v4();
+        let component4 = uuid::Uuid::new_v4();
+        let node1 = uuid::Uuid::new_v4();
+        let node2 = uuid::Uuid::new_v4();
+        let intents = vec![
+            DeployIntent::Migrate(component1, vec![]),
+            DeployIntent::Migrate(component2, vec![node1]),
+            DeployIntent::Migrate(component3, vec![node1, node2]),
+            DeployIntent::Migrate(component4, vec![node1, node2, node2]),
+        ];
+        let mut connection = redis::Client::open(redis_url).unwrap().get_connection().unwrap();
+        for intent in intents {
+            assert!(connection.set::<&str, &str, String>(&intent.key(), &intent.value()).is_ok());
+            assert!(connection.lpush::<&str, &str, usize>("intents", &intent.key()).is_ok());
+        }
+
+        // retrieve them
+        for intent in proxy.retrieve_deploy_intents() {
+            match intent {
+                DeployIntent::Migrate(component, targets) => {
+                    if component == component1 {
+                        assert!(targets.is_empty());
+                    } else if component == component2 {
+                        assert!(targets.len() == 1);
+                    } else if component == component3 {
+                        assert!(targets.len() == 2);
+                    } else if component == component4 {
+                        assert!(targets.len() == 3);
+                    } else {
+                        panic!("unknown component: {}", component);
+                    }
+                }
+            }
+        }
     }
 }
