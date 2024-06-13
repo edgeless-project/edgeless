@@ -61,13 +61,19 @@ impl SCD30Sensor {
     }
 
     pub async fn new(sensor: &'static mut dyn Sensor) -> &'static mut dyn crate::resource::ResourceDyn {
-        let sensor_state = static_cell::make_static!(core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(SCD30SensorInner {
-            instance_id: None,
-            data_out_id: None,
-            delay: 5,
-            sensor: sensor
-        })));
-        static_cell::make_static!(SCD30Sensor { inner: sensor_state })
+        static SENSOR_STATE_RAW: static_cell::StaticCell<
+            core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, SCD30SensorInner>>,
+        > = static_cell::StaticCell::new();
+        let sensor_state = SENSOR_STATE_RAW.init_with(|| {
+            core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(SCD30SensorInner {
+                instance_id: None,
+                data_out_id: None,
+                delay: 5,
+                sensor: sensor,
+            }))
+        });
+        static SLF_RAW: static_cell::StaticCell<SCD30Sensor> = static_cell::StaticCell::new();
+        SLF_RAW.init_with(|| SCD30Sensor { inner: sensor_state })
     }
 }
 
