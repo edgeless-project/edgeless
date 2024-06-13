@@ -1,0 +1,11 @@
+[general]
+node_id = "fda6ce79-46df-4f96-a0d2-456f720f606d"
+agent_url = "http://127.0.0.1:7221"
+agent_url_announced = ""
+invocation_url = "http://127.0.0.1:7202"
+invocation_url_announced = ""
+metrics_url = "http://127.0.0.1:7203"
+orchestrator_url = "http://127.0.0.1:7011"
+
+[wasm_runtime]
+enabled = true
