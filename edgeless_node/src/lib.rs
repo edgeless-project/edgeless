@@ -329,20 +329,24 @@ async fn fill_resources(
         if let (Some(dda_url), Some(provider_id)) = (&settings.dda_url, &settings.dda_provider) {
             if !dda_url.is_empty() && !provider_id.is_empty() {
                 log::info!("Creating resource '{}' at {}", provider_id, dda_url);
+                let class_type = "dda".to_string();
                 ret.insert(
                     provider_id.clone(),
-                    Box::new(
-                        resources::dda::DDAResourceProvider::new(
-                            data_plane.clone(),
-                            edgeless_api::function_instance::InstanceId::new(node_id.clone()),
-                        )
-                        .await,
-                    ),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::dda::DDAResourceProvider::new(
+                                data_plane.clone(),
+                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                            )
+                            .await,
+                        ),
+                    },
                 );
 
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id: provider_id.clone(),
-                    class_type: "dda".to_string(),
+                    class_type,
                     outputs: vec!["new_request".to_string()],
                 });
             }
