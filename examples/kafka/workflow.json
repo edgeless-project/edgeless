@@ -23,8 +23,9 @@
             "class_type": "kafka",
             "output_mapping": {},
             "configurations": {
-                "brokers": "localhost:9092",
-                "topic": "test-topic"
+                "brokers": "localhost:9092",                
+                "url": "localhost:9092",
+                "key": "my-test"
             }
         }
     ],
