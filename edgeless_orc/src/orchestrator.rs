@@ -1133,6 +1133,7 @@ impl Orchestrator {
                     // because they failed to reply to a keep-alive.
                     let mut to_be_disconnected = std::collections::HashSet::new();
                     for (node_id, client_desc) in &mut nodes {
+                        log::debug!("polling node {} begin", node_id);
                         match client_desc.api.node_management_api().keep_alive().await {
                             Ok(health_status) => {
                                 log::debug!("node uuid {} health status {}", node_id, health_status);
@@ -1142,6 +1143,7 @@ impl Orchestrator {
                                 to_be_disconnected.insert(*node_id);
                             }
                         };
+                        log::debug!("polling node {} end", node_id);
                     }
 
                     // Second, remove all those nodes from the map of clients.
