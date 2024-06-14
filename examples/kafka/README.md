@@ -125,7 +125,7 @@ It is convenient to see what is happening underneath.
 ./edgeless_inabox -t 
 ```
 
-This command starts the edgeless_inabox application with the `-t` option, that meas 'test'.
+This command starts the edgeless_inabox application with the `-t` option, that means 'test'.
 We will find the time, node and controller inside, so they will all be launched.
 
 3. If there are already running configuration files remove them:
