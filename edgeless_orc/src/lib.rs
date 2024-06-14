@@ -29,8 +29,15 @@ pub struct EdgelessOrcGeneralSettings {
     pub orchestrator_url: String,
     /// The URL of the agent of the node embedded in the orchestrator.
     pub agent_url: String,
+    /// The agent URL announced by the node.
+    /// It is the end-point used by the orchestrator to manage the node.
+    /// It can be different from `agent_url`, e.g., for NAT traversal.
+    pub agent_url_announced: String,
     /// The URL of the data plane of the node embedded in the orchestrator.
     pub invocation_url: String,
+    /// The invocation URL announced by the node.
+    /// It can be different from `invocation_url`, e.g., for NAT traversal.
+    pub invocation_url_announced: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -83,7 +90,7 @@ pub fn make_proxy(settings: EdgelessOrcProxySettings) -> Box<dyn proxy::Proxy> {
 }
 
 pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
-    log::info!("Starting Edgeless Orchestrator at {}", settings.general.orchestrator_url);
+    log::info!("Starting Edgeless Orchestrator at {}", settings.general.orchestrator_url,);
     log::debug!("Settings: {:?}", settings);
 
     // Create the data plane for the node embedded in the orchestrator.
@@ -169,9 +176,9 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
             edgeless_node::EdgelessNodeGeneralSettings {
                 node_id,
                 agent_url: settings.general.agent_url,
-                agent_url_announced: "".to_string(),
+                agent_url_announced: settings.general.agent_url_announced,
                 invocation_url: settings.general.invocation_url,
-                invocation_url_announced: "".to_string(),
+                invocation_url_announced: settings.general.invocation_url_announced,
                 metrics_url: "".to_string(),
                 orchestrator_url: settings.general.orchestrator_url
             },
@@ -187,7 +194,9 @@ pub fn edgeless_orc_default_conf() -> String {
 domain_id = "domain-1"
 orchestrator_url = "http://127.0.0.1:7011"
 agent_url = "http://127.0.0.1:7121"
+agent_url_announced = ""
 invocation_url = "http://127.0.0.1:7102"
+invocation_url_announced = ""
 
 [baseline]
 orchestration_strategy = "Random"

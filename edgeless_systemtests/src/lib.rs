@@ -38,7 +38,9 @@ mod tests {
                     domain_id: domain_id.to_string(),
                     orchestrator_url: orchestrator_url.to_string(),
                     agent_url: format!("http://{}:{}", address, next_port()),
+                    agent_url_announced: "".to_string(),
                     invocation_url: format!("http://{}:{}", address, next_port()),
+                    invocation_url_announced: "".to_string(),
                 },
                 baseline: edgeless_orc::EdgelessOrcBaselineSettings {
                     orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
