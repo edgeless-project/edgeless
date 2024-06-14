@@ -1,0 +1,45 @@
+{
+    "functions": [
+        {
+            "name": "double",
+            "class_specification": {
+                "id": "double",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../simple_workflow_http/double/double.wasm",
+                "outputs": [
+                    "result"
+                ]
+            },
+            "output_mapping": {
+                "result": "kafka-producer"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "kafka-consumer",
+            "class_type": "kafka",
+            "output_mapping": {
+                "out": "double"
+            },
+            "configurations": {
+                "mode": "consumer",
+                "brokers": "localhost:9092",                
+                "topic": "test-topic"
+            }
+        },
+        {
+            "name": "kafka-producer",
+            "class_type": "kafka",
+            "output_mapping": {},
+            "configurations": {
+                "mode": "producer",
+                "brokers": "localhost:9092",                
+                "topic": "test-topic"
+            }
+        }
+    ],
+    "annotations": {}
+}
