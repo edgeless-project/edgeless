@@ -1,11 +1,14 @@
 #!/bin/bash
 
+agent_addr_port=(${AGENT_ENDPOINT//:/ })
+invocation_addr_port=(${INVOCATION_ENDPOINT//:/ })
+
 cat > node.toml << EOF
 [general]
 node_id = "$(uuid)"
-agent_url = "http://0.0.0.0:$AGENT_PORT"
+agent_url = "http://0.0.0.0:${agent_addr_port[1]}"
 agent_url_announced = "http://$AGENT_ENDPOINT"
-invocation_url = "http://0.0.0.0:$INVOCATION_PORT"
+invocation_url = "http://0.0.0.0:${invocation_addr_port[1]}"
 invocation_url_announced = "http://$INVOCATION_ENDPOINT"
 metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://$ORCHESTRATOR_ENDPOINT"
