@@ -10,7 +10,7 @@ services:
       - 7001:7001
     environment:
       RUST_LOG: info
-      SHOWCONF: 1
+      SHOWCONF: 0
       ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
       
   edgeless_orc:
@@ -20,8 +20,11 @@ services:
       - redis
     environment:
       RUST_LOG: info
-      SHOWCONF: 1
+      SHOWCONF: 0
       REDIS_ENDPOINT: redis:6379
+      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
+      INVOCATION_ENDPOINT: edgeless_orc:7102
+      AGENT_ENDPOINT: edgeless_orc:7121
     ports:
       - 7011:7011
       - 7121:7121
@@ -33,30 +36,11 @@ services:
       - edgeless_orc
     environment:
       RUST_LOG: info
-      SHOWCONF: 1
+      SHOWCONF: 0
       ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
       INVOCATION_ENDPOINT: edgeless_node1:10001
-      INVOCATION_PORT: 10001
       AGENT_ENDPOINT: edgeless_node1:10002
-      AGENT_PORT: 10002
       LABELS: '[]'
     ports:
       - 10001:10001
       - 10002:10002
-
-  edgeless_node2:
-    image: edgeless_node:latest
-    depends_on:
-      - edgeless_orc
-    environment:
-      RUST_LOG: info
-      SHOWCONF: 1
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
-      INVOCATION_ENDPOINT: edgeless_node2:10003
-      INVOCATION_PORT: 10003
-      AGENT_ENDPOINT: edgeless_node2:10004
-      AGENT_PORT: 10004
-      LABELS: '[]'
-    ports:
-      - 10003:10003
-      - 10004:10004
