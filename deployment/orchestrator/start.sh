@@ -27,7 +27,7 @@ collector_type = "Redis"
 redis_url = "redis://$REDIS_ENDPOINT"
 EOF
 
-if [ "$SHOWCONF" != "" ] ; then
+if [ "$SHOWCONF" != "1" ] ; then
     cat orchestrator.toml
 fi
 /usr/src/myapp/edgeless/target/release/edgeless_orc_d
