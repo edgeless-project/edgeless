@@ -20,8 +20,8 @@ cat docker-compose.yml > $OUT_FILE
 
 for (( i = 2 ; i <= $NUM_NODES ; i++ )) ; do
 
-  port1=$(( 10001 + (i - 1) * 2 ))
-  port2=$(( 10002 + (i - 1) * 2 ))
+  port1=$(( 10003 + (i - 1) * 2 ))
+  port2=$(( 10004 + (i - 1) * 2 ))
 
   cat >> $OUT_FILE << EOF
   
@@ -36,6 +36,7 @@ for (( i = 2 ; i <= $NUM_NODES ; i++ )) ; do
       INVOCATION_ENDPOINT: edgeless_node$i:$port1
       AGENT_ENDPOINT: edgeless_node$i:$port2
       LABELS: '[]'
+      NODE_TYPE: WASM
     ports:
       - $port1:$port1
       - $port2:$port2
