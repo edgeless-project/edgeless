@@ -13,14 +13,27 @@ invocation_url_announced = "http://$INVOCATION_ENDPOINT"
 metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://$ORCHESTRATOR_ENDPOINT"
 
-[wasm_runtime]
-enabled = true
-
-[user_node_capabilities]
-labels = $LABELS
 EOF
 
-if [ "$SHOWCONF" != "" ] ; then
+if [ "$NODE_TYPE" == "WASM" ] ; then
+    cat >> node.toml << EOF
+    [wasm_runtime]
+    enabled = true
+
+    [user_node_capabilities]
+    labels = $LABELS
+EOF
+elif [ $"$NODE_TYPE" == "FILE_LOG" ] ; then
+    cat >> node.toml << EOF
+[resources]
+file_log_provider = "file-log-1"
+EOF
+else
+    echo "invalid NODE_TYPE: $NODE_TYPE"
+    exit 1
+fi
+
+if [ "$SHOWCONF" != "1" ] ; then
     cat node.toml
 fi
 /usr/src/myapp/edgeless/target/release/edgeless_node_d
