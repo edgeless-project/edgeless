@@ -1132,6 +1132,10 @@ impl Orchestrator {
                     // First check if there are nodes that must be disconnected
                     // because they failed to reply to a keep-alive.
                     let mut to_be_disconnected = std::collections::HashSet::new();
+                    log::debug!(
+                        "nodes to be polled: {}",
+                        nodes.keys().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                    );
                     for (node_id, client_desc) in &mut nodes {
                         log::debug!("polling node {} begin", node_id);
                         match client_desc.api.node_management_api().keep_alive().await {

@@ -101,6 +101,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         general: edgeless_orc::EdgelessOrcGeneralSettings {
             domain_id: "domain-1".to_string(),
             orchestrator_url: next_url(),
+            orchestrator_url_announced: "".to_string(),
             agent_url: next_url(),
             agent_url_announced: "".to_string(),
             invocation_url: next_url(),
