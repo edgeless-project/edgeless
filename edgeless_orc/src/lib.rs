@@ -25,8 +25,11 @@ pub struct EdgelessOrcSettings {
 pub struct EdgelessOrcGeneralSettings {
     /// The identifier of the orchestration domain managed by this orchestrator.
     pub domain_id: String,
-    // The URL to which the orchestrator can be reached.
+    /// The URL to which the orchestrator is bound.
     pub orchestrator_url: String,
+    /// The URL to which the orchestrator can be reached, which may be
+    /// different from `orchestrator_url`, e.g., for NAT traversal.
+    pub orchestrator_url_announced: String,
     /// The URL of the agent of the node embedded in the orchestrator.
     pub agent_url: String,
     /// The agent URL announced by the node.
@@ -180,7 +183,10 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
                 invocation_url: settings.general.invocation_url,
                 invocation_url_announced: settings.general.invocation_url_announced,
                 metrics_url: "".to_string(),
-                orchestrator_url: settings.general.orchestrator_url
+                orchestrator_url: match settings.general.orchestrator_url_announced.is_empty() {
+                    true => settings.general.orchestrator_url,
+                    false => settings.general.orchestrator_url_announced.clone(),
+                },
             },
             edgeless_api::node_registration::NodeCapabilities::empty(),
             resource_provider_specifications
@@ -193,6 +199,7 @@ pub fn edgeless_orc_default_conf() -> String {
         r##"[general]
 domain_id = "domain-1"
 orchestrator_url = "http://127.0.0.1:7011"
+orchestrator_url_announced = ""
 agent_url = "http://127.0.0.1:7121"
 agent_url_announced = ""
 invocation_url = "http://127.0.0.1:7102"
