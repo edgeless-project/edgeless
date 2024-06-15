@@ -13,10 +13,6 @@ RUN git branch -lr
 RUN git checkout 149-ε-orc-delegated-orchestration-model
 RUN cargo build --release
 
-EXPOSE 7011
-EXPOSE 7121
-EXPOSE 7102
-
 ADD start.sh /
 RUN chmod +x /start.sh
 
