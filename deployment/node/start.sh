@@ -17,11 +17,14 @@ EOF
 
 if [ "$NODE_TYPE" == "WASM" ] ; then
     cat >> node.toml << EOF
-    [wasm_runtime]
-    enabled = true
+[wasm_runtime]
+enabled = true
 
-    [user_node_capabilities]
-    labels = $LABELS
+[user_node_capabilities]
+labels = $LABELS
+num_cpus = 1
+clock_freq_cpu = 1000
+num_cores = $NUM_CORES
 EOF
 elif [ $"$NODE_TYPE" == "FILE_LOG" ] ; then
     cat >> node.toml << EOF
@@ -33,7 +36,7 @@ else
     exit 1
 fi
 
-if [ "$SHOWCONF" != "1" ] ; then
+if [ "$SHOWCONF" == "1" ] ; then
     cat node.toml
 fi
 /usr/src/myapp/edgeless/target/release/edgeless_node_d

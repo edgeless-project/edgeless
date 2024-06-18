@@ -44,6 +44,7 @@ services:
       INVOCATION_ENDPOINT: edgeless_node_file_log:10001
       AGENT_ENDPOINT: edgeless_node_file_log:10002
       LABELS: '[]'
+      NUM_CORES: 1
       NODE_TYPE: FILE_LOG
     ports:
       - 10001:10001
@@ -61,6 +62,7 @@ services:
       INVOCATION_ENDPOINT: edgeless_node1:10003
       AGENT_ENDPOINT: edgeless_node1:10004
       LABELS: '[]'
+      NUM_CORES: 1
       NODE_TYPE: WASM
     ports:
       - 10003:10003
