@@ -3,6 +3,7 @@ use elasticsearch::indices::IndicesCreateParts;
 use elasticsearch::{
     auth::Credentials, http::transport::SingleNodeConnectionPool, http::transport::TransportBuilder, Elasticsearch, IndexParts, SearchParts,
 };
+use log::info;
 use serde_json::json;
 use serde_json::Value;
 use url::Url;
@@ -13,7 +14,7 @@ static mut COUNTER: u32 = 0;
 /// Establish connection to specified ES endpoint.
 /// # Returns
 /// A Result indicating success or failure.
-pub fn es_create_client() -> Result<Elasticsearch, Box<dyn std::error::Error>> {
+pub fn es_create_client() -> Elasticsearch {
     //define ES endpoint configs
 
     let url = Url::parse("elastic_endpoint_url")?; //contant Panagiotis Antoniou(Aegis) for details
@@ -21,7 +22,7 @@ pub fn es_create_client() -> Result<Elasticsearch, Box<dyn std::error::Error>> {
     let conn_pool = SingleNodeConnectionPool::new(url);
     let transport = TransportBuilder::new(conn_pool).auth(credentials).build()?;
 
-    Ok(Elasticsearch::new(transport))
+    Elasticsearch::new(transport);
 }
 
 /// Creates an Elasticsearch index with a specified mapping.
@@ -30,16 +31,8 @@ pub fn es_create_client() -> Result<Elasticsearch, Box<dyn std::error::Error>> {
 /// # Returns
 /// A Result indicating success or failure.
 //To be called once on init.
-pub async fn es_create_index(
-    client_result: &Result<Elasticsearch, Box<dyn std::error::Error>>,
-    index_flag: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn es_create_index(client: &Elasticsearch, index_flag: bool) -> Result<(), Box<dyn std::error::Error>> {
     //define mapping
-    let client = match client_result {
-        Ok(client) => client,
-        Err(err) => return Err(err.to_string().into()), // Convert error to String
-    };
-    //define ES index mapping based on the index_flag value
     let mapping = if index_flag {
         //create edgeless_resources mapping
         json!({
@@ -78,9 +71,9 @@ pub async fn es_create_index(
         .await?;
 
     if create_index_response.status_code().is_success() {
-        println!("Index 'edgeless_runtime' created successfully");
+        log::info!("Index 'edgeless_runtime' created successfully");
     } else {
-        println!("Failed to create index 'edgeless_runtime': {}", create_index_response.status_code());
+        log::error!("Failed to create index 'edgeless_runtime': {}", create_index_response.status_code());
     }
     Ok(())
 }
@@ -101,15 +94,7 @@ fn increment_counter() -> String {
 /// # Returns
 /// A Result indicating success or failure.
 
-pub async fn es_write_to_index(
-    client_result: &Result<Elasticsearch, Box<dyn std::error::Error>>,
-    data: Value,
-    index_flag: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let client = match client_result {
-        Ok(client) => client,
-        Err(err) => return Err(err.to_string().into()), // Convert error to String
-    };
+pub async fn es_write_to_index(client: &Elasticsearch, data: Value, index_flag: bool) -> Result<(), Box<dyn std::error::Error>> {
     let id = increment_counter();
     //send data to ES endpoint via POST
     let index_response = client
@@ -118,7 +103,7 @@ pub async fn es_write_to_index(
         .send()
         .await?;
 
-    println!("Response Status Code: {}", index_response.status_code());
+    log::info!("Response Status Code: {}", index_response.status_code());
     Ok(())
 }
 
@@ -132,17 +117,9 @@ pub fn get_current_timestamp() -> DateTime<Utc> {
 /// * `index_flag` - which index to read   
 /// # Returns
 /// A Result containing a vector of JSON values representing the contents of the index
-pub async fn es_read_from_index(
-    client_result: &Result<Elasticsearch, Box<dyn std::error::Error>>,
-    index_flag: bool,
-) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
-    let client = match client_result {
-        Ok(client) => client,
-        Err(err) => return Err(err.to_string().into()), // Convert error to String
-    };
-
+pub async fn es_read_from_index(client: &Elasticsearch, index_flag: bool) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
     let index = get_index_name(index_flag);
-    println!("Contents of index {}", index);
+    log::info!("Contents of index {}", index);
 
     //fetch data from ES endpoint with index via GET
     let search_response = client
@@ -161,7 +138,7 @@ pub async fn es_read_from_index(
         let contents: Vec<Value> = hits.iter().map(|hit| hit["_source"].clone()).collect();
         Ok(contents)
     } else {
-        Err("Failed to retrieve index contents".into())
+        log::error("Failed to retrieve index contents".into())
     }
 }
 
