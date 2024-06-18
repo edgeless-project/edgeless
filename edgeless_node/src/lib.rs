@@ -167,7 +167,7 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         model_name_cpu: user_node_capabilities.model_name_cpu.unwrap_or(model_name_cpu),
         clock_freq_cpu: user_node_capabilities.clock_freq_cpu.unwrap_or(clock_freq_cpu),
         num_cores: user_node_capabilities.num_cores.unwrap_or(sys.physical_core_count().unwrap_or(1) as u32),
-        mem_size: user_node_capabilities.mem_size.unwrap_or(sys.total_memory() as u32 / 1024),
+        mem_size: user_node_capabilities.mem_size.unwrap_or(sys.total_memory() as u32 / (1024 * 1024)),
         labels: user_node_capabilities.labels.unwrap_or(vec![]),
         is_tee_running: user_node_capabilities.is_tee_running.unwrap_or(false),
         has_tpm: user_node_capabilities.has_tpm.unwrap_or(false),
