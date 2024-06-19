@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: MIT
 
 use edgeless_api::{function_instance::InstanceId, resource_configuration::ResourceConfigurationAPI};
-use edgeless_dataplane::handle::DataplaneProvider;
 use serde::Deserialize;
 use serde_json::Error;
-use std::{collections::HashMap, process, str::from_utf8, sync::Arc};
+use std::{collections::HashMap, str::from_utf8, sync::Arc};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -23,7 +22,7 @@ pub struct DDAResourceProvider {
 }
 
 impl DDAResourceProvider {
-    pub async fn new(dataplane_provider: DataplaneProvider, resource_provider_id: InstanceId) -> Self {
+    pub async fn new(dataplane_provider: edgeless_dataplane::handle::DataplaneProvider, resource_provider_id: InstanceId) -> Self {
         Self {
             inner: Arc::new(Mutex::new(DDAResourceProviderInner {
                 resource_provider_id,
@@ -80,8 +79,11 @@ impl DDAResource {
         let dda_sub_array = match dcs {
             Ok(dda_array) => dda_array,
             Err(err) => {
-                eprintln!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
-                process::exit(1);
+                log::error!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
+                panic!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
+                //eprintln!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
+                //ToDo: After discussion clarify if process exit is the right way to react..
+                //process::exit(1);
             }
         };
 
@@ -90,8 +92,10 @@ impl DDAResource {
         let dda_pub_array = match dcp {
             Ok(dda_array) => dda_array,
             Err(err) => {
-                eprintln!("Error parsing input dda_com_publication_mapping JSON: {}", err);
-                process::exit(1);
+                log::error!("Error parsing input dda_com_publication_mapping JSON: {}", err);
+                panic!("Error parsing input dda_com_publication_mapping JSON: {}", err);
+                //eprintln!("Error parsing input dda_com_publication_mapping JSON: {}", err);
+                //process::exit(1);
             }
         };
 
