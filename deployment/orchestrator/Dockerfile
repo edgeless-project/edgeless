@@ -10,7 +10,6 @@ WORKDIR /usr/src/myapp/edgeless/
 WORKDIR /usr/src/myapp/edgeless/edgeless_orc
 RUN git fetch -p
 RUN git branch -lr
-RUN git checkout 149-ε-orc-delegated-orchestration-model
 RUN cargo build --release
 
 ADD start.sh /
