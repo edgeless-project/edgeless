@@ -11,4 +11,5 @@ pub mod coap_mapping;
 pub mod common;
 pub mod instance_id;
 pub mod invocation;
+pub mod node_registration;
 pub mod resource_configuration;

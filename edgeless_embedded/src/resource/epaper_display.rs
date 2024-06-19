@@ -18,22 +18,20 @@ impl EPaperDisplay {
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<EPaperDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
-        if data.provider_id == "epaper-display-1" {
+        if data.class_type == "epaper-display-1" {
             let mut config: Option<[u8; 128]> = None;
-            for configuration_item in data.configuration {
-                if let Some((key, val)) = configuration_item {
-                    if key == "header_text" {
-                        let mut header_data: [u8; 128] = [0; 128];
-                        let mut i: usize = 0;
-                        for b in val.bytes() {
-                            header_data[i] = b;
-                            i = i + 1;
-                            if i == 128 {
-                                break;
-                            }
+            for (key, val) in data.configuration {
+                if key == "header_text" {
+                    let mut header_data: [u8; 128] = [0; 128];
+                    let mut i: usize = 0;
+                    for b in val.bytes() {
+                        header_data[i] = b;
+                        i = i + 1;
+                        if i == 128 {
+                            break;
                         }
-                        config = Some(header_data);
                     }
+                    config = Some(header_data);
                 }
             }
 
@@ -52,6 +50,14 @@ impl crate::resource::Resource for EPaperDisplay {
         return "epaper-display-1";
     }
 
+    fn resource_class(&self) -> &'static str {
+        return "epaper-display";
+    }
+
+    fn outputs(&self) -> &'static [&'static str] {
+        return &[];
+    }
+
     async fn has_instance(&self, id: &edgeless_api_core::instance_id::InstanceId) -> bool {
         if self.instance_id == Some(*id) {
             return true;
@@ -64,10 +70,11 @@ impl crate::resource::Resource for EPaperDisplay {
 
 impl EPaperDisplay {
     pub async fn new(display: &'static mut dyn EPaper) -> &'static mut dyn crate::resource::ResourceDyn {
-        static_cell::make_static!(EPaperDisplay {
+        static SLF_RAW: static_cell::StaticCell<EPaperDisplay> = static_cell::StaticCell::new();
+        SLF_RAW.init_with(|| EPaperDisplay {
             header: None,
             instance_id: None,
-            display: display
+            display: display,
         })
     }
 }
@@ -129,5 +136,12 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
         }
 
         Ok(self.instance_id.unwrap())
+    }
+
+    async fn patch(
+        &mut self,
+        resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+        Ok(())
     }
 }
