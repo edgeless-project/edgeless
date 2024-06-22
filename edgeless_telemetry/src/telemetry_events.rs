@@ -143,6 +143,7 @@ impl TelemetryProcessor {
                 let inner = TelemetryProcessorInner {
                     processing_chain: vec![
                         Box::new(crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
+                        // elastic here
                         Box::new(EventLogger {}),
                     ],
                     receiver,
