@@ -10,7 +10,7 @@ for i in $(redis-cli -p $REDIS_PORT --scan --pattern '*' | sort) ; do
 		data=$(redis-cli -p $REDIS_PORT --raw lrange $i 0 -1 | tr '\n' ' ')
 	elif [ "$type" == "string" ] ; then
 		data=$(redis-cli -p $REDIS_PORT get $i)
-		json=$(python3 -m json.tool <<< "$data")
+		json=$(python3 -m json.tool 2> /dev/null <<< "$data")
 		if [ $? -eq 0 ] ; then
 			data=$json
 		fi
