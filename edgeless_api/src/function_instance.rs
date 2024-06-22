@@ -17,6 +17,15 @@ pub struct StateSpecification {
     pub state_policy: StatePolicy,
 }
 
+impl Default for StateSpecification {
+    fn default() -> Self {
+        Self {
+            state_id: uuid::Uuid::nil(),
+            state_policy: StatePolicy::NodeLocal,
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
 pub struct FunctionClassSpecification {
     /// Function class identifier.
@@ -31,14 +40,26 @@ pub struct FunctionClassSpecification {
     pub function_class_outputs: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+impl Default for FunctionClassSpecification {
+    fn default() -> Self {
+        Self {
+            function_class_id: "".to_string(),
+            function_class_type: "".to_string(),
+            function_class_version: "".to_string(),
+            function_class_code: vec![],
+            function_class_outputs: vec![],
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SpawnFunctionRequest {
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub instance_id: Option<InstanceId>,
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub code: FunctionClassSpecification,
     pub annotations: std::collections::HashMap<String, String>,
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub state_specification: StateSpecification,
 }
 
