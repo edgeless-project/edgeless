@@ -2,9 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 // use sysinfo::System::SystemExt;
 use chrono::{DateTime, Utc};
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
+// use std::sync::{Arc, Mutex};
+
 use sysinfo::*;
 
 use crate::elasticsearch_api;
@@ -24,29 +23,34 @@ fn convert_to_value(data: &SystemResources) -> Value {
     })
 }
 
-#[tokio::main]
-async fn elasticsearch_resources() {
-    let system = Arc::new(Mutex::new(System::new_all()));
+pub async fn elasticsearch_resources() {
+    let mut system = System::new_all();
+    // //periodically update the system information
+    // let system_clone = Arc::clone(&system);
+    // thread::spawn(move || loop {
+    //     let mut system = system_clone.lock().unwrap();
 
-    //periodically update the system information
-    let system_clone = Arc::clone(&system);
-    thread::spawn(move || loop {
-        let mut system = system_clone.lock().unwrap();
-        system.refresh_all();
-        drop(system); // Release the lock before sleeping
-        thread::sleep(Duration::from_secs(1)); // Update every second
-    });
+    //     drop(system); // Release the lock before sleeping
+    //     thread::sleep(Duration::from_secs(1)); // Update every second
+    // });
 
-    let client = elasticsearch_api::es_create_client();
+    let client = match elasticsearch_api::es_create_client() {
+        Ok(client) => client,
+        Err(error) => {
+            log::error!("es_create_client {}", error); //Log also the error message
+            return;
+        }
+    };
     //Create index
-    let _ = elasticsearch_api::es_create_index(&client, true);
+    let _ = elasticsearch_api::es_create_index(&client, elasticsearch_api::IndexType::Runtime);
     //loop to calculate system resources
     loop {
-        thread::sleep(Duration::from_secs(2)); // Sleep
-                                               //retrieve CPU usage for all processors
-        let system = system.lock().unwrap();
-        let cpu_usage = system.global_cpu_info().cpu_usage();
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await; // Sleep
+                                                                          //retrieve CPU usage for all processors
 
+        // let mut system = system.lock().unwrap();
+        system.refresh_all();
+        let cpu_usage = system.global_cpu_info().cpu_usage();
         //calculate total CPU usage
         let total_cpu_usage = cpu_usage / system.cpus().len() as f32 * 100.0;
 
@@ -64,8 +68,8 @@ async fn elasticsearch_resources() {
         //convert to json value
         let data_value = convert_to_value(&data);
         //write to index
-        let _ = elasticsearch_api::es_write_to_index(&client, data_value, true).await;
-        let contents = elasticsearch_api::es_read_from_index(&client, true).await;
-        println!("{:#?}", contents);
+        let _ = elasticsearch_api::es_write_to_index(&client, data_value, elasticsearch_api::IndexType::Runtime).await;
+        let contents = elasticsearch_api::es_read_from_index(&client, elasticsearch_api::IndexType::Runtime).await;
+        log::info!("{:#?}", contents);
     }
 }

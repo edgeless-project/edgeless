@@ -443,6 +443,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         container_runtime_task,
         agent_task,
         agent_api_server,
+        tokio::task::spawn(edgeless_telemetry::elasticsearch_resources::elasticsearch_resources()),
         register_node(
             settings.general,
             get_capabilities(runtimes, settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),

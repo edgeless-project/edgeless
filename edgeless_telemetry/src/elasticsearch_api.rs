@@ -3,10 +3,15 @@ use elasticsearch::indices::IndicesCreateParts;
 use elasticsearch::{
     auth::Credentials, http::transport::SingleNodeConnectionPool, http::transport::TransportBuilder, Elasticsearch, IndexParts, SearchParts,
 };
-use log::info;
 use serde_json::json;
 use serde_json::Value;
 use url::Url;
+
+#[derive(Debug)]
+pub enum IndexType {
+    Runtime,
+    Resources,
+}
 
 //static mut variable to hold the counter
 static mut COUNTER: u32 = 0;
@@ -14,7 +19,7 @@ static mut COUNTER: u32 = 0;
 /// Establish connection to specified ES endpoint.
 /// # Returns
 /// A Result indicating success or failure.
-pub fn es_create_client() -> Elasticsearch {
+pub fn es_create_client() -> Result<Elasticsearch, Box<dyn std::error::Error>> {
     //define ES endpoint configs
 
     let url = Url::parse("elastic_endpoint_url")?; //contant Panagiotis Antoniou(Aegis) for details
@@ -22,8 +27,9 @@ pub fn es_create_client() -> Elasticsearch {
     let conn_pool = SingleNodeConnectionPool::new(url);
     let transport = TransportBuilder::new(conn_pool).auth(credentials).build()?;
 
-    Elasticsearch::new(transport);
+    Ok(Elasticsearch::new(transport))
 }
+///Perform a check when the create client is called to check the result
 
 /// Creates an Elasticsearch index with a specified mapping.
 /// # Arguments
@@ -31,41 +37,46 @@ pub fn es_create_client() -> Elasticsearch {
 /// # Returns
 /// A Result indicating success or failure.
 //To be called once on init.
-pub async fn es_create_index(client: &Elasticsearch, index_flag: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn es_create_index(client: &Elasticsearch, index_type: IndexType) -> Result<(), Box<dyn std::error::Error>> {
     //define mapping
-    let mapping = if index_flag {
-        //create edgeless_resources mapping
-        json!({
-            "mappings": {
-                "properties": {
-                    "cpu_percent": { "type": "float" },
-                    "memory_percent": { "type": "float" },
-                    "timestamp": { "type": "date" }
-                }
-            }
-        })
-    } else {
+    let mapping = match index_type {
+        IndexType::Runtime =>
         //create edgeless_runtime mapping (currently based on stdout console log)
-        json!({
-            "mappings": {
-                "properties": {
-                    "event": { "type": "keyword" },
-                    "timestamp": {"type": "date"},
-                    "tags": {
-                        "properties": {
-                            "FUNCTION_ID": { "type": "keyword" },
-                            "FUNCTION_TYPE": { "type": "keyword" },
-                            "NODE_ID": { "type": "keyword" }
+        {
+            json!({
+                "mappings": {
+                    "properties": {
+                        "cpu_percent": { "type": "float" },
+                        "memory_percent": { "type": "float" },
+                        "timestamp": { "type": "date" }
+                    }
+                }
+            })
+        }
+        IndexType::Resources =>
+        //create edgeless_resources mapping
+        {
+            json!({
+                "mappings": {
+                    "properties": {
+                        "event": { "type": "keyword" },
+                        "timestamp": {"type": "date"},
+                        "tags": {
+                            "properties": {
+                                "FUNCTION_ID": { "type": "keyword" },
+                                "FUNCTION_TYPE": { "type": "keyword" },
+                                "NODE_ID": { "type": "keyword" }
+                            }
                         }
                     }
                 }
-            }
-        })
+            })
+        }
     };
 
     let create_index_response = client
         .indices()
-        .create(IndicesCreateParts::Index(get_index_name(index_flag)))
+        .create(IndicesCreateParts::Index(get_index_name(index_type)))
         .body(mapping)
         .send()
         .await?;
@@ -90,15 +101,15 @@ fn increment_counter() -> String {
 /// # Arguments
 /// * `client_result` - the Elasticsearch client
 /// * `data` - The data to be written to the index.
-/// * `index_flag` - which index to write to
+/// * `index_type: IndexType` - which index to write to
 /// # Returns
 /// A Result indicating success or failure.
 
-pub async fn es_write_to_index(client: &Elasticsearch, data: Value, index_flag: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn es_write_to_index(client: &Elasticsearch, data: Value, index_type: IndexType) -> Result<(), Box<dyn std::error::Error>> {
     let id = increment_counter();
     //send data to ES endpoint via POST
     let index_response = client
-        .index(IndexParts::IndexId(get_index_name(index_flag), &id))
+        .index(IndexParts::IndexId(get_index_name(index_type), &id))
         .body(data)
         .send()
         .await?;
@@ -114,11 +125,11 @@ pub fn get_current_timestamp() -> DateTime<Utc> {
 /// Retrieves data from an Elasticsearch index.
 /// # Arguments
 /// * `client_result` - the Elasticsearch client
-/// * `index_flag` - which index to read   
+/// * `index_type: IndexType` - which index to read   
 /// # Returns
 /// A Result containing a vector of JSON values representing the contents of the index
-pub async fn es_read_from_index(client: &Elasticsearch, index_flag: bool) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
-    let index = get_index_name(index_flag);
+pub async fn es_read_from_index(client: &Elasticsearch, index_type: IndexType) -> anyhow::Result<Vec<Value>> {
+    let index = get_index_name(index_type);
     log::info!("Contents of index {}", index);
 
     //fetch data from ES endpoint with index via GET
@@ -138,7 +149,8 @@ pub async fn es_read_from_index(client: &Elasticsearch, index_flag: bool) -> Res
         let contents: Vec<Value> = hits.iter().map(|hit| hit["_source"].clone()).collect();
         Ok(contents)
     } else {
-        log::error("Failed to retrieve index contents".into())
+        log::error!("Failed to retrieve index contents");
+        Err(anyhow::anyhow!("read from index failed")) //TODO Actual error handling
     }
 }
 
@@ -147,10 +159,10 @@ pub async fn es_read_from_index(client: &Elasticsearch, index_flag: bool) -> Res
 /// * `use_resources_index` - A boolean flag indicating whether to use the resources index (`true`) or the runtime index (`false`).
 /// # Returns
 /// * Returns a string slice (`&'static str`) representing the index name.
-fn get_index_name(use_resources_index: bool) -> &'static str {
-    match use_resources_index {
-        false => "edgeless_runtime",
-        true => "edgeless_resources",
+fn get_index_name(index_type: IndexType) -> &'static str {
+    match index_type {
+        IndexType::Runtime => "edgeless_runtime",
+        IndexType::Resources => "edgeless_resources",
     }
 }
 
