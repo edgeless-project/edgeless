@@ -142,6 +142,7 @@ impl super::proxy::Proxy for ProxyRedis {
                 Ok(intent_key) => {
                     if let Some(intent_key) = intent_key {
                         let get_res = self.connection.get::<&str, Option<String>>(&intent_key);
+                        let _ = self.connection.del::<&str, usize>(&intent_key);
                         match get_res {
                             Ok(intent_value) => match intent_value {
                                 Some(intent_value) => match crate::orchestrator::DeployIntent::new(&intent_key, &intent_value) {
