@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: MIT
 use crate::common::PatchRequest;
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ResourceInstanceSpecification {
     pub class_type: String,
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub output_mapping: std::collections::HashMap<String, crate::function_instance::InstanceId>,
     pub configuration: std::collections::HashMap<String, String>,
 }
