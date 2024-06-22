@@ -107,13 +107,30 @@ In another shell, create the default configuration of the ε-ORC:
 The configuration file is the following:
 
 ```toml
+[general]
 domain_id = "domain-1"
 orchestrator_url = "http://127.0.0.1:7011"
+orchestrator_url_announced = ""
+agent_url = "http://127.0.0.1:7121"
+agent_url_announced = ""
+invocation_url = "http://127.0.0.1:7102"
+invocation_url_announced = ""
+
+[baseline]
 orchestration_strategy = "Random"
 keep_alive_interval_secs = 2
+
+[proxy]
+proxy_type = "None"
+redis_url = ""
+
+[collector]
+collector_type = "None"
+redis_url = ""
 ```
 
-and it contains the domain name and URL exposed by the orchestrator (note: they _must_ be the same as those in `controller.toml`) and the orchestrator configuration, i.e., the strategy to be used (can be one of Random or RoundRobin) and the keep-alive interval before a node is automatically deregistered.
+and it contains the domain name and URL exposed by the orchestrator (note: they _must_ be the same as those in `controller.toml`) and the orchestrator basline configuration, with the strategy to be used (can be one of Random or RoundRobin) and the keep-alive interval before a node is automatically deregistered.
+The `[proxy]` and `[collector]` sections are explained in [orchestration guide](./orchestration.md); the related features are disabled by default.
 
 Then, deploy the ε-ORC:
 
@@ -121,7 +138,7 @@ Then, deploy the ε-ORC:
 RUST_LOG=info ./edgeless_orc_d
 ```
 
-This will show the following output:
+This will show an output containing (among other lines) the following:
 
 ```
 Starting Edgeless Orchestrator at http://127.0.0.1:7011
