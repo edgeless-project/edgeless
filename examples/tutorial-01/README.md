@@ -2,13 +2,7 @@
 
 ![](moving_avg.png)
 
-Build the WASM binaries:
-
-```
-target/debug/edgeless_cli function build examples/tutorial-01/filter_in_range_function/function.json
-target/debug/edgeless_cli function build examples/tutorial-01/moving_avg_function/function.json
-target/debug/edgeless_cli function build examples/tutorial-01/sensor_simulator_function/function.json
-```
+First, build the `filter_in_range`, `moving_avg`, and `sensor_simulator` WASM binaries following the [instructions](../../functions/README.md). 
 
 Then you can start and stop the workflow with:
 

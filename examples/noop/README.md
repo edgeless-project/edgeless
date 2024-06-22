@@ -2,11 +2,7 @@
 
 The example creates a chain of one function that does nothing except calling a log directive.
 
-First build the WASM binary:
-
-```
-target/debug/edgeless_cli function build examples/noop/noop_function/function.json
-```
+First, build the `noop` WASM binary following the [instructions](../../functions/README.md). 
 
 Then you can start and stop the workflow with:
 

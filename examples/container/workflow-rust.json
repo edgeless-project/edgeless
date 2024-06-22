@@ -6,7 +6,7 @@
                 "id": "sensor_simulator",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "../../examples/tutorial-01/sensor_simulator_function/sensor_simulator.wasm",
+                "code": "../../functions/sensor_simulator/sensor_simulator.wasm",
                 "outputs": [
                     "output"
                 ]

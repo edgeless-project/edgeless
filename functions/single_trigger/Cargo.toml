@@ -1,0 +1,28 @@
+# SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+# SPDX-License-Identifier: MIT
+
+[workspace]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+lto = true
+opt-level = "z"
+panic = "abort"
+codegen-units = 1
+strip = true
+
+[package]
+name = "single_trigger"
+version = "0.1.0"
+authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it>"]
+edition = "2021"
+
+[lib]
+name = "single_trigger"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { path = "../../edgeless_function" }

@@ -2,11 +2,7 @@
 
 The example creates a function that periodically send messages to be saved to a file.
 
-First build the WASM binary:
-
-```
-target/debug/edgeless_cli function build examples/file_log/message_generator/function.json
-```
+First, build the `message_generator` WASM binary following the [instructions](../../functions/README.md). 
 
 Then you can start and stop the workflow with:
 
