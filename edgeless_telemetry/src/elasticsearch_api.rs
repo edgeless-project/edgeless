@@ -5,7 +5,9 @@ use elasticsearch::{
 };
 use serde_json::json;
 use serde_json::Value;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use url::Url;
+use uuid::Uuid;
 
 #[derive(Debug)]
 pub enum IndexType {
@@ -13,9 +15,24 @@ pub enum IndexType {
     Resources,
 }
 
-//static mut variable to hold the counter
-static mut COUNTER: u32 = 0;
+//used to generate index UUID
+struct IdGenerator {
+    counter: AtomicUsize,
+}
 
+impl IdGenerator {
+    fn new() -> Self {
+        IdGenerator {
+            counter: AtomicUsize::new(0),
+        }
+    }
+
+    fn increment_counter(&self) -> String {
+        let count = self.counter.fetch_add(1, Ordering::SeqCst);
+        let uuid = Uuid::new_v4();
+        format!("{}_{}", count, uuid)
+    }
+}
 /// Establish connection to specified ES endpoint.
 /// # Returns
 /// A Result indicating success or failure.
@@ -27,6 +44,9 @@ pub fn es_create_client() -> Result<Elasticsearch, Box<dyn std::error::Error>> {
     let conn_pool = SingleNodeConnectionPool::new(url);
     let transport = TransportBuilder::new(conn_pool).auth(credentials).build()?;
 
+    //Return only the client and not the connection response
+    // let client = Elasticsearch::new(transport);
+    // client
     Ok(Elasticsearch::new(transport))
 }
 ///Perform a check when the create client is called to check the result
@@ -90,12 +110,6 @@ pub async fn es_create_index(client: &Elasticsearch, index_type: IndexType) -> R
 }
 
 //static counter for indexing identification
-fn increment_counter() -> String {
-    unsafe {
-        COUNTER += 1;
-        COUNTER.to_string()
-    }
-}
 
 /// Writes data to an Elasticsearch index.
 /// # Arguments
@@ -105,9 +119,13 @@ fn increment_counter() -> String {
 /// # Returns
 /// A Result indicating success or failure.
 
-pub async fn es_write_to_index(client: &Elasticsearch, data: Value, index_type: IndexType) -> Result<(), Box<dyn std::error::Error>> {
-    let id = increment_counter();
-    //send data to ES endpoint via POST
+pub async fn es_write_to_index(
+    client: &Elasticsearch,
+    data: Value,
+    index_type: IndexType,
+    id_generator: &IdGenerator,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let id = id_generator.increment_counter(); //send data to ES endpoint via POST
     let index_response = client
         .index(IndexParts::IndexId(get_index_name(index_type), &id))
         .body(data)
