@@ -4,11 +4,7 @@ The example creates a chain of one function that waits for POST commands
 matching a given host addressed to the balancer HTTP end-point and replies with
 a 200 OK.
 
-First build the WASM binary:
-
-```
-target/debug/edgeless_cli function build examples/http_ingress/processing_function/function.json
-```
+First, build the `http_processor` WASM binary following the [instructions](../../functions/README.md). 
 
 Then you can start the workflow:
 

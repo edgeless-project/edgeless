@@ -2,8 +2,8 @@
 # SPDX-FileCopyrightText: © 2024 Siemens AG
 # SPDX-License-Identifier: MIT
 
-# Delete old function wasm files
-rm -f $(find ../functions -name "*.wasm")
-
 # Build all dda demo functions
-for i in $(find ../functions -name function.json) ; do ../../../target/debug/edgeless_cli function build $i ; done
+dda_demo_functions="check_temperature move_arm"
+for dda_demo_function in $dda_demo_functions ; do
+    ../../../target/debug/edgeless_cli function build ../../../functions/$dda_demo_function/function.json
+done

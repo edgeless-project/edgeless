@@ -1,0 +1,54 @@
+{
+    "functions": [
+        {
+            "name": "matrix_mul",
+            "class_specification": {
+                "id": "matrix_mul",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/matrix_mul/matrix_mul.wasm",
+                "outputs": [
+                    "metric",
+                    "out-0",
+                    "out-1",
+                    "out-2",
+                    "out-3",
+                    "out-4",
+                    "out-5",
+                    "out-6",
+                    "out-7",
+                    "out-8",
+                    "out-9",
+                    "out-10",
+                    "out-11",
+                    "out-12",
+                    "out-13",
+                    "out-14",
+                    "out-15",
+                    "out-16",
+                    "out-17",
+                    "out-18",
+                    "out-19"
+                ]
+            },
+            "output_mapping": {
+                "metric": "metrics-collector"
+            },
+            "annotations": {
+                "init-payload": "seed=42,inter_arrival=2000,is_first=true,is_last=true,matrix_size=1000,outputs="
+            }
+        }
+    ],
+    "resources": [
+        {
+            "name": "metrics-collector",
+            "class_type": "metrics-collector",
+            "output_mapping": {},
+            "configurations": {
+                "alpha": "0.9",
+                "wf_name": "matrix_mul_wf_single"
+            }
+        }
+    ],
+    "annotations": {}
+}
