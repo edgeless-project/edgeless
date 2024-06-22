@@ -2,7 +2,7 @@
 
 logs="build.log build_functions.log edgeless_bal.log edgeless_con.log edgeless_orc.log edgeless_node.log my-local-file.log reading-errors.log"
 confs="balancer.toml controller.toml orchestrator.toml node.toml cli.toml"
-specialized_workflows="dda_demo esp32_resources redis"
+specialized_workflows="container dda_demo esp32_resources redis vector_mul matrix_mul"
 
 echo "checking for existing files"
 existing_files=""
@@ -31,18 +31,11 @@ if [ $? -ne 0 ] ; then
 fi
 
 echo "building the functions, if needed"
-rm -f build_functions.log 2> /dev/null
-for func in $(find examples/ -type f -name function.json) ; do
-    echo -n "checking function in $(dirname $func): "
-
-    wasm_name="$(dirname $func)/$(grep "\"id\"" $func | cut -f 4 -d '"').wasm"
-    if [ -r $wasm_name ] ; then
-        echo "using pre-built byte code"
-    else
-        echo "building byte code (please be patient)"
-        target/debug/edgeless_cli function build $func >> build_functions.log 2>&1
-    fi
-done
+scripts/functions_build.sh
+if [ $? -ne 0 ] ; then
+    echo "error building some functions, bailing out"
+    exit 1
+fi
 
 echo "creating configuration files"
 target/debug/edgeless_bal_d -t balancer.toml
@@ -64,8 +57,9 @@ pids+=($!)
 
 sleep 0.5
 
-echo "workflows"
-for workflow in $(find examples/ -type f -name workflow.json) ; do
+echo "starting workflows"
+for workflow in $(find examples -type f -name "workflow*.json") ; do
+    name=$(basename $(dirname $workflow))
     if [ "$RUN_SPECIALIZED_WORKFLOWS" != "1" ] ; then
         specialized=0
         for specialized_workflow in $specialized_workflows ; do
@@ -80,7 +74,7 @@ for workflow in $(find examples/ -type f -name workflow.json) ; do
         fi
     fi
 
-    echo -n "starting workflow $(dirname $workflow): "
+    echo -n "starting workflow $name: "
     uid=$(RUST_LOG=error target/debug/edgeless_cli workflow start $workflow | grep '-')
     if [ $? -eq 0 ] ; then
         echo "started with ID $uid"
@@ -88,7 +82,7 @@ for workflow in $(find examples/ -type f -name workflow.json) ; do
         echo "error"
     fi
     sleep 2
-    echo -n "stopping workflow $(dirname $workflow): "
+    echo -n "stopping workflow $name: "
     target/debug/edgeless_cli workflow stop $uid >& /dev/null
     if [ $? -eq 0 ] ; then
         echo "done"

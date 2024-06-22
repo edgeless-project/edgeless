@@ -18,11 +18,7 @@ where:
 
 #### Function preparation
 
-First build the `sensor_simulator` WASM binary:
-
-```bash
-target/debug/edgeless_cli function build examples/tutorial-01/sensor_simulator_function/function.json
-```
+First, build the `sensor_simulator` WASM binary following the [instructions](../../functions/README.md). 
 
 Then install Docker following the
 [official instructions](https://docs.docker.com/get-docker/) and make sure
