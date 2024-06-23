@@ -4,10 +4,9 @@ use serde_json::{json, Value};
 use chrono::{DateTime, Utc};
 // use std::sync::{Arc, Mutex};
 
-use sysinfo::*;
-
 use crate::elasticsearch_api;
-
+use crate::elasticsearch_api::IdGenerator;
+use sysinfo::*;
 #[derive(Debug, Serialize, Deserialize)]
 struct SystemResources {
     cpu_percent: f32,
@@ -34,6 +33,8 @@ pub async fn elasticsearch_resources() {
     //     thread::sleep(Duration::from_secs(1)); // Update every second
     // });
 
+    let id_generator = IdGenerator::new();
+
     let client = match elasticsearch_api::es_create_client() {
         Ok(client) => client,
         Err(error) => {
@@ -45,8 +46,8 @@ pub async fn elasticsearch_resources() {
     let _ = elasticsearch_api::es_create_index(&client, elasticsearch_api::IndexType::Runtime);
     //loop to calculate system resources
     loop {
-        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await; // Sleep
-                                                                          //retrieve CPU usage for all processors
+        tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await; // Sleep
+                                                                            //retrieve CPU usage for all processors
 
         // let mut system = system.lock().unwrap();
         system.refresh_all();
@@ -55,9 +56,9 @@ pub async fn elasticsearch_resources() {
         let total_cpu_usage = cpu_usage / system.cpus().len() as f32 * 100.0;
 
         //print total CPU usage
-        println!("Total CPU Usage: {:.5}%", total_cpu_usage);
+        // log::info!("Total CPU Usage: {:.5}%", total_cpu_usage);
         let total_memory_usage = system.used_memory() as f32 / system.total_memory() as f32 * 100.0;
-        println!("Memory Usage: {:?}%", total_memory_usage);
+        // log::info!("Memory Usage: {:?}%", total_memory_usage);
 
         //save resources to struct
         let data = SystemResources {
@@ -68,8 +69,8 @@ pub async fn elasticsearch_resources() {
         //convert to json value
         let data_value = convert_to_value(&data);
         //write to index
-        let _ = elasticsearch_api::es_write_to_index(&client, data_value, elasticsearch_api::IndexType::Runtime).await;
-        let contents = elasticsearch_api::es_read_from_index(&client, elasticsearch_api::IndexType::Runtime).await;
+        let _ = elasticsearch_api::es_write_to_index(&client, data_value, elasticsearch_api::IndexType::Resources, &id_generator).await;
+        let contents = elasticsearch_api::es_read_from_index(&client, elasticsearch_api::IndexType::Resources).await;
         log::info!("{:#?}", contents);
     }
 }
