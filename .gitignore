@@ -13,3 +13,4 @@ vendor/
 secrets/
 .venv
 *.swp
+creds.json

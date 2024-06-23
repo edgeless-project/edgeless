@@ -3,18 +3,30 @@ use elasticsearch::indices::IndicesCreateParts;
 use elasticsearch::{
     auth::Credentials, http::transport::SingleNodeConnectionPool, http::transport::TransportBuilder, Elasticsearch, IndexParts, SearchParts,
 };
+
+use serde::Deserialize;
 use serde_json::json;
 use serde_json::Value;
+use std::fs;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use url::Url;
 use uuid::Uuid;
-
 #[derive(Debug)]
 pub enum IndexType {
     Runtime,
     Resources,
 }
-
+#[derive(Deserialize)]
+struct Creds {
+    username: String,
+    password: String,
+    url: String,
+}
+fn read_creds_from_file(file_path: &str) -> Creds {
+    let contents = fs::read_to_string(file_path).expect("Failed to read the file");
+    let creds: Creds = serde_json::from_str(&contents).expect("Failed to parse JSON");
+    creds
+}
 //used to generate index UUID
 pub struct IdGenerator {
     counter: AtomicUsize,
@@ -38,12 +50,17 @@ impl IdGenerator {
 /// A Result indicating success or failure.
 pub fn es_create_client() -> Result<Elasticsearch, Box<dyn std::error::Error>> {
     //define ES endpoint configs
+    //read credentials from file
+    let file_path = "/workspaces/edgeless/es_creds.json";
 
-    let url = Url::parse("https://edgeless1.iit.cnr.it:9200")?;
-    let credentials = Credentials::Basic("elastic".into(), "clJMa57d1VG3wLQBk8=Z".into());
+    // Read the credentials from the file
+    let creds = read_creds_from_file(file_path);
+
+    let url = Url::parse(&creds.url)?;
+    let credentials = Credentials::Basic(creds.username, creds.password);
     let conn_pool = SingleNodeConnectionPool::new(url);
     let transport = TransportBuilder::new(conn_pool).auth(credentials).build()?;
-    //Return only the client and not the connection response
+    //TODO: Return only the client and not the connection response
     // let client = Elasticsearch::new(transport);
     // client
     Ok(Elasticsearch::new(transport))
