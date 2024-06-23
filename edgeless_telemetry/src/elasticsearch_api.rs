@@ -16,18 +16,18 @@ pub enum IndexType {
 }
 
 //used to generate index UUID
-struct IdGenerator {
+pub struct IdGenerator {
     counter: AtomicUsize,
 }
 
 impl IdGenerator {
-    fn new() -> Self {
+    pub fn new() -> Self {
         IdGenerator {
             counter: AtomicUsize::new(0),
         }
     }
 
-    fn increment_counter(&self) -> String {
+    pub fn increment_counter(&self) -> String {
         let count = self.counter.fetch_add(1, Ordering::SeqCst);
         let uuid = Uuid::new_v4();
         format!("{}_{}", count, uuid)
@@ -39,11 +39,10 @@ impl IdGenerator {
 pub fn es_create_client() -> Result<Elasticsearch, Box<dyn std::error::Error>> {
     //define ES endpoint configs
 
-    let url = Url::parse("elastic_endpoint_url")?; //contant Panagiotis Antoniou(Aegis) for details
-    let credentials = Credentials::Basic("username".into(), "password".into()); //contact Panagiotis Antoniou(Aegis) for details
+    let url = Url::parse("https://edgeless1.iit.cnr.it:9200")?;
+    let credentials = Credentials::Basic("elastic".into(), "clJMa57d1VG3wLQBk8=Z".into());
     let conn_pool = SingleNodeConnectionPool::new(url);
     let transport = TransportBuilder::new(conn_pool).auth(credentials).build()?;
-
     //Return only the client and not the connection response
     // let client = Elasticsearch::new(transport);
     // client
@@ -60,7 +59,7 @@ pub fn es_create_client() -> Result<Elasticsearch, Box<dyn std::error::Error>> {
 pub async fn es_create_index(client: &Elasticsearch, index_type: IndexType) -> Result<(), Box<dyn std::error::Error>> {
     //define mapping
     let mapping = match index_type {
-        IndexType::Runtime =>
+        IndexType::Resources =>
         //create edgeless_runtime mapping (currently based on stdout console log)
         {
             json!({
@@ -73,7 +72,7 @@ pub async fn es_create_index(client: &Elasticsearch, index_type: IndexType) -> R
                 }
             })
         }
-        IndexType::Resources =>
+        IndexType::Runtime =>
         //create edgeless_resources mapping
         {
             json!({
