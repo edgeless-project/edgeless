@@ -36,7 +36,7 @@ impl EdgeFunction for Counter {
 
 fn start_kafka_producer(initial_value: i32) -> Result<()> {
     let kafka_brokers = "localhost:9092";  
-    let kafka_topic = "counter-topic";   //si può modififcare con il topic desiderato
+    let kafka_topic = "test-topic";   //si può modififcare con il topic desiderato
 
     let producer: BaseProducer = ClientConfig::new()
         .set("bootstrap.servers", kafka_brokers)

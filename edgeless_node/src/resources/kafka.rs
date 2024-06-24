@@ -63,7 +63,7 @@ impl KafkaResource {
                 if let Err(e) = producer.send(
                     BaseRecord::to(&kafka_topic)
                         .payload(&message_data)
-                        .key("some_key"),
+                        .key(""),
                 ) {
                     log::error!("Failed to send message to topic '{}': {:?}", kafka_topic, e);
                 }

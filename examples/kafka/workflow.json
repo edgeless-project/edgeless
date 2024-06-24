@@ -25,7 +25,8 @@
             "configurations": {
                 "brokers": "localhost:9092",                
                 "url": "localhost:9092",
-                "key": "my-test"
+                "key": "my-test",
+                "topic": "test-topic"
             }
         }
     ],
