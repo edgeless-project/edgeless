@@ -1,3 +1,5 @@
+use crate::elasticsearch_api::ESClient;
+
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
@@ -104,6 +106,13 @@ impl EventProcessor for EventLogger {
     }
 }
 
+//Elasticsearch API Event prosessor
+impl EventProcessor for crate::elasticsearch_api::ESClient {
+    fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult {
+        let _ = self.write_event(event, event_tags);
+        TelemetryProcessingResult::PROCESSED
+    }
+}
 struct TelemetryProcessorInner {
     processing_chain: Vec<Box<dyn EventProcessor>>,
     receiver: tokio::sync::mpsc::UnboundedReceiver<TelemetryProcessorInput>,
@@ -143,7 +152,7 @@ impl TelemetryProcessor {
                 let inner = TelemetryProcessorInner {
                     processing_chain: vec![
                         Box::new(crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
-                        // elastic here
+                        Box::new(crate::elasticsearch_api::ESClient::new().await?),
                         Box::new(EventLogger {}),
                     ],
                     receiver,

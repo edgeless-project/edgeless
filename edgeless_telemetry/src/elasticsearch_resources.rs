@@ -3,9 +3,9 @@ use serde_json::{json, Value};
 // use sysinfo::System::SystemExt;
 use chrono::{DateTime, Utc};
 // use std::sync::{Arc, Mutex};
-
 use crate::elasticsearch_api;
-use crate::elasticsearch_api::IdGenerator;
+use uuid::Uuid;
+
 use sysinfo::*;
 #[derive(Debug, Serialize, Deserialize)]
 struct SystemResources {
@@ -24,18 +24,10 @@ fn convert_to_value(data: &SystemResources) -> Value {
 
 pub async fn elasticsearch_resources() {
     let mut system = System::new_all();
-    // //periodically update the system information
-    // let system_clone = Arc::clone(&system);
-    // thread::spawn(move || loop {
-    //     let mut system = system_clone.lock().unwrap();
 
-    //     drop(system); // Release the lock before sleeping
-    //     thread::sleep(Duration::from_secs(1)); // Update every second
-    // });
+    let id_generator = Uuid::new_v4().to_string();
 
-    let id_generator = IdGenerator::new();
-
-    let client = match elasticsearch_api::es_create_client() {
+    let client = match elasticsearch_api::es_create_client().await {
         Ok(client) => client,
         Err(error) => {
             log::error!("es_create_client {}", error); //Log also the error message
@@ -69,8 +61,11 @@ pub async fn elasticsearch_resources() {
         //convert to json value
         let data_value = convert_to_value(&data);
         //write to index
-        let _ = elasticsearch_api::es_write_to_index(&client, data_value, elasticsearch_api::IndexType::Resources, &id_generator).await;
-        let contents = elasticsearch_api::es_read_from_index(&client, elasticsearch_api::IndexType::Resources).await;
-        log::info!("{:#?}", contents);
+        let _ = elasticsearch_api::es_write_to_index(&client, data_value, elasticsearch_api::IndexType::Resources).await;
+        // log::info!("Written to Elasticsearch");
+        // let contents = elasticsearch_api::es_read_from_index(&client, elasticsearch_api::IndexType::Resources).await;
+        // log::info!("{:#?}", contents);
     }
 }
+
+//TODO: USE ESCLIENT
