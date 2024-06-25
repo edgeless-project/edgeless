@@ -9,6 +9,7 @@ use uuid::Uuid;
 use sysinfo::*;
 #[derive(Debug, Serialize, Deserialize)]
 struct SystemResources {
+    node_id: String,
     cpu_percent: f32,
     memory_percent: f32,
     timestamp: DateTime<Utc>,
@@ -16,17 +17,15 @@ struct SystemResources {
 
 fn convert_to_value(data: &SystemResources) -> Value {
     json!({
+        "node_id": data.node_id,
         "cpu_percent": data.cpu_percent,
         "memory_percent": data.memory_percent,
         "timestamp": data.timestamp,
     })
 }
 
-pub async fn elasticsearch_resources() {
+pub async fn elasticsearch_resources(node: String) {
     let mut system = System::new_all();
-
-    let id_generator = Uuid::new_v4().to_string();
-
     let client = match elasticsearch_api::es_create_client().await {
         Ok(client) => client,
         Err(error) => {
@@ -35,7 +34,7 @@ pub async fn elasticsearch_resources() {
         }
     };
     //Create index
-    let _ = elasticsearch_api::es_create_index(&client, elasticsearch_api::IndexType::Runtime);
+    // let _ = elasticsearch_api::es_create_index(&client, elasticsearch_api::IndexType::Runtime);
     //loop to calculate system resources
     loop {
         tokio::time::sleep(tokio::time::Duration::from_millis(5000)).await; // Sleep
@@ -54,6 +53,7 @@ pub async fn elasticsearch_resources() {
 
         //save resources to struct
         let data = SystemResources {
+            node_id: node.clone(),
             cpu_percent: total_cpu_usage,
             memory_percent: total_memory_usage,
             timestamp: elasticsearch_api::get_current_timestamp(),
@@ -62,7 +62,7 @@ pub async fn elasticsearch_resources() {
         let data_value = convert_to_value(&data);
         //write to index
         let _ = elasticsearch_api::es_write_to_index(&client, data_value, elasticsearch_api::IndexType::Resources).await;
-        // log::info!("Written to Elasticsearch");
+        log::info!("Written to Elasticsearch");
         // let contents = elasticsearch_api::es_read_from_index(&client, elasticsearch_api::IndexType::Resources).await;
         // log::info!("{:#?}", contents);
     }
