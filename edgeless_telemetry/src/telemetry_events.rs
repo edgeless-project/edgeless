@@ -1,5 +1,5 @@
 use crate::elasticsearch_api::ESClient;
-
+use async_trait::async_trait;
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
@@ -93,26 +93,49 @@ enum TelemetryProcessorInput {
     TelemetryEvent(TelemetryEvent, std::collections::BTreeMap<String, String>),
 }
 
+#[async_trait]
 pub trait EventProcessor: Sync + Send {
     fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult;
+
+    async fn handle_async(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult {
+        // Default implementation calls the synchronous method
+        self.handle(event, event_tags)
+    }
 }
 
 struct EventLogger {}
 
 impl EventProcessor for EventLogger {
     fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult {
-        println!("Event: {:?} , tags: {:?}", event, event_tags);
+        log::info!("Event: {:?} , tags: {:?}", event, event_tags);
         TelemetryProcessingResult::PROCESSED
     }
 }
 
 //Elasticsearch API Event prosessor
-impl EventProcessor for crate::elasticsearch_api::ESClient {
-    fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult {
-        let _ = self.write_event(event, event_tags);
-        TelemetryProcessingResult::PROCESSED
+#[async_trait]
+impl crate::telemetry_events::EventProcessor for ESClient {
+    fn handle(
+        &mut self,
+        event: &crate::telemetry_events::TelemetryEvent,
+        event_tags: &std::collections::BTreeMap<String, String>,
+    ) -> crate::telemetry_events::TelemetryProcessingResult {
+        crate::telemetry_events::TelemetryProcessingResult::FINAL
+    }
+
+    async fn handle_async(
+        &mut self,
+        event: &crate::telemetry_events::TelemetryEvent,
+        event_tags: &std::collections::BTreeMap<String, String>,
+    ) -> crate::telemetry_events::TelemetryProcessingResult {
+        log::info!("ASYNC");
+        match self.write_event(event, event_tags).await {
+            Ok(_) => crate::telemetry_events::TelemetryProcessingResult::PROCESSED,
+            Err(_) => crate::telemetry_events::TelemetryProcessingResult::FINAL,
+        }
     }
 }
+
 struct TelemetryProcessorInner {
     processing_chain: Vec<Box<dyn EventProcessor>>,
     receiver: tokio::sync::mpsc::UnboundedReceiver<TelemetryProcessorInput>,
@@ -131,7 +154,7 @@ impl TelemetryProcessorInner {
 
     async fn handle(&mut self, event: TelemetryEvent, event_tags: std::collections::BTreeMap<String, String>) {
         for processor in &mut self.processing_chain {
-            let processing_result = processor.handle(&event, &event_tags);
+            let processing_result = processor.handle_async(&event, &event_tags).await;
             if processing_result == TelemetryProcessingResult::FINAL {
                 break;
             }
@@ -148,7 +171,6 @@ impl TelemetryProcessor {
         match edgeless_api::util::parse_http_host(&metrics_url) {
             Ok((_, ip, port)) => {
                 let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<TelemetryProcessorInput>();
-
                 let inner = TelemetryProcessorInner {
                     processing_chain: vec![
                         Box::new(crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
