@@ -14,9 +14,9 @@ pub enum StatePolicy {
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Eq, Hash)]
 pub enum FunctionType {
-    Rust_WASM,
-    Rust_x86_64,
-    Rust_aarch64,
+    RustWasm,
+    RustX86_64,
+    RustAarch64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -57,10 +57,10 @@ pub trait FunctionInstanceAPI<FunctionIdType: Clone>: FunctionInstanceAPIClone<F
 impl FunctionType {
     pub fn from_string(function_type: &str) -> Self {
         match function_type {
-            "RUST_WASM" => Self::Rust_WASM,
-            "RUST_X86" => Self::Rust_x86_64,
-            "RUST_ARM" => Self::Rust_aarch64,
-            _ => Self::Rust_WASM,
+            "RUST_WASM" => Self::RustWasm,
+            "RUST_X86" => Self::RustX86_64,
+            "RUST_ARM" => Self::RustAarch64,
+            _ => Self::RustWasm,
         }
     }
 }
