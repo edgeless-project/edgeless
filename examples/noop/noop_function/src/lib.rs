@@ -7,6 +7,13 @@ struct NoopFunction;
 
 impl EdgeFunction for NoopFunction {
     fn handle_cast(src: InstanceId, encoded_message: &[u8]) {
+        println!(
+            "Noop casted, node {:?}, function {:?}, MSG: {:?}",
+            src.node_id,
+            src.component_id,
+            encoded_message
+        );
+
         log::info!(
             "Noop casted, node {:?}, function {:?}, MSG: {:?}",
             src.node_id,
@@ -16,6 +23,13 @@ impl EdgeFunction for NoopFunction {
     }
 
     fn handle_call(src: InstanceId, encoded_message: &[u8]) -> CallRet {
+        println!(
+            "Noop called, node {:?}, function {:?}, MSG: {:?}",
+            src.node_id,
+            src.component_id,
+            encoded_message
+        );
+
         log::info!(
             "Noop called, node {:?}, function {:?}, MSG: {:?}",
             src.node_id,
@@ -26,11 +40,13 @@ impl EdgeFunction for NoopFunction {
     }
 
     fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
+        println!("Noop initialized, payload: {:?}", payload);
         edgeless_function::init_logger();
         log::info!("Noop initialized, payload: {:?}", payload);
     }
 
     fn handle_stop() {
+        println!("Noop stopped");
         log::info!("Noop stopped");
     }
 }
