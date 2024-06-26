@@ -5,90 +5,9 @@
 mod tests {
     // use super::*;
 
-    fn string_to_instance_id(val: &str) -> edgeless_api::function_instance::InstanceId {
-        let tokens: Vec<&str> = val.split(' ').collect();
-        if tokens.len() == 4 {
-            let node_id = match uuid::Uuid::from_str(&tokens[1][0..tokens[1].len() - 1]) {
-                Ok(val) => val,
-                Err(_) => uuid::Uuid::nil(),
-            };
-            let function_id = match uuid::Uuid::from_str(&tokens[3][0..tokens[3].len() - 1]) {
-                Ok(val) => val,
-                Err(_) => uuid::Uuid::nil(),
-            };
-            edgeless_api::function_instance::InstanceId { node_id, function_id }
-        } else {
-            edgeless_api::function_instance::InstanceId::none()
-        }
-    }
-
-    // Data structure clone of ActiveInstance, which can be deserialized.
-    #[derive(Clone, serde::Deserialize)]
-    pub enum ActiveInstanceClone {
-        // 0: request
-        // 1: [ (node_id, int_fid) ]
-        Function(edgeless_api::function_instance::SpawnFunctionRequest, Vec<String>),
-
-        // 0: request
-        // 1: (node_id, int_fid)
-        Resource(edgeless_api::resource_configuration::ResourceInstanceSpecification, String),
-    }
-
-    impl ActiveInstanceClone {
-        fn node_id(&self) -> edgeless_api::function_instance::NodeId {
-            string_to_instance_id(match self {
-                ActiveInstanceClone::Function(_, instances) => match instances.first() {
-                    Some(val) => val,
-                    None => return uuid::Uuid::nil(),
-                },
-                ActiveInstanceClone::Resource(_, instance) => instance,
-            })
-            .node_id
-        }
-    }
-
-    use std::str::FromStr;
-
     use edgeless_api::controller::ControllerAPI;
     use edgeless_api::workflow_instance::WorkflowInstanceAPI;
-    use redis::Commands;
-
-    fn redis_node_ids(connection: &mut redis::Connection) -> Vec<edgeless_api::function_instance::NodeId> {
-        let mut uuids = vec![];
-        for node_key in connection.keys::<&str, Vec<String>>("node:capabilities:*").unwrap_or(vec![]) {
-            let tokens: Vec<&str> = node_key.split(':').collect();
-            assert_eq!(tokens.len(), 3);
-            if let Ok(uuid) = edgeless_api::function_instance::NodeId::parse_str(tokens[2]) {
-                uuids.push(uuid);
-            }
-        }
-        uuids
-    }
-
-    fn redis_instances(
-        connection: &mut redis::Connection,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, ActiveInstanceClone> {
-        let mut instance_ids = vec![];
-        for instance_key in connection.keys::<&str, Vec<String>>("instance:*").unwrap_or(vec![]) {
-            let tokens: Vec<&str> = instance_key.split(':').collect();
-            assert_eq!(tokens.len(), 2);
-            if let Ok(uuid) = edgeless_api::function_instance::NodeId::parse_str(tokens[1]) {
-                instance_ids.push(uuid);
-            }
-        }
-        let mut instances = std::collections::HashMap::new();
-        for instance_id in instance_ids {
-            if let Ok(val) = connection.get::<String, String>(format!("instance:{}", instance_id.to_string())) {
-                if let Ok(val) = serde_json::from_str(&val) {
-                    instances.insert(instance_id, val);
-                }
-                if let Err(err) = serde_json::from_str::<ActiveInstanceClone>(&val) {
-                    println!("{}: {}", val, err);
-                }
-            }
-        }
-        instances
-    }
+    use edgeless_orc::proxy::Proxy;
 
     async fn setup(
         num_domains: u32,
@@ -418,14 +337,8 @@ mod tests {
         let _ = env_logger::try_init();
 
         // Skip the test if there is no local Redis listening on default port.
-        let mut redis_connection = match redis::Client::open("redis://localhost:6379") {
-            Ok(client) => match client.get_connection() {
-                Ok(connection) => connection,
-                Err(_) => {
-                    println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
-                    return Ok(());
-                }
-            },
+        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", false) {
+            Ok(redis_proxy) => redis_proxy,
             Err(_) => {
                 println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
                 return Ok(());
@@ -437,8 +350,19 @@ mod tests {
 
         // Check that in the Redis there are two regular nodes, in addition to
         // the one for metrics collection in the orchestrator.
-        let node_uuids = redis_node_ids(&mut redis_connection);
+        for (uuid, capabilities) in redis_proxy.fetch_node_capabilities() {
+            println!("node {}, capabilities {}", uuid, capabilities);
+        }
+        for (uuid, health) in redis_proxy.fetch_node_health() {
+            println!("node {}, health {}", uuid, health);
+        }
+        let node_uuids = redis_proxy
+            .fetch_node_capabilities()
+            .keys()
+            .cloned()
+            .collect::<Vec<edgeless_api::function_instance::NodeId>>();
         assert_eq!(node_uuids.len(), 1 + 2);
+        assert_eq!(redis_proxy.fetch_node_health().len(), 1 + 2);
 
         // Check that there is no workflow through the client.
         assert!(wf_list(&mut client).await.is_empty());
@@ -501,29 +425,24 @@ mod tests {
         // Check that the client now shows one workflow.
         assert_eq!(1, wf_list(&mut client).await.len());
 
-        // Find the logical identifiers of the functions and how the instances
-        // were mapped to nodes.
+        // Logical function identifiers -> nodes.
         let mut instances = std::collections::HashMap::new();
         for _ in 0..100 {
-            instances = redis_instances(&mut redis_connection);
+            instances = redis_proxy.fetch_function_instances_to_nodes();
             if instances.len() == 3 {
                 break;
             } else {
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
             }
         }
-        let mut instances_to_nodes = std::collections::HashMap::new();
-        for (logical_fid, instance) in instances {
-            println!("before function {} -> node {}", logical_fid, instance.node_id());
-            instances_to_nodes.insert(logical_fid, instance.node_id());
-        }
 
         // Find the nodes with assigned functions.
         let mut nodes_with_functions = std::collections::HashSet::new();
-        for (_logical_fid, node_id) in &instances_to_nodes {
-            nodes_with_functions.insert(node_id.clone());
+        for (logical_fid, nodes) in &instances {
+            assert!(nodes.len() == 1);
+            println!("before function {} -> node {}", logical_fid, nodes.first().unwrap());
+            nodes_with_functions.insert(nodes.first().unwrap().clone());
         }
-        assert_eq!(nodes_with_functions.len(), 2);
 
         // Add intents to migrate the function instances.
         let other = |x: &edgeless_api::function_instance::NodeId| {
@@ -533,22 +452,29 @@ mod tests {
                 uuid::Uuid::nil()
             }
         };
-        for (logical_fid, node_id) in &instances_to_nodes {
-            let key = format!("intent:migrate:{}", logical_fid);
-            let _ = redis_connection.set::<&str, &str, usize>(&key, &other(node_id).to_string());
-            let _ = redis_connection.lpush::<&str, &str, String>("intents", &key);
+
+        let mut intents = vec![];
+        for (logical_fid, nodes) in &instances {
+            assert!(nodes.len() == 1);
+            intents.push(edgeless_orc::orchestrator::DeployIntent::Migrate(
+                logical_fid.clone(),
+                vec![other(nodes.first().unwrap())],
+            ));
         }
+        redis_proxy.add_deploy_intents(intents);
 
         // Wait until the policy is implemented.
         for _ in 0..100 {
-            let new_instances = redis_instances(&mut redis_connection);
-            assert_eq!(new_instances.len(), instances_to_nodes.len());
+            let new_instances = redis_proxy.fetch_function_instances_to_nodes();
+            assert_eq!(new_instances.len(), instances.len());
 
             let mut not_done = false;
-            for (logical_fid, node_id) in &instances_to_nodes {
-                if let Some(new_instance) = new_instances.get(logical_fid) {
-                    let new_node = new_instance.node_id();
-                    if new_node != other(node_id) {
+            for (logical_fid, nodes) in &instances {
+                if let Some(new_nodes) = new_instances.get(logical_fid) {
+                    assert!(new_nodes.len() == 1);
+                    let new_node = new_nodes.first().unwrap();
+                    let node = nodes.first().unwrap();
+                    if new_node != &other(node) {
                         not_done = true;
                         break;
                     }
@@ -563,14 +489,14 @@ mod tests {
         }
 
         // Print new mapping
-        instances = redis_instances(&mut redis_connection);
-        for (logical_fid, instance) in instances {
-            println!("after function {} -> node {}", logical_fid, instance.node_id());
+        instances = redis_proxy.fetch_function_instances_to_nodes();
+        for (logical_fid, nodes) in instances {
+            assert!(nodes.len() == 1);
+            println!("after function {} -> node {}", logical_fid, nodes.first().unwrap());
         }
 
         // Check that the intents have been cleared.
-        assert!(redis_connection.keys::<&str, Vec<String>>("intents").unwrap().is_empty());
-        assert!(redis_connection.keys::<&str, Vec<String>>("intent:*").unwrap().is_empty());
+        assert!(redis_proxy.retrieve_deploy_intents().is_empty());
 
         // Stop the workflows
         match client.stop(workflow_id.unwrap()).await {
