@@ -8,10 +8,6 @@ struct VectorMulFunction;
 struct Conf {
     // True: this is the client, which triggers the first input and receives the last output.
     is_client: bool,
-    // Name of the workflow (for stats only).
-    wf_name: String,
-    // Name of the function (for stats only).
-    fun_name: String,
     // Input size of the vector.
     input_size: usize,
 }
@@ -30,7 +26,6 @@ static STATE: std::sync::OnceLock<std::sync::Mutex<State>> = std::sync::OnceLock
 impl EdgeFunction for VectorMulFunction {
     fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
         let conf = CONF.get().unwrap();
-        // log::info!("VectorMul casted, wf {}, fun {}, MSG: {}", conf.wf_name, conf.fun_name, encoded_message);
         let mut state = STATE.get().unwrap().lock().unwrap();
 
         //
@@ -39,7 +34,7 @@ impl EdgeFunction for VectorMulFunction {
         if conf.is_client {
             let id = state.next_id;
             if id > 0 {
-                cast("metric", format!("workflow:end:{}:{}", conf.wf_name, id).as_bytes());
+                cast("metric", format!("workflow:end:{}", id).as_bytes());
             }
 
             state.next_id += 1;
@@ -50,7 +45,7 @@ impl EdgeFunction for VectorMulFunction {
                 random_input.iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(",")
             );
 
-            cast("metric", format!("workflow:start:{}:{}", conf.wf_name, state.next_id).as_bytes());
+            cast("metric", format!("workflow:begin:{}", state.next_id).as_bytes());
             cast("out", payload.as_bytes());
 
         //
@@ -65,7 +60,7 @@ impl EdgeFunction for VectorMulFunction {
             let n = conf.input_size;
             assert!(input.len() == (1 + n));
             let id = input[0] as usize;
-            cast("metric", format!("function:start:{}:{}:{}", conf.wf_name, conf.fun_name, id).as_bytes());
+            cast("metric", format!("function:begin:{}", id).as_bytes());
 
             // Produce the output by multiplying the internal matrix by the input.
             let mut output = vec![0.0_f32; n];
@@ -78,20 +73,18 @@ impl EdgeFunction for VectorMulFunction {
                 "out",
                 format!("{},{}", id, output.iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(",")).as_bytes(),
             );
-            cast("metric", format!("function:end:{}:{}:{}", conf.wf_name, conf.fun_name, id).as_bytes());
+            cast("metric", format!("function:end:{}", id).as_bytes());
         }
     }
 
     fn handle_call(_src: InstanceId, _encoded_message: &[u8]) -> CallRet {
-        log::info!("VectorMul called: ignored");
         CallRet::NoReply
     }
 
     // example of payload:
-    // seed=42,is_client=true,is_last=false,wf_name=my_workflow,fun_name=my_function,input_size=1000
+    // seed=42,is_client=true,is_last=false,input_size=1000
     fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
-        edgeless_function::init_logger();
-        log::info!("VectorMul initialized, payload: {:?}", payload);
+        // edgeless_function::init_logger();
         let arguments = if let Some(payload) = payload {
             let str_payload = core::str::from_utf8(payload).unwrap();
             edgeless_function::parse_init_payload(str_payload)
@@ -102,22 +95,9 @@ impl EdgeFunction for VectorMulFunction {
         let seed = arguments.get("seed").unwrap_or(&"0").parse::<u32>().unwrap_or(0);
 
         let is_client = arguments.get("is_client").unwrap_or(&"false").to_lowercase() == "true";
-        let wf_name = arguments.get("wf_name").unwrap_or(&"no-wf-name").to_string();
-        if wf_name == "no-wf-name" {
-            log::warn!("workflow name not specified, using: no-wf-name");
-        }
-        let fun_name = arguments.get("fun_name").unwrap_or(&"no-fun-name").to_string();
-        if fun_name == "no-fun-name" {
-            log::warn!("workflow name not specified, using: no-fun-name");
-        }
         let input_size = arguments.get("input_size").unwrap_or(&"100").parse::<usize>().unwrap_or(100);
 
-        let _ = CONF.set(Conf {
-            is_client,
-            wf_name,
-            fun_name,
-            input_size,
-        });
+        let _ = CONF.set(Conf { is_client, input_size });
 
         let mut lcg = edgeless_function::lcg::Lcg::new(seed);
         let matrix = edgeless_function::lcg::random_matrix(
@@ -136,8 +116,7 @@ impl EdgeFunction for VectorMulFunction {
     }
 
     fn handle_stop() {
-        let conf = CONF.get().unwrap();
-        log::info!("VectorMul stopped, wf {}, fun {}", conf.wf_name, conf.fun_name);
+        // Noop
     }
 }
 

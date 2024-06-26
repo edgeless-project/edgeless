@@ -8,7 +8,7 @@ pub struct ResourceProviderSpecification {
     pub outputs: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct NodeCapabilities {
     // Number of (actual or virtual) CPUs associated with the edge node.
     pub num_cpus: u32,
@@ -18,7 +18,7 @@ pub struct NodeCapabilities {
     pub clock_freq_cpu: f32,
     // Number of cores for each CPU.
     pub num_cores: u32,
-    // Size of memory available to applications running on the edge node, in MB.
+    // Size of memory available to applications running on the edge node, in MiB.
     pub mem_size: u32,
     // List of labels assigned to this node.
     pub labels: Vec<String>,
@@ -71,7 +71,7 @@ impl std::fmt::Display for NodeCapabilities {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{} {} CPU(s) at {} BogoMIPS, {} core(s), {} MB memory, labels [{}]{}{}, runtimes [{}]",
+            "{} {} CPU(s) at {} BogoMIPS, {} core(s), {} MiB memory, labels [{}]{}{}, runtimes [{}]",
             self.num_cpus,
             self.model_name_cpu,
             self.clock_freq_cpu,

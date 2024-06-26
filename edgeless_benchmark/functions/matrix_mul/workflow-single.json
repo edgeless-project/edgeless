@@ -35,7 +35,7 @@
                 "metric": "metrics-collector"
             },
             "annotations": {
-                "init-payload": "seed=42,inter_arrival=2000,is_first=true,is_last=true,wf_name=my_workflow,fun_name=my_function,matrix_size=1000,outputs="
+                "init-payload": "seed=42,inter_arrival=2000,is_first=true,is_last=true,matrix_size=1000,outputs="
             }
         }
     ],
@@ -45,7 +45,8 @@
             "class_type": "metrics-collector",
             "output_mapping": {},
             "configurations": {
-                "url": "redis://127.0.0.1:6379/"
+                "alpha": "0.9",
+                "wf_name": "wf_single"
             }
         }
     ],

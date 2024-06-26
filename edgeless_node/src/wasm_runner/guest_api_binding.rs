@@ -109,7 +109,7 @@ pub async fn cast(
         Ok(_) => {}
         Err(_) => {
             // We ignore casts to unknown targets.
-            log::warn!("Cast to unknown target");
+            log::warn!("Cast to unknown target: {}", target);
         }
     };
 

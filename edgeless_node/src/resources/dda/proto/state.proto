@@ -1,0 +1,149 @@
+// SPDX-FileCopyrightText: © 2024 Siemens AG
+// SPDX-License-Identifier: MIT
+
+// Service definition of DDA distributed state synchronization API.
+
+syntax = "proto3";
+
+package dda.state.v1;
+
+option java_package = "io.dda.state.v1";
+option java_multiple_files = true;
+option java_outer_classname = "DdaStateProto";
+
+// This gRPC service exposes the DDA distributed state synchronization API to
+// gRPC clients.
+//
+// This service enables application components to share distributed state with
+// each other by use of an underlying consensus protocol, like Raft or Paxos,
+// that guarantees strong consistency.
+//
+// This service maintains a replicated state in a state synchronization group
+// that is formed by all associated DDA agents in a DDA cluster that are
+// configured as state group members. State changes can be observed and proposed
+// by members of the group. Replicated state is represented as a key-value
+// store. Whereas keys are strings, values can be any application-specific
+// binary encoding represented by Protobuf scalar value type bytes. You may
+// partition the overall state into multiple application-specific use cases by
+// providing a unique key prefix for each one.
+//
+// Replicated state can be modified with method ProposeInput to propose new
+// input that should be applied to the replicated state. Applied state changes
+// can be observed with method ObserveStateChange.
+//
+// All members of a state synchronization group can monitor the lifecycle of
+// each other by method ObserveMembershipChange emitting new membership change
+// information whenever a member is joining or leaving the group.
+service StateService {
+
+  // Proposes the given input to the state synchronization group. It tries to
+  // add the input to a log replicated by all members. If the input is accepted
+  // into the log it counts as committed and is applied to each member's
+  // key-value store. The resulting state of the key-value store after the
+  // proposed input has been applied, if it ever gets applied, can be observed
+  // with method ObserveStateChange.
+  //
+  // A majority of members need to give their consent before the given input is
+  // accepted into the log. This might take indefinitely if no majority can be
+  // reached, e.g. if too many members have crashed and cannot recover. In this
+  // case the call never returns unless you specify a deadline/timeout with the
+  // call.
+  //
+  // If the given input cannot be transmitted or if the operation fails due to a
+  // non-retryable error, a gRPC error with status code UNAVAILABLE (14) is
+  // signaled.
+  rpc ProposeInput(Input) returns (Ack);
+
+  // Emits new input that has been proposed and applied to the replicated
+  // key-value store as soon as the change becomes known to the local state
+  // group member. A state change is triggered whenever a new input of type
+  // INPUT_OPERATION_SET or INPUT_OPERATION_DELETE is committed. Upon
+  // invocation, synthetic INPUT_OPERATION_SET state changes are triggered to
+  // reproduce the current key-value entries of the replicated state.
+  //
+  // This server streaming call is automatically ended by this service once its
+  // local member leaves the group.
+  //
+  // To stop receiving state changes, a gRPC client should cancel this server
+  // streaming call or specify a deadline/timeout with this call from the very
+  // start.
+  //
+  // If the operation fails, a gRPC error with status code UNAVAILABLE (14) is
+  // signaled and the stream is aborted.
+  rpc ObserveStateChange(ObserveStateChangeParams) returns (stream Input);
+
+  // Emits state member information on every state membership change as soon as
+  // the update becomes known to the local member. State membership changes are
+  // triggered whenever a member joins or leaves the state synchronization
+  // group.
+  //
+  // This server streaming call is automatically ended by this service once its
+  // local member leaves the group.
+  //
+  // To stop receiving membership changes, a gRPC client should cancel this
+  // server streaming call or specify a deadline/timeout with this call from the
+  // very start.
+  //
+  // If the operation fails, a gRPC error with status code UNAVAILABLE (14) is
+  // signaled and the stream is aborted.
+  rpc ObserveMembershipChange(ObserveMembershipChangeParams)
+      returns (stream MembershipChange);
+}
+
+// Empty acknowledgement message.
+message Ack {
+}
+
+// Input represents an operation proposed by method ProposeInput. Input is
+// applied to the replicated state represented as a key-value store and finally
+// emitted as a state change by method ObserveStateChange.
+message Input {
+  // Operation applied on given key ([INPUT_OPERATION_DELETE]) or key-value pair
+  // ([INPUT_OPERATION_SET]) (required).
+  InputOperation op = 1;
+
+  // Key on which given operation is applied (required).
+  //
+  // If this field is not set, the default key "" is used.
+  string key = 2;
+
+  // Value that is set or changed (required for INPUT_OPERATION_SET operation
+  // only).
+  //
+  // Value is represented as any application-specific binary encoding. If this
+  // field is not specified but required, the value which is set represents
+  // empty bytes.
+  bytes value = 3;
+}
+
+// Defines all input operations available on replicated state.
+enum InputOperation {
+  // No operation. This operation should never be specified and will be ignored.
+  INPUT_OPERATION_UNSPECIFIED = 0;
+
+  // Set or change the value of a key.
+  INPUT_OPERATION_SET = 1;
+
+  // Delete a key-value pair.
+  INPUT_OPERATION_DELETE = 2;
+}
+
+// Represents parameters of method ObserveStateChange.
+message ObserveStateChangeParams {
+}
+
+// Represents parameters of method ObserveMembershipChangeParams.
+message ObserveMembershipChangeParams {
+}
+
+// Represents information about a single member joining or leaving the state
+// synchronization group.
+message MembershipChange {
+  // Unique Id of member usually represented as a UUID v4 (required). This Id
+  // corresponds with the configured DDA identity id.
+  string id = 1;
+
+  // Determines whether the member has joined (true) or left (false) the state
+  // synchronization group.
+  bool joined = 2;
+}

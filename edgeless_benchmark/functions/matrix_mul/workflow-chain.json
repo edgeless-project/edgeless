@@ -36,7 +36,7 @@
                 "out-0": "f2"
             },
             "annotations": {
-                "init-payload": "seed=42,inter_arrival=2000,is_first=true,is_last=false,wf_name=wf0,fun_name=f1,matrix_size=1000,outputs=0"
+                "init-payload": "seed=42,inter_arrival=2000,is_first=true,is_last=false,matrix_size=100,outputs=0"
             }
         },
         {
@@ -75,7 +75,7 @@
                 "out-0": "f3"
             },
             "annotations": {
-                "init-payload": "seed=42,inter_arrival=2000,is_first=false,is_last=false,wf_name=wf0,fun_name=f2,matrix_size=1000,outputs=0"
+                "init-payload": "seed=42,inter_arrival=2000,is_first=false,is_last=false,matrix_size=100,outputs=0"
             }
         },
         {
@@ -113,7 +113,7 @@
                 "metric": "metrics-collector"
             },
             "annotations": {
-                "init-payload": "seed=42,inter_arrival=2000,is_first=false,is_last=true,wf_name=wf0,fun_name=f3,matrix_size=1000,outputs=0"
+                "init-payload": "seed=42,inter_arrival=2000,is_first=false,is_last=true,matrix_size=100,outputs="
             }
         }
     ],
@@ -123,7 +123,8 @@
             "class_type": "metrics-collector",
             "output_mapping": {},
             "configurations": {
-                "url": "redis://127.0.0.1:6379/"
+                "alpha": "0.9",
+                "wf_name": "wf_chain"
             }
         }
     ],

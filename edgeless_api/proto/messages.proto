@@ -114,7 +114,7 @@ message NodeCapabilities {
     float clock_freq_cpu     = 12;
     // Number of physical cores.
     uint32 num_cores         = 13;
-    // Size of memory available to applications running on the edge node, in MB.
+    // Size of memory available to applications running on the edge node, in MiB.
     uint32 mem_size          = 14;
     // List of labels assigned to this node.
     repeated string labels   = 20;

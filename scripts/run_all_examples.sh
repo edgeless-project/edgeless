@@ -2,6 +2,7 @@
 
 logs="build.log build_functions.log edgeless_bal.log edgeless_con.log edgeless_orc.log edgeless_node.log my-local-file.log reading-errors.log"
 confs="balancer.toml controller.toml orchestrator.toml node.toml cli.toml"
+specialized_workflows="dda_demo esp32_resources redis"
 
 echo "checking for existing files"
 existing_files=""
@@ -65,8 +66,22 @@ sleep 0.5
 
 echo "workflows"
 for workflow in $(find examples/ -type f -name workflow.json) ; do
+    if [ "$RUN_SPECIALIZED_WORKFLOWS" != "1" ] ; then
+        specialized=0
+        for specialized_workflow in $specialized_workflows ; do
+            if [[ "$workflow" == *"$specialized_workflow"* ]] ; then
+                specialized=1
+                break
+            fi
+        done
+        if [ $specialized -eq 1 ] ; then
+        echo "skipping specialized workflow '$workflow', use RUN_SPECIALIZED_WORKFLOWS=1 to run everything"
+            continue
+        fi
+    fi
+
     echo -n "starting workflow $(dirname $workflow): "
-    uid=$(target/debug/edgeless_cli workflow start $workflow | grep '-')
+    uid=$(RUST_LOG=error target/debug/edgeless_cli workflow start $workflow | grep '-')
     if [ $? -eq 0 ] ; then
         echo "started with ID $uid"
     else

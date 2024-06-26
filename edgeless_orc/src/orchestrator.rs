@@ -3,7 +3,10 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use std::str::FromStr;
+
 use edgeless_api::function_instance::{ComponentId, InstanceId};
+use serde::ser::{Serialize, SerializeTupleVariant, Serializer};
 
 use futures::{Future, SinkExt, StreamExt};
 use rand::seq::SliceRandom;
@@ -39,6 +42,65 @@ impl AffinityLevel {
             AffinityLevel::Required
         } else {
             AffinityLevel::NotRequired
+        }
+    }
+}
+
+/// Intent to update/change deployment.
+pub enum DeployIntent {
+    /// The component with givel logical identifier should be migrated to
+    /// the given target nodes, if possible.
+    Migrate(ComponentId, Vec<edgeless_api::function_instance::NodeId>),
+}
+
+impl DeployIntent {
+    pub fn new(key: &str, value: &str) -> anyhow::Result<Self> {
+        let tokens: Vec<&str> = key.split(':').collect();
+        assert!(!tokens.is_empty());
+        anyhow::ensure!(tokens[0] == "intent", "intent not starting with \"intent\"");
+        if tokens.len() >= 2 {
+            match tokens[1] {
+                "migrate" => {
+                    anyhow::ensure!(tokens.len() == 3);
+                    let component_id = uuid::Uuid::from_str(tokens[2])?;
+                    let mut targets = vec![];
+                    for target in value.split(',') {
+                        if target.is_empty() {
+                            continue;
+                        }
+                        targets.push(uuid::Uuid::from_str(target)?);
+                    }
+                    Ok(DeployIntent::Migrate(component_id, targets))
+                }
+                _ => anyhow::bail!("unknown intent type '{}'", tokens[1]),
+            }
+        } else {
+            anyhow::bail!("ill-formed intent");
+        }
+    }
+
+    pub fn key(&self) -> String {
+        match self {
+            Self::Migrate(component, _) => format!("intent:migrate:{}", component),
+        }
+    }
+
+    pub fn value(&self) -> String {
+        match self {
+            Self::Migrate(_, targets) => targets.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
+        }
+    }
+}
+
+impl std::fmt::Display for DeployIntent {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            DeployIntent::Migrate(component, target) => write!(
+                f,
+                "migrate component {} to [{}]",
+                component.to_string(),
+                target.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+            ),
         }
     }
 }
@@ -158,6 +220,7 @@ enum OrchestratorRequest {
     KEEPALIVE(),
 }
 
+#[derive(serde::Serialize)]
 pub struct ResourceProvider {
     pub class_type: String,
     pub node_id: edgeless_api::function_instance::NodeId,
@@ -165,7 +228,7 @@ pub struct ResourceProvider {
 }
 
 #[derive(Clone)]
-enum ActiveInstance {
+pub enum ActiveInstance {
     // 0: request
     // 1: [ (node_id, int_fid) ]
     Function(edgeless_api::function_instance::SpawnFunctionRequest, Vec<InstanceId>),
@@ -173,6 +236,28 @@ enum ActiveInstance {
     // 0: request
     // 1: (node_id, int_fid)
     Resource(edgeless_api::resource_configuration::ResourceInstanceSpecification, InstanceId),
+}
+
+impl Serialize for ActiveInstance {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            ActiveInstance::Function(ref req, ref ids) => {
+                let mut tv = serializer.serialize_tuple_variant("ActiveInstance", 0, "Function", 2)?;
+                tv.serialize_field(req)?;
+                tv.serialize_field::<Vec<String>>(ids.iter().map(|x| x.to_string()).collect::<Vec<String>>().as_ref())?;
+                tv.end()
+            }
+            ActiveInstance::Resource(ref req, ref id) => {
+                let mut tv = serializer.serialize_tuple_variant("ActiveInstance", 1, "Resource", 2)?;
+                tv.serialize_field(req)?;
+                tv.serialize_field(id.to_string().as_str())?;
+                tv.end()
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for ActiveInstance {
@@ -273,10 +358,20 @@ impl IntFid {
 }
 
 impl Orchestrator {
-    pub async fn new(settings: crate::EdgelessOrcSettings) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
+    pub async fn new(
+        settings: crate::EdgelessOrcBaselineSettings,
+        proxy: Box<dyn super::proxy::Proxy>,
+    ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, settings, std::collections::HashMap::new(), std::collections::HashMap::new()).await;
+            Self::main_task(
+                receiver,
+                settings,
+                std::collections::HashMap::new(),
+                std::collections::HashMap::new(),
+                proxy,
+            )
+            .await;
         });
 
         (Orchestrator { sender }, main_task)
@@ -284,13 +379,13 @@ impl Orchestrator {
 
     #[cfg(test)]
     pub async fn new_with_clients(
-        settings: crate::EdgelessOrcSettings,
+        settings: crate::EdgelessOrcBaselineSettings,
         clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
         resource_providers: std::collections::HashMap<String, ResourceProvider>,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, settings, clients, resource_providers).await;
+            Self::main_task(receiver, settings, clients, resource_providers, Box::new(super::proxy_none::ProxyNone {})).await;
         });
 
         (Orchestrator { sender }, main_task)
@@ -323,14 +418,77 @@ impl Orchestrator {
         }
     }
 
+    /// Deploy an instance to a new set of targets, if possible. No repatching.
+    ///
+    /// * `active_instances` - The set of active instances, resources/functions.
+    /// * `clients` - The nodes' descriptors.
+    /// * `orchestration_logic` - The baseline orchestration logic.
+    /// * `component` - The logical identifier of the function/resource to be
+    ///   migrated.
+    /// * `targets` - The set of nodes to which the instance has to be migrated.
+    async fn migrate(
+        active_instances: &mut std::collections::HashMap<ComponentId, ActiveInstance>,
+        clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        orchestration_logic: &OrchestrationLogic,
+        component: &ComponentId,
+        targets: &Vec<edgeless_api::function_instance::NodeId>,
+    ) {
+        let mut to_be_started = vec![];
+        match active_instances.get_mut(component) {
+            Some(active_instance) => match active_instance {
+                ActiveInstance::Function(spawn_req, origins) => {
+                    // Stop the origin nodes.
+                    for origin in origins.drain(..) {
+                        Self::stop_function(clients, &origin).await;
+                    }
+
+                    // Filter out the unfeasible targets.
+                    let targets = orchestration_logic.feasible_nodes(&spawn_req, targets);
+
+                    let target = targets.first();
+                    if let Some(target) = target {
+                        if targets.len() > 1 {
+                            log::warn!(
+                                "Currently supporting only a single target node per component: choosing {}, the others will be ignored",
+                                target
+                            );
+                        }
+                        to_be_started.push((spawn_req.clone(), target.clone()));
+                    } else {
+                        log::warn!("No (valid) target found for the migration of function ext_fid {}", component);
+                    }
+                }
+                ActiveInstance::Resource(_spec, origin) => log::warn!(
+                    "Currently not supporting the migration of resources: ignoring request for ext_fid {} to migrate from node_id {}",
+                    component,
+                    origin
+                ),
+            },
+            None => log::warn!("Intent to migrate component {} that is not active: ignored", component),
+        }
+        for element in to_be_started {
+            match Self::start_function(&element.0, active_instances, clients, component, &element.1).await {
+                Ok(_) => {}
+                Err(err) => log::error!("Error when migrating function ext_id {} to node_id {}: {}", component, element.1, err),
+            }
+        }
+    }
+
+    /// Apply patches on node's run-time agents.
+    ///
+    /// * `active_instances` - The set of active instances, resources/functions.
+    /// * `dependency_graph` - The logical dependencies.
+    /// * `clients` - The nodes' descriptor.s
+    /// * `origin_ext_fids` - The logical resource identifiers for which patches
+    ///    must be applied.
     async fn apply_patches(
         active_instances: &std::collections::HashMap<ComponentId, ActiveInstance>,
-        active_patches: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
+        dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
         clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
         origin_ext_fids: Vec<ComponentId>,
     ) {
         for origin_ext_fid in origin_ext_fids.iter() {
-            let ext_output_mapping = match active_patches.get(origin_ext_fid) {
+            let ext_output_mapping = match dependency_graph.get(origin_ext_fid) {
                 Some(x) => x,
                 None => continue,
             };
@@ -426,14 +584,14 @@ impl Orchestrator {
 
         // Select one provider at random.
         match matching_providers.choose(rng) {
-            Some(class_type) => {
-                let resource_provider = resource_providers.get_mut(class_type).unwrap();
+            Some(provider_id) => {
+                let resource_provider = resource_providers.get_mut(provider_id).unwrap();
                 match clients.get_mut(&resource_provider.node_id) {
                     Some(client) => match client
                         .api
                         .resource_configuration_api()
                         .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
-                            class_type: class_type.clone(),
+                            class_type: resource_provider.class_type.clone(),
                             // [TODO] Issue #94 remove output mapping
                             output_mapping: std::collections::HashMap::new(),
                             configuration: start_req.configuration.clone(),
@@ -455,7 +613,7 @@ impl Orchestrator {
                                 );
                                 log::info!(
                                     "Started resource provider_id {}, node_id {}, ext_fid {}, int_fid {}",
-                                    class_type,
+                                    provider_id,
                                     resource_provider.node_id,
                                     &ext_fid,
                                     instance_id.function_id
@@ -485,33 +643,49 @@ impl Orchestrator {
         }
     }
 
-    async fn start_function(
-        spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
+    /// Select the node to which to deploy a given function instance.
+    ///
+    /// Orchestration step: select the node to spawn this
+    /// function instance by using the orchestration logic.
+    /// Orchestration strategy can also be changed during
+    /// runtime.
+    ///
+    /// * `spawn_req` - The specifications of the function.
+    /// * `orchestration_logic` - The orchestration logic configured at run-time.
+    fn select_node(
+        spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest,
         orchestration_logic: &mut OrchestrationLogic,
+    ) -> anyhow::Result<edgeless_api::function_instance::NodeId> {
+        match orchestration_logic.next(spawn_req) {
+            Some(node_id) => Ok(node_id),
+            None => Err(anyhow::anyhow!("no valid node found")),
+        }
+    }
+
+    /// Start a new function instance on a specific node.
+    ///
+    /// If the operation fails, then active_instances is not
+    /// updated, i.e., it is as if the request to start the
+    /// function has never been issued.
+    ///
+    /// * `spawn_req` - The specifications of the function.
+    /// * `active_instances` - The set of active instances, resources/functions.
+    /// * `dependency_graph` - The logical dependencies.
+    /// * `clients` - The nodes' descriptors.
+    /// * `ext_fid` - The logical identifier of the function.
+    /// * `node_id` - The node where to deploy the function instance.
+    async fn start_function(
+        spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest,
         active_instances: &mut std::collections::HashMap<ComponentId, ActiveInstance>,
         clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
-        ext_fid: uuid::Uuid,
+        ext_fid: &uuid::Uuid,
+        node_id: &edgeless_api::function_instance::NodeId,
     ) -> Result<edgeless_api::common::StartComponentResponse<uuid::Uuid>, anyhow::Error> {
-        // Orchestration step: select the node to spawn this
-        // function instance by using the orchestration logic.
-        // Orchestration strategy can also be changed during
-        // runtime.
-
-        let selected_node_id = match orchestration_logic.next(&spawn_req) {
-            Some(u) => u,
-            None => {
-                return Err(anyhow::anyhow!(
-                    "Could not start a function instance for ext_fid {}: no valid node found",
-                    ext_fid
-                ));
-            }
-        };
-
-        let mut fn_client = match clients.get_mut(&selected_node_id) {
+        let mut fn_client = match clients.get_mut(&node_id) {
             Some(c) => c,
             None => panic!(
-                "Invalid node selected by the orchestration logic when starting function instance ext_fid {}: {}",
-                ext_fid, selected_node_id
+                "Invalid node_id {} selected by the orchestration logic when starting function instance ext_fid {}",
+                node_id, ext_fid
             ),
         }
         .api
@@ -521,7 +695,7 @@ impl Orchestrator {
             "Orchestrator StartFunction {:?} ext_fid {} at worker node with node_id {:?}",
             spawn_req,
             ext_fid,
-            selected_node_id
+            node_id
         );
 
         // Finally try to spawn the function instance on the
@@ -533,31 +707,68 @@ impl Orchestrator {
                     Err(anyhow::anyhow!("Could not start a function instance for ext_fid {}: {}", ext_fid, err))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                    assert!(selected_node_id == id.node_id);
+                    assert!(*node_id == id.node_id);
                     active_instances.insert(
-                        ext_fid,
+                        ext_fid.clone(),
                         ActiveInstance::Function(
-                            spawn_req,
+                            spawn_req.clone(),
                             vec![InstanceId {
-                                node_id: selected_node_id,
+                                node_id: node_id.clone(),
                                 function_id: id.function_id,
                             }],
                         ),
                     );
-                    log::info!(
-                        "Spawned at node_id {}, ext_fid {}, int_fid {}",
-                        selected_node_id,
-                        &ext_fid,
-                        id.function_id
-                    );
+                    log::info!("Spawned at node_id {}, ext_fid {}, int_fid {}", node_id, &ext_fid, id.function_id);
 
-                    Ok(edgeless_api::common::StartComponentResponse::InstanceId(ext_fid))
+                    Ok(edgeless_api::common::StartComponentResponse::InstanceId(ext_fid.clone()))
                 }
             },
             Err(err) => {
                 log::error!("Unhandled: {}", err);
                 Err(anyhow::anyhow!("Could not start a function instance for ext_fid {}: {}", ext_fid, err))
             }
+        }
+    }
+
+    /// Stop a running function instance.
+    ///
+    /// * `clients` - The nodes' descriptors.
+    /// * `instance_id` - The function instance to be stopped.
+    async fn stop_function(clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>, instance_id: &InstanceId) {
+        match clients.get_mut(&instance_id.node_id) {
+            Some(client_desc) => match client_desc.api.function_instance_api().stop(*instance_id).await {
+                Ok(_) => {
+                    log::info!("Stopped function instance_id {}", instance_id)
+                }
+                Err(err) => {
+                    log::error!("Unhandled stop function instance_id {}: {}", instance_id, err)
+                }
+            },
+            None => log::error!(
+                "Cannot stop function instance_id {} because there is no node associated with it",
+                instance_id
+            ),
+        }
+    }
+
+    /// Stop a running resource instance.
+    ///
+    /// * `clients` - The nodes' descriptors.
+    /// * `instance_id` - The resource instance to be stopped.
+    async fn stop_resource(clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>, instance_id: &InstanceId) {
+        match clients.get_mut(&instance_id.node_id) {
+            Some(node_client) => match node_client.api.resource_configuration_api().stop(*instance_id).await {
+                Ok(_) => {
+                    log::info!("Stopped resource instance_id {}", instance_id)
+                }
+                Err(err) => {
+                    log::error!("Unhandled stop resource instance_id {}: {}", instance_id, err)
+                }
+            },
+            None => log::error!(
+                "Cannot stop resource instance_id {} because there is no node associated with it",
+                instance_id
+            ),
         }
     }
 
@@ -571,11 +782,11 @@ impl Orchestrator {
     /// this function will return all the ingress vertices of the vertex
     /// identified by `ext_fid`.
     fn dependencies(
-        active_patches: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
+        dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
         ext_fid: &uuid::Uuid,
     ) -> Vec<uuid::Uuid> {
         let mut dependencies = vec![];
-        for (origin_ext_fid, output_mapping) in active_patches.iter() {
+        for (origin_ext_fid, output_mapping) in dependency_graph.iter() {
             for (_output, target_ext_fid) in output_mapping.iter() {
                 if target_ext_fid == ext_fid {
                     dependencies.push(origin_ext_fid.clone());
@@ -588,19 +799,20 @@ impl Orchestrator {
 
     async fn main_task(
         receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>,
-        orchestrator_settings: crate::EdgelessOrcSettings,
-        clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        orchestrator_settings: crate::EdgelessOrcBaselineSettings,
+        nodes: std::collections::HashMap<uuid::Uuid, ClientDesc>,
         resource_providers: std::collections::HashMap<String, ResourceProvider>,
+        mut proxy: Box<dyn super::proxy::Proxy>,
     ) {
         let mut receiver = receiver;
         let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy);
         let mut rng = rand::rngs::StdRng::from_entropy();
 
-        // known agents
+        // known nodes
         // key: node_id
-        let mut clients = clients;
-        orchestration_logic.update_nodes(&clients, &resource_providers);
-        for (node_id, client_desc) in &clients {
+        let mut nodes = nodes;
+        orchestration_logic.update_nodes(&nodes, &resource_providers);
+        for (node_id, client_desc) in &nodes {
             log::info!(
                 "added function instance client: node_id {}, agent URL {}, invocation URL {}, capabilities {}",
                 node_id,
@@ -609,8 +821,9 @@ impl Orchestrator {
                 client_desc.capabilities
             );
         }
+        proxy.update_nodes(&nodes);
 
-        // known resources providers as notified by nodes upon registration
+        // known resources providers as advertised by the nodes upon registration
         // key: provider_id
         let mut resource_providers = resource_providers;
         for (provider, resource_provider) in &resource_providers {
@@ -622,35 +835,42 @@ impl Orchestrator {
                 resource_provider.outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
             );
         }
+        let mut resource_providers_changed = false;
 
-        // instances that the orchestrator promised to keep active
+        // instances that the orchestrator promises to keep active
         // key: ext_fid
         let mut active_instances = std::collections::HashMap::new();
+        let mut active_instances_changed = false;
 
-        // active patches to which the orchestrator committed
+        // active patches to which the orchestrator commits
         // key:   ext_fid (origin function)
         // value: map of:
         //        key:   channel output name
         //        value: ext_fid (target function)
-        let mut active_patches: std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>> =
-            std::collections::HashMap::new();
+        let mut dependency_graph = std::collections::HashMap::new();
+        let mut dependency_graph_changed = false;
 
-        // Main loop that reacts to events on the receiver channel
+        // main orchestration loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
             match req {
                 OrchestratorRequest::STARTFUNCTION(spawn_req, reply_channel) => {
                     // Create a new ext_fid for this resource.
                     let ext_fid = uuid::Uuid::new_v4();
 
-                    // Start the function instance.
-                    // If the operation fails, then active_instances is not
-                    // updated, i.e., it is as if the request to start the
-                    // function has never been issued.
-                    let res = Self::start_function(spawn_req.clone(), &mut orchestration_logic, &mut active_instances, &mut clients, ext_fid).await;
+                    // Select the target node.
+                    match Self::select_node(&spawn_req, &mut orchestration_logic) {
+                        Ok(node_id) => {
+                            // Start the function instance.
+                            let res = Self::start_function(&spawn_req, &mut active_instances, &mut nodes, &ext_fid, &node_id).await;
 
-                    // Send back the response to the caller.
-                    if let Err(err) = reply_channel.send(res) {
-                        log::error!("Orchestrator channel error in SPAWN: {:?}", err);
+                            // Send back the response to the caller.
+                            if let Err(err) = reply_channel.send(res) {
+                                log::error!("Orchestrator channel error in SPAWN: {:?}", err);
+                            }
+
+                            active_instances_changed = true;
+                        }
+                        Err(err) => log::warn!("Could not start function ext_fid {}: {}", ext_fid, err),
                     }
                 }
                 OrchestratorRequest::STOPFUNCTION(ext_fid) => {
@@ -661,28 +881,8 @@ impl Orchestrator {
                             match active_instance {
                                 ActiveInstance::Function(_req, instances) => {
                                     // Stop all the instances of this function.
-                                    for instance in instances {
-                                        match clients.get_mut(&instance.node_id) {
-                                            Some(c) => match c.api.function_instance_api().stop(instance).await {
-                                                Ok(_) => {
-                                                    log::info!(
-                                                        "Stopped function ext_fid {}, node_id {}, int_fid {}",
-                                                        ext_fid,
-                                                        instance.node_id,
-                                                        instance.function_id
-                                                    );
-                                                }
-                                                Err(err) => {
-                                                    log::error!("Unhandled stop function ext_fid {}: {}", ext_fid, err);
-                                                }
-                                            },
-                                            None => {
-                                                log::error!(
-                                                    "This orchestrator does not manage the node where the function instance is located: {}",
-                                                    ext_fid
-                                                );
-                                            }
-                                        }
+                                    for instance_id in instances {
+                                        Self::stop_function(&mut nodes, &instance_id).await;
                                     }
                                 }
                                 ActiveInstance::Resource(_, _) => {
@@ -694,17 +894,20 @@ impl Orchestrator {
                             };
                             Self::apply_patches(
                                 &mut active_instances,
-                                &active_patches,
-                                &mut clients,
-                                Self::dependencies(&active_patches, &ext_fid),
+                                &dependency_graph,
+                                &mut nodes,
+                                Self::dependencies(&dependency_graph, &ext_fid),
                             )
                             .await;
-                            active_patches.remove(&ext_fid);
+                            dependency_graph.remove(&ext_fid);
+                            dependency_graph_changed = true;
                         }
                         None => {
                             log::error!("Request to stop a function that is not known: ext_fid {}", ext_fid);
                         }
                     }
+
+                    active_instances_changed = true;
                 }
                 OrchestratorRequest::STARTRESOURCE(start_req, reply_channel) => {
                     log::debug!("Orchestrator StartResource {:?}", &start_req);
@@ -720,7 +923,7 @@ impl Orchestrator {
                         start_req.clone(),
                         &mut resource_providers,
                         &mut active_instances,
-                        &mut clients,
+                        &mut nodes,
                         ext_fid,
                         &mut rng,
                     )
@@ -730,6 +933,8 @@ impl Orchestrator {
                     if let Err(err) = reply_channel.send(res) {
                         log::error!("Orchestrator channel error in STARTRESOURCE: {:?}", err);
                     }
+
+                    active_instances_changed = true;
                 }
                 OrchestratorRequest::STOPRESOURCE(ext_fid) => {
                     log::debug!("Orchestrator StopResource {:?}", ext_fid);
@@ -743,41 +948,27 @@ impl Orchestrator {
                                         ext_fid
                                     );
                                 }
-                                ActiveInstance::Resource(_req, instance) => {
+                                ActiveInstance::Resource(_req, instance_id) => {
                                     // Stop the instance of this resource.
-                                    match clients.get_mut(&instance.node_id) {
-                                        Some(node_client) => match node_client.api.resource_configuration_api().stop(instance).await {
-                                            Ok(_) => {
-                                                log::info!(
-                                                    "Stopped resource, ext_fid {}, node_id {}, int_fid {}",
-                                                    ext_fid,
-                                                    instance.node_id,
-                                                    instance.function_id
-                                                );
-                                            }
-                                            Err(err) => {
-                                                log::error!("Unhandled stop resource ext_fid {}: {}", ext_fid, err);
-                                            }
-                                        },
-                                        None => {
-                                            log::error!("Request to stop a resource but the provider does not exist anymore, ext_fid {}", ext_fid);
-                                        }
-                                    }
+                                    Self::stop_resource(&mut nodes, &instance_id).await;
                                 }
                             }
                             Self::apply_patches(
                                 &mut active_instances,
-                                &active_patches,
-                                &mut clients,
-                                Self::dependencies(&active_patches, &ext_fid),
+                                &dependency_graph,
+                                &mut nodes,
+                                Self::dependencies(&dependency_graph, &ext_fid),
                             )
                             .await;
-                            active_patches.remove(&ext_fid);
+                            dependency_graph.remove(&ext_fid);
+                            dependency_graph_changed = true;
                         }
                         None => {
                             log::error!("Request to stop a resource that is not known: ext_fid {}", ext_fid);
                         }
                     }
+
+                    active_instances_changed = true;
                 }
                 OrchestratorRequest::PATCH(update) => {
                     log::debug!("Orchestrator Patch {:?}", update);
@@ -794,10 +985,11 @@ impl Orchestrator {
                     // Save the patch request into an internal data structure,
                     // keeping track only of the ext_fid for both origin
                     // and target (logical) functions.
-                    active_patches.insert(origin_ext_fid, output_mapping);
+                    dependency_graph.insert(origin_ext_fid, output_mapping);
+                    dependency_graph_changed = true;
 
                     // Apply the patch.
-                    Self::apply_patches(&active_instances, &active_patches, &mut clients, vec![origin_ext_fid]).await;
+                    Self::apply_patches(&active_instances, &dependency_graph, &mut nodes, vec![origin_ext_fid]).await;
                 }
                 OrchestratorRequest::UPDATENODE(request, reply_channel) => {
                     // Update the map of clients and, at the same time, prepare
@@ -814,7 +1006,7 @@ impl Orchestrator {
                             capabilities,
                         ) => {
                             let mut dup_entry = false;
-                            if let Some(client_desc) = clients.get(&node_id) {
+                            if let Some(client_desc) = nodes.get(&node_id) {
                                 if client_desc.agent_url == agent_url && client_desc.invocation_url == invocation_url {
                                     dup_entry = true;
                                 }
@@ -846,6 +1038,7 @@ impl Orchestrator {
                                                 outputs: resource.outputs.clone(),
                                             },
                                         );
+                                        resource_providers_changed = true;
                                     }
                                 }
 
@@ -857,7 +1050,7 @@ impl Orchestrator {
                                     invocation_url,
                                     capabilities
                                 );
-                                clients.insert(
+                                nodes.insert(
                                     node_id,
                                     ClientDesc {
                                         agent_url: agent_url.clone(),
@@ -871,11 +1064,11 @@ impl Orchestrator {
                             }
                         }
                         edgeless_api::node_registration::UpdateNodeRequest::Deregistration(node_id) => {
-                            if let None = clients.get(&node_id) {
+                            if let None = nodes.get(&node_id) {
                                 // There is no client with that node_id
                                 None
                             } else {
-                                clients.remove(&node_id);
+                                nodes.remove(&node_id);
                                 Some(edgeless_api::node_management::UpdatePeersRequest::Del(node_id))
                             }
                         }
@@ -887,13 +1080,14 @@ impl Orchestrator {
                     let mut response = edgeless_api::node_registration::UpdateNodeResponse::Accepted;
 
                     if let Some(msg) = msg {
-                        // Update the orchestration logic with the new set of nodes.
-                        orchestration_logic.update_nodes(&clients, &resource_providers);
+                        // Update the orchestration logic & proxy with the new set of nodes.
+                        orchestration_logic.update_nodes(&nodes, &resource_providers);
+                        proxy.update_nodes(&nodes);
 
                         // Update all the peers (including the node, unless it
                         // was a deregister operation).
                         let mut num_failures: u32 = 0;
-                        for (_node_id, client) in clients.iter_mut() {
+                        for (_node_id, client) in nodes.iter_mut() {
                             if let Err(_) = client.api.node_management_api().update_peers(msg.clone()).await {
                                 num_failures += 1;
                             }
@@ -902,8 +1096,8 @@ impl Orchestrator {
                         // Only with registration, we also update the new node
                         // by adding as peers all the existing nodes.
                         if let Some(this_node_id) = this_node_id {
-                            let mut new_node_client = clients.get_mut(&this_node_id).unwrap().api.node_management_api();
-                            for (other_node_id, client_desc) in clients.iter_mut() {
+                            let mut new_node_client = nodes.get_mut(&this_node_id).unwrap().api.node_management_api();
+                            for (other_node_id, client_desc) in nodes.iter_mut() {
                                 if other_node_id.eq(&this_node_id) {
                                     continue;
                                 }
@@ -938,7 +1132,12 @@ impl Orchestrator {
                     // First check if there are nodes that must be disconnected
                     // because they failed to reply to a keep-alive.
                     let mut to_be_disconnected = std::collections::HashSet::new();
-                    for (node_id, client_desc) in &mut clients {
+                    log::debug!(
+                        "nodes to be polled: {}",
+                        nodes.keys().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                    );
+                    for (node_id, client_desc) in &mut nodes {
+                        log::debug!("polling node {} begin", node_id);
                         match client_desc.api.node_management_api().keep_alive().await {
                             Ok(health_status) => {
                                 log::debug!("node uuid {} health status {}", node_id, health_status);
@@ -948,12 +1147,13 @@ impl Orchestrator {
                                 to_be_disconnected.insert(*node_id);
                             }
                         };
+                        log::debug!("polling node {} end", node_id);
                     }
 
                     // Second, remove all those nodes from the map of clients.
                     for node_id in to_be_disconnected.iter() {
                         log::info!("disconnected node not replying to keep-alive: {}", &node_id);
-                        let val = clients.remove(&node_id);
+                        let val = nodes.remove(&node_id);
                         assert!(val.is_some());
                     }
 
@@ -962,6 +1162,7 @@ impl Orchestrator {
                     resource_providers.retain(|_k, v| {
                         if to_be_disconnected.contains(&v.node_id) {
                             log::info!("removed resource from disconnected node: {}", v);
+                            resource_providers_changed = true;
                             false
                         } else {
                             true
@@ -971,7 +1172,7 @@ impl Orchestrator {
                     // Update the peers of (still alive) nodes by
                     // deleting the missing-in-action peers.
                     for removed_node_id in &to_be_disconnected {
-                        for (_, client_desc) in clients.iter_mut() {
+                        for (_, client_desc) in nodes.iter_mut() {
                             match client_desc
                                 .api
                                 .node_management_api()
@@ -986,8 +1187,9 @@ impl Orchestrator {
                         }
                     }
 
-                    // Update the orchestration logic.
-                    orchestration_logic.update_nodes(&clients, &resource_providers);
+                    // Update the orchestration logic and proxy.
+                    orchestration_logic.update_nodes(&nodes, &resource_providers);
+                    proxy.update_nodes(&nodes);
 
                     //
                     // Make sure that all active logical functions are assigned
@@ -1056,7 +1258,7 @@ impl Orchestrator {
 
                     // Also schedule to repatch all the functions that
                     // depend on the functions/resources modified.
-                    for (origin_ext_fid, output_mapping) in active_patches.iter() {
+                    for (origin_ext_fid, output_mapping) in dependency_graph.iter() {
                         for (_output, target_ext_fid) in output_mapping.iter() {
                             if active_instances_to_be_updated.contains(target_ext_fid)
                                 || fun_to_be_created.contains_key(target_ext_fid)
@@ -1073,10 +1275,13 @@ impl Orchestrator {
                     for ext_fid in active_instances_to_be_updated.iter() {
                         match active_instances.get_mut(ext_fid) {
                             None => panic!("ext_fid {} just disappeared", ext_fid),
-                            Some(active_instance) => match active_instance {
-                                ActiveInstance::Resource(_, _) => panic!("expecting a function, found a resource for ext_fid {}", ext_fid),
-                                ActiveInstance::Function(_, instances) => instances.retain(|x| !to_be_disconnected.contains(&x.node_id)),
-                            },
+                            Some(active_instance) => {
+                                active_instances_changed = true;
+                                match active_instance {
+                                    ActiveInstance::Resource(_, _) => panic!("expecting a function, found a resource for ext_fid {}", ext_fid),
+                                    ActiveInstance::Function(_, instances) => instances.retain(|x| !to_be_disconnected.contains(&x.node_id)),
+                                }
+                            }
                         }
                     }
 
@@ -1085,18 +1290,26 @@ impl Orchestrator {
                     // function remains in the active_instances, but it is
                     // assigned no function instance.
                     for (ext_fid, spawn_req) in fun_to_be_created.into_iter() {
-                        match Self::start_function(spawn_req, &mut orchestration_logic, &mut active_instances, &mut clients, ext_fid).await {
-                            Ok(_) => {}
-                            Err(err) => {
-                                log::error!("error when creating a new function assigned with ext_fid {}: {}", ext_fid, err);
-                                match active_instances.get_mut(&ext_fid).unwrap() {
-                                    ActiveInstance::Function(_spawn_req, instances) => instances.clear(),
-                                    ActiveInstance::Resource(_, _) => {
-                                        panic!("expecting a function to be associated with ext_fid {}, found a resource", ext_fid)
-                                    }
+                        let res = match Self::select_node(&spawn_req, &mut orchestration_logic) {
+                            Ok(node_id) => {
+                                // Start the function instance.
+                                match Self::start_function(&spawn_req, &mut active_instances, &mut nodes, &ext_fid, &node_id).await {
+                                    Ok(_) => Ok(()),
+                                    Err(err) => Err(err),
+                                }
+                            }
+                            Err(err) => Err(err),
+                        };
+                        if let Err(err) = res {
+                            log::error!("error when creating a new function assigned with ext_fid {}: {}", ext_fid, err);
+                            match active_instances.get_mut(&ext_fid).unwrap() {
+                                ActiveInstance::Function(_spawn_req, instances) => instances.clear(),
+                                ActiveInstance::Resource(_, _) => {
+                                    panic!("expecting a function to be associated with ext_fid {}, found a resource", ext_fid)
                                 }
                             }
                         }
+                        active_instances_changed = true;
                     }
 
                     // Create the resources that went missing.
@@ -1104,7 +1317,7 @@ impl Orchestrator {
                     // resource remains in the active_instances, but it is
                     // assigned an invalid function instance.
                     for (ext_fid, start_req) in res_to_be_created.into_iter() {
-                        match Self::start_resource(start_req, &mut resource_providers, &mut active_instances, &mut clients, ext_fid, &mut rng).await {
+                        match Self::start_resource(start_req, &mut resource_providers, &mut active_instances, &mut nodes, ext_fid, &mut rng).await {
                             Ok(_) => {}
                             Err(err) => {
                                 log::error!("error when creating a new resource assigned with ext_fid {}: {}", ext_fid, err);
@@ -1118,10 +1331,36 @@ impl Orchestrator {
                                 }
                             }
                         }
+                        active_instances_changed = true;
+                    }
+
+                    // Check if there are intents from the proxy.
+                    for intent in proxy.retrieve_deploy_intents() {
+                        match intent {
+                            DeployIntent::Migrate(component, targets) => {
+                                Orchestrator::migrate(&mut active_instances, &mut nodes, &orchestration_logic, &component, &targets).await;
+                                to_be_repatched.push(component)
+                            }
+                        }
+                        active_instances_changed = true;
                     }
 
                     // Repatch everything that needs to be repatched.
-                    Self::apply_patches(&mut active_instances, &active_patches, &mut clients, to_be_repatched).await;
+                    Self::apply_patches(&mut active_instances, &dependency_graph, &mut nodes, to_be_repatched).await;
+
+                    // Update the proxy, if necessary.
+                    if resource_providers_changed {
+                        proxy.update_resource_providers(&resource_providers);
+                        resource_providers_changed = false;
+                    }
+                    if active_instances_changed {
+                        proxy.update_active_instances(&active_instances);
+                        active_instances_changed = false;
+                    }
+                    if dependency_graph_changed {
+                        proxy.update_dependency_graph(&dependency_graph);
+                        dependency_graph_changed = false;
+                    }
                 }
             }
         }

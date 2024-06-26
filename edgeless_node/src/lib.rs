@@ -91,6 +91,10 @@ pub struct EdgelessNodeResourceSettings {
     /// value of a given given, as specified in the resource configuration
     /// at run-time.
     pub redis_provider: Option<String>,
+    /// The URL of DDA used by this node, used for communication via the DDA resources
+    pub dda_url: Option<String>,
+    /// If not empty, a DDA resource with the given name is created.
+    pub dda_provider: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -174,7 +178,7 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         model_name_cpu: user_node_capabilities.model_name_cpu.unwrap_or(model_name_cpu),
         clock_freq_cpu: user_node_capabilities.clock_freq_cpu.unwrap_or(clock_freq_cpu),
         num_cores: user_node_capabilities.num_cores.unwrap_or(sys.physical_core_count().unwrap_or(1) as u32),
-        mem_size: user_node_capabilities.mem_size.unwrap_or(sys.total_memory() as u32 / 1024),
+        mem_size: user_node_capabilities.mem_size.unwrap_or(sys.total_memory() as u32 / (1024 * 1024)),
         labels: user_node_capabilities.labels.unwrap_or(vec![]),
         is_tee_running: user_node_capabilities.is_tee_running.unwrap_or(false),
         has_tpm: user_node_capabilities.has_tpm.unwrap_or(false),
@@ -230,31 +234,29 @@ async fn fill_resources(
     node_id: uuid::Uuid,
     settings: &Option<EdgelessNodeResourceSettings>,
     provider_specifications: &mut Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
-) -> std::collections::HashMap<
-    String,
-    Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
-> {
-    let mut ret = std::collections::HashMap::<
-        String,
-        Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
-    >::new();
+) -> std::collections::HashMap<String, agent::ResourceDesc> {
+    let mut ret = std::collections::HashMap::<String, agent::ResourceDesc>::new();
 
     if let Some(settings) = settings {
         if let (Some(http_ingress_url), Some(provider_id)) = (&settings.http_ingress_url, &settings.http_ingress_provider) {
             if !http_ingress_url.is_empty() && !provider_id.is_empty() {
+                let class_type = "http-ingress".to_string();
                 log::info!("Creating resource '{}' at {}", provider_id, http_ingress_url);
                 ret.insert(
                     provider_id.clone(),
-                    resources::http_ingress::ingress_task(
-                        data_plane.clone(),
-                        edgeless_api::function_instance::InstanceId::new(node_id.clone()),
-                        http_ingress_url.clone(),
-                    )
-                    .await,
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: resources::http_ingress::ingress_task(
+                            data_plane.clone(),
+                            edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                            http_ingress_url.clone(),
+                        )
+                        .await,
+                    },
                 );
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id: provider_id.clone(),
-                    class_type: "http-ingress".to_string(),
+                    class_type,
                     outputs: vec!["new_request".to_string()],
                 });
             }
@@ -263,19 +265,23 @@ async fn fill_resources(
         if let Some(provider_id) = &settings.http_egress_provider {
             if !provider_id.is_empty() {
                 log::info!("Creating resource '{}'", provider_id);
+                let class_type = "http-egress".to_string();
                 ret.insert(
                     provider_id.clone(),
-                    Box::new(
-                        resources::http_egress::EgressResourceProvider::new(
-                            data_plane.clone(),
-                            edgeless_api::function_instance::InstanceId::new(node_id.clone()),
-                        )
-                        .await,
-                    ),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::http_egress::EgressResourceProvider::new(
+                                data_plane.clone(),
+                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                            )
+                            .await,
+                        ),
+                    },
                 );
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id: provider_id.clone(),
-                    class_type: "http-egress".to_string(),
+                    class_type,
                     outputs: vec![],
                 });
             }
@@ -284,19 +290,23 @@ async fn fill_resources(
         if let Some(provider_id) = &settings.file_log_provider {
             if !provider_id.is_empty() {
                 log::info!("Creating resource '{}'", provider_id);
+                let class_type = "file-log".to_string();
                 ret.insert(
                     provider_id.clone(),
-                    Box::new(
-                        resources::file_log::FileLogResourceProvider::new(
-                            data_plane.clone(),
-                            edgeless_api::function_instance::InstanceId::new(node_id.clone()),
-                        )
-                        .await,
-                    ),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::file_log::FileLogResourceProvider::new(
+                                data_plane.clone(),
+                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                            )
+                            .await,
+                        ),
+                    },
                 );
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id: provider_id.clone(),
-                    class_type: "file-log".to_string(),
+                    class_type,
                     outputs: vec![],
                 });
             }
@@ -305,20 +315,50 @@ async fn fill_resources(
         if let Some(provider_id) = &settings.redis_provider {
             if !provider_id.is_empty() {
                 log::info!("Creating resource '{}'", provider_id);
+                let class_type = "redis".to_string();
                 ret.insert(
                     provider_id.clone(),
-                    Box::new(
-                        resources::redis::RedisResourceProvider::new(
-                            data_plane.clone(),
-                            edgeless_api::function_instance::InstanceId::new(node_id.clone()),
-                        )
-                        .await,
-                    ),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::redis::RedisResourceProvider::new(
+                                data_plane.clone(),
+                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                            )
+                            .await,
+                        ),
+                    },
                 );
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id: provider_id.clone(),
-                    class_type: "redis".to_string(),
+                    class_type,
                     outputs: vec![],
+                });
+            }
+        }
+
+        if let (Some(dda_url), Some(provider_id)) = (&settings.dda_url, &settings.dda_provider) {
+            if !dda_url.is_empty() && !provider_id.is_empty() {
+                log::info!("Creating resource '{}' at {}", provider_id, dda_url);
+                let class_type = "dda".to_string();
+                ret.insert(
+                    provider_id.clone(),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::dda::DDAResourceProvider::new(
+                                data_plane.clone(),
+                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                            )
+                            .await,
+                        ),
+                    },
+                );
+
+                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id: provider_id.clone(),
+                    class_type,
+                    outputs: vec!["new_request".to_string()],
                 });
             }
         }
@@ -522,6 +562,8 @@ http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"
 file_log_provider = "file-log-1"
 redis_provider = "redis-1"
+dda_url = "http://127.0.0.1:10000"
+dda_provider = "dda-1"
 
 [user_node_capabilities]
 "##,
