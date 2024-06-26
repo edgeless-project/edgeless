@@ -98,10 +98,27 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
 
     // Orchestrator
     let orc_conf = edgeless_orc::EdgelessOrcSettings {
-        domain_id: "domain-1".to_string(),
-        orchestrator_url: next_url(),
-        orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
-        keep_alive_interval_secs: 2,
+        general: edgeless_orc::EdgelessOrcGeneralSettings {
+            domain_id: "domain-1".to_string(),
+            orchestrator_url: next_url(),
+            orchestrator_url_announced: "".to_string(),
+            agent_url: next_url(),
+            agent_url_announced: "".to_string(),
+            invocation_url: next_url(),
+            invocation_url_announced: "".to_string(),
+        },
+        baseline: edgeless_orc::EdgelessOrcBaselineSettings {
+            orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
+            keep_alive_interval_secs: 2,
+        },
+        proxy: edgeless_orc::EdgelessOrcProxySettings {
+            proxy_type: "None".to_string(),
+            redis_url: None,
+        },
+        collector: edgeless_orc::EdgelessOrcCollectorSettings {
+            collector_type: "None".to_string(),
+            redis_url: None,
+        },
     };
 
     // Controller
@@ -109,8 +126,8 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         controller_url,
         // for now only one orchestrator
         orchestrators: vec![EdgelessConOrcConfig {
-            domain_id: orc_conf.domain_id.clone(),
-            orchestrator_url: orc_conf.orchestrator_url.clone(),
+            domain_id: orc_conf.general.domain_id.clone(),
+            orchestrator_url: orc_conf.general.orchestrator_url.clone(),
         }],
     };
 
@@ -127,7 +144,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 invocation_url: node_invocation_urls.get(node_id).expect("").clone(), // we are sure that it is there
                 invocation_url_announced: "".to_string(),
                 metrics_url: next_url(),
-                orchestrator_url: orc_conf.orchestrator_url.clone(),
+                orchestrator_url: orc_conf.general.orchestrator_url.clone(),
             },
             wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: None,
@@ -151,6 +168,14 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 },
                 redis_provider: match first_node {
                     true => Some("redis-1".to_string()),
+                    false => None,
+                },
+                dda_url: match first_node {
+                    true => Some(next_url()),
+                    false => None,
+                },
+                dda_provider: match first_node {
+                    true => Some("dda-1".to_string()),
                     false => None,
                 },
             }),

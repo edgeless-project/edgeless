@@ -30,13 +30,15 @@ pub struct Agent {
     node_id: uuid::Uuid,
 }
 
+pub struct ResourceDesc {
+    pub class_type: String,
+    pub client: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
+}
+
 impl Agent {
     pub fn new(
         runners: std::collections::HashMap<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
-        resources: std::collections::HashMap<
-            String,
-            Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
-        >,
+        resources: std::collections::HashMap<String, ResourceDesc>,
         node_id: uuid::Uuid,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
@@ -58,17 +60,15 @@ impl Agent {
         // runners-key: class_type
         // runners-value: RuntimeBox
         mut runners: std::collections::HashMap<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
-        resources: std::collections::HashMap<
-            String,
-            Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
-        >,
+        resources: std::collections::HashMap<String, ResourceDesc>,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     ) {
         let mut receiver = std::pin::pin!(receiver);
         let mut data_plane_provider = data_plane_provider;
 
-        // key: class_type
-        // value: resource configuration API
+        // key: provider_id
+        // value: class_type
+        //        client (resource configuration API)
         let mut resource_providers = resources;
         // key: fid
         // value: provider_id
@@ -198,9 +198,11 @@ impl Agent {
                     };
                 }
                 AgentRequest::SpawnResource(instance_specification, responder) => {
-                    if let Some(resource) = resource_providers.get_mut(&instance_specification.class_type) {
-                        let resource_class = instance_specification.class_type.clone();
-                        let res = match resource.start(instance_specification).await {
+                    if let Some((provider_id, resource_desc)) = resource_providers
+                        .iter_mut()
+                        .find(|(_provider_id, resource_desc)| resource_desc.class_type == instance_specification.class_type)
+                    {
+                        let res = match resource_desc.client.start(instance_specification).await {
                             Ok(val) => val,
                             Err(err) => {
                                 responder
@@ -211,12 +213,13 @@ impl Agent {
                         };
                         if let edgeless_api::common::StartComponentResponse::InstanceId(id) = res {
                             log::info!(
-                                "Started resource class_type {}, node_id {}, fid {}",
-                                resource_class,
+                                "Started resource class_type {}, provider_id {}, node_id {}, fid {}",
+                                resource_desc.class_type,
+                                provider_id,
                                 id.node_id,
                                 id.function_id
                             );
-                            resource_instances.insert(id.function_id.clone(), resource_class.clone());
+                            resource_instances.insert(id.function_id.clone(), provider_id.clone());
                             responder
                                 .send(Ok(edgeless_api::common::StartComponentResponse::InstanceId(id)))
                                 .unwrap_or_else(|_| log::warn!("Responder Send Error"));
@@ -235,23 +238,24 @@ impl Agent {
                     }
                 }
                 AgentRequest::StopResource(resource_id, responder) => {
-                    if let Some(resource_class) = resource_instances.get(&resource_id.function_id) {
-                        if let Some(provider) = resource_providers.get_mut(resource_class) {
+                    if let Some(provider_id) = resource_instances.get(&resource_id.function_id) {
+                        if let Some(resource_desc) = resource_providers.get_mut(provider_id) {
                             log::info!(
-                                "Stopped resource provider_id {} node_id {}, fid {}",
-                                resource_class,
+                                "Stopped resource class_type {}, provider_id {} node_id {}, fid {}",
+                                resource_desc.class_type,
+                                provider_id,
                                 resource_id.node_id,
                                 resource_id.function_id
                             );
                             responder
-                                .send(provider.stop(resource_id).await)
+                                .send(resource_desc.client.stop(resource_id).await)
                                 .unwrap_or_else(|_| log::warn!("Responder Send Error"));
                             continue;
                         } else {
                             responder
                                 .send(Err(anyhow::anyhow!(
                                     "Cannot stop a resource, provider not found with provider_id: {}",
-                                    resource_class
+                                    provider_id
                                 )))
                                 .unwrap_or_else(|_| log::warn!("Responder Send Error"));
                             continue;
@@ -266,10 +270,10 @@ impl Agent {
                 }
                 AgentRequest::PatchResource(update, responder) => {
                     if let Some(provider_id) = resource_instances.get(&update.function_id) {
-                        if let Some(provider) = resource_providers.get_mut(provider_id) {
+                        if let Some(resource_desc) = resource_providers.get_mut(provider_id) {
                             log::info!("Patch resource provider_id {} fid {}", provider_id, update.function_id);
                             responder
-                                .send(provider.patch(update).await)
+                                .send(resource_desc.client.patch(update).await)
                                 .unwrap_or_else(|_| log::warn!("Responder Send Error"));
                             continue;
                         } else {

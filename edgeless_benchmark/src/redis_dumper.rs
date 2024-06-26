@@ -27,11 +27,6 @@ impl RedisDumper {
         }
     }
 
-    pub fn flushdb(&mut self) -> redis::RedisResult<()> {
-        let _ = redis::cmd("FLUSHDB").query(&mut self.connection)?;
-        Ok(())
-    }
-
     ///
     /// Dump the content from Redis to a CSV file.
     ///
@@ -39,31 +34,26 @@ impl RedisDumper {
     ///
     /// ```ignore
     /// >>> import pandas as pd
-    /// >>> df = pd.read_csv('../../out.csv')
-    /// >>> df[df["entity"] == "W"]["value"].mean()
-    /// 146.875
+    /// >>> df = pd.read_csv('out.csv')
+    /// >>> df[df["entity"] == "w"]["value"].mean()
+    /// 142.66666666666666
     /// >>> df
-    ///     entity    name  value
-    /// 0        W     wf0    161
-    /// 1        W     wf0    151
-    /// 2        W     wf0    176
-    /// 3        W     wf0    146
-    /// 4        W     wf0    121
-    /// ..     ...     ...    ...
-    /// 120      F  wf1:f3     33
-    /// 121      F  wf1:f3     26
-    /// 122      F  wf1:f3     30
-    /// 123      F  wf1:f3     26
-    /// 124      F  wf1:f3     21
+    ///      seed entity                                  name  value     timestamp
+    /// 0      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     32  1.718281e+09
+    /// 1      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     47  1.718281e+09
+    /// 2      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     31  1.718281e+09
+    /// 3      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     29  1.718281e+09
+    /// 4      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     31  1.718281e+09
+    /// ..    ...    ...                                   ...    ...           ...
+    /// 115    42      w                                   wf0    142  1.718281e+09
+    /// 116    42      w                                   wf0    142  1.718281e+09
+    /// 117    42      w                                   wf0    141  1.718281e+09
+    /// 118    42      w                                   wf0    134  1.718281e+09
+    /// 119    42      w                                   wf0    145  1.718281e+09
     ///
-    /// [125 rows x 3 columns]
+    /// [120 rows x 5 columns]
     /// ```
-    pub fn dump_csv(
-        &mut self,
-        output: &str,
-        append: bool,
-        workflows: std::collections::HashMap<String, std::collections::HashSet<String>>,
-    ) -> anyhow::Result<()> {
+    pub fn dump_csv(&mut self, output: &str, append: bool) -> anyhow::Result<()> {
         let header = !append
             || match std::fs::metadata(output) {
                 Ok(metadata) => metadata.len() == 0,
@@ -77,21 +67,22 @@ impl RedisDumper {
             .open(output)?;
 
         if header {
-            writeln!(&mut f, "{},entity,name,value", self.additional_header)?;
+            writeln!(&mut f, "{},entity,name,value,timestamp", self.additional_header)?;
         }
 
-        for (workflow, functions) in workflows {
-            self.write_values(&mut f, "workflow:latencies", "W", &workflow)?;
-            for function in functions {
-                self.write_values(&mut f, "function:latencies", "F", format!("{}:{}", workflow, function).as_str())?;
-            }
+        for key_in in self.connection.keys::<&str, Vec<String>>("*:*:samples")? {
+            let tokens: Vec<&str> = key_in.split(':').collect();
+            assert!(tokens.len() == 3);
+            let key_out = &tokens[0][0..1].to_string();
+            let id = tokens[1];
+            self.write_values(&mut f, &key_in, key_out, id)?;
         }
 
         Ok(())
     }
 
     fn write_values(&mut self, f: &mut std::fs::File, key_in: &str, key_out: &str, name: &str) -> anyhow::Result<()> {
-        for value in self.connection.lrange::<String, Vec<String>>(format!("{}:{}", key_in, name), 0, -1)? {
+        for value in self.connection.lrange::<&str, Vec<String>>(key_in, 0, -1)? {
             writeln!(f, "{},{},{},{}", self.additional_fields, key_out, name, value)?;
         }
         Ok(())

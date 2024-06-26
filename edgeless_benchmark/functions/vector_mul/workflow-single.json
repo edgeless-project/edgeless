@@ -17,7 +17,7 @@
                 "out": "client"
             },
             "annotations": {
-                "init-payload": "seed=42,is_client=true,wf_name=wf0,fun_name=my_function,input_size=1000"
+                "init-payload": "seed=42,is_client=true,input_size=10000"
             }
         }
     ],
@@ -27,7 +27,8 @@
             "class_type": "metrics-collector",
             "output_mapping": {},
             "configurations": {
-                "url": "redis://127.0.0.1:6379/"
+                "alpha": "0.9",
+                "wf_name": "wf_single"
             }
         }
     ],
