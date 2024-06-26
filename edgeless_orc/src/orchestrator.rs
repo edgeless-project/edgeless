@@ -3,16 +3,12 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use std::str::FromStr;
-
-use edgeless_api::function_instance::{ComponentId, InstanceId};
 use serde::ser::{Serialize, SerializeTupleVariant, Serializer};
 
 use futures::{Future, SinkExt, StreamExt};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
-
-use crate::orchestration_logic::OrchestrationLogic;
+use std::str::FromStr;
 
 #[cfg(test)]
 pub mod test;
@@ -50,7 +46,7 @@ impl AffinityLevel {
 pub enum DeployIntent {
     /// The component with givel logical identifier should be migrated to
     /// the given target nodes, if possible.
-    Migrate(ComponentId, Vec<edgeless_api::function_instance::NodeId>),
+    Migrate(edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::NodeId>),
 }
 
 impl DeployIntent {
@@ -231,11 +227,17 @@ pub struct ResourceProvider {
 pub enum ActiveInstance {
     // 0: request
     // 1: [ (node_id, int_fid) ]
-    Function(edgeless_api::function_instance::SpawnFunctionRequest, Vec<InstanceId>),
+    Function(
+        edgeless_api::function_instance::SpawnFunctionRequest,
+        Vec<edgeless_api::function_instance::InstanceId>,
+    ),
 
     // 0: request
     // 1: (node_id, int_fid)
-    Resource(edgeless_api::resource_configuration::ResourceInstanceSpecification, InstanceId),
+    Resource(
+        edgeless_api::resource_configuration::ResourceInstanceSpecification,
+        edgeless_api::function_instance::InstanceId,
+    ),
 }
 
 impl Serialize for ActiveInstance {
@@ -343,13 +345,13 @@ pub struct ClientDesc {
 
 enum IntFid {
     // 0: node_id, int_fid
-    Function(InstanceId),
+    Function(edgeless_api::function_instance::InstanceId),
     // 0: node_id, int_fid
-    Resource(InstanceId),
+    Resource(edgeless_api::function_instance::InstanceId),
 }
 
 impl IntFid {
-    fn instance_id(&self) -> InstanceId {
+    fn instance_id(&self) -> edgeless_api::function_instance::InstanceId {
         match self {
             Self::Function(id) => *id,
             Self::Resource(id) => *id,
@@ -395,20 +397,23 @@ impl Orchestrator {
         let _ = self.sender.send(OrchestratorRequest::KEEPALIVE()).await;
     }
 
-    fn ext_to_int(active_instances: &std::collections::HashMap<ComponentId, ActiveInstance>, ext_fid: &ComponentId) -> Vec<IntFid> {
+    fn ext_to_int(
+        active_instances: &std::collections::HashMap<edgeless_api::function_instance::ComponentId, ActiveInstance>,
+        ext_fid: &edgeless_api::function_instance::ComponentId,
+    ) -> Vec<IntFid> {
         match active_instances.get(ext_fid) {
             Some(active_instance) => match active_instance {
                 ActiveInstance::Function(_req, instances) => instances
                     .iter()
                     .map(|x| {
-                        IntFid::Function(InstanceId {
+                        IntFid::Function(edgeless_api::function_instance::InstanceId {
                             node_id: x.node_id,
                             function_id: x.function_id,
                         })
                     })
                     .collect(),
                 ActiveInstance::Resource(_req, instance) => {
-                    vec![IntFid::Resource(InstanceId {
+                    vec![IntFid::Resource(edgeless_api::function_instance::InstanceId {
                         node_id: instance.node_id,
                         function_id: instance.function_id,
                     })]
@@ -427,10 +432,10 @@ impl Orchestrator {
     ///   migrated.
     /// * `targets` - The set of nodes to which the instance has to be migrated.
     async fn migrate(
-        active_instances: &mut std::collections::HashMap<ComponentId, ActiveInstance>,
+        active_instances: &mut std::collections::HashMap<edgeless_api::function_instance::ComponentId, ActiveInstance>,
         clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
-        orchestration_logic: &OrchestrationLogic,
-        component: &ComponentId,
+        orchestration_logic: &crate::orchestration_logic::OrchestrationLogic,
+        component: &edgeless_api::function_instance::ComponentId,
         targets: &Vec<edgeless_api::function_instance::NodeId>,
     ) {
         let mut to_be_started = vec![];
@@ -482,10 +487,10 @@ impl Orchestrator {
     /// * `origin_ext_fids` - The logical resource identifiers for which patches
     ///    must be applied.
     async fn apply_patches(
-        active_instances: &std::collections::HashMap<ComponentId, ActiveInstance>,
+        active_instances: &std::collections::HashMap<edgeless_api::function_instance::ComponentId, ActiveInstance>,
         dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
         clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
-        origin_ext_fids: Vec<ComponentId>,
+        origin_ext_fids: Vec<edgeless_api::function_instance::ComponentId>,
     ) {
         for origin_ext_fid in origin_ext_fids.iter() {
             let ext_output_mapping = match dependency_graph.get(origin_ext_fid) {
@@ -571,7 +576,7 @@ impl Orchestrator {
     async fn start_resource(
         start_req: edgeless_api::resource_configuration::ResourceInstanceSpecification,
         resource_providers: &mut std::collections::HashMap<String, ResourceProvider>,
-        active_instances: &mut std::collections::HashMap<ComponentId, ActiveInstance>,
+        active_instances: &mut std::collections::HashMap<edgeless_api::function_instance::ComponentId, ActiveInstance>,
         clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
         ext_fid: uuid::Uuid,
         rng: &mut rand::rngs::StdRng,
@@ -605,7 +610,7 @@ impl Orchestrator {
                                     ext_fid.clone(),
                                     ActiveInstance::Resource(
                                         start_req,
-                                        InstanceId {
+                                        edgeless_api::function_instance::InstanceId {
                                             node_id: resource_provider.node_id.clone(),
                                             function_id: instance_id.function_id.clone(),
                                         },
@@ -654,7 +659,7 @@ impl Orchestrator {
     /// * `orchestration_logic` - The orchestration logic configured at run-time.
     fn select_node(
         spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest,
-        orchestration_logic: &mut OrchestrationLogic,
+        orchestration_logic: &mut crate::orchestration_logic::OrchestrationLogic,
     ) -> anyhow::Result<edgeless_api::function_instance::NodeId> {
         match orchestration_logic.next(spawn_req) {
             Some(node_id) => Ok(node_id),
@@ -676,7 +681,7 @@ impl Orchestrator {
     /// * `node_id` - The node where to deploy the function instance.
     async fn start_function(
         spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest,
-        active_instances: &mut std::collections::HashMap<ComponentId, ActiveInstance>,
+        active_instances: &mut std::collections::HashMap<edgeless_api::function_instance::ComponentId, ActiveInstance>,
         clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
         ext_fid: &uuid::Uuid,
         node_id: &edgeless_api::function_instance::NodeId,
@@ -712,7 +717,7 @@ impl Orchestrator {
                         ext_fid.clone(),
                         ActiveInstance::Function(
                             spawn_req.clone(),
-                            vec![InstanceId {
+                            vec![edgeless_api::function_instance::InstanceId {
                                 node_id: node_id.clone(),
                                 function_id: id.function_id,
                             }],
@@ -734,7 +739,10 @@ impl Orchestrator {
     ///
     /// * `clients` - The nodes' descriptors.
     /// * `instance_id` - The function instance to be stopped.
-    async fn stop_function(clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>, instance_id: &InstanceId) {
+    async fn stop_function(
+        clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        instance_id: &edgeless_api::function_instance::InstanceId,
+    ) {
         match clients.get_mut(&instance_id.node_id) {
             Some(client_desc) => match client_desc.api.function_instance_api().stop(*instance_id).await {
                 Ok(_) => {
@@ -755,7 +763,10 @@ impl Orchestrator {
     ///
     /// * `clients` - The nodes' descriptors.
     /// * `instance_id` - The resource instance to be stopped.
-    async fn stop_resource(clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>, instance_id: &InstanceId) {
+    async fn stop_resource(
+        clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        instance_id: &edgeless_api::function_instance::InstanceId,
+    ) {
         match clients.get_mut(&instance_id.node_id) {
             Some(node_client) => match node_client.api.resource_configuration_api().stop(*instance_id).await {
                 Ok(_) => {
@@ -980,7 +991,7 @@ impl Orchestrator {
                         .output_mapping
                         .iter()
                         .map(|x| (x.0.clone(), x.1.function_id.clone()))
-                        .collect::<std::collections::HashMap<String, ComponentId>>();
+                        .collect::<std::collections::HashMap<String, edgeless_api::function_instance::ComponentId>>();
 
                     // Save the patch request into an internal data structure,
                     // keeping track only of the ext_fid for both origin
@@ -1326,7 +1337,7 @@ impl Orchestrator {
                                         panic!("expecting a resource to be associated with ext_fid {}, found a function", ext_fid)
                                     }
                                     ActiveInstance::Resource(_start_req, instance_id) => {
-                                        *instance_id = InstanceId::none();
+                                        *instance_id = edgeless_api::function_instance::InstanceId::none();
                                     }
                                 }
                             }

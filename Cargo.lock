@@ -1555,8 +1555,6 @@ dependencies = [
  "futures 0.3.30",
  "log",
  "redis",
- "serde",
- "serde_json",
  "serial_test",
  "tokio 1.36.0",
  "toml 0.7.8",

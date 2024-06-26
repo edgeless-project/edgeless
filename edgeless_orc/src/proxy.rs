@@ -1,6 +1,14 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
+use crate::orchestrator;
+
+#[derive(Clone)]
+pub enum Instance {
+    Function(edgeless_api::function_instance::ComponentId),
+    Resource(edgeless_api::function_instance::ComponentId),
+}
+
 #[async_trait::async_trait]
 pub trait Proxy: Sync + Send {
     /// Update the info on the currently actives nodes as given.
@@ -15,6 +23,32 @@ pub trait Proxy: Sync + Send {
     /// Update the dependency graph.
     fn update_dependency_graph(&mut self, dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>);
 
-    /// Retrieve the pending deploy intents.
+    /// Add deployment intents.
+    fn add_deploy_intents(&mut self, intents: Vec<orchestrator::DeployIntent>);
+
+    /// Retrieve the pending deploy intents. Consume the intents retrieved.
     fn retrieve_deploy_intents(&mut self) -> Vec<super::orchestrator::DeployIntent>;
+
+    /// Fetch the nodes' capabilities.
+    fn fetch_node_capabilities(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeCapabilities>;
+
+    /// Fetch the nodes' health status.
+    fn fetch_node_health(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_management::HealthStatus>;
+
+    /// Fetch the mapping between active function instances and nodes.
+    fn fetch_function_instances_to_nodes(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::NodeId>>;
+
+    /// Fetch the mapping between active resources instances and nodes.
+    fn fetch_resource_instances_to_nodes(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::NodeId>;
+
+    /// Find all the active instances on nodes.
+    fn fetch_nodes_to_instances(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, Vec<Instance>>;
 }

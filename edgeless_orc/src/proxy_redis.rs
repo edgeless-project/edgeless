@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use redis::Commands;
+use std::str::FromStr;
 
 /// An orchestrator proxy that uses a Redis in-memory database to mirror
 /// internal data structures and read orchestration intents.
@@ -44,6 +45,58 @@ impl ProxyRedis {
             active_instance_uuids: std::collections::HashSet::new(),
             dependency_uuids: std::collections::HashSet::new(),
         })
+    }
+}
+
+// Data structure clone of ActiveInstance, which can be deserialized.
+#[derive(Clone, serde::Deserialize, Debug)]
+pub enum ActiveInstanceClone {
+    // 0: request
+    // 1: [ (node_id, int_fid) ]
+    Function(edgeless_api::function_instance::SpawnFunctionRequest, Vec<String>),
+
+    // 0: request
+    // 1: (node_id, int_fid)
+    Resource(edgeless_api::resource_configuration::ResourceInstanceSpecification, String),
+}
+
+fn string_to_instance_id(val: &str) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
+    let tokens: Vec<&str> = val.split(' ').collect();
+    if tokens.len() != 4 {
+        anyhow::bail!("invalid number of tokens in InstanceId: {}", tokens.len());
+    }
+
+    let node_id = match uuid::Uuid::from_str(&tokens[1][0..tokens[1].len() - 1]) {
+        Ok(val) => val,
+        Err(err) => anyhow::bail!("invalid node_id in InstanceId: {}", err),
+    };
+    let function_id = match uuid::Uuid::from_str(&tokens[3][0..tokens[3].len() - 1]) {
+        Ok(val) => val,
+        Err(err) => anyhow::bail!("invalid function_id in InstanceId: {}", err),
+    };
+    Ok(edgeless_api::function_instance::InstanceId { node_id, function_id })
+}
+
+impl ProxyRedis {
+    fn fetch_instances(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, ActiveInstanceClone> {
+        let mut instance_ids = vec![];
+        for instance_key in self.connection.keys::<&str, Vec<String>>("instance:*").unwrap_or(vec![]) {
+            let tokens: Vec<&str> = instance_key.split(':').collect();
+            if tokens.len() == 2 {
+                if let Ok(uuid) = edgeless_api::function_instance::ComponentId::parse_str(tokens[1]) {
+                    instance_ids.push(uuid);
+                }
+            }
+        }
+        let mut instances = std::collections::HashMap::new();
+        for instance_id in instance_ids {
+            if let Ok(val) = self.connection.get::<String, String>(format!("instance:{}", instance_id.to_string())) {
+                if let Ok(val) = serde_json::from_str::<ActiveInstanceClone>(&val) {
+                    instances.insert(instance_id, val);
+                }
+            }
+        }
+        instances
     }
 }
 
@@ -133,6 +186,20 @@ impl super::proxy::Proxy for ProxyRedis {
         self.dependency_uuids = new_dependency_uuids;
     }
 
+    fn add_deploy_intents(&mut self, intents: Vec<super::orchestrator::DeployIntent>) {
+        for intent in intents {
+            match intent {
+                super::orchestrator::DeployIntent::Migrate(instance, nodes) => {
+                    let key = format!("intent:migrate:{}", instance);
+                    let _ = self
+                        .connection
+                        .set::<&str, &str, usize>(&key, &nodes.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","));
+                    let _ = self.connection.lpush::<&str, &str, String>("intents", &key);
+                }
+            }
+        }
+    }
+
     fn retrieve_deploy_intents(&mut self) -> Vec<super::orchestrator::DeployIntent> {
         let mut intents = vec![];
         loop {
@@ -161,6 +228,97 @@ impl super::proxy::Proxy for ProxyRedis {
             }
         }
         intents
+    }
+
+    fn fetch_node_capabilities(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeCapabilities> {
+        let mut capabilities = std::collections::HashMap::new();
+        for node_key in self.connection.keys::<&str, Vec<String>>("node:capabilities:*").unwrap_or(vec![]) {
+            let tokens: Vec<&str> = node_key.split(':').collect();
+            assert_eq!(tokens.len(), 3);
+            if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2]) {
+                if let Ok(val) = self.connection.get::<&str, String>(&node_key) {
+                    if let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeCapabilities>(&val) {
+                        capabilities.insert(node_id, val);
+                    }
+                }
+            }
+        }
+        capabilities
+    }
+
+    fn fetch_node_health(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_management::HealthStatus> {
+        let mut health = std::collections::HashMap::new();
+        for node_key in self.connection.keys::<&str, Vec<String>>("node:health:*").unwrap_or(vec![]) {
+            let tokens: Vec<&str> = node_key.split(':').collect();
+            assert_eq!(tokens.len(), 3);
+            if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2]) {
+                if let Ok(val) = self.connection.get::<&str, String>(&node_key) {
+                    if let Ok(val) = serde_json::from_str::<edgeless_api::node_management::HealthStatus>(&val) {
+                        health.insert(node_id, val);
+                    }
+                }
+            }
+        }
+        health
+    }
+
+    fn fetch_function_instances_to_nodes(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::NodeId>> {
+        let mut instances = std::collections::HashMap::new();
+        for (instance_id, instance) in self.fetch_instances() {
+            if let ActiveInstanceClone::Function(_, nodes) = instance {
+                instances.insert(
+                    instance_id,
+                    nodes.iter().filter_map(|x| string_to_instance_id(x).ok()).map(|x| x.node_id).collect(),
+                );
+            }
+        }
+        instances
+    }
+
+    fn fetch_resource_instances_to_nodes(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::NodeId> {
+        let mut instances = std::collections::HashMap::new();
+        for (instance_id, instance) in self.fetch_instances() {
+            if let ActiveInstanceClone::Resource(_, node) = instance {
+                let node_id = uuid::Uuid::from_str(&node);
+                if let Ok(node_id) = node_id {
+                    instances.insert(instance_id, node_id);
+                }
+            }
+        }
+        instances
+    }
+
+    fn fetch_nodes_to_instances(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, Vec<crate::proxy::Instance>> {
+        let mut nodes_mapping = std::collections::HashMap::new();
+        for (instance_id, instance) in self.fetch_instances() {
+            match instance {
+                ActiveInstanceClone::Function(_, nodes) => {
+                    for node in nodes {
+                        let node_id = uuid::Uuid::from_str(&node);
+                        if let Ok(node_id) = node_id {
+                            let res = nodes_mapping.entry(node_id).or_insert(vec![]);
+                            res.push(crate::proxy::Instance::Function(instance_id));
+                        }
+                    }
+                }
+                ActiveInstanceClone::Resource(_, node) => {
+                    let node_id = uuid::Uuid::from_str(&node);
+                    if let Ok(node_id) = node_id {
+                        let res = nodes_mapping.entry(node_id).or_insert(vec![]);
+                        res.push(crate::proxy::Instance::Resource(instance_id));
+                    }
+                }
+            }
+        }
+        nodes_mapping
     }
 }
 
