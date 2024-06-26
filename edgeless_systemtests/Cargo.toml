@@ -30,6 +30,4 @@ edgeless_con = {path = "../edgeless_con" }
 edgeless_orc = {path = "../edgeless_orc" }
 edgeless_node = {path = "../edgeless_node" }
 redis = "*"
-serde = "1.0"
-serde_json = "1"
 serial_test = { version = "3" }

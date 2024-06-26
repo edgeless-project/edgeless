@@ -5,10 +5,10 @@
 
 mod metrics_collector;
 mod orchestration_logic;
-mod orchestrator;
-mod proxy;
-mod proxy_none;
-mod proxy_redis;
+pub mod orchestrator;
+pub mod proxy;
+pub mod proxy_none;
+pub mod proxy_redis;
 
 use edgeless_node::agent;
 use futures::join;

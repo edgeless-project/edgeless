@@ -9,7 +9,7 @@ pub enum UpdatePeersRequest {
     Clear,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HealthStatus {
     pub cpu_usage: i32,
     pub cpu_load: i32,
