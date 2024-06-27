@@ -1,0 +1,23 @@
+{
+    "name": "robot-arm-gui",
+    "version": "1.0.0",
+    "description": "GUI for the robotic arm",
+    "scripts": {
+        "start": "lite-server"
+    },
+    "author": "Siemens AG",
+    "license": "MIT",
+    "dependencies": {
+        "colors": "^1.1.2",
+        "commander": "^2.9.0",
+        "debug": "^2.2.0",
+        "redux": "^3.6.0"
+    },
+    "devDependencies": {
+        "@eslint/js": "^9.5.0",
+        "eslint": "^9.5.0",
+        "globals": "^15.6.0",
+        "lite-server": "^2.4.0",
+        "mocha": "^10.5.1"
+    }
+}
