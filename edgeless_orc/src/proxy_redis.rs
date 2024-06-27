@@ -270,11 +270,15 @@ impl super::proxy::Proxy for ProxyRedis {
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::NodeId>> {
         let mut instances = std::collections::HashMap::new();
-        for (instance_id, instance) in self.fetch_instances() {
-            if let ActiveInstanceClone::Function(_, nodes) = instance {
+        for (logical_id, instance) in self.fetch_instances() {
+            if let ActiveInstanceClone::Function(_, instance_ids) = instance {
                 instances.insert(
-                    instance_id,
-                    nodes.iter().filter_map(|x| string_to_instance_id(x).ok()).map(|x| x.node_id).collect(),
+                    logical_id,
+                    instance_ids
+                        .iter()
+                        .filter_map(|x| string_to_instance_id(x).ok())
+                        .map(|x| x.node_id)
+                        .collect(),
                 );
             }
         }
@@ -285,11 +289,10 @@ impl super::proxy::Proxy for ProxyRedis {
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::NodeId> {
         let mut instances = std::collections::HashMap::new();
-        for (instance_id, instance) in self.fetch_instances() {
-            if let ActiveInstanceClone::Resource(_, node) = instance {
-                let node_id = uuid::Uuid::from_str(&node);
-                if let Ok(node_id) = node_id {
-                    instances.insert(instance_id, node_id);
+        for (logical_id, instance) in self.fetch_instances() {
+            if let ActiveInstanceClone::Resource(_, instance_id) = instance {
+                if let Ok(instance_id) = string_to_instance_id(&instance_id) {
+                    instances.insert(logical_id, instance_id.node_id);
                 }
             }
         }
@@ -298,22 +301,20 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_nodes_to_instances(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, Vec<crate::proxy::Instance>> {
         let mut nodes_mapping = std::collections::HashMap::new();
-        for (instance_id, instance) in self.fetch_instances() {
+        for (logical_id, instance) in self.fetch_instances() {
             match instance {
-                ActiveInstanceClone::Function(_, nodes) => {
-                    for node in nodes {
-                        let node_id = uuid::Uuid::from_str(&node);
-                        if let Ok(node_id) = node_id {
-                            let res = nodes_mapping.entry(node_id).or_insert(vec![]);
-                            res.push(crate::proxy::Instance::Function(instance_id));
+                ActiveInstanceClone::Function(_, instance_ids) => {
+                    for instance_id in instance_ids {
+                        if let Ok(instance_id) = string_to_instance_id(&instance_id) {
+                            let res = nodes_mapping.entry(instance_id.node_id).or_insert(vec![]);
+                            res.push(crate::proxy::Instance::Function(logical_id));
                         }
                     }
                 }
-                ActiveInstanceClone::Resource(_, node) => {
-                    let node_id = uuid::Uuid::from_str(&node);
-                    if let Ok(node_id) = node_id {
-                        let res = nodes_mapping.entry(node_id).or_insert(vec![]);
-                        res.push(crate::proxy::Instance::Resource(instance_id));
+                ActiveInstanceClone::Resource(_, instance_id) => {
+                    if let Ok(instance_id) = string_to_instance_id(&instance_id) {
+                        let res = nodes_mapping.entry(instance_id.node_id).or_insert(vec![]);
+                        res.push(crate::proxy::Instance::Resource(logical_id));
                     }
                 }
             }
@@ -324,9 +325,101 @@ impl super::proxy::Proxy for ProxyRedis {
 
 #[cfg(test)]
 mod test {
+    use edgeless_api::function_instance::SpawnFunctionRequest;
+
     use crate::{orchestrator::DeployIntent, proxy::Proxy};
 
     use super::*;
+
+    #[test]
+    fn test_redis_proxy() {
+        // Skip the test if there is no local Redis listening on default port.
+        let mut redis_proxy = match ProxyRedis::new("redis://localhost:6379", true) {
+            Ok(redis_proxy) => redis_proxy,
+            Err(_) => {
+                println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
+                return;
+            }
+        };
+
+        assert!(redis_proxy.fetch_function_instances_to_nodes().is_empty());
+        assert!(redis_proxy.fetch_instances().is_empty());
+        assert!(redis_proxy.fetch_node_capabilities().is_empty());
+        assert!(redis_proxy.fetch_node_health().is_empty());
+        assert!(redis_proxy.fetch_nodes_to_instances().is_empty());
+        assert!(redis_proxy.fetch_resource_instances_to_nodes().is_empty());
+
+        let mut active_instances = std::collections::HashMap::new();
+        let node1_id = uuid::Uuid::new_v4(); // functions
+        let node2_id = uuid::Uuid::new_v4(); // resources
+        for _ in 0..10 {
+            active_instances.insert(
+                uuid::Uuid::new_v4(),
+                crate::orchestrator::ActiveInstance::Function(
+                    SpawnFunctionRequest {
+                        instance_id: None,
+                        code: edgeless_api::function_instance::FunctionClassSpecification {
+                            function_class_id: "fun".to_string(),
+                            function_class_type: "class".to_string(),
+                            function_class_version: "1.0".to_string(),
+                            function_class_code: vec![],
+                            function_class_outputs: vec![],
+                        },
+                        annotations: std::collections::HashMap::new(),
+                        state_specification: edgeless_api::function_instance::StateSpecification {
+                            state_id: uuid::Uuid::new_v4(),
+                            state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
+                        },
+                    },
+                    vec![edgeless_api::function_instance::InstanceId {
+                        node_id: node1_id,
+                        function_id: uuid::Uuid::new_v4(),
+                    }],
+                ),
+            );
+        }
+        for _ in 0..5 {
+            active_instances.insert(
+                uuid::Uuid::new_v4(),
+                crate::orchestrator::ActiveInstance::Resource(
+                    edgeless_api::resource_configuration::ResourceInstanceSpecification {
+                        class_type: "res".to_string(),
+                        output_mapping: std::collections::HashMap::new(),
+                        configuration: std::collections::HashMap::new(),
+                    },
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: node2_id,
+                        function_id: uuid::Uuid::new_v4(),
+                    },
+                ),
+            );
+        }
+
+        redis_proxy.update_active_instances(&active_instances);
+
+        let function_instances = redis_proxy.fetch_function_instances_to_nodes();
+        assert_eq!(function_instances.len(), 10);
+        for (_instance, nodes) in function_instances {
+            assert_eq!(nodes.len(), 1);
+            assert!(nodes.first().is_some());
+            assert!(nodes.first().unwrap() == &node1_id);
+        }
+
+        let resources_instances = redis_proxy.fetch_resource_instances_to_nodes();
+        assert_eq!(resources_instances.len(), 5);
+        for (_instance, node) in resources_instances {
+            assert!(&node == &node2_id);
+        }
+
+        let nodes = redis_proxy.fetch_nodes_to_instances();
+        assert_eq!(nodes.len(), 2);
+        let entry = nodes.get(&node1_id);
+        assert!(entry.is_some());
+        assert_eq!(entry.unwrap().len(), 10);
+        let entry = nodes.get(&node2_id);
+        assert!(entry.is_some());
+        assert_eq!(entry.unwrap().len(), 5);
+    }
 
     #[test]
     #[ignore]
