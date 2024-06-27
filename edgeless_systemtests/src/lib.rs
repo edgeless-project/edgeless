@@ -337,7 +337,7 @@ mod tests {
         let _ = env_logger::try_init();
 
         // Skip the test if there is no local Redis listening on default port.
-        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", false) {
+        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true) {
             Ok(redis_proxy) => redis_proxy,
             Err(_) => {
                 println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
