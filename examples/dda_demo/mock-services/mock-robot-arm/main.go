@@ -37,7 +37,6 @@ func acceptActions(ctx context.Context) {
 	}
 	for action := range events {
 		println("Received an action to move the robotic arm from DDA")
-		println("TEST?")
 
 		time.Sleep(2 * time.Second) // artificial delay
 
