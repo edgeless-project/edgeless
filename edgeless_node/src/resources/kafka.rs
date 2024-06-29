@@ -1,7 +1,7 @@
-use edgeless_dataplane::core::Message;
-use rdkafka::producer::{BaseProducer, BaseRecord};
-use rdkafka::config::ClientConfig;
 use anyhow::Result;
+use edgeless_dataplane::core::Message;
+use rdkafka::config::ClientConfig;
+use rdkafka::producer::{BaseProducer, BaseRecord};
 
 #[derive(Clone)]
 pub struct KafkaResourceProvider {
@@ -25,18 +25,12 @@ impl Drop for KafkaResource {
 }
 
 impl KafkaResource {
-    async fn new(
-        dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
-        kafka_brokers: &str,
-        kafka_topic: &str,
-    ) -> Result<Self> {
+    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, kafka_brokers: &str, kafka_topic: &str) -> Result<Self> {
         let mut dataplane_handle = dataplane_handle;
         let kafka_brokers = kafka_brokers.to_string();
         let kafka_topic = kafka_topic.to_string();
 
-        let producer: BaseProducer = ClientConfig::new()
-            .set("bootstrap.servers", &kafka_brokers)
-            .create()?;
+        let producer: BaseProducer = ClientConfig::new().set("bootstrap.servers", &kafka_brokers).create()?;
 
         log::info!("KafkaResource created, brokers: {}", kafka_brokers);
 
@@ -60,11 +54,7 @@ impl KafkaResource {
                     }
                 };
 
-                if let Err(e) = producer.send(
-                    BaseRecord::to(&kafka_topic)
-                        .payload(&message_data)
-                        .key(""),
-                ) {
+                if let Err(e) = producer.send(BaseRecord::to(&kafka_topic).payload(&message_data).key("")) {
                     log::error!("Failed to send message to topic '{}': {:?}", kafka_topic, e);
                 }
 
