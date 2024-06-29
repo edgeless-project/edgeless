@@ -38,3 +38,4 @@ toml = "0.7"
 rand = "0.8.5"
 redis = "*"
 serial_test = { version = "3" }
+itertools = "0.13.0"
