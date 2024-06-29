@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
+use itertools::Itertools;
 use std::str::FromStr;
 
 use clap::Parser;
@@ -67,7 +68,7 @@ fn main() -> anyhow::Result<()> {
     match args.command {
         Commands::Show { show_command } => match show_command {
             ShowCommands::Functions {} => {
-                for (function, nodes) in proxy.fetch_function_instances_to_nodes() {
+                for (function, nodes) in proxy.fetch_function_instances_to_nodes().iter().sorted_by_key(|x| x.0.to_string()) {
                     println!(
                         "{} -> {}",
                         function,
@@ -76,23 +77,23 @@ fn main() -> anyhow::Result<()> {
                 }
             }
             ShowCommands::Resources {} => {
-                for (resource, node) in proxy.fetch_resource_instances_to_nodes() {
+                for (resource, node) in proxy.fetch_resource_instances_to_nodes().iter().sorted_by_key(|x| x.0.to_string()) {
                     println!("{} -> {}", resource, node);
                 }
             }
             ShowCommands::Node { node_command } => match node_command {
                 NodeCommands::Capabilities {} => {
-                    for (node, capabilities) in proxy.fetch_node_capabilities() {
+                    for (node, capabilities) in proxy.fetch_node_capabilities().iter().sorted_by_key(|x| x.0.to_string()) {
                         println!("{} -> {}", node, capabilities);
                     }
                 }
                 NodeCommands::Health {} => {
-                    for (node, health) in proxy.fetch_node_health() {
+                    for (node, health) in proxy.fetch_node_health().iter().sorted_by_key(|x| x.0.to_string()) {
                         println!("{} -> {}", node, health);
                     }
                 }
                 NodeCommands::Instances {} => {
-                    for (node, instances) in proxy.fetch_nodes_to_instances() {
+                    for (node, instances) in proxy.fetch_nodes_to_instances().iter().sorted_by_key(|x| x.0.to_string()) {
                         println!("{}", node);
                         for instance in instances {
                             match instance {
