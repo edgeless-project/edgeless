@@ -6,6 +6,15 @@ mod workflow_spec;
 use clap::Parser;
 use edgeless_api::{controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
 
+use mailparse::{parse_content_disposition, parse_header};
+use reqwest::header::ACCEPT;
+use reqwest::{multipart, Body, Client};
+use std::collections::HashMap;
+use std::io::Cursor;
+use tokio::fs::File;
+use tokio_util::codec::{BytesCodec, FramedRead};
+use toml; // for parse
+
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
     Start { spec_file: String },
@@ -24,6 +33,16 @@ enum FunctionCommands {
         node_id: String,
         function_id: String,
         payload: String,
+    },
+    Get {
+        function_name: String,
+    },
+    Download {
+        code_file_id: String,
+    },
+    Push {
+        binary_name: String,
+        function_type: String,
     },
 }
 
@@ -53,6 +72,9 @@ struct Args {
 #[derive(serde::Deserialize)]
 struct CLiConfig {
     controller_url: String,
+    pub url: String,
+    pub basic_auth_user: String,
+    pub basic_auth_pass: String,
 }
 
 pub fn edgeless_cli_default_conf() -> String {
@@ -261,6 +283,140 @@ async fn main() -> anyhow::Result<()> {
                         Ok(_) => println!("event casted"),
                         Err(err) => return Err(anyhow::anyhow!("error casting the event: {}", err)),
                     }
+                }
+
+                FunctionCommands::Get { function_name } => {
+                    if std::fs::metadata(&args.config_file).is_err() {
+                        return Err(anyhow::anyhow!(
+                            "configuration file does not exist or cannot be accessed: {}",
+                            &args.config_file
+                        ));
+                    }
+                    log::debug!("Got Config");
+                    let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
+
+                    let client = Client::new();
+                    let response = client
+                        .get(conf.url.to_string() + "/api/admin/function/" + function_name.as_str())
+                        .header(ACCEPT, "application/json")
+                        .basic_auth(conf.basic_auth_user, Some(conf.basic_auth_pass))
+                        .send()
+                        .await
+                        .expect("failed to get response")
+                        .text()
+                        .await
+                        .expect("failed to get payload");
+
+                    println!("Successfully get function {}", response);
+                }
+
+                FunctionCommands::Download { code_file_id } => {
+                    if std::fs::metadata(&args.config_file).is_err() {
+                        return Err(anyhow::anyhow!(
+                            "configuration file does not exist or cannot be accessed: {}",
+                            &args.config_file
+                        ));
+                    }
+                    log::debug!("Got Config");
+                    let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
+
+                    let client = Client::new();
+                    let response = client
+                        .get(conf.url.to_string() + "/api/admin/function/download/" + code_file_id.as_str())
+                        .header(ACCEPT, "*/*")
+                        .basic_auth(conf.basic_auth_user, Some(conf.basic_auth_pass))
+                        .send()
+                        .await
+                        .expect("failed to get header");
+                    let status = response.status();
+                    println!("status code {}", status);
+                    let header = response.headers().get("content-disposition").unwrap();
+
+                    let header_str = format!("{}{}", "Content-Disposition: ", header.to_str().unwrap());
+                    let (parsed, _) = parse_header(header_str.as_bytes()).unwrap();
+                    let dis = parse_content_disposition(&parsed.get_value());
+
+                    let downloadfilename = dis.params.get("filename").unwrap();
+
+                    println!("filename:\n{:?}", downloadfilename);
+
+                    let body = response.bytes().await.expect("failed to download payload");
+
+                    let mut file = std::fs::File::create(downloadfilename)?;
+                    let mut content = Cursor::new(body);
+                    std::io::copy(&mut content, &mut file)?;
+
+                    println!("File downloaded successfully.");
+                }
+
+                FunctionCommands::Push { binary_name, function_type } => {
+                    if std::fs::metadata(&args.config_file).is_err() {
+                        return Err(anyhow::anyhow!(
+                            "configuration file does not exist or cannot be accessed: {}",
+                            &args.config_file
+                        ));
+                    }
+                    log::debug!("Got Config");
+                    let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(&args.config_file).unwrap()).unwrap();
+
+                    let client = Client::new();
+                    let file = File::open(&binary_name).await?;
+
+                    // read file body stream
+                    let stream = FramedRead::new(file, BytesCodec::new());
+                    let file_body = Body::wrap_stream(stream);
+
+                    //make form part of file
+                    let some_file = multipart::Part::stream(file_body).file_name("binary"); // this is in curl -F "function_x86" in "file=@function_x86"
+
+                    //create the multipart form
+                    let form = multipart::Form::new().part("file", some_file); // this is in curl -F "file"
+
+                    let response = client
+                        .post(conf.url.to_string() + "/api/admin/function/upload")
+                        .header(ACCEPT, "application/json")
+                        .basic_auth(conf.basic_auth_user, Some(conf.basic_auth_pass))
+                        .multipart(form)
+                        .send()
+                        .await
+                        .expect("failed to get response");
+
+                    let json = response.json::<HashMap<String, String>>().await?;
+                    println!("receive code_file_id {:?}", json);
+
+                    let internal_id = &binary_name;
+                    let r = serde_json::json!({
+
+                        "function_type": function_type,
+                        "id": internal_id,
+                        "version": "0.1",
+                        "code_file_id": json.get("id"), //get the id
+                        "outputs": [  "success_cb",
+                                      "failure_cb"
+                                   ],
+                    });
+
+                    if std::fs::metadata(&args.config_file).is_err() {
+                        return Err(anyhow::anyhow!(
+                            "configuration file does not exist or cannot be accessed: {}",
+                            &args.config_file
+                        ));
+                    }
+                    log::debug!("Got Config");
+                    let conf_new: CLiConfig = toml::from_str(&std::fs::read_to_string(&args.config_file).unwrap()).unwrap();
+
+                    let post_response = client
+                        .post(conf_new.url.to_string() + "/api/admin/function")
+                        .header(ACCEPT, "application/json")
+                        .basic_auth(conf_new.basic_auth_user, Some(conf_new.basic_auth_pass))
+                        .json(&r)
+                        .send()
+                        .await
+                        .expect("failed to get response")
+                        .text()
+                        .await
+                        .expect("failed to get body");
+                    println!("post_response body: {:?}", post_response);
                 }
             },
         },
