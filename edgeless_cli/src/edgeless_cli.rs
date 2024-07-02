@@ -78,7 +78,11 @@ struct CLiConfig {
 }
 
 pub fn edgeless_cli_default_conf() -> String {
-    String::from("controller_url = \"http://127.0.0.1:7001\"")
+    let controller_url = String::from("controller_url = \"http://127.0.0.1:7001\"");
+    let url = String::from("#url = <url>");
+    let user = String::from("#basic_auth_user = <username>");
+    let passwd = String::from("#basic_auth_pass = <password>");
+    return format!("{}\n{}\n{}\n{}", controller_url, url, user, passwd);
 }
 
 #[tokio::main]
