@@ -56,12 +56,6 @@ cargo build
 cargo test
 ```
 
-[Optional] Run all the examples provided:
-
-```bash
-scripts/run_all_examples.sh
-```
-
 ## Devcontainer
 
 An easy and clean way to get started is the `devcontainer` shipped as part of this
