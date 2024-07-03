@@ -38,11 +38,12 @@ func acceptActions(ctx context.Context) {
 	for action := range events {
 		println("Received an action to move the robotic arm from DDA")
 
-		time.Sleep(2 * time.Second) // artificial delay
+		time.Sleep(600 * time.Millisecond) // artificial delay
 
 		utf8String := string(action.Params)
 
 		move_diff_value, err := strconv.ParseFloat(utf8String, 64)
+		println(move_diff_value)
 		if err != nil {
 			println("Failed to parse DDA action params")
 			continue

@@ -93,7 +93,7 @@ define((require, exports, module) => {
             } else {
                 Robot.dispatch('ROBOT_CHANGE_ANGLES', {
                     A0: 0, // main vertical axis rotation
-                    A1: 0.5, // arm up-down movement (axis attached to the main box)
+                    A1: 0.8, // arm up-down movement (axis attached to the main box)
                     A2: 0, // arm up-down movement, axis between two poles
                     A3: 0, // handle rotation
                     A4: 0, // small handle rotation (last)
