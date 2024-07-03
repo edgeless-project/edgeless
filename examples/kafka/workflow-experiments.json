@@ -1,0 +1,41 @@
+{
+    "functions": [
+        {
+            "name": "forward-1",
+            "class_specification": {
+                "id": "forward",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "./forward/forward.wasm",
+                "outputs": []
+            },
+            "output_mapping": {
+                "out": "kafka"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "http-ingress",
+            "class_type": "http-ingress",
+            "output_mapping": {
+                "new_request": "forward-1"
+            },
+            "configurations": {
+                "host": "kafka",
+                "methods": "POST"
+            }
+        },
+        {
+            "name": "kafka",
+            "class_type": "kafka",
+            "output_mapping": {},
+            "configurations": {
+                "brokers": "localhost:9092",
+                "topic": "test-topic"
+            }
+        }
+    ],
+    "annotations": {}
+}
