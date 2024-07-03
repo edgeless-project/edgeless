@@ -7,16 +7,7 @@ mod workflow_spec;
 
 use clap::Parser;
 use edgeless_api::{controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
-use reqwest::header::ACCEPT;
 use std::fs;
-use std::io::Cursor;
-use toml;
-
-use mailparse::{parse_content_disposition, parse_header};
-use reqwest::{multipart, Body, Client};
-use std::collections::HashMap;
-use tokio::fs::File;
-use tokio_util::codec::{BytesCodec, FramedRead}; // for parse
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -38,17 +29,6 @@ enum FunctionCommands {
         node_id: String,
         function_id: String,
         payload: String,
-    },
-    Push {
-        file_name: String,
-    },
-    Get {
-        file_name: String,
-        id: String,
-    },
-    Download {
-        config_file: String,
-        code_file_id: String,
     },
 }
 
@@ -323,171 +303,6 @@ async fn main() -> anyhow::Result<()> {
                         Ok(_) => println!("event casted"),
                         Err(err) => return Err(anyhow::anyhow!("error casting the event: {}", err)),
                     }
-                }
-
-                FunctionCommands::Push {
-                    //toml file specify the function
-                    file_name,
-                } => {
-                    let filename = file_name;
-                    //read end point and credentials in a file
-                    let contents = fs::read_to_string(filename).expect("Failed to read file, please make sure the file exist and in .toml");
-                    // println!("contents {}", contents); //
-                    let repo_endpoint: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
-
-                    // Print out the values to `stdout`.
-                    println!("Url {}", repo_endpoint.url.name); //
-                    println!("username {}", repo_endpoint.credential.basic_auth_user); //
-                    println!("passwd {}", repo_endpoint.credential.basic_auth_pass); //
-                                                                                     //create a curl request as follow
-                                                                                     // curl -X 'POST' \
-                                                                                     //    'https://function-repository.edgeless.wlilab.eu/api/admin/function/upload' \
-                                                                                     //    -H 'accept: application/json' \
-                                                                                     //    -H 'Content-Type: multipart/form-data' \
-                                                                                     //    -F 'file=@function_x86'
-                                                                                     //use multipart
-                    let client = Client::new();
-                    let file = File::open(repo_endpoint.binary.name).await?;
-
-                    // read file body stream
-                    let stream = FramedRead::new(file, BytesCodec::new());
-                    let file_body = Body::wrap_stream(stream);
-
-                    //make form part of file
-                    let some_file = multipart::Part::stream(file_body).file_name("function_x86"); // this is in curl -F "function_x86" in "file=@function_x86"
-
-                    //create the multipart form
-                    let form = multipart::Form::new().part("file", some_file); // this is in curl -F "file"
-
-                    let response = client
-                        .post(repo_endpoint.url.name.to_string() + "/api/admin/function/upload")
-                        .header(ACCEPT, "application/json")
-                        .basic_auth(repo_endpoint.credential.basic_auth_user, Some(repo_endpoint.credential.basic_auth_pass))
-                        .multipart(form)
-                        .send()
-                        .await
-                        .expect("failed to get response");
-
-                    let json = response.json::<HashMap<String, String>>().await?;
-                    println!("receive code_file_id {:?}", json);
-
-                    //post to /api/admin/function
-                    //example
-                    // curl -X 'POST' \
-                    //   'https://function-repository.edgeless.wlilab.eu/api/admin/function' \
-                    //   -H 'accept: application/json' \
-                    //   -H 'Content-Type: application/json' \
-                    //   -d '{
-                    //   "function_type": "RUST_WASM",
-                    //   "id": "http_requestor",
-                    //   "version": "0.1",
-                    //   "code_file_id": "652faf54465c2e7ec15facce",
-                    //   "outputs": [
-                    //     "success_cb",
-                    //     "failure_cb"
-                    //   ]
-                    // }'
-
-                    let r = serde_json::json!({
-
-                        "function_type": "RUST_WASM",
-                        "id": repo_endpoint.binary.id,
-                        "version": "0.1",
-                        "code_file_id": json.get("id"), //get the id
-                        "outputs": [  "success_cb",
-                                      "failure_cb"
-                                   ],
-                    });
-
-                    let repo_endpoint_new: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
-                    let post_response = client
-                        .post(repo_endpoint_new.url.name.to_string() + "/api/admin/function")
-                        .header(ACCEPT, "application/json")
-                        .basic_auth(
-                            repo_endpoint_new.credential.basic_auth_user,
-                            Some(repo_endpoint_new.credential.basic_auth_pass),
-                        )
-                        .json(&r)
-                        .send()
-                        .await
-                        .expect("failed to get response")
-                        .text()
-                        .await
-                        .expect("failed to get body");
-                    println!("post_response body: {:?}", post_response);
-                    println!("Post function successfully!");
-                }
-
-                FunctionCommands::Get {
-                    file_name, //config file name
-                    id,        // wordline id, actually function name
-                } => {
-                    let filename = file_name;
-                    //read end point and credentials in a file
-                    let contents = fs::read_to_string(filename).expect("Failed to read file, please make sure the file exist and in .toml");
-                    let repo_endpoint: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
-
-                    // Print out the values to `stdout`.
-                    println!("Url {}", repo_endpoint.url.name); //
-                    println!("username {}", repo_endpoint.credential.basic_auth_user);
-                    println!("passwd {}", repo_endpoint.credential.basic_auth_pass);
-
-                    let client = Client::new();
-                    let response = client
-                        .get(repo_endpoint.url.name.to_string() + "/api/admin/function/" + id.as_str())
-                        .header(ACCEPT, "application/json")
-                        .basic_auth(repo_endpoint.credential.basic_auth_user, Some(repo_endpoint.credential.basic_auth_pass))
-                        .send()
-                        .await
-                        .expect("failed to get response")
-                        .text()
-                        .await
-                        .expect("failed to get payload");
-
-                    println!("Successfully get function {}", response);
-                }
-
-                FunctionCommands::Download {
-                    config_file,  //config file name
-                    code_file_id, // file id
-                } => {
-                    let config = config_file;
-                    //read end point and credentials in a file
-                    let contents = fs::read_to_string(config).expect("Failed to read config file, please make sure the file exist and in .toml");
-                    let repo_endpoint: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
-
-                    // Print out the values to `stdout`.
-                    println!("Url {}", repo_endpoint.url.name); //
-                    println!("username {}", repo_endpoint.credential.basic_auth_user);
-                    println!("passwd {}", repo_endpoint.credential.basic_auth_pass);
-
-                    let client = Client::new();
-                    let response = client
-                        .get(repo_endpoint.url.name.to_string() + "/api/admin/function/download/" + code_file_id.as_str())
-                        .header(ACCEPT, "*/*")
-                        .basic_auth(repo_endpoint.credential.basic_auth_user, Some(repo_endpoint.credential.basic_auth_pass))
-                        .send()
-                        .await
-                        .expect("failed to get header");
-                    let status = response.status();
-                    println!("status code {}", status);
-                    let header = response.headers().get("content-disposition").unwrap();
-
-                    let header_str = format!("{}{}", "Content-Disposition: ", header.to_str().unwrap());
-                    let (parsed, _) = parse_header(header_str.as_bytes()).unwrap();
-                    let dis = parse_content_disposition(&parsed.get_value());
-
-                    let downloadfilename = dis.params.get("filename").unwrap();
-
-                    println!("filename:\n{:?}", downloadfilename);
-
-                    let body = response.bytes().await.expect("failed to download payload");
-                    //parse filename from header
-                    let mut file = std::fs::File::create(downloadfilename)?;
-                    let mut content = Cursor::new(body);
-                    std::io::copy(&mut content, &mut file)?;
-
-                    println!("File downloaded successfully.");
                 }
             },
         },
