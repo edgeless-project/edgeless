@@ -15,7 +15,6 @@ strip = true
 [package]
 name = "counter"
 version = "0.1.0"
-authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it>"]
 edition = "2021"
 
 [lib]
