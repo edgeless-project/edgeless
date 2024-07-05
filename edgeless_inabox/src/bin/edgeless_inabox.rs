@@ -78,15 +78,24 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         port += 1;
         format!("http://127.0.0.1:{}", port)
     };
+
+    let mut udp_port = 7000;
+    let mut next_coap_url = || {
+        udp_port += 1;
+        format!("coap://127.0.0.1:{}", udp_port)
+    };
+
     let controller_url = next_url();
 
     // At first generate endpoints for invocation_urls and orc_agent_urls
     let mut node_invocation_urls: HashMap<Uuid, String> = HashMap::new();
+    let mut node_coap_invocation_urls: HashMap<Uuid, String> = HashMap::new();
     let mut node_orc_agent_urls: HashMap<Uuid, String> = HashMap::new();
 
     for _ in 0..number_of_nodes {
         let node_id = Uuid::new_v4();
         node_invocation_urls.insert(node_id, next_url());
+        node_coap_invocation_urls.insert(node_id, next_coap_url());
         node_orc_agent_urls.insert(node_id, next_url());
     }
 
@@ -102,6 +111,8 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
             domain_id: "domain-1".to_string(),
             orchestrator_url: next_url(),
             orchestrator_url_announced: "".to_string(),
+            orchestrator_coap_url: None,
+            orchestrator_coap_url_announced: None,
             agent_url: next_url(),
             agent_url_announced: "".to_string(),
             invocation_url: next_url(),
@@ -143,6 +154,8 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 agent_url_announced: "".to_string(),
                 invocation_url: node_invocation_urls.get(node_id).expect("").clone(), // we are sure that it is there
                 invocation_url_announced: "".to_string(),
+                invocation_url_coap: Some(node_coap_invocation_urls.get(node_id).expect("").clone()), // we are sure that it is there
+                invocation_url_announced_coap: Some("".to_string()),
                 metrics_url: next_url(),
                 orchestrator_url: orc_conf.general.orchestrator_url.clone(),
             },

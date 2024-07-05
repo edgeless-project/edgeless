@@ -74,7 +74,7 @@ async fn basic_lifecycle() {
     let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
 
     let state_manager = Box::new(crate::state_management::StateManager::new().await);
-    let dataplane_provider = edgeless_dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string()).await;
+    let dataplane_provider = edgeless_dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string(), None).await;
 
     let (telemetry_mock_sender, telemetry_mock_receiver) = std::sync::mpsc::channel::<(
         edgeless_telemetry::telemetry_events::TelemetryEvent,
@@ -206,7 +206,7 @@ async fn messaging_test_setup() -> (
     let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
 
     let state_manager = Box::new(crate::state_management::StateManager::new().await);
-    let mut dataplane_provider = edgeless_dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string()).await;
+    let mut dataplane_provider = edgeless_dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string(), None).await;
 
     // shared insert
     let test_peer_fid = edgeless_api::function_instance::InstanceId::new(node_id);
@@ -524,7 +524,7 @@ async fn state_management() {
         output_mocks: output_mocks.clone(),
     });
 
-    let mut dataplane_provider = edgeless_dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string()).await;
+    let mut dataplane_provider = edgeless_dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string(), None).await;
 
     let (telemetry_mock_sender, telemetry_mock_receiver) = std::sync::mpsc::channel::<(
         edgeless_telemetry::telemetry_events::TelemetryEvent,
