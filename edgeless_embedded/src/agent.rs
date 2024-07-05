@@ -9,11 +9,22 @@ pub struct EmbeddedAgent {
         embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, &'static mut [&'static mut dyn crate::resource::ResourceDyn]>,
     >,
     orchestrator_url: &'static str,
+    registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
 }
 
 pub enum AgentEvent {
     Invocation(edgeless_api_core::invocation::Event<heapless::Vec<u8, 1500>>),
-    Registration(edgeless_api_core::node_registration::EncodedNodeRegistration<'static>),
+    Registration(
+        (
+            edgeless_api_core::node_registration::EncodedNodeRegistration<'static>,
+            &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
+        ),
+    ),
+}
+
+pub enum RegistrationReply {
+    Sucess,
+    Failure,
 }
 
 impl EmbeddedAgent {
@@ -41,6 +52,10 @@ impl EmbeddedAgent {
         > = static_cell::StaticCell::new();
         let slf_inner = SLF_INNER_RAW.init_with(|| core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(&mut resources[..])));
 
+        static REPLY_CHANNEL: static_cell::StaticCell<
+            embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
+        > = static_cell::StaticCell::new();
+
         static SLF_RAW: static_cell::StaticCell<EmbeddedAgent> = static_cell::StaticCell::new();
         let slf = SLF_RAW.init_with(|| EmbeddedAgent {
             own_node_id: node_id.clone(),
@@ -48,6 +63,8 @@ impl EmbeddedAgent {
             upstream_receiver: Some(receiver),
             inner: slf_inner,
             orchestrator_url: orchestrator_url,
+            registration_signal: REPLY_CHANNEL
+                .init_with(|| embassy_sync::signal::Signal::<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>::new()),
         });
 
         {
@@ -72,8 +89,10 @@ impl EmbeddedAgent {
     }
 
     pub async fn register(&mut self) {
-        let agent_url = "coap://192.168.101.1:7050";
-        let invocation_url = "coap://192.168.101.1:7050";
+        // let agent_url = "coap://192.168.101.1:7050";
+        // let invocation_url = "coap://192.168.101.1:7050";
+        let agent_url = "coap://192.168.2.233:7050";
+        let invocation_url = "coap://192.168.2.233:7050";
 
         let tmp = self.inner.borrow_mut();
         let lck = tmp.lock().await;
@@ -91,7 +110,6 @@ impl EmbeddedAgent {
                 .push(edgeless_api_core::node_registration::ResourceProviderSpecification {
                     provider_id: i.provider_id(),
                     class_type: i.resource_class(),
-                    //TODO(raphaelhetzel) list outputs
                     outputs: outputs,
                 })
                 .is_err()
@@ -107,7 +125,18 @@ impl EmbeddedAgent {
             resources: resources,
         };
 
-        self.upstream_sender.send(AgentEvent::Registration(reg)).await;
+        loop {
+            self.registration_signal.reset();
+            self.upstream_sender
+                .send(AgentEvent::Registration((reg.clone(), self.registration_signal)))
+                .await;
+            match self.registration_signal.wait().await {
+                RegistrationReply::Sucess => {
+                    return;
+                }
+                _ => {}
+            }
+        }
     }
 }
 
@@ -174,7 +203,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         let inner = self.inner.borrow_mut();
         let mut lck = inner.lock().await;
         for r in lck.iter_mut() {
-            if r.provider_id() == instance_specification.class_type {
+            if r.resource_class() == instance_specification.class_type {
                 return r.start(instance_specification).await;
             }
         }

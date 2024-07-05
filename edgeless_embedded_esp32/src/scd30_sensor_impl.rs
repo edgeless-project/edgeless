@@ -14,7 +14,6 @@ impl<Conn: sensor_scd30::base::Base<Err, Delay>, Delay: embedded_hal::delay::Del
     fn read(&mut self) -> Result<edgeless_embedded::resource::scd30_sensor::Measurement, ()> {
         match self.sensor.read_data() {
             Ok(val) => {
-                log::error!("{}", val.co2);
                 let wrapped_measurement = edgeless_embedded::resource::scd30_sensor::Measurement {
                     co2: val.co2,
                     rh: val.rh,

@@ -9,7 +9,8 @@ pub struct EncodedNodeRegistration<'a> {
     pub node_id: NodeId,
     pub agent_url: &'a str,
     pub invocation_url: &'a str,
-    pub resources: heapless::Vec<ResourceProviderSpecification<'a>, 16>, // 4: node capabilities
+    pub resources: heapless::Vec<ResourceProviderSpecification<'a>, 16>,
+    // 4: node capabilities
 }
 
 #[derive(Clone)]
