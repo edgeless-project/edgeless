@@ -164,7 +164,7 @@ pub struct DataplaneProvider {
 }
 
 impl DataplaneProvider {
-    pub async fn new(node_id: uuid::Uuid, invocation_url: String) -> Self {
+    pub async fn new(node_id: uuid::Uuid, invocation_url: String, invocation_url_coap: Option<String>) -> Self {
         let remote_provider = std::sync::Arc::new(tokio::sync::Mutex::new(RemoteLinkProvider::new(node_id).await));
 
         let (_, _, port) = edgeless_api::util::parse_http_host(&invocation_url.clone()).unwrap();
@@ -175,12 +175,15 @@ impl DataplaneProvider {
             invocation_url,
         ));
 
-        log::info!("coap port {}", port);
+        if let Some(invocation_url_coap) = invocation_url_coap {
+            let (_, coap_ip, coap_port) = edgeless_api::util::parse_http_host(&&invocation_url_coap.clone()).unwrap();
+            log::info!("Start COAP Invocation Server {}:{}", coap_ip, port);
 
-        let _coap_server = tokio::spawn(edgeless_api::coap_impl::invocation::CoapInvocationServer::run(
-            clone_provider.lock().await.incomming_api().await,
-            std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
-        ));
+            let _coap_server = tokio::spawn(edgeless_api::coap_impl::invocation::CoapInvocationServer::run(
+                clone_provider.lock().await.incomming_api().await,
+                std::net::SocketAddrV4::new(coap_ip.parse().unwrap(), coap_port),
+            ));
+        }
 
         Self {
             local_provider: std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalLinkProvider::new())),
@@ -232,7 +235,7 @@ mod test {
         let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
         let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
 
-        let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7096".to_string()).await;
+        let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7096".to_string(), None).await;
 
         let mut handle_1 = provider.get_handle_for(fid_1.clone()).await;
         let mut handle_2 = provider.get_handle_for(fid_2.clone()).await;
@@ -252,7 +255,7 @@ mod test {
         let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
         let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
 
-        let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7097".to_string()).await;
+        let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7097".to_string(), None).await;
 
         let mut handle_1 = provider.get_handle_for(fid_1.clone()).await;
         let mut handle_2 = provider.get_handle_for(fid_2.clone()).await;
@@ -279,7 +282,7 @@ mod test {
         let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id_2.clone());
 
         let provider1_f = tokio::spawn(async move {
-            let mut dataplane = DataplaneProvider::new(node_id.clone(), "http://127.0.0.1:7099".to_string()).await;
+            let mut dataplane = DataplaneProvider::new(node_id.clone(), "http://127.0.0.1:7099".to_string(), None).await;
             dataplane
                 .add_peer(EdgelessDataplanePeerSettings {
                     node_id: node_id_2.clone(),
@@ -290,7 +293,7 @@ mod test {
         });
 
         let provider2_f = tokio::spawn(async move {
-            let mut dataplane = DataplaneProvider::new(node_id_2.clone(), "http://127.0.0.1:7098".to_string()).await;
+            let mut dataplane = DataplaneProvider::new(node_id_2.clone(), "http://127.0.0.1:7098".to_string(), None).await;
             dataplane
                 .add_peer(EdgelessDataplanePeerSettings {
                     node_id: node_id.clone(),
