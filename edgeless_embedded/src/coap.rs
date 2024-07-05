@@ -18,6 +18,10 @@ struct CoapMultiplexer {
     >,
     peers: heapless::LinearMap<edgeless_api_core::node_registration::NodeId, smoltcp::wire::IpEndpoint, 8>,
     token: u8,
+    waiting_for_reply: Option<(
+        u8,
+        &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::RegistrationReply>,
+    )>,
 }
 
 #[embassy_executor::task]
@@ -36,6 +40,7 @@ pub async fn coap_task(
         last_tokens: heapless::LinearMap::new(),
         peers: heapless::LinearMap::new(),
         token: 0,
+        waiting_for_reply: None,
     };
 
     slf.task().await;
@@ -85,6 +90,11 @@ impl CoapMultiplexer {
                         }
                         edgeless_api_core::coap_mapping::CoapMessage::Response(data, success) => {
                             log::info!("Got Response: {}, {}", data.len(), success);
+                            if let Some((t, channel)) = self.waiting_for_reply.take() {
+                                if t == token {
+                                    channel.signal(crate::agent::RegistrationReply::Sucess)
+                                }
+                            }
                         }
                         edgeless_api_core::coap_mapping::CoapMessage::KeepAlive => {
                             self.incoming_keepalive(sender, token).await;
@@ -99,8 +109,8 @@ impl CoapMultiplexer {
                     crate::agent::AgentEvent::Invocation(event) => {
                         self.outgoing_invocation(event).await;
                     }
-                    crate::agent::AgentEvent::Registration(registration) => {
-                        self.outgoing_registration(registration).await;
+                    crate::agent::AgentEvent::Registration((registration, reply_signal)) => {
+                        self.outgoing_registration(registration, reply_signal).await;
                     }
                 },
             }
@@ -287,7 +297,6 @@ impl CoapMultiplexer {
     }
 
     async fn incoming_keepalive(&mut self, sender: smoltcp::wire::IpEndpoint, token: u8) {
-        log::debug!("got keepalive request");
         let ((data, sender), _tail) =
             edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &[], token, &mut self.app_buf_tx[..], true);
         if let Err(err) = self.sock.send_to(data, sender).await {
@@ -325,16 +334,23 @@ impl CoapMultiplexer {
         }
     }
 
-    async fn outgoing_registration(&mut self, registration: &edgeless_api_core::node_registration::EncodedNodeRegistration<'static>) {
+    async fn outgoing_registration(
+        &mut self,
+        registration: &edgeless_api_core::node_registration::EncodedNodeRegistration<'static>,
+        reply_channel: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, crate::agent::RegistrationReply>,
+    ) {
         let endpoint = crate::REGISTRATION_PEER;
         let ((data, endpoint), _tail) =
             edgeless_api_core::coap_mapping::COAPEncoder::encode_node_registration(endpoint, registration, self.token, &mut self.app_buf_tx[..]);
+        let used_token = self.token;
         self.token = match self.token {
             u8::MAX => 0,
             _ => self.token + 1,
         };
         if let Err(err) = self.sock.send_to(&data, endpoint).await {
             log::error!("UDP/COAP Send Error: {:?}", err);
+        } else {
+            self.waiting_for_reply = Some((used_token, reply_channel))
         }
     }
 }

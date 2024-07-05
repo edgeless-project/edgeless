@@ -3,7 +3,6 @@
 
 use embassy_net::{Ipv4Address, Ipv4Cidr};
 use embassy_net_tuntap::TunTapDevice;
-use embedded_hal::delay::DelayNs;
 
 const NODE_ID: uuid::Uuid = uuid::uuid!("0827240a-3050-4604-bf3e-564c41c77106");
 
@@ -29,12 +28,10 @@ async fn net_task(stack: &'static embassy_net::Stack<TunTapDevice>) -> ! {
 #[embassy_executor::task]
 async fn registration(agent: edgeless_embedded::agent::EmbeddedAgent) {
     let mut agent = agent;
-    let mut delay = embassy_time::Delay {};
-    // loop {
-    delay.delay_ms(10000);
-    log::info!("Try Register");
+    embassy_time::Timer::after_millis(5000).await;
+    log::info!("Try Register!");
     agent.register().await;
-    // }
+    log::info!("Registration done!");
 }
 
 #[embassy_executor::task]

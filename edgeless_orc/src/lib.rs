@@ -159,7 +159,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
 
     let orchestrator_coap_server = edgeless_api::coap_impl::orchestration::CoapOrchestrationServer::run(
         orchestrator.get_api_client().node_registration_api(),
-        std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), 7051),
+        std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), 7050),
     );
 
     if settings.baseline.keep_alive_interval_secs == 0 {

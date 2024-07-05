@@ -8,7 +8,7 @@ const NODE_ID: uuid::Uuid = uuid::uuid!("0827240a-3050-4604-bf3e-564c41c77106");
 
 const REGISTRATION_PEER: smoltcp::wire::IpEndpoint = smoltcp::wire::IpEndpoint {
     addr: embassy_net::IpAddress::v4(192, 168, 101, 2),
-    port: 7051,
+    port: 7050,
 };
 
 pub mod agent;

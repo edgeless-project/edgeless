@@ -22,9 +22,9 @@ impl MockSensor {
     ) -> Result<MockSensorConfiguration, edgeless_api_core::common::ErrorResponse> {
         let mut out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
 
-        if data.class_type != "mock-scd30-sensor-1" {
+        if data.class_type != "scd30-sensor" {
             return Err(edgeless_api_core::common::ErrorResponse {
-                summary: "Wrong Resource ProviderId",
+                summary: "Wrong Resource class type",
                 detail: None,
             });
         }
@@ -141,9 +141,11 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
     ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
         log::info!("Mock Sensor Start");
         let instance_specification = Self::parse_configuration(instance_specification).await?;
+        log::info!("Post Config Start");
 
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;
+        log::info!("got Lock Start");
 
         if let Some(_) = lck.instance_id {
             return Err(edgeless_api_core::common::ErrorResponse {
@@ -157,6 +159,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
         lck.instance_id = Some(instance_id.clone());
         lck.data_out_id = instance_specification.data_out_id;
         lck.delay = instance_specification.delay_s;
+        log::info!("End Start");
         Ok(instance_id)
     }
 
