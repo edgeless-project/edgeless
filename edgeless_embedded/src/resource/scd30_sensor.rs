@@ -1,10 +1,18 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
+#[derive(Debug)]
 pub struct Measurement {
     pub co2: f32,
     pub rh: f32,
     pub temp: f32,
+}
+
+pub struct SCD30SensorInner {
+    pub instance_id: Option<edgeless_api_core::instance_id::InstanceId>,
+    pub data_out_id: Option<edgeless_api_core::instance_id::InstanceId>,
+    pub data_receiver: Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, Measurement, 2>>,
+    // pub delay: u8,
 }
 
 pub trait Sensor {
@@ -12,15 +20,8 @@ pub trait Sensor {
     fn read(&mut self) -> Result<Measurement, ()>;
 }
 
-pub struct SCD30SensorInner {
-    pub instance_id: Option<edgeless_api_core::instance_id::InstanceId>,
-    pub data_out_id: Option<edgeless_api_core::instance_id::InstanceId>,
-    pub sensor: &'static mut dyn Sensor,
-    pub delay: u8,
-}
-
 pub struct SCD30SensorConfiguration {
-    pub data_out_id: edgeless_api_core::instance_id::InstanceId,
+    pub data_out_id: Option<edgeless_api_core::instance_id::InstanceId>,
 }
 
 pub struct SCD30Sensor {
@@ -33,7 +34,7 @@ impl SCD30Sensor {
     ) -> Result<SCD30SensorConfiguration, edgeless_api_core::common::ErrorResponse> {
         let mut out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
 
-        if data.class_type != "scd30-sensor-1" {
+        if data.class_type != "scd30-sensor" {
             return Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Wrong Resource ProviderId",
                 detail: None,
@@ -47,20 +48,12 @@ impl SCD30Sensor {
             }
         }
 
-        let out_id = match out_id {
-            Some(val) => val,
-            None => {
-                return Err(edgeless_api_core::common::ErrorResponse {
-                    summary: "Output Configuration Missing",
-                    detail: None,
-                })
-            }
-        };
-
         Ok(SCD30SensorConfiguration { data_out_id: out_id })
     }
 
-    pub async fn new(sensor: &'static mut dyn Sensor) -> &'static mut dyn crate::resource::ResourceDyn {
+    pub async fn new(
+        data_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, Measurement, 2>,
+    ) -> &'static mut dyn crate::resource::ResourceDyn {
         static SENSOR_STATE_RAW: static_cell::StaticCell<
             core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, SCD30SensorInner>>,
         > = static_cell::StaticCell::new();
@@ -68,8 +61,7 @@ impl SCD30Sensor {
             core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(SCD30SensorInner {
                 instance_id: None,
                 data_out_id: None,
-                delay: 5,
-                sensor: sensor,
+                data_receiver: Some(data_receiver),
             }))
         });
         static SLF_RAW: static_cell::StaticCell<SCD30Sensor> = static_cell::StaticCell::new();
@@ -77,9 +69,37 @@ impl SCD30Sensor {
     }
 }
 
+#[embassy_executor::task]
+pub async fn scd30_reader_task(
+    sensor: &'static mut dyn Sensor,
+    sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, Measurement, 2>,
+) {
+    sensor.init(10);
+    embassy_time::Timer::after(embassy_time::Duration::from_secs(10 as u64)).await;
+    loop {
+        let data = {
+            match sensor.read() {
+                Ok(val) => {
+                    if !val.co2.is_nan() && !val.rh.is_nan() && !val.rh.is_nan() {
+                        // log::info!("{:?}", val);
+                        val
+                    } else {
+                        continue;
+                    }
+                }
+                Err(_) => {
+                    continue;
+                }
+            }
+        };
+        sender.send(data).await;
+        embassy_time::Timer::after(embassy_time::Duration::from_secs(10 as u64)).await;
+    }
+}
+
 impl crate::resource::Resource for SCD30Sensor {
     fn provider_id(&self) -> &'static str {
-        return "scd30-sensor-1";
+        return "scd30-sensor-bridge-1";
     }
 
     fn resource_class(&self) -> &'static str {
@@ -108,42 +128,30 @@ pub async fn scd30_sensor_task(
     dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
 ) {
     let mut dataplane_handle = dataplane_handle;
-    let delay = {
+
+    let receiver = {
         let tmp = state.borrow_mut();
         let mut lck = tmp.lock().await;
-        let delay = lck.delay;
-        lck.sensor.init(delay);
-        delay
+        lck.data_receiver.take().unwrap()
     };
 
-    embassy_time::Timer::after(embassy_time::Duration::from_secs(delay as u64)).await;
     loop {
-        let (instance_id, data_out_id, data) = {
-            let tmp = state.borrow_mut();
-            let mut lck = tmp.lock().await;
+        let measurement = receiver.receive().await;
 
-            let data = match lck.sensor.read() {
-                Ok(val) => {
-                    if !val.co2.is_nan() && !val.rh.is_nan() && !val.rh.is_nan() {
-                        val
-                    } else {
-                        continue;
-                    }
-                }
-                Err(_) => {
-                    continue;
-                }
-            };
+        let tmp = state.borrow_mut();
+        let lck = tmp.lock().await;
 
-            (lck.instance_id, lck.data_out_id, data)
-        };
-        if let (Some(instance_id), Some(data_out_id)) = (instance_id, data_out_id) {
+        if let (Some(instance_id), Some(data_out_id)) = (lck.instance_id, lck.data_out_id) {
             let mut buffer = heapless::String::<150>::new();
-            if core::fmt::write(&mut buffer, format_args!("{:.5};{:.5};{:.5}", data.co2, data.rh, data.temp)).is_ok() {
+            if core::fmt::write(
+                &mut buffer,
+                format_args!("{:.5};{:.5};{:.5}", measurement.co2, measurement.rh, measurement.temp),
+            )
+            .is_ok()
+            {
                 dataplane_handle.send(instance_id, data_out_id, buffer.as_str()).await;
             }
         }
-        embassy_time::Timer::after(embassy_time::Duration::from_secs(delay as u64)).await;
     }
 }
 
@@ -177,7 +185,8 @@ impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
         let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone());
 
         lck.instance_id = Some(instance_id.clone());
-        lck.data_out_id = Some(instance_specification.data_out_id);
+        lck.data_out_id = instance_specification.data_out_id;
+        log::info!("Start Sensor");
         Ok(instance_id)
     }
 

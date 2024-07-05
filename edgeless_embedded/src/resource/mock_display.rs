@@ -11,11 +11,11 @@ impl MockDisplay {
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<MockDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
-        if data.class_type == "mock-display-1" {
+        if data.class_type == "epaper-display" {
             Ok(MockDisplayInstanceConfiguration {})
         } else {
             return Err(edgeless_api_core::common::ErrorResponse {
-                summary: "Wrong Resource ProviderId",
+                summary: "Wrong Resource class type.",
                 detail: None,
             });
         }

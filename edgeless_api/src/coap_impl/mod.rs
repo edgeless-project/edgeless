@@ -43,7 +43,7 @@ impl CoapClient {
         let mut buffer = vec![0 as u8; 5000];
 
         let token = lck.next_token;
-        lck.next_token = lck.next_token + 1;
+        (lck.next_token, _) = lck.next_token.overflowing_add(1);
 
         for _ in 0..3 {
             let ((packet, addr), _tail) = encode_request(token, lck.endpoint, &mut buffer);
@@ -70,7 +70,7 @@ impl CoapClient {
                             false => return Err(Vec::from(response_data)),
                         }
                     } else {
-                        log::info!("received wrong token");
+                        log::info!("received wrong token: wanted {}, got: {}", token, response_token);
                     }
                 }
                 _ => {

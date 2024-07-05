@@ -3,16 +3,14 @@
 // Based on https://github.com/esp-rs/esp-wifi/blob/main/examples-esp32/examples/embassy_dhcp.rs
 use embedded_svc::wifi::Wifi;
 
-
-
 const SSID: &str = env!("SSID");
 const PASSWORD: &str = env!("PASSWORD");
 
 pub async fn init(
     spawner: embassy_executor::Spawner,
-    timer: hal::timer::Timer<hal::timer::TimerX<hal::peripherals::TIMG1>, hal::Blocking>,
+    timer: hal::timer::timg::Timer<hal::timer::timg::TimerX<hal::peripherals::TIMG1>, hal::Blocking>,
     rng: hal::rng::Rng,
-    radio_clock_control: hal::system::RadioClockControl,
+    radio_clock_control: hal::peripherals::RADIO_CLK,
     clocks: hal::clock::Clocks<'static>,
     radio: hal::peripherals::WIFI,
 ) -> &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>> {
