@@ -72,17 +72,17 @@ struct Args {
 #[derive(serde::Deserialize)]
 struct CLiConfig {
     controller_url: String,
-    pub url: String,
-    pub basic_auth_user: String,
-    pub basic_auth_pass: String,
+    pub repository_url: String,
+    pub repository_basic_auth_user: String,
+    pub repository_basic_auth_pass: String,
 }
 
 pub fn edgeless_cli_default_conf() -> String {
     let controller_url = String::from("controller_url = \"http://127.0.0.1:7001\"");
-    let url = String::from("#url = <url>");
-    let user = String::from("#basic_auth_user = <username>");
-    let passwd = String::from("#basic_auth_pass = <password>");
-    return format!("{}\n{}\n{}\n{}", controller_url, url, user, passwd);
+    let repository_url = String::from("repository_url = \"\"");
+    let repository_user = String::from("repository_basic_auth_user = \"\"");
+    let reposisitory_passwd = String::from("repository_basic_auth_pass = \"\"");
+    return format!("{}\n{}\n{}\n{}", controller_url, repository_url, repository_user, reposisitory_passwd);
 }
 
 #[tokio::main]
@@ -301,9 +301,9 @@ async fn main() -> anyhow::Result<()> {
 
                     let client = Client::new();
                     let response = client
-                        .get(conf.url.to_string() + "/api/admin/function/" + function_name.as_str())
+                        .get(conf.repository_url.to_string() + "/api/admin/function/" + function_name.as_str())
                         .header(ACCEPT, "application/json")
-                        .basic_auth(conf.basic_auth_user, Some(conf.basic_auth_pass))
+                        .basic_auth(conf.repository_basic_auth_user, Some(conf.repository_basic_auth_pass))
                         .send()
                         .await
                         .expect("failed to get response")
@@ -326,9 +326,9 @@ async fn main() -> anyhow::Result<()> {
 
                     let client = Client::new();
                     let response = client
-                        .get(conf.url.to_string() + "/api/admin/function/download/" + code_file_id.as_str())
+                        .get(conf.repository_url.to_string() + "/api/admin/function/download/" + code_file_id.as_str())
                         .header(ACCEPT, "*/*")
-                        .basic_auth(conf.basic_auth_user, Some(conf.basic_auth_pass))
+                        .basic_auth(conf.repository_basic_auth_user, Some(conf.repository_basic_auth_pass))
                         .send()
                         .await
                         .expect("failed to get header");
@@ -377,9 +377,9 @@ async fn main() -> anyhow::Result<()> {
                     let form = multipart::Form::new().part("file", some_file); // this is in curl -F "file"
 
                     let response = client
-                        .post(conf.url.to_string() + "/api/admin/function/upload")
+                        .post(conf.repository_url.to_string() + "/api/admin/function/upload")
                         .header(ACCEPT, "application/json")
-                        .basic_auth(conf.basic_auth_user, Some(conf.basic_auth_pass))
+                        .basic_auth(conf.repository_basic_auth_user, Some(conf.repository_basic_auth_pass))
                         .multipart(form)
                         .send()
                         .await
@@ -410,9 +410,9 @@ async fn main() -> anyhow::Result<()> {
                     let conf_new: CLiConfig = toml::from_str(&std::fs::read_to_string(&args.config_file).unwrap()).unwrap();
 
                     let post_response = client
-                        .post(conf_new.url.to_string() + "/api/admin/function")
+                        .post(conf_new.repository_url.to_string() + "/api/admin/function")
                         .header(ACCEPT, "application/json")
-                        .basic_auth(conf_new.basic_auth_user, Some(conf_new.basic_auth_pass))
+                        .basic_auth(conf_new.repository_basic_auth_user, Some(conf_new.repository_basic_auth_pass))
                         .json(&r)
                         .send()
                         .await
