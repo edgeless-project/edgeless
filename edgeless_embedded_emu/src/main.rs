@@ -30,7 +30,7 @@ async fn registration(agent: edgeless_embedded::agent::EmbeddedAgent) {
     let mut agent = agent;
     embassy_time::Timer::after_millis(5000).await;
     log::info!("Try Register!");
-    agent.register().await;
+    agent.register(Ipv4Address::new(192, 168, 101, 1)).await;
     log::info!("Registration done!");
 }
 
@@ -76,7 +76,7 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
     static RESOURCES_RAW: static_cell::StaticCell<[&'static mut dyn edgeless_embedded::resource::ResourceDyn; 2]> = static_cell::StaticCell::new();
     let resources = RESOURCES_RAW.init_with(|| [display, sensor_scd30]);
 
-    let resource_registry = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), resources, "").await;
+    let resource_registry = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), resources).await;
 
     spawner
         .spawn(edgeless_embedded::coap::coap_task(

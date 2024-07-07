@@ -13,6 +13,7 @@ pub async fn init(
     radio_clock_control: hal::peripherals::RADIO_CLK,
     clocks: hal::clock::Clocks<'static>,
     radio: hal::peripherals::WIFI,
+    agent: edgeless_embedded::agent::EmbeddedAgent,
 ) -> &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>> {
     let init = esp_wifi::initialize(esp_wifi::EspWifiInitFor::Wifi, timer, rng.clone(), radio_clock_control, &clocks).unwrap();
 
@@ -37,13 +38,16 @@ pub async fn init(
 
     spawner.spawn(connection(controller)).unwrap();
     spawner.spawn(net_task(stack)).unwrap();
-    spawner.spawn(network_watchdog(stack)).unwrap();
+    spawner.spawn(network_watchdog(stack, agent)).unwrap();
 
     stack
 }
 
 #[embassy_executor::task]
-async fn network_watchdog(stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>>) {
+async fn network_watchdog(
+    stack: &'static embassy_net::Stack<esp_wifi::wifi::WifiDevice<'static, esp_wifi::wifi::WifiStaDevice>>,
+    mut agent: edgeless_embedded::agent::EmbeddedAgent,
+) {
     loop {
         if stack.is_link_up() {
             break;
@@ -54,7 +58,9 @@ async fn network_watchdog(stack: &'static embassy_net::Stack<esp_wifi::wifi::Wif
     log::info!("Waiting to get IP address...");
     loop {
         if let Some(config) = stack.config_v4() {
-            log::info!("Got IP: {}", config.address);
+            log::info!("Got IP: {}. Registering with the Orchestrator.", config.address);
+            agent.register(config.address.address()).await;
+            log::info!("Registered with the Orchestrator.");
             break;
         }
         embassy_time::Timer::after(embassy_time::Duration::from_millis(500)).await;

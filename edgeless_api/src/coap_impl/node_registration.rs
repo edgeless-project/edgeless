@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+use std::str::FromStr;
+
 #[async_trait::async_trait]
 trait NodeRegistrationHelper {
     async fn register(&mut self, update: crate::node_registration::UpdateNodeRequest)
@@ -56,8 +58,8 @@ impl NodeRegistrationHelper for super::CoapClient {
 
             let encoded_registration = edgeless_api_core::node_registration::EncodedNodeRegistration {
                 node_id: edgeless_api_core::node_registration::NodeId(node_id),
-                agent_url: agent_url.as_str(),
-                invocation_url: invocation_url.as_str(),
+                agent_url: heapless::String::<256>::from_str(agent_url.as_str()).unwrap(),
+                invocation_url: heapless::String::<256>::from_str(invocation_url.as_str()).unwrap(),
                 resources: encoded_resources,
             };
 
