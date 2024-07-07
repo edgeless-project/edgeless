@@ -54,8 +54,8 @@ impl CoapOrchestrationServer {
 
         let registration = crate::node_registration::UpdateNodeRequest::Registration(
             registration.node_id.0,
-            String::from(registration.agent_url),
-            String::from(registration.invocation_url),
+            String::from(registration.agent_url.as_str()),
+            String::from(registration.invocation_url.as_str()),
             registration
                 .resources
                 .iter()

@@ -1,14 +1,16 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+use core::str::FromStr;
+
 #[derive(Clone, PartialEq, Eq)]
 pub struct NodeId(pub uuid::Uuid);
 
 #[derive(Clone)]
 pub struct EncodedNodeRegistration<'a> {
     pub node_id: NodeId,
-    pub agent_url: &'a str,
-    pub invocation_url: &'a str,
+    pub agent_url: heapless::String<256>,
+    pub invocation_url: heapless::String<256>,
     pub resources: heapless::Vec<ResourceProviderSpecification<'a>, 16>,
     // 4: node capabilities
 }
@@ -46,8 +48,8 @@ impl<C> minicbor::Encode<C> for EncodedNodeRegistration<'_> {
     fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
         let mut e = e;
         e = e.encode(self.node_id.clone())?;
-        e = e.encode(self.agent_url)?;
-        e = e.encode(self.invocation_url)?;
+        e = e.encode(self.agent_url.as_str())?;
+        e = e.encode(self.invocation_url.as_str())?;
 
         {
             e = e.array(self.resources.len().try_into().unwrap())?;
@@ -76,8 +78,8 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedNodeRegistration<'b> {
 
         Ok(EncodedNodeRegistration {
             node_id: id,
-            agent_url: &agent_url,
-            invocation_url: &invocation_url,
+            agent_url: heapless::String::from_str(&agent_url).unwrap(),
+            invocation_url: heapless::String::from_str(&invocation_url).unwrap(),
             resources: resources,
         })
     }

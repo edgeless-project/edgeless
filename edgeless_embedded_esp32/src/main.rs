@@ -211,15 +211,6 @@ fn main() -> ! {
 }
 
 #[embassy_executor::task]
-async fn registration(agent: EmbeddedAgent) {
-    let mut agent = agent;
-    embassy_time::Timer::after_millis(30000).await;
-    log::info!("Registration with the Orchestrator!");
-    agent.register().await;
-    log::info!("Registration done!");
-}
-
-#[embassy_executor::task]
 async fn io_task(
     spawner: embassy_executor::Spawner,
     sender: embassy_sync::channel::Sender<
@@ -262,9 +253,6 @@ async fn edgeless(
     static TX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
     let tx_meta = TX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
 
-    let stack = wifi::init(spawner.clone(), timer, rng, radio_clock_control, clocks, wifi).await;
-    let sock = embassy_net::udp::UdpSocket::new(stack, rx_meta, rx_buf, tx_meta, tx_buf);
-
     let display_resource = edgeless_embedded::resource::epaper_display::EPaperDisplay::new(display_sender).await;
 
     let sensor_scd30_resource = edgeless_embedded::resource::scd30_sensor::SCD30Sensor::new(sensor_scd_receiver).await;
@@ -272,13 +260,14 @@ async fn edgeless(
     static RESOURCES_RAW: static_cell::StaticCell<[&'static mut dyn edgeless_embedded::resource::ResourceDyn; 2]> = static_cell::StaticCell::new();
     let resources = RESOURCES_RAW.init_with(|| [sensor_scd30_resource, display_resource]);
 
-    let resource_registry = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), resources, "coap://192.168.2.60").await;
+    let agent = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), resources).await;
+
+    let stack = wifi::init(spawner.clone(), timer, rng, radio_clock_control, clocks, wifi, agent.clone()).await;
+    let sock = embassy_net::udp::UdpSocket::new(stack, rx_meta, rx_buf, tx_meta, tx_buf);
 
     spawner.spawn(edgeless_embedded::coap::coap_task(
         sock,
-        resource_registry.upstream_receiver().unwrap(),
-        resource_registry.clone(),
+        agent.upstream_receiver().unwrap(),
+        agent.clone(),
     ));
-
-    spawner.spawn(registration(resource_registry.clone()));
 }
