@@ -8,7 +8,6 @@ pub struct EmbeddedAgent {
     inner: &'static core::cell::RefCell<
         embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, &'static mut [&'static mut dyn crate::resource::ResourceDyn]>,
     >,
-    orchestrator_url: &'static str,
     registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
 }
 
@@ -32,7 +31,6 @@ impl EmbeddedAgent {
         spawner: embassy_executor::Spawner,
         node_id: edgeless_api_core::instance_id::NodeId,
         resources: &'static mut [&'static mut dyn crate::resource::ResourceDyn],
-        orchestrator_url: &'static str,
     ) -> &'static mut EmbeddedAgent {
         static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>> =
             static_cell::StaticCell::new();
@@ -62,7 +60,6 @@ impl EmbeddedAgent {
             upstream_sender: sender,
             upstream_receiver: Some(receiver),
             inner: slf_inner,
-            orchestrator_url: orchestrator_url,
             registration_signal: REPLY_CHANNEL
                 .init_with(|| embassy_sync::signal::Signal::<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>::new()),
         });
@@ -88,11 +85,10 @@ impl EmbeddedAgent {
         self.upstream_receiver.take()
     }
 
-    pub async fn register(&mut self) {
-        // let agent_url = "coap://192.168.101.1:7050";
-        // let invocation_url = "coap://192.168.101.1:7050";
-        let agent_url = "coap://192.168.2.233:7050";
-        let invocation_url = "coap://192.168.2.233:7050";
+    pub async fn register(&mut self, addr: smoltcp::wire::Ipv4Address) {
+        let mut url = heapless::String::<256>::new();
+        let url_bytes = addr.as_bytes();
+        ufmt::uwrite!(url, "coap://{}.{}.{}.{}:7050", url_bytes[0], url_bytes[1], url_bytes[2], url_bytes[3]).unwrap();
 
         let tmp = self.inner.borrow_mut();
         let lck = tmp.lock().await;
@@ -120,8 +116,8 @@ impl EmbeddedAgent {
 
         let reg = edgeless_api_core::node_registration::EncodedNodeRegistration {
             node_id: edgeless_api_core::node_registration::NodeId(self.own_node_id),
-            agent_url: agent_url,
-            invocation_url: invocation_url,
+            agent_url: url.clone(),
+            invocation_url: url,
             resources: resources,
         };
 
