@@ -4,7 +4,7 @@
 use edgeless_api::{function_instance::InstanceId, resource_configuration::ResourceConfigurationAPI};
 use serde::Deserialize;
 use serde_json::Error;
-use std::{collections::HashMap, str::from_utf8, sync::Arc};
+use std::{any::Any, collections::HashMap, str::from_utf8, sync::Arc};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -104,6 +104,25 @@ impl DDAResource {
             Ok(client) => client,
             Err(err) => {
                 log::error!("Failed to connect to the DDA sidecar: {}", err);
+                panic!("Failed to connect to the DDA sidecar: {}", err);
+            }
+        };
+
+        // Publishing a random hard coded event from DDA resource
+        // This only serves as an example of publish event pattern from DDA resource. It publishes exactly one event.
+        // To use it in a real use case, all the hardcoded types need to be updated. Type can be passed as configuration. Id can be generated and data should be based on some logical processing.
+        let mut event_request = dda_com::Event::default();
+        event_request.r#type = "com.edgeless.ddaResource".to_string();
+        event_request.id = "randomUID".to_string();
+        event_request.source = "dda_resource_provider".to_string();
+        event_request.data = "Here is some random data".into();
+        let event_ack = match dda_client.publish_event(event_request).await {
+            Ok(ack) => {
+                log::info!("Published event successfully {:?}", ack);
+                ack.into_inner()
+            },
+            Err(err) => {
+                log::error!("Failed to publish the event: {}", err);
                 panic!("Failed to connect to the DDA sidecar: {}", err);
             }
         };
@@ -243,6 +262,7 @@ impl DDAResource {
                 }
             }
         });
+
         Self {}
     }
 }

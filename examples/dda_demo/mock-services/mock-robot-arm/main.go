@@ -53,6 +53,18 @@ func acceptActions(ctx context.Context) {
 	}
 }
 
+func acceptEvent(ctx context.Context) {
+	events, err := inst.SubscribeEvent(ctx, api.SubscriptionFilter{Type: "com.edgeless.ddaResource"})
+	if err != nil {
+		println("Failed to subscribe to event being published from DDA resource")
+	}
+	for event := range events {
+		println("Received an event from DDA resource")
+		println(event.Id)
+		println(event.Source)
+	}
+}
+
 func main() {
 	cfg := config.New()
 	cfg.Identity.Name = "mock-robot-arm"
@@ -77,6 +89,8 @@ func main() {
 
 	println("Starting to accept actions to move my robotic arm from DDA")
 	go acceptActions(ctx)
+	println("Starting to accept events from DDA")
+	go acceptEvent(ctx)
 
 	// This is needed to keep the connection alive
 	<-time.After(30 * time.Minute)
