@@ -120,7 +120,7 @@ impl DDAResource {
             Ok(ack) => {
                 log::info!("Published event successfully {:?}", ack);
                 ack.into_inner()
-            },
+            }
             Err(err) => {
                 log::error!("Failed to publish the event: {}", err);
                 panic!("Failed to connect to the DDA sidecar: {}", err);
