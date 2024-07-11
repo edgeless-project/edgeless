@@ -285,13 +285,22 @@ mod tests {
                     }
                     edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val) => {
                         assert_eq!(4, val.domain_mapping.len());
+                        let mut expected_names = std::collections::HashSet::<String>::new();
+                        let mut expected_domains = std::collections::HashSet::<String>::new();
+                        let mut actual_names = std::collections::HashSet::<String>::new();
+                        let mut actual_domains = std::collections::HashSet::<String>::new();
+
                         for i in 0..4 {
                             match i {
-                                3 => assert_eq!("log", val.domain_mapping[i].name),
-                                _ => assert_eq!(format!("f{}", i + 1), val.domain_mapping[i].name),
+                                3 => expected_names.insert("log".to_string()),
+                                _ => expected_names.insert(format!("f{}", i + 1)),
                             };
-                            assert_eq!("domain-0", val.domain_mapping[i].domain_id);
+                            expected_domains.insert("domain-0".to_string());
+                            actual_names.insert(val.domain_mapping[i].name.clone());
+                            actual_domains.insert(val.domain_mapping[i].domain_id.clone());
                         }
+                        assert_eq!(expected_names, actual_names);
+                        assert_eq!(expected_domains, actual_domains);
                         val.workflow_id.clone()
                     }
                 },
