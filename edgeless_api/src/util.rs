@@ -11,6 +11,11 @@ pub enum Proto {
     COAP,
 }
 
+/// Parse the host and port from an url
+///
+/// From the project references, it is mainly used to bind socket and start listening. As
+/// such, from usage, it must return an IP because the socket API will not resolve names.
+///
 pub fn parse_http_host(raw: &str) -> anyhow::Result<(Proto, String, u16)> {
     let re = regex::Regex::new(r"(\w+):\/\/(.*):(\d+)").unwrap();
     let res = re.captures(raw);
@@ -21,19 +26,43 @@ pub fn parse_http_host(raw: &str) -> anyhow::Result<(Proto, String, u16)> {
                 "https" => Proto::HTTPS,
                 "coap" => Proto::COAP,
                 _ => {
-                    return Err(anyhow::anyhow!("Host Parse Error"));
+                    return Err(anyhow::anyhow!("Protocol Parse Error, got '{:?}'", raw));
                 }
             };
             let port = match val[3].parse() {
                 Ok(prt) => prt,
                 Err(_) => {
-                    return Err(anyhow::anyhow!("Host Parse Error"));
+                    return Err(anyhow::anyhow!("Port Parse Error, got '{:?}'", raw));
                 }
             };
-            Ok((proto, val[2].to_string(), port))
+            let maybe_an_ip = val[2]
+                .parse::<IpAddr>() // Try to parse an IP
+                .ok() // convert to Option
+                // If None (i.e no IP), remove the eventual bracket prefix and suffix (for IPv6) then try again
+                .or_else(|| val[2].strip_prefix("[")?.strip_suffix("]")?.parse::<IpAddr>().ok());
+            let host = match maybe_an_ip {
+                Some(ip) => ip.to_string(), // WARNING the verbatim IP in `raw` may be outputed in a canonical form
+                None => {
+                    // FIXME: the val[2] could still be an hostname or dns name
+                    //    The next step should be to try to resolve it to an IP
+                    //    or return an error:  `return Err(anyhow::anyhow!("Host Parse Error"))`
+                    //    But to keep the previous API behavior, we return the host verbatim
+                    // For example with:
+                    // let resolve = tokio::runtime::Runtime::new()
+                    //     .unwrap()
+                    //     .block_on(tokio::net::lookup_host(val[2].to_string()));
+                    // resolve?.last().map_or(val[2].to_string(), |v| v.to_string())
+                    let fallback = val[2].trim().to_string();
+                    if fallback.is_empty() {
+                        return Err(anyhow::anyhow!("Host Parse Error, got '{:?}'", raw));
+                    }
+                    fallback
+                }
+            };
+            Ok((proto, host, port))
         }
         None => {
-            return Err(anyhow::anyhow!("Host Parse Error"));
+            return Err(anyhow::anyhow!("Regexp Parse Error, got '{:?}'", raw));
         }
     }
 }
