@@ -12,13 +12,7 @@ impl COAPEncoder {
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
-        req.set_method(coap_lite::RequestType::Post);
-        req.set_path("invocation");
-        req.message.set_token(vec![token]);
-        req.message.header.set_type(MessageType::NonConfirmable);
         let mut buffer = [0 as u8; 1024];
-
         let new_event: crate::invocation::Event<&minicbor::bytes::ByteSlice> = crate::invocation::Event::<&minicbor::bytes::ByteSlice> {
             target: event.target,
             source: event.source,
@@ -31,16 +25,10 @@ impl COAPEncoder {
                 crate::invocation::EventData::Err => crate::invocation::EventData::Err,
             },
         };
-
         minicbor::encode(&new_event, &mut buffer[..]).unwrap();
-
         let len = minicbor::len(&event);
-        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
-        req.message.payload = data2;
-        let out = req.message.to_bytes().unwrap();
-        let (data, tail) = out_buf.split_at_mut(out.len());
-        data.clone_from_slice(&out);
-        ((data, endpoint), tail)
+
+        Self::encode(endpoint, token, "invocation", out_buf, false, &buffer[..len])
     }
 
     pub fn encode_start_resource<'a, Endpoint>(
@@ -49,19 +37,11 @@ impl COAPEncoder {
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
-        req.set_method(coap_lite::RequestType::Post);
-        req.set_path("resources/start");
-        req.message.set_token(vec![token]);
         let mut buffer = [0 as u8; 1024];
         minicbor::encode(&instance, &mut buffer[..]).unwrap();
         let len = minicbor::len(&instance);
-        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
-        req.message.payload = data2;
-        let out = req.message.to_bytes().unwrap();
-        let (data, tail) = out_buf.split_at_mut(out.len());
-        data.clone_from_slice(&out);
-        ((data, endpoint), tail)
+
+        Self::encode(endpoint, token, "resources/start", out_buf, true, &buffer[..len])
     }
 
     pub fn encode_stop_resource<'a, Endpoint>(
@@ -77,12 +57,8 @@ impl COAPEncoder {
         let mut buffer = [0_u8; 512];
         minicbor::encode(&instance_id, &mut buffer[..]).unwrap();
         let len = minicbor::len(&instance_id);
-        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
-        req.message.payload = data2;
-        let out = req.message.to_bytes().unwrap();
-        let (data, tail) = out_buf.split_at_mut(out.len());
-        data.clone_from_slice(&out);
-        ((data, endpoint), tail)
+
+        Self::encode(endpoint, token, "resources/stop", out_buf, true, &buffer[..len])
     }
 
     pub fn encode_patch_request<'a, Endpoint>(
@@ -91,19 +67,11 @@ impl COAPEncoder {
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
-        req.set_method(coap_lite::RequestType::Post);
-        req.set_path("resources/patch");
-        req.message.set_token(vec![token]);
         let mut buffer = [0 as u8; 1024];
         minicbor::encode(&patch_request, &mut buffer[..]).unwrap();
         let len = minicbor::len(&patch_request);
-        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
-        req.message.payload = data2;
-        let out = req.message.to_bytes().unwrap();
-        let (data, tail) = out_buf.split_at_mut(out.len());
-        data.clone_from_slice(&out);
-        ((data, endpoint), tail)
+
+        Self::encode(endpoint, token, "resources/patch", out_buf, true, &buffer[..len])
     }
 
     pub fn encode_node_registration<'a, Endpoint>(
@@ -112,19 +80,11 @@ impl COAPEncoder {
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
-        req.set_method(coap_lite::RequestType::Post);
-        req.set_path("registration/register");
-        req.message.set_token(vec![token]);
         let mut buffer = [0 as u8; 2048];
         minicbor::encode(&node_registration, &mut buffer[..]).unwrap();
         let len = minicbor::len(&node_registration);
-        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
-        req.message.payload = data2;
-        let out = req.message.to_bytes().unwrap();
-        let (data, tail) = out_buf.split_at_mut(out.len());
-        data.clone_from_slice(&out);
-        ((data, endpoint), tail)
+
+        Self::encode(endpoint, token, "registration/register", out_buf, true, &buffer[..len])
     }
 
     pub fn encode_node_deregistration<'a, Endpoint>(
@@ -133,19 +93,11 @@ impl COAPEncoder {
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
-        req.set_method(coap_lite::RequestType::Post);
-        req.set_path("registration/deregister");
-        req.message.set_token(vec![token]);
         let mut buffer = [0 as u8; 2048];
         minicbor::encode(&node_id, &mut buffer[..]).unwrap();
         let len = minicbor::len(&node_id);
-        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
-        req.message.payload = data2;
-        let out = req.message.to_bytes().unwrap();
-        let (data, tail) = out_buf.split_at_mut(out.len());
-        data.clone_from_slice(&out);
-        ((data, endpoint), tail)
+
+        Self::encode(endpoint, token, "registration/deregister", out_buf, true, &buffer[..len])
     }
 
     pub fn encode_peer_add<'a, 'b, Endpoint>(
@@ -156,19 +108,11 @@ impl COAPEncoder {
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
-        req.set_method(coap_lite::RequestType::Post);
-        req.set_path("peers/add");
-        req.message.set_token(vec![token]);
         let mut buffer = [0 as u8; 2048];
         minicbor::encode((node_id, node_ip, port), &mut buffer[..]).unwrap();
         let len = minicbor::len((node_id, node_ip, port));
-        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
-        req.message.payload = data2;
-        let out = req.message.to_bytes().unwrap();
-        let (data, tail) = out_buf.split_at_mut(out.len());
-        data.clone_from_slice(&out);
-        ((data, endpoint), tail)
+
+        Self::encode(endpoint, token, "peers/add", out_buf, true, &buffer[..len])
     }
 
     pub fn encode_peer_remove<'a, Endpoint>(
@@ -177,31 +121,15 @@ impl COAPEncoder {
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
-        req.set_method(coap_lite::RequestType::Post);
-        req.set_path("peers/remove");
-        req.message.set_token(vec![token]);
         let mut buffer = [0 as u8; 2048];
         minicbor::encode(node_id, &mut buffer[..]).unwrap();
         let len = minicbor::len(node_id);
-        let data2 = alloc::vec::Vec::<u8>::from(&buffer[..len]);
-        req.message.payload = data2;
-        let out = req.message.to_bytes().unwrap();
-        let (data, tail) = out_buf.split_at_mut(out.len());
-        data.clone_from_slice(&out);
-        ((data, endpoint), tail)
+
+        Self::encode(endpoint, token, "peers/remove", out_buf, true, &buffer[..len])
     }
 
     pub fn encode_keepalive<'a, Endpoint>(endpoint: Endpoint, token: u8, out_buf: &'a mut [u8]) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
-        req.set_method(coap_lite::RequestType::Post);
-        req.set_path("keepalive");
-        req.message.set_token(vec![token]);
-        req.message.payload = alloc::vec::Vec::new();
-        let out = req.message.to_bytes().unwrap();
-        let (data, tail) = out_buf.split_at_mut(out.len());
-        data.clone_from_slice(&out);
-        ((data, endpoint), tail)
+        Self::encode(endpoint, token, "keepalive", out_buf, true, &[])
     }
 
     pub fn encode_response<'a, Endpoint>(
@@ -221,6 +149,34 @@ impl COAPEncoder {
         packet.set_token(vec![token]);
         packet.payload = alloc::vec::Vec::from(data);
         let out = packet.to_bytes().unwrap();
+        let (data, tail) = out_buf.split_at_mut(out.len());
+        data.clone_from_slice(&out);
+        ((data, endpoint), tail)
+    }
+
+    pub fn encode<'a, 'b, Endpoint>(
+        endpoint: Endpoint,
+        token: u8,
+        path: &'b str,
+        out_buf: &'a mut [u8],
+        confirmable: bool,
+        payload: &'b [u8],
+    ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+        let mut req = coap_lite::CoapRequest::<Endpoint>::new();
+        req.set_method(coap_lite::RequestType::Post);
+        req.set_path(path);
+        req.message.set_token(vec![token]);
+        match confirmable {
+            true => {
+                req.message.header.set_type(MessageType::Confirmable);
+            }
+            false => {
+                req.message.header.set_type(MessageType::NonConfirmable);
+            }
+        }
+
+        req.message.payload = alloc::vec::Vec::<u8>::from(payload);
+        let out = req.message.to_bytes().unwrap();
         let (data, tail) = out_buf.split_at_mut(out.len());
         data.clone_from_slice(&out);
         ((data, endpoint), tail)
