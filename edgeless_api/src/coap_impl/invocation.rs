@@ -99,7 +99,7 @@ impl crate::invocation::InvocationAPI for super::CoapClient {
 
         let ((packet, addr), _tail) =
             edgeless_api_core::coap_mapping::COAPEncoder::encode_invocation_event(lck.endpoint, encoded_event, token, &mut buffer[..]);
-        lck.sock.send_to(&packet, addr).await.unwrap();
+        self.outgoing_sender.send(Vec::from(packet)).unwrap();
         Ok(crate::invocation::LinkProcessingResult::FINAL)
     }
 }
