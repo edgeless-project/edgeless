@@ -75,7 +75,7 @@ esp-hal-embassy = { version = "0.1.0", features = [
 hal = { package = "esp-hal", version="0.18", features = ["async" ] }
 esp-backtrace = { version = "0.8.0", features = ["esp32s3", "panic-handler", "exception-handler", "print-uart"] }
 esp-println = { version = "0.6.0", default-features=false, features = ["esp32s3", "uart", "log", "critical-section"] }
-esp-wifi = { version = "0.6", features = ["esp32s3", "utils", "async", "wifi", "embassy-net"] }
+esp-wifi = { version = "0.6", features = ["esp32s3", "utils", "async", "wifi", "embassy-net", "phy-enable-usb"] }
 esp-hal-embassy = { version = "0.1.0", features = [
     "time-timg0",            # Compatible with all chips
     # "time-systimer-16mhz", # Compatible with all chips except ESP32 and ESP32-S2
