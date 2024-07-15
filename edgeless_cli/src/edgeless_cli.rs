@@ -288,7 +288,7 @@ async fn main() -> anyhow::Result<()> {
                     cargo::ops::compile(&ws, &compile_options)?;
 
                     let raw_result = build_dir
-                        .join(format!("{}/release/{}.{}", platform.target(), lib_name, platform.suffix()))
+                        .join(format!("{}/release/lib{}.{}", platform.target(), lib_name, platform.suffix()))
                         .to_str()
                         .unwrap()
                         .to_string();
@@ -297,7 +297,7 @@ async fn main() -> anyhow::Result<()> {
                         .to_str()
                         .unwrap()
                         .to_string();
-
+                    
                     match platform {
                         Platform::WASM => println!(
                             "{:?}",
@@ -305,7 +305,10 @@ async fn main() -> anyhow::Result<()> {
                                 .args(["-Oz", &raw_result, "-o", &out_file])
                                 .status()?
                         ),
-                        _ => fs::write(&out_file, &raw_result).expect("Unable to write file"),
+                        _ => println!(
+                            "{:?}",
+                            fs::copy(&raw_result, out_file)?
+                        ),
                     }
                 }
                 FunctionCommands::Invoke {

@@ -13,7 +13,7 @@ use std::io::prelude::*;
 //type HandleInitFun = fn (&str, &str);
 type HandleInitFun = fn (&str, usize,  &str, usize);
 //type HandleInitFun = fn (&[u8], usize,  &[u8], usize);
-type HandleCallFun = fn (&str, &str, &str, usize, &str, usize);
+type HandleCallFun = fn (&str, &str, &str, usize, *mut *const u8, *mut usize);
 type HandleCastFun = fn (&str, &str, &str, usize);
 type HandleStopFun = fn ();
 
@@ -110,16 +110,17 @@ impl crate::base_runtime::FunctionInstance for NativeFunctionInstance {
 
         unsafe {
             let handle_call_fun: Symbol<HandleCallFun> = self.library.get(b"handle_call_asm").unwrap();
-            let mut out_ptr_ptr: *mut *const u8;
-            let mut out_len_ptr: *mut usize;
+            let mut out_ptr_ptr: *const u8 = std::ptr::null();
+            let mut_out_ptr_ptr: *mut *const u8 = &mut out_ptr_ptr; 
+            let mut out_len_ptr: usize = 0;
 
             handle_call_fun(
                 std::str::from_utf8(self.instance_id.node_id.as_bytes()).unwrap(),
                 std::str::from_utf8(self.instance_id.node_id.as_bytes()).unwrap(),
                 msg,
                 payload_len,
-                out_ptr_ptr,
-                out_len_ptr,
+                mut_out_ptr_ptr,
+                &mut out_len_ptr,
             );
         }
 
