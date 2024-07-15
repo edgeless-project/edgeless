@@ -11,20 +11,21 @@ impl MockDisplay {
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<MockDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
-        if data.provider_id == "mock-display-1" {
+        if data.class_type == "epaper-display" {
             Ok(MockDisplayInstanceConfiguration {})
         } else {
             return Err(edgeless_api_core::common::ErrorResponse {
-                summary: "Wrong Resource ProviderId",
+                summary: "Wrong Resource class type.",
                 detail: None,
             });
         }
     }
 
     pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
-        static_cell::make_static!(MockDisplay {
+        static SLF_RAW: static_cell::StaticCell<MockDisplay> = static_cell::StaticCell::new();
+        SLF_RAW.init_with(|| MockDisplay {
             instance_id: None,
-            active: false
+            active: false,
         })
     }
 }
@@ -32,6 +33,14 @@ impl MockDisplay {
 impl crate::resource::Resource for MockDisplay {
     fn provider_id(&self) -> &'static str {
         return "mock-display-1";
+    }
+
+    fn resource_class(&self) -> &'static str {
+        return "epaper-display";
+    }
+
+    fn outputs(&self) -> &'static [&'static str] {
+        return &[];
     }
 
     async fn has_instance(&self, id: &edgeless_api_core::instance_id::InstanceId) -> bool {
@@ -94,5 +103,12 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
         self.instance_id = Some(id);
 
         Ok(id)
+    }
+
+    async fn patch(
+        &mut self,
+        resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+        Ok(())
     }
 }

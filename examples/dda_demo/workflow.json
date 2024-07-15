@@ -6,7 +6,7 @@
                 "id": "check_temperature",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./functions/check_temperature/check_temperature.wasm",
+                "code": "../../functions/check_temperature/check_temperature.wasm",
                 "outputs": [
                     "dda",
                     "move_arm",
@@ -26,7 +26,7 @@
                 "id": "move_arm",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./functions/move_arm/move_arm.wasm",
+                "code": "../../functions/move_arm/move_arm.wasm",
                 "outputs": [
                     "dda",
                     "log_output"
@@ -49,7 +49,7 @@
             },
             "configurations": {
                 "dda_url": "http://127.0.0.1:12000",
-                "dda_com_subscription_mapping" : "[{\"ddatopic\": \"com.edgeless.temperature\", \"ddapattern\": \"event\", \"cast_mapping\": \"check_temperature\"}, {\"ddatopic\": \"com.edgeless.someddatopic\", \"ddapattern\": \"action\", \"cast_mapping\": \"some_functioncall\"}]",
+                "dda_com_subscription_mapping": "[{\"ddatopic\": \"com.edgeless.temperature\", \"ddapattern\": \"event\", \"cast_mapping\": \"check_temperature\"}, {\"ddatopic\": \"com.edgeless.someddatopic\", \"ddapattern\": \"action\", \"cast_mapping\": \"some_functioncall\"}]",
                 "dda_com_publication_mapping": "[{\"pubid\":\"dda_move_arm\", \"ddatopic\": \"com.edgeless.moveRobotArm\"}]"
             }
         },

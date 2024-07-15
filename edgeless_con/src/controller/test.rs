@@ -5,6 +5,8 @@ use edgeless_api::workflow_instance::SpawnWorkflowResponse;
 
 use super::*;
 
+use futures::SinkExt;
+
 enum MockFunctionInstanceEvent {
     StartFunction(
         (
@@ -103,7 +105,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         self.sender.send(MockFunctionInstanceEvent::StopResource(resource_id)).await.unwrap();
         Ok(())
     }
-    async fn patch(&mut self, update: PatchRequest) -> anyhow::Result<()> {
+    async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         self.sender.send(MockFunctionInstanceEvent::Patch(update)).await.unwrap();
         Ok(())
     }
@@ -246,8 +248,15 @@ async fn resource_to_function_start_stop() {
         SpawnWorkflowResponse::WorkflowInstance(val) => val,
     };
 
-    assert_eq!(instance.domain_mapping[0].name, "f1".to_string());
-    assert_eq!(instance.domain_mapping[0].domain_id, "domain-1".to_string());
+    let comparison_names = std::collections::HashSet::from([instance.domain_mapping[0].name.clone(), instance.domain_mapping[1].name.clone()]);
+    let comparison_domains =
+        std::collections::HashSet::from([instance.domain_mapping[0].domain_id.clone(), instance.domain_mapping[1].domain_id.clone()]);
+
+    assert_eq!(comparison_names, std::collections::HashSet::from(["r1".to_string(), "f1".to_string()]));
+    assert_eq!(
+        comparison_domains,
+        std::collections::HashSet::from(["domain-1".to_string(), "domain-1".to_string()])
+    );
 
     let mut new_func_id = uuid::Uuid::nil();
     assert!(new_func_id.is_nil());
@@ -280,16 +289,24 @@ async fn resource_to_function_start_stop() {
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    if let MockFunctionInstanceEvent::StopFunction(id) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        assert_eq!(new_func_id, id);
-    } else {
-        panic!();
-    }
-
-    if let MockFunctionInstanceEvent::StopResource(id) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        assert_eq!(new_res_id, id);
-    } else {
-        panic!();
+    let mut got_function_stop = false;
+    let mut got_resource_stop = false;
+    for _i in 0..2 {
+        match mock_orc_receiver.try_next().unwrap().unwrap() {
+            MockFunctionInstanceEvent::StopFunction(id) => {
+                assert_eq!(new_func_id, id);
+                assert!(got_function_stop == false);
+                got_function_stop = true;
+            }
+            MockFunctionInstanceEvent::StopResource(id) => {
+                assert_eq!(new_res_id, id);
+                assert!(got_resource_stop == false);
+                got_resource_stop = true;
+            }
+            _ => {
+                panic!()
+            }
+        }
     }
 
     assert!(mock_orc_receiver.try_next().is_err());

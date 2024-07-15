@@ -10,7 +10,7 @@ pub struct LillyGoEPaper<
     BUSY: embedded_hal::digital::InputPin,
     DC: embedded_hal::digital::OutputPin,
     RST: embedded_hal::digital::OutputPin,
-    DELAY: embedded_hal::delay::DelayUs,
+    DELAY: embedded_hal::delay::DelayNs,
 > {
     pub spi_dev: SPI,
     pub delay: DELAY,
@@ -23,7 +23,7 @@ impl<
         BUSY: embedded_hal::digital::InputPin,
         DC: embedded_hal::digital::OutputPin,
         RST: embedded_hal::digital::OutputPin,
-        DELAY: embedded_hal::delay::DelayUs,
+        DELAY: embedded_hal::delay::DelayNs,
     > edgeless_embedded::resource::epaper_display::EPaper for LillyGoEPaper<SPI, BUSY, DC, RST, DELAY>
 {
     fn set_text(&mut self, new_text: &str) {

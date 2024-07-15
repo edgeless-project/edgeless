@@ -3,10 +3,10 @@
         {
             "name": "ponger",
             "class_specification": {
-                "id": "ponger",
+                "id": "pong",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./pong/ponger.wasm",
+                "code": "../../functions/pong/pong.wasm",
                 "outputs": [
                     "ping"
                 ]
@@ -19,10 +19,10 @@
         {
             "name": "pinger",
             "class_specification": {
-                "id": "pinger",
+                "id": "ping",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./ping/pinger.wasm",
+                "code": "../../functions/ping/ping.wasm",
                 "outputs": [
                     "ponger"
                 ]

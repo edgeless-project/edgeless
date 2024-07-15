@@ -6,7 +6,7 @@
                 "id": "esp_test_fun",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./esp_test_fun/esp_test_fun.wasm",
+                "code": "../../functions/esp_test_fun/esp_test_fun.wasm",
                 "outputs": [
                     "check_display"
                 ]
@@ -28,7 +28,7 @@
         },
         {
             "name": "test_display",
-            "class_type": "text-display",
+            "class_type": "epaper-display",
             "output_mapping": {},
             "configurations": {}
         }
