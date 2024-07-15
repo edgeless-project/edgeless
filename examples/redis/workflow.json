@@ -1,16 +1,16 @@
 {
     "functions": [
         {
-            "name": "my-message-generator",
+            "name": "counter",
             "class_specification": {
                 "id": "counter",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./counter/counter.wasm",
+                "code": "../../functions/counter/counter.wasm",
                 "outputs": []
             },
             "output_mapping": {
-                "output": "my-redis"
+                "output": "redis"
             },
             "annotations": {
                 "init-payload": "42"
@@ -19,7 +19,7 @@
     ],
     "resources": [
         {
-            "name": "my-redis",
+            "name": "redis",
             "class_type": "redis",
             "output_mapping": {},
             "configurations": {

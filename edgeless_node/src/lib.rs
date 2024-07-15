@@ -68,6 +68,11 @@ pub struct EdgelessNodeGeneralSettings {
     /// The invocation URL announced by the node.
     /// It can be different from `agent_url`, e.g., for NAT traversal.
     pub invocation_url_announced: String,
+    /// The COAP URL of the dataplane of this node, used for event dispatching.
+    pub invocation_url_coap: Option<String>,
+    /// The COAP invocation URL announced by the node.
+    /// It can be different from `agent_url`, e.g., for NAT traversal.
+    pub invocation_url_announced_coap: Option<String>,
     /// The URL exposed by this node to publish telemetry metrics collected.
     pub metrics_url: String,
     /// The URL of the orchestrator to which this node registers.
@@ -130,6 +135,7 @@ impl EdgelessNodeSettings {
     pub fn new_without_resources(orchestrator_url: &str, node_address: &str, agent_port: u16, invocation_port: u16, metrics_port: u16) -> Self {
         let agent_url = format!("http://{}:{}", node_address, agent_port);
         let invocation_url = format!("http://{}:{}", node_address, invocation_port);
+        let invocation_url_coap = Some(format!("coap://{}:{}", node_address, invocation_port));
         Self {
             general: EdgelessNodeGeneralSettings {
                 node_id: uuid::Uuid::new_v4(),
@@ -137,6 +143,8 @@ impl EdgelessNodeSettings {
                 agent_url_announced: agent_url,
                 invocation_url: invocation_url.clone(),
                 invocation_url_announced: invocation_url,
+                invocation_url_coap: invocation_url_coap.clone(),
+                invocation_url_announced_coap: invocation_url_coap,
                 metrics_url: format!("http://{}:{}", node_address, metrics_port),
                 orchestrator_url: orchestrator_url.to_string(),
             },
@@ -375,8 +383,12 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let state_manager = Box::new(state_management::StateManager::new().await);
 
     // Create the data plane.
-    let data_plane =
-        edgeless_dataplane::handle::DataplaneProvider::new(settings.general.node_id.clone(), settings.general.invocation_url.clone()).await;
+    let data_plane = edgeless_dataplane::handle::DataplaneProvider::new(
+        settings.general.node_id.clone(),
+        settings.general.invocation_url.clone(),
+        settings.general.invocation_url_coap.clone(),
+    )
+    .await;
 
     // Create the telemetry provider.
     let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.general.metrics_url.clone())
@@ -543,6 +555,8 @@ agent_url = "http://127.0.0.1:7021"
 agent_url_announced = ""
 invocation_url = "http://127.0.0.1:7002"
 invocation_url_announced = ""
+invocation_url_coap = "coap://127.0.0.1:7002"
+invocation_url_announced_coap = ""
 metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://127.0.0.1:7011"
 

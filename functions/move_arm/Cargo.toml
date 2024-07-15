@@ -1,0 +1,23 @@
+# SPDX-FileCopyrightText: © 2024 Siemens AG
+# SPDX-License-Identifier: MIT
+[workspace]
+
+[profile.release]
+lto = true
+opt-level = "s"
+
+[package]
+name = "move_arm"
+version = "0.1.0"
+authors = ["Lukasz Zalewski <zalewski.lukasz@siemens.com>", "Saurabh Singh <narayan.singh@siemens.com>", "Markus Sauer <markussauer@siemens.com>"]
+edition = "2021"
+
+[lib]
+name = "move_arm"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { path = "../../edgeless_function" }
+edgeless_http = { path = "../../edgeless_http" }
+log = "0.4"
