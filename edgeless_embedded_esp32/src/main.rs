@@ -11,15 +11,23 @@ extern crate alloc;
 pub mod epaper_display_impl;
 #[cfg(feature = "scd30")]
 pub mod scd30_sensor_impl;
+pub mod lcd_display_impl;
 pub mod wifi;
 
 use edgeless_embedded::agent::EmbeddedAgent;
 #[cfg(feature = "epaper_2_13")]
 use edgeless_embedded::resource::epaper_display::EPaper;
+use embedded_graphics::pixelcolor::RgbColor;
+use embedded_graphics::draw_target::DrawTarget;
 use embedded_hal::delay::DelayNs;
 use epd_waveshare::prelude::*;
 use esp_backtrace as _;
 use hal::prelude::*;
+
+
+use embedded_graphics::Drawable;
+
+use edgeless_embedded::resource::epaper_display::EPaper;
 
 #[global_allocator]
 static ALLOCATOR: esp_alloc::EspHeap = esp_alloc::EspHeap::empty();
@@ -122,6 +130,124 @@ fn main() -> ! {
         display_wrapper
     };
 
+    #[cfg(feature = "t_display_s3")]
+    let display_wrapper = {
+
+        // log::info!("Display Start");
+
+        let mut epaper_delay = hal::delay::Delay::new(&clocks);
+
+        let mut tft_pwr = hal::gpio::Output::new(io.pins.gpio15, hal::gpio::Level::High);
+        let mut tft_bl = hal::gpio::Output::new(io.pins.gpio38, hal::gpio::Level::High);
+        
+        let tft_d0 = hal::gpio::Output::new(io.pins.gpio39, hal::gpio::Level::Low);
+        let tft_d1 = hal::gpio::Output::new(io.pins.gpio40, hal::gpio::Level::Low);
+        let tft_d2 = hal::gpio::Output::new(io.pins.gpio41, hal::gpio::Level::Low);
+        let tft_d3 = hal::gpio::Output::new(io.pins.gpio42, hal::gpio::Level::Low);
+        
+        let tft_d4 = hal::gpio::Output::new(io.pins.gpio45, hal::gpio::Level::Low);
+        let tft_d5 = hal::gpio::Output::new(io.pins.gpio46, hal::gpio::Level::Low);
+        let tft_d6 = hal::gpio::Output::new(io.pins.gpio47, hal::gpio::Level::Low);
+        let tft_d7 = hal::gpio::Output::new(io.pins.gpio48, hal::gpio::Level::Low);
+        
+        let dc_pin = hal::gpio::Output::new(io.pins.gpio7, hal::gpio::Level::Low);
+        let wr_pin = hal::gpio::Output::new(io.pins.gpio8, hal::gpio::Level::High);
+  
+  
+        let mut rst = hal::gpio::Output::new(io.pins.gpio5, hal::gpio::Level::High);
+        // let mut cs = hal::gpio::Output::new(io.pins.gpio6, hal::gpio::Level::High);
+        let rdy = hal::gpio::Input::new(io.pins.gpio9, hal::gpio::Pull::Up);
+
+
+        // epaper_delay.delay_millis(100);
+        // while rdy.is_high() {
+        //     epaper_delay.delay_millis(10);
+        // }
+
+        let bus = display_interface_parallel_gpio::Generic8BitBus::new((
+            tft_d0, tft_d1, tft_d2, tft_d3,
+            tft_d4, tft_d5, tft_d6, tft_d7
+        ));
+
+        let di = display_interface_parallel_gpio::PGPIO8BitInterface::new(bus, dc_pin, wr_pin);
+
+
+        let mut display = mipidsi::Builder::new(
+            mipidsi::models::ST7789,
+            di
+        )
+        .display_size(170, 320)
+        .reset_pin(rst)
+        // .rotate(1)
+        .invert_colors(mipidsi::options::ColorInversion::Inverted)
+        .display_offset(35, 0)
+        .orientation(mipidsi::options::Orientation::new().rotate(mipidsi::options::Rotation::Deg90))
+        .init(&mut epaper_delay)
+        .unwrap();
+
+        static DISPLAY_WRAPPER_RAW: static_cell::StaticCell<
+            lcd_display_impl::LilyGoLCD<
+                // embedded_hal_bus::spi::ExclusiveDevice<
+                //     hal::spi::master::Spi<'_, hal::peripherals::SPI2, hal::spi::FullDuplexMode>,
+                //     hal::gpio::Output<hal::gpio::Gpio5>,
+                //     embedded_hal_bus::spi::NoDelay,
+                // >,
+                display_interface_parallel_gpio::PGPIO8BitInterface<
+                    display_interface_parallel_gpio::Generic8BitBus<
+                        hal::gpio::Output<hal::gpio::Gpio39>,
+                        hal::gpio::Output<hal::gpio::Gpio40>,
+                        hal::gpio::Output<hal::gpio::Gpio41>,
+                        hal::gpio::Output<hal::gpio::Gpio42>,
+                        hal::gpio::Output<hal::gpio::Gpio45>,
+                        hal::gpio::Output<hal::gpio::Gpio46>,
+                        hal::gpio::Output<hal::gpio::Gpio47>,
+                        hal::gpio::Output<hal::gpio::Gpio48>
+                    >,
+                    hal::gpio::Output<hal::gpio::Gpio7>,
+                    hal::gpio::Output<hal::gpio::Gpio8>
+                >,
+                hal::gpio::Output<hal::gpio::Gpio5>
+            >,
+        > = static_cell::StaticCell::new();
+
+        let display_wrapper = DISPLAY_WRAPPER_RAW.init_with(|| lcd_display_impl::LilyGoLCD {
+            display: display,
+        });
+
+        // display_wrapper.set_text("ASDDF");
+
+        // display.clear(embedded_graphics::pixelcolor::Rgb565::RED).unwrap();
+        // display.clear(embedded_graphics::pixelcolor::Rgb565::WHITE).unwrap();
+
+        // let style = embedded_graphics::mono_font::MonoTextStyleBuilder::new()
+        //     .font(&embedded_graphics::mono_font::ascii::FONT_10X20)
+        //     .text_color(embedded_graphics::pixelcolor::Rgb565::BLUE)
+        //     // .background_color(Color::White)
+        //     .build();
+
+        // let text_style = embedded_graphics::text::TextStyleBuilder::new()
+        //     .baseline(embedded_graphics::text::Baseline::Top)
+        //     .build();
+
+        // let _ = embedded_graphics::text::Text::with_text_style("Test", embedded_graphics::prelude::Point::new(0, 5), style, text_style).draw(&mut display);
+
+        // display.clear(embedded_graphics::pixelcolor::Rgb565::WHITE).unwrap();
+
+        // let data = include_bytes!("logo_edgeless_alpha_light.bmp");
+        // let bmp = tinybmp::Bmp::from_slice(data).unwrap();
+        // embedded_graphics::image::Image::new(&bmp, embedded_graphics::prelude::Point::new(0, 0)).draw(&mut display).unwrap();
+        // // self.epd
+        // //     .update_and_display_frame(&mut self.spi_dev, &self.display.buffer(), &mut self.delay)
+        // //     .unwrap();
+
+        // log::info!("Display Done");
+        // // let rst_pin = hal::gpio::Output::new(io.pins.gpio16, hal::gpio::Level::High);
+        // // let spi = hal::spi::master::Spi::new(peripherals.SPI2, 100u32.kHz(), hal::spi::SpiMode::Mode0, &clocks)
+        // // .with_sck(io.pins.gpio18)
+        // // .with_mosi(io.pins.gpio23);
+        display_wrapper
+    };
+
     #[cfg(feature = "scd30")]
     let sensor_wrapper = {
         let i2c = hal::i2c::I2C::new_with_timeout(
@@ -180,11 +306,11 @@ fn main() -> ! {
             let io_executor = IO_EXECUTOR_RAW.init_with(|| esp_hal_embassy::Executor::new());
 
             io_executor.run(|spawner| {
-                #[cfg(feature = "epaper_2_13")]
+                #[cfg(any(feature = "epaper_2_13", feature = "t_display_s3"))]
                 display_wrapper.set_text("Edgeless");
                 #[cfg(feature = "scd30")]
                 spawner.spawn(io_task(spawner, sender, sensor_wrapper));
-                #[cfg(feature = "epaper_2_13")]
+                #[cfg(any(feature = "epaper_2_13", feature = "t_display_s3"))]
                 spawner.spawn(edgeless_embedded::resource::epaper_display::display_writer(
                     display_receiver,
                     display_wrapper,
@@ -254,8 +380,10 @@ async fn edgeless(
     let tx_meta = TX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
 
     let display_resource = edgeless_embedded::resource::epaper_display::EPaperDisplay::new(display_sender).await;
+    // let display_resource = edgeless_embedded::resource::mock_display::MockDisplay::new().await;
 
-    let sensor_scd30_resource = edgeless_embedded::resource::scd30_sensor::SCD30Sensor::new(sensor_scd_receiver).await;
+    // let sensor_scd30_resource = edgeless_embedded::resource::scd30_sensor::SCD30Sensor::new(sensor_scd_receiver).await;
+    let sensor_scd30_resource = edgeless_embedded::resource::mock_sensor::MockSensor::new().await;
 
     static RESOURCES_RAW: static_cell::StaticCell<[&'static mut dyn edgeless_embedded::resource::ResourceDyn; 2]> = static_cell::StaticCell::new();
     let resources = RESOURCES_RAW.init_with(|| [sensor_scd30_resource, display_resource]);

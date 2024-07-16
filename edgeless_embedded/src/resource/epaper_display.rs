@@ -76,7 +76,7 @@ pub async fn display_writer(
     message_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>,
     display: &'static mut dyn EPaper,
 ) {
-    display.set_text("Edgeless\nInitialized");
+    // display.set_text("Edgeless\nInitialized");
     loop {
         let new_message = message_receiver.receive().await;
         display.set_text(&new_message);

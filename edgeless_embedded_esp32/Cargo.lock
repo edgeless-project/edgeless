@@ -248,6 +248,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "display-interface"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ba2aab1ef3793e6f7804162debb5ac5edb93b3d650fbcc5aeb72fcd0e6c03a0"
+
+[[package]]
+name = "display-interface-parallel-gpio"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fbb812553b582e8afad641e19717ec3bbb46f91b4464c2634b4ccbb2d6e563ea"
+dependencies = [
+ "display-interface",
+ "embedded-hal 1.0.0",
+]
+
+[[package]]
 name = "document-features"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -260,6 +276,7 @@ dependencies = [
 name = "edgeless-embedded-esp32"
 version = "0.1.0"
 dependencies = [
+ "display-interface-parallel-gpio",
  "edgeless_api_core",
  "edgeless_embedded",
  "embassy-embedded-hal",
@@ -284,10 +301,12 @@ dependencies = [
  "getrandom",
  "heapless 0.8.0",
  "log",
+ "mipidsi",
  "once_cell",
  "sensor-scd30",
  "smoltcp",
  "static_cell",
+ "tinybmp",
  "uuid",
 ]
 
@@ -1260,6 +1279,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "mipidsi"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "44e2bbd372d8ae9ccd0fc6eb4d91742b971ed8149968bbc623f025506989bd30"
+dependencies = [
+ "display-interface",
+ "embedded-graphics-core",
+ "embedded-hal 1.0.0",
+ "heapless 0.8.0",
+ "nb 1.1.0",
+]
+
+[[package]]
 name = "mutex-trait"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1730,6 +1762,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.68",
+]
+
+[[package]]
+name = "tinybmp"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df43af2cb7b369009aa14144959bb4f2720ab62034c9073242f2d3a186c2edb6"
+dependencies = [
+ "embedded-graphics",
 ]
 
 [[package]]
