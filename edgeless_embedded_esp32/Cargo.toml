@@ -59,6 +59,10 @@ epd-waveshare = { git = "https://github.com/edgeless-project/epd-waveshare.git",
 embedded-graphics = { version = "0.8"}
 sensor-scd30 = { git = "https://github.com/edgeless-project/rust-sensor-scd30.git", branch = "edgeless_fork", default-features=false }
 
+display-interface-parallel-gpio = "0.7"
+mipidsi = "0.8"
+tinybmp = "0.6"
+
 [target.xtensa-esp32-none-elf.dependencies]
 hal = { package = "esp-hal", version="0.18", features = ["async" ] }
 esp-backtrace = { version = "0.8.0", features = ["esp32", "panic-handler", "exception-handler", "print-uart"] }
@@ -85,6 +89,7 @@ esp-hal-embassy = { version = "0.1.0", features = [
 [features]
 # GDEH0213B73
 epaper_2_13 = []
+t_display_s3 = []
 scd30 = []
 tum_node_2_13 = ["epaper_2_13", "scd30"]
 
