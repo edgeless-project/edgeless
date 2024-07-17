@@ -74,22 +74,30 @@ pub struct EdgelessNodeResourceSettings {
     /// If `http_ingress_provider` is not empty, this is the URL of the
     /// HTTP web server exposed by the http-ingress resource for this node.
     pub http_ingress_url: Option<String>,
-    /// If not empty, a http-ingress resource with the given name is created.
+    /// If not empty, a http-ingress resource provider with that name is created.
     pub http_ingress_provider: Option<String>,
-    /// If not empty, a http-egress resource with the given name is created.
+    /// If not empty, a http-egress resource provider with that name is created.
     pub http_egress_provider: Option<String>,
-    /// If not empty, a file-log resource with the given name is created.
+    /// If not empty, a file-log resource provider with that name is created.
     /// The resource will write on the local filesystem.
     pub file_log_provider: Option<String>,
-    /// If not empty, a redis resource with the given name is created.
+    /// If not empty, a redis resource provider with that name is created.
     /// The resource will connect to a remote Redis server to update the
     /// value of a given given, as specified in the resource configuration
     /// at run-time.
     pub redis_provider: Option<String>,
     /// The URL of DDA used by this node, used for communication via the DDA resources
     pub dda_url: Option<String>,
-    /// If not empty, a DDA resource with the given name is created.
+    /// If not empty, a DDA resource with that name is created.
     pub dda_provider: Option<String>,
+    /// The address of the ollama server.
+    pub ollama_host: Option<String>,
+    /// The port of the ollama server.
+    pub ollama_port: Option<u16>,
+    /// The maximum number of messages in the history of the ollama resource.
+    pub ollama_messages_number_limit: Option<u16>,
+    /// If not empty, an ollama resource provider with that name is created.
+    pub ollama_provider: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -346,6 +354,46 @@ async fn fill_resources(
                             resources::dda::DDAResourceProvider::new(
                                 data_plane.clone(),
                                 edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                            )
+                            .await,
+                        ),
+                    },
+                );
+
+                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id: provider_id.clone(),
+                    class_type,
+                    outputs: vec!["new_request".to_string()],
+                });
+            }
+        }
+
+        if let (Some(host), Some(port), Some(messages_number_limit), Some(provider_id)) = (
+            &settings.ollama_host,
+            &settings.ollama_port,
+            &settings.ollama_messages_number_limit,
+            &settings.ollama_provider,
+        ) {
+            if !host.is_empty() && !provider_id.is_empty() {
+                log::info!(
+                    "Creating resource '{}' towards {}:{} (limit to {} messages per chat)",
+                    provider_id,
+                    host,
+                    port,
+                    messages_number_limit
+                );
+                let class_type = "ollama".to_string();
+                ret.insert(
+                    provider_id.clone(),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::ollama::OllamaResourceProvider::new(
+                                data_plane.clone(),
+                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                                host,
+                                *port,
+                                *messages_number_limit,
                             )
                             .await,
                         ),
