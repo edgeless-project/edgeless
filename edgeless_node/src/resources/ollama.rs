@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
-use futures::{SinkExt, StreamExt, TryFutureExt};
+use futures::{SinkExt, StreamExt};
 
 #[derive(Clone)]
 pub struct OllamaResourceProvider {
@@ -9,14 +9,30 @@ pub struct OllamaResourceProvider {
 }
 
 enum OllamaCommand {
-    // model_name, history_id, prompt
-    Chat(String, String, String),
+    // model_name, history_id, prompt, resource_id, reply_receiver
+    Chat(
+        String,
+        String,
+        String,
+        edgeless_api::function_instance::ComponentId,
+        tokio::sync::oneshot::Sender<anyhow::Result<(edgeless_api::function_instance::InstanceId, String)>>,
+    ),
+    // resource_id, target
+    Patch(edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::InstanceId),
 }
 
 impl std::fmt::Display for OllamaCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            OllamaCommand::Chat(model_name, history_id, prompt) => write!(f, "({}, {},{})", model_name, history_id, prompt),
+            OllamaCommand::Chat(model_name, history_id, prompt, resource_id, _) => write!(
+                f,
+                "model {}, history_id {}, prompt length {}, resource_id {})",
+                model_name,
+                history_id,
+                prompt.len(),
+                resource_id
+            ),
+            OllamaCommand::Patch(resource_id, target) => write!(f, "resource_id {}, target {}", resource_id, target),
         }
     }
 }
@@ -24,7 +40,7 @@ impl std::fmt::Display for OllamaCommand {
 pub struct OllamaResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
-    instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, OllamaResource>,
+    instances: std::collections::HashMap<edgeless_api::function_instance::ComponentId, OllamaResource>,
     sender: futures::channel::mpsc::UnboundedSender<OllamaCommand>,
     _handle: tokio::task::JoinHandle<()>,
 }
@@ -42,6 +58,7 @@ impl Drop for OllamaResource {
 impl OllamaResource {
     /// Create a new Ollama resource.
     ///
+    /// - `resource_provider`: the resource provider.
     /// - `dataplane_handle`: gives access to the EDGELESS dataplane.
     /// - `model_name`: name of the AI model to use.
     /// - `instance_id`: identifier of this resource instance.
@@ -76,9 +93,31 @@ impl OllamaResource {
                     }
                 };
 
+                let (reply_sender, reply_receiver) =
+                    tokio::sync::oneshot::channel::<anyhow::Result<(edgeless_api::function_instance::InstanceId, String)>>();
                 let _ = sender
-                    .send(OllamaCommand::Chat(model_name.clone(), history_id.clone(), message_data))
+                    .send(OllamaCommand::Chat(
+                        model_name.clone(),
+                        history_id.clone(),
+                        message_data,
+                        instance_id.function_id.clone(),
+                        reply_sender,
+                    ))
                     .await;
+
+                match reply_receiver.await {
+                    Ok(response) => match response {
+                        Ok((target, response)) => {
+                            let _ = dataplane_handle.send(target, response).await;
+                        }
+                        Err(err) => {
+                            log::warn!("Error from ollama: {}", err)
+                        }
+                    },
+                    Err(err) => {
+                        log::warn!("Communication error with ollama resource provider: {}", err)
+                    }
+                };
 
                 if need_reply {
                     dataplane_handle
@@ -120,26 +159,34 @@ impl OllamaResourceProvider {
         let mut ollama = ollama_rs::Ollama::new_with_history(format!("http://{}", ollama_host), ollama_port, ollama_messages_number_limit);
 
         let _handle = tokio::spawn(async move {
+            let mut targets = std::collections::HashMap::new();
             while let Some(command) = receiver.next().await {
                 match command {
-                    OllamaCommand::Chat(model_name, history_id, prompt) => {
-                        let res = ollama
-                            .send_chat_messages_with_history(
-                                ollama_rs::generation::chat::request::ChatMessageRequest::new(
-                                    model_name.clone(),
-                                    vec![ollama_rs::generation::chat::ChatMessage::user(prompt)],
-                                ),
-                                history_id.clone(),
-                            )
-                            .await;
-                        match res {
-                            Ok(res) => {
-                                println!("XXX {:?}", res.message);
-                            }
-                            Err(err) => {
-                                log::error!("Ollama error with model {}, history_id {}: {}", model_name, history_id, err);
-                            }
+                    OllamaCommand::Chat(model_name, history_id, prompt, resource_id, reply_receiver) => {
+                        if let Some(target) = targets.get(&resource_id) {
+                            let result = ollama
+                                .send_chat_messages_with_history(
+                                    ollama_rs::generation::chat::request::ChatMessageRequest::new(
+                                        model_name.clone(),
+                                        vec![ollama_rs::generation::chat::ChatMessage::user(prompt)],
+                                    ),
+                                    history_id.clone(),
+                                )
+                                .await;
+                            let response = match result {
+                                Ok(res) => Ok((*target, res.message.unwrap().content)),
+                                Err(err) => anyhow::Result::Err(anyhow::anyhow!(
+                                    "Ollama error with model {}, history_id {}: {}",
+                                    model_name,
+                                    history_id,
+                                    err
+                                )),
+                            };
+                            let _ = reply_receiver.send(response);
                         }
+                    }
+                    OllamaCommand::Patch(resource_id, target) => {
+                        targets.insert(resource_id, target);
                     }
                 };
             }
@@ -148,7 +195,7 @@ impl OllamaResourceProvider {
             inner: std::sync::Arc::new(tokio::sync::Mutex::new(OllamaResourceProviderInner {
                 resource_provider_id,
                 dataplane_provider,
-                instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, OllamaResource>::new(),
+                instances: std::collections::HashMap::new(),
                 sender,
                 _handle,
             })),
@@ -167,8 +214,8 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
 
         // Read configuration
-        let model_name = match instance_specification.configuration.get("model") {
-            Some(model_name) => model_name,
+        let model = match instance_specification.configuration.get("model") {
+            Some(model) => model,
             None => {
                 return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                     edgeless_api::common::ResponseError {
@@ -179,9 +226,9 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             }
         };
 
-        match OllamaResource::new(dataplane_handle, model_name.to_string(), new_id, lck.sender.clone()).await {
+        match OllamaResource::new(dataplane_handle, model.to_string(), new_id, lck.sender.clone()).await {
             Ok(resource) => {
-                lck.instances.insert(new_id.clone(), resource);
+                lck.instances.insert(new_id.function_id.clone(), resource);
                 return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
             }
             Err(err) => {
@@ -196,12 +243,29 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 
     async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-        self.inner.lock().await.instances.remove(&resource_id);
+        self.inner.lock().await.instances.remove(&resource_id.function_id);
         Ok(())
     }
 
-    async fn patch(&mut self, _update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
-        // the resource has no channels: nothing to be patched
+    async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
+        // Find the target component to which we have to send events
+        // generated on the "out" output channel.
+        let target = match update.output_mapping.get("out") {
+            Some(val) => val.clone(),
+            None => {
+                anyhow::bail!("Missing mapping of channel: out");
+            }
+        };
+
+        // Check that the resource to be patched is active.
+        let mut lck = self.inner.lock().await;
+        if lck.instances.get(&update.function_id).is_none() {
+            anyhow::bail!("Patching a non-existing resource: {}", update.function_id);
+        }
+
+        // Add/update the mapping of the resource provider to the target.
+        let _ = lck.sender.send(OllamaCommand::Patch(update.function_id, target)).await;
+
         Ok(())
     }
 }
