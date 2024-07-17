@@ -190,6 +190,10 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                     true => Some("dda-1".to_string()),
                     false => None,
                 },
+                ollama_host: None,
+                ollama_port: None,
+                ollama_messages_number_limit: None,
+                ollama_provider: None,
             }),
             user_node_capabilities: None,
         });
