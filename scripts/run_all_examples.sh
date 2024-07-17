@@ -2,7 +2,7 @@
 
 logs="build.log build_functions.log edgeless_bal.log edgeless_con.log edgeless_orc.log edgeless_node.log my-local-file.log reading-errors.log"
 confs="balancer.toml controller.toml orchestrator.toml node.toml cli.toml"
-specialized_workflows="container dda_demo esp32_resources redis vector_mul matrix_mul"
+specialized_workflows="container dda_demo esp32_resources redis vector_mul matrix_mul ollama"
 
 echo "checking for existing files"
 existing_files=""
