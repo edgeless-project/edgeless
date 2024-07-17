@@ -1,12 +1,21 @@
 ### Ollama example
 
-The example creates a function that queries an ollama server.
+The example creates a workflow that queries an ollama server.
 
-XXX
+![](ollama.png)
 
-Then you can start and stop the workflow with:
+Install [ollama](https://ollama.com/), e.g., by following the
+[quick-start instructions](https://github.com/ollama/ollama/blob/main/README.md#quickstart).
 
+Start the workflow with:
+
+```shell
+ID=$(target/debug/edgeless_cli workflow start examples/ollama/workflow.json)
+target/debug/edgeless_cli workflow stop $ID
 ```
-ID=$(target/debug/edgeless_cli workflow start examples/redis/workflow.json)
+
+Stop the workflow with:
+
+```shell
 target/debug/edgeless_cli workflow stop $ID
 ```
