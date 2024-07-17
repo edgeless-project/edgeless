@@ -583,6 +583,10 @@ file_log_provider = "file-log-1"
 redis_provider = "redis-1"
 dda_url = "http://127.0.0.1:10000"
 dda_provider = "dda-1"
+ollama_host = "localhost"
+ollama_port = 11434
+ollama_messages_number_limit = 30
+ollama_provider = "ollama-1"
 
 [user_node_capabilities]
 "##,
