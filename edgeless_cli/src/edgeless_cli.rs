@@ -72,17 +72,26 @@ struct Args {
 #[derive(serde::Deserialize)]
 struct CLiConfig {
     controller_url: String,
-    pub repository_url: String,
-    pub repository_basic_auth_user: String,
-    pub repository_basic_auth_pass: String,
+    function_repository: Option<FunctionRepositoryConfig>,
+}
+
+#[derive(serde::Deserialize)]
+struct FunctionRepositoryConfig {
+    pub url: String,
+    pub basic_auth_user: String,
+    pub basic_auth_pass: String,
 }
 
 pub fn edgeless_cli_default_conf() -> String {
-    let controller_url = String::from("controller_url = \"http://127.0.0.1:7001\"");
-    let repository_url = String::from("repository_url = \"\"");
-    let repository_user = String::from("repository_basic_auth_user = \"\"");
-    let reposisitory_passwd = String::from("repository_basic_auth_pass = \"\"");
-    return format!("{}\n{}\n{}\n{}", controller_url, repository_url, repository_user, reposisitory_passwd);
+    String::from(
+        r##"controller_url = "http://127.0.0.1:7001"
+
+#[function_repository]
+#url = ""
+#basic_auth_user = ""
+#basic_auth_pass = ""
+"##,
+    )
 }
 
 #[tokio::main]
@@ -298,12 +307,16 @@ async fn main() -> anyhow::Result<()> {
                     }
                     log::debug!("Got Config");
                     let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
+                    let function_repository_conf = match conf.function_repository {
+                        Some(conf) => conf,
+                        None => anyhow::bail!("function repository configuration section missing"),
+                    };
 
                     let client = Client::new();
                     let response = client
-                        .get(conf.repository_url.to_string() + "/api/admin/function/" + function_name.as_str())
+                        .get(function_repository_conf.url.to_string() + "/api/admin/function/" + function_name.as_str())
                         .header(ACCEPT, "application/json")
-                        .basic_auth(conf.repository_basic_auth_user, Some(conf.repository_basic_auth_pass))
+                        .basic_auth(function_repository_conf.basic_auth_user, Some(function_repository_conf.basic_auth_pass))
                         .send()
                         .await
                         .expect("failed to get response")
@@ -323,12 +336,16 @@ async fn main() -> anyhow::Result<()> {
                     }
                     log::debug!("Got Config");
                     let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
+                    let function_repository_conf = match conf.function_repository {
+                        Some(conf) => conf,
+                        None => anyhow::bail!("function repository configuration section missing"),
+                    };
 
                     let client = Client::new();
                     let response = client
-                        .get(conf.repository_url.to_string() + "/api/admin/function/download/" + code_file_id.as_str())
+                        .get(function_repository_conf.url.to_string() + "/api/admin/function/download/" + code_file_id.as_str())
                         .header(ACCEPT, "*/*")
-                        .basic_auth(conf.repository_basic_auth_user, Some(conf.repository_basic_auth_pass))
+                        .basic_auth(function_repository_conf.basic_auth_user, Some(function_repository_conf.basic_auth_pass))
                         .send()
                         .await
                         .expect("failed to get header");
@@ -362,6 +379,10 @@ async fn main() -> anyhow::Result<()> {
                     }
                     log::debug!("Got Config");
                     let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(&args.config_file).unwrap()).unwrap();
+                    let function_repository_conf = match conf.function_repository {
+                        Some(conf) => conf,
+                        None => anyhow::bail!("function repository configuration section missing"),
+                    };
 
                     let client = Client::new();
                     let file = File::open(&binary_name).await?;
@@ -377,9 +398,12 @@ async fn main() -> anyhow::Result<()> {
                     let form = multipart::Form::new().part("file", some_file); // this is in curl -F "file"
 
                     let response = client
-                        .post(conf.repository_url.to_string() + "/api/admin/function/upload")
+                        .post(function_repository_conf.url.to_string() + "/api/admin/function/upload")
                         .header(ACCEPT, "application/json")
-                        .basic_auth(conf.repository_basic_auth_user, Some(conf.repository_basic_auth_pass))
+                        .basic_auth(
+                            function_repository_conf.basic_auth_user.clone(),
+                            Some(function_repository_conf.basic_auth_pass.clone()),
+                        )
                         .multipart(form)
                         .send()
                         .await
@@ -400,19 +424,10 @@ async fn main() -> anyhow::Result<()> {
                                    ],
                     });
 
-                    if std::fs::metadata(&args.config_file).is_err() {
-                        return Err(anyhow::anyhow!(
-                            "configuration file does not exist or cannot be accessed: {}",
-                            &args.config_file
-                        ));
-                    }
-                    log::debug!("Got Config");
-                    let conf_new: CLiConfig = toml::from_str(&std::fs::read_to_string(&args.config_file).unwrap()).unwrap();
-
                     let post_response = client
-                        .post(conf_new.repository_url.to_string() + "/api/admin/function")
+                        .post(function_repository_conf.url.to_string() + "/api/admin/function")
                         .header(ACCEPT, "application/json")
-                        .basic_auth(conf_new.repository_basic_auth_user, Some(conf_new.repository_basic_auth_pass))
+                        .basic_auth(function_repository_conf.basic_auth_user, Some(function_repository_conf.basic_auth_pass))
                         .json(&r)
                         .send()
                         .await
