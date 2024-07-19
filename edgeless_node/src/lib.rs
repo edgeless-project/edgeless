@@ -90,14 +90,20 @@ pub struct EdgelessNodeResourceSettings {
     pub dda_url: Option<String>,
     /// If not empty, a DDA resource with that name is created.
     pub dda_provider: Option<String>,
+    /// The ollama resource provider settings.
+    pub ollama_provider: Option<OllamaProviderSettings>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct OllamaProviderSettings {
     /// The address of the ollama server.
-    pub ollama_host: Option<String>,
+    pub host: String,
     /// The port of the ollama server.
-    pub ollama_port: Option<u16>,
+    pub port: u16,
     /// The maximum number of messages in the history of the ollama resource.
-    pub ollama_messages_number_limit: Option<u16>,
+    pub messages_number_limit: u16,
     /// If not empty, an ollama resource provider with that name is created.
-    pub ollama_provider: Option<String>,
+    pub provider: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -368,32 +374,27 @@ async fn fill_resources(
             }
         }
 
-        if let (Some(host), Some(port), Some(messages_number_limit), Some(provider_id)) = (
-            &settings.ollama_host,
-            &settings.ollama_port,
-            &settings.ollama_messages_number_limit,
-            &settings.ollama_provider,
-        ) {
-            if !host.is_empty() && !provider_id.is_empty() {
+        if let Some(settings) = &settings.ollama_provider {
+            if !settings.host.is_empty() && !settings.provider.is_empty() {
                 log::info!(
                     "Creating resource '{}' towards {}:{} (limit to {} messages per chat)",
-                    provider_id,
-                    host,
-                    port,
-                    messages_number_limit
+                    settings.provider,
+                    settings.host,
+                    settings.port,
+                    settings.messages_number_limit
                 );
                 let class_type = "ollama".to_string();
                 ret.insert(
-                    provider_id.clone(),
+                    settings.provider.clone(),
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
                         client: Box::new(
                             resources::ollama::OllamaResourceProvider::new(
                                 data_plane.clone(),
                                 edgeless_api::function_instance::InstanceId::new(node_id.clone()),
-                                host,
-                                *port,
-                                *messages_number_limit,
+                                &settings.host,
+                                settings.port,
+                                settings.messages_number_limit,
                             )
                             .await,
                         ),
@@ -401,9 +402,9 @@ async fn fill_resources(
                 );
 
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                    provider_id: provider_id.clone(),
+                    provider_id: settings.provider.clone(),
                     class_type,
-                    outputs: vec!["new_request".to_string()],
+                    outputs: vec!["out".to_string()],
                 });
             }
         }
@@ -583,10 +584,12 @@ file_log_provider = "file-log-1"
 redis_provider = "redis-1"
 dda_url = "http://127.0.0.1:10000"
 dda_provider = "dda-1"
-ollama_host = "localhost"
-ollama_port = 11434
-ollama_messages_number_limit = 30
-ollama_provider = "ollama-1"
+
+[resources.ollama_provider]
+host = "localhost"
+port = 11434
+messages_number_limit = 30
+provider = "ollama-1"
 
 [user_node_capabilities]
 "##,

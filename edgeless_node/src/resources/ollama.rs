@@ -8,15 +8,16 @@ pub struct OllamaResourceProvider {
     inner: std::sync::Arc<tokio::sync::Mutex<OllamaResourceProviderInner>>,
 }
 
+struct ChatCommand {
+    model_name: String,
+    history_id: String,
+    prompt: String,
+    resource_id: edgeless_api::function_instance::ComponentId,
+    reply_sender: tokio::sync::oneshot::Sender<anyhow::Result<(edgeless_api::function_instance::InstanceId, String)>>,
+}
+
 enum OllamaCommand {
-    // model_name, history_id, prompt, resource_id, reply_receiver
-    Chat(
-        String,
-        String,
-        String,
-        edgeless_api::function_instance::ComponentId,
-        tokio::sync::oneshot::Sender<anyhow::Result<(edgeless_api::function_instance::InstanceId, String)>>,
-    ),
+    Chat(ChatCommand),
     // resource_id, target
     Patch(edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::InstanceId),
 }
@@ -24,13 +25,13 @@ enum OllamaCommand {
 impl std::fmt::Display for OllamaCommand {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            OllamaCommand::Chat(model_name, history_id, prompt, resource_id, _) => write!(
+            OllamaCommand::Chat(cmd) => write!(
                 f,
                 "model {}, history_id {}, prompt length {}, resource_id {})",
-                model_name,
-                history_id,
-                prompt.len(),
-                resource_id
+                cmd.model_name,
+                cmd.history_id,
+                cmd.prompt.len(),
+                cmd.resource_id
             ),
             OllamaCommand::Patch(resource_id, target) => write!(f, "resource_id {}, target {}", resource_id, target),
         }
@@ -76,17 +77,13 @@ impl OllamaResource {
         let handle = tokio::spawn(async move {
             loop {
                 let edgeless_dataplane::core::DataplaneEvent {
-                    source_id,
-                    channel_id,
+                    source_id: _,
+                    channel_id: _,
                     message,
                 } = dataplane_handle.receive_next().await;
 
-                let mut need_reply = false;
-                let message_data = match message {
-                    edgeless_dataplane::core::Message::Call(data) => {
-                        need_reply = true;
-                        data
-                    }
+                // Ignore any non-cast messages.
+                let prompt = match message {
                     edgeless_dataplane::core::Message::Cast(data) => data,
                     _ => {
                         continue;
@@ -96,13 +93,13 @@ impl OllamaResource {
                 let (reply_sender, reply_receiver) =
                     tokio::sync::oneshot::channel::<anyhow::Result<(edgeless_api::function_instance::InstanceId, String)>>();
                 let _ = sender
-                    .send(OllamaCommand::Chat(
-                        model_name.clone(),
-                        history_id.clone(),
-                        message_data,
-                        instance_id.function_id.clone(),
+                    .send(OllamaCommand::Chat(ChatCommand {
+                        model_name: model_name.clone(),
+                        history_id: history_id.clone(),
+                        prompt,
+                        resource_id: instance_id.function_id.clone(),
                         reply_sender,
-                    ))
+                    }))
                     .await;
 
                 match reply_receiver.await {
@@ -117,12 +114,6 @@ impl OllamaResource {
                     Err(err) => {
                         log::warn!("Communication error with ollama resource provider: {}", err)
                     }
-                };
-
-                if need_reply {
-                    dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
-                        .await;
                 }
             }
         });
@@ -162,27 +153,27 @@ impl OllamaResourceProvider {
             let mut targets = std::collections::HashMap::new();
             while let Some(command) = receiver.next().await {
                 match command {
-                    OllamaCommand::Chat(model_name, history_id, prompt, resource_id, reply_receiver) => {
-                        if let Some(target) = targets.get(&resource_id) {
+                    OllamaCommand::Chat(cmd) => {
+                        if let Some(target) = targets.get(&cmd.resource_id) {
                             let result = ollama
                                 .send_chat_messages_with_history(
                                     ollama_rs::generation::chat::request::ChatMessageRequest::new(
-                                        model_name.clone(),
-                                        vec![ollama_rs::generation::chat::ChatMessage::user(prompt)],
+                                        cmd.model_name.clone(),
+                                        vec![ollama_rs::generation::chat::ChatMessage::user(cmd.prompt)],
                                     ),
-                                    history_id.clone(),
+                                    cmd.history_id.clone(),
                                 )
                                 .await;
                             let response = match result {
                                 Ok(res) => Ok((*target, res.message.unwrap().content)),
                                 Err(err) => anyhow::Result::Err(anyhow::anyhow!(
                                     "Ollama error with model {}, history_id {}: {}",
-                                    model_name,
-                                    history_id,
+                                    cmd.model_name,
+                                    cmd.history_id,
                                     err
                                 )),
                             };
-                            let _ = reply_receiver.send(response);
+                            let _ = cmd.reply_sender.send(response);
                         }
                     }
                     OllamaCommand::Patch(resource_id, target) => {
