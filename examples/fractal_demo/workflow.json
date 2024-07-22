@@ -1,0 +1,86 @@
+{
+    "functions": [
+        {
+            "name": "external_trigger",
+            "class_specification": {
+                "id": "http_read_parameters",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "./http_read_parameters/http_read_parameters.wasm",
+                "outputs": [
+                    "parameters"
+                ]
+            },
+            "output_mapping": {
+                "parameters": "work_splitter"
+            },
+            "annotations": {}
+        },
+        {
+            "name": "work_splitter",
+            "class_specification": {
+                "id": "work_splitter",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "./work_splitter/work_splitter.wasm",
+                "outputs": [
+                    "chunk-metadata",
+                    "chunkinfo"
+                ]
+            },
+            "output_mapping": {
+                "chunk-metadata": "redis-metadata",
+                "chunkinfo": "calculator"
+            },
+            "annotations": {}
+        },
+        {
+            "name": "calculator",
+            "class_specification": {
+                "id": "calculator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "./calculator/calculator.wasm",
+                "outputs": [
+                    "chunk-0-data"
+                ]
+            },
+            "output_mapping": {
+                "chunk-0-data": "redis-chunk-0-data"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "http-ingress",
+            "class_type": "http-ingress",
+            "output_mapping": {
+                "new_request": "external_trigger"
+            },
+            "configurations": {
+                "host": "demo.edgeless-project.eu",
+                "methods": "POST"
+            }
+        },
+        {
+            "name": "redis-metadata",
+            "class_type": "redis",
+            "output_mapping": {},
+            "configurations": {
+                "url": "redis://127.0.0.1:6379/",
+                "key": "fractal-metadata"
+            }
+        },
+        {
+            "name": "redis-chunk-0-data",
+            "class_type": "redis",
+            "output_mapping": {},
+            "configurations": {
+                "url": "redis://127.0.0.1:6379/",
+                "key": "fractal-chunk-0-data"
+            }
+        }
+    ],
+    "annotations": {}
+}
