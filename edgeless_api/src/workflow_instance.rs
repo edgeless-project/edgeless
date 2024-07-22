@@ -51,15 +51,23 @@ pub struct WorkflowInstance {
 pub struct WorkflowResource {
     pub name: String,
     pub class_type: String,
-    pub output_mapping: std::collections::HashMap<String, String>,
+    pub output_mapping: std::collections::HashMap<super::function_instance::PortId, PortMapping>,
+    pub input_mapping: std::collections::HashMap<super::function_instance::PortId, PortMapping>,
     pub configurations: std::collections::HashMap<String, String>,
+}
+
+#[derive(Clone, Debug, serde::Deserialize, PartialEq)]
+pub enum PortMapping {
+    DirectTarget(String, super::function_instance::PortId),
+    Topic(String),
 }
 
 #[derive(Clone, Debug, serde::Deserialize, PartialEq)]
 pub struct WorkflowFunction {
     pub name: String,
     pub function_class_specification: crate::function_instance::FunctionClassSpecification,
-    pub output_mapping: std::collections::HashMap<String, String>,
+    pub output_mapping: std::collections::HashMap<super::function_instance::PortId, PortMapping>,
+    pub input_mapping: std::collections::HashMap<super::function_instance::PortId, PortMapping>,
     pub annotations: std::collections::HashMap<String, String>,
 }
 

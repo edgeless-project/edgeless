@@ -2,8 +2,31 @@
     "id": "pong_async",
     "function_type": "RUST_WASM",
     "version": "0.1",
-    "build": "Cargo.toml",
-    "outputs": [
-        "pinger"
+    "code": "./pong_async.wasm",
+    "outputs": {
+        "pong": {
+            "method": "CAST",
+            "data_type": "edgeless.example.Pong"
+        }
+    },
+    "inputs": {
+        "ping": {
+            "method": "CAST",
+            "data_type": "edgeless.example.Ping" 
+        }
+    }, 
+    "inner_structure": [
+        {
+            "source": {
+                "type": "PORT",
+                "port_id": "ping"
+            },
+            "dests": [
+                {
+                    "type": "PORT",
+                    "port_id": "pong"
+                }
+            ]
+        }
     ]
 }

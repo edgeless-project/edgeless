@@ -34,6 +34,34 @@ message StateSpecification {
     StatePolicy policy = 2;
 }
 
+enum PortMethod {
+    METHOD_CAST = 0;
+    METHOD_CALL = 1;
+}
+
+message Port {
+    string port_id = 1;
+    PortMethod method = 2;
+    string data_type = 3;
+    optional string return_data_type = 4;
+}
+
+message SideEffectMapping {
+
+}
+
+message MappingNodeVariant {
+    oneof MappingNodeType {
+        SideEffectMapping side_effect = 1;
+        string port = 2;
+    }
+}
+
+message Mapping {
+    MappingNodeVariant source = 1;
+    repeated MappingNodeVariant dest = 2; 
+}
+
 // Message defining the function class specification.
 message FunctionClassSpecification {
     // Function class identifier.
@@ -45,7 +73,11 @@ message FunctionClassSpecification {
     // Inline function's code (if present).
     optional bytes function_class_code = 4;
     // Output channels in which the function may generate new. Can be empty.
-    repeated string function_class_outputs = 5;
+    map<string, Port> function_class_outputs = 5;
+
+    map<string, Port> function_class_inputs = 6;
+
+    repeated Mapping function_class_inner_structure = 7;
 }
 
 // Message to request the creation a new function instance.
@@ -180,6 +212,18 @@ message PatchRequest {
     map<string, InstanceId> output_mapping = 3;
 }
 
+message WorkflowComponentPort {
+    string workflow_component_id = 1;
+    string port_id = 2;
+}
+
+message PortMapping {
+    oneof MappingType {
+        WorkflowComponentPort direct_target = 1;
+        string topic = 2;
+    }
+}
+
 // Message definining a workflow resource.
 message WorkflowResource {
     // Name of the resource, local to the workflow specification,
@@ -187,9 +231,11 @@ message WorkflowResource {
     // Resource type.
     string class_type = 2;
     // Mapping of the outputs to other functions/resources in the workflow.
-    map<string, string> output_mapping = 3;
+    map<string, PortMapping> output_mapping = 3;
     // Configuration of the resource, which depends on the resource type.
     map<string, string> configurations = 4;
+
+    map<string, PortMapping> input_mapping = 5;
 }
 
 // Message defining a function within a workflow.
@@ -199,9 +245,11 @@ message WorkflowFunction {
     // Specification of the function.
     FunctionClassSpecification class_spec = 2;
     // Mapping of the outputs to other functions/resources in the workflow.
-    map<string, string> output_mapping = 3;
+    map<string, PortMapping> output_mapping = 3;
     // Annotations associated with this function, if any.
     map<string, string> annotations = 4;
+
+    map<string, PortMapping> input_mapping = 5;
 }
 
 // Message defining a request to create a new workflow.

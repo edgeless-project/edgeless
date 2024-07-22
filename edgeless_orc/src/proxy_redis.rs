@@ -363,7 +363,9 @@ mod test {
                             function_class_type: "class".to_string(),
                             function_class_version: "1.0".to_string(),
                             function_class_code: vec![],
-                            function_class_outputs: vec![],
+                            function_class_outputs: std::collections::HashMap::new(),
+                            function_class_inputs: std::collections::HashMap::new(),
+                            function_class_inner_structure: std::collections::HashMap::new(),
                         },
                         annotations: std::collections::HashMap::new(),
                         state_specification: edgeless_api::function_instance::StateSpecification {

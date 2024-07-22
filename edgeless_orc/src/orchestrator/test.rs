@@ -318,7 +318,9 @@ fn make_spawn_function_request(class_id: &str) -> edgeless_api::function_instanc
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
             function_class_code: "function_code".as_bytes().to_vec(),
-            function_class_outputs: vec![],
+            function_class_outputs: std::collections::HashMap::new(),
+            function_class_inputs: std::collections::HashMap::new(),
+            function_class_inner_structure: std::collections::HashMap::new(),
         },
         annotations: std::collections::HashMap::new(),
         state_specification: StateSpecification {

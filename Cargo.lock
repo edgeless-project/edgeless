@@ -1515,34 +1515,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "edgeless_benchmark"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "cargo",
- "clap",
- "edgeless_api",
- "edgeless_cli",
- "edgeless_dataplane",
- "edgeless_node",
- "edgeless_telemetry",
- "env_logger",
- "futures 0.3.30",
- "log",
- "openssl",
- "rand",
- "rand_distr",
- "rand_pcg",
- "redis",
- "serde",
- "serde_json",
- "tokio 1.38.0",
- "toml 0.7.8",
- "uuid",
-]
-
-[[package]]
 name = "edgeless_cli"
 version = "0.1.0"
 dependencies = [

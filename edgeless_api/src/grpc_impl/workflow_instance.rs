@@ -23,19 +23,37 @@ impl WorkflowInstanceConverters {
                     None => return Err(anyhow::anyhow!("Missing Workflow FunctionClass")),
                 },
             )?,
-            output_mapping: api_function.output_mapping.clone(),
+            output_mapping: api_function
+                .output_mapping
+                .iter()
+                .map(|(port_id, mapping)| (crate::function_instance::PortId(port_id.clone()), Self::parse_port_mapping(mapping)))
+                .collect(),
             annotations: api_function.annotations.clone(),
+            input_mapping: api_function
+                .input_mapping
+                .iter()
+                .map(|(port_id, mapping)| (crate::function_instance::PortId(port_id.clone()), Self::parse_port_mapping(mapping)))
+                .collect(),
         })
     }
 
     pub fn parse_workflow_resource(
-        api_workflow: &crate::grpc_impl::api::WorkflowResource,
+        api_resource: &crate::grpc_impl::api::WorkflowResource,
     ) -> anyhow::Result<crate::workflow_instance::WorkflowResource> {
         Ok(crate::workflow_instance::WorkflowResource {
-            name: api_workflow.name.clone(),
-            class_type: api_workflow.class_type.clone(),
-            output_mapping: api_workflow.output_mapping.clone(),
-            configurations: api_workflow.configurations.clone(),
+            name: api_resource.name.clone(),
+            class_type: api_resource.class_type.clone(),
+            output_mapping: api_resource
+                .output_mapping
+                .iter()
+                .map(|(port_id, mapping)| (crate::function_instance::PortId(port_id.clone()), Self::parse_port_mapping(mapping)))
+                .collect(),
+            configurations: api_resource.configurations.clone(),
+            input_mapping: api_resource
+                .input_mapping
+                .iter()
+                .map(|(port_id, mapping)| (crate::function_instance::PortId(port_id.clone()), Self::parse_port_mapping(mapping)))
+                .collect(),
         })
     }
 
@@ -71,6 +89,16 @@ impl WorkflowInstanceConverters {
             name: api_mapping.name.to_string(),
             domain_id: api_mapping.domain_id.to_string(),
         })
+    }
+
+    pub fn parse_port_mapping(api_mapping: &super::api::PortMapping) -> crate::workflow_instance::PortMapping {
+        match api_mapping.mapping_type.as_ref().unwrap() {
+            super::api::port_mapping::MappingType::DirectTarget(target) => crate::workflow_instance::PortMapping::DirectTarget(
+                target.workflow_component_id.clone(),
+                crate::function_instance::PortId(target.port_id.clone()),
+            ),
+            super::api::port_mapping::MappingType::Topic(topic) => crate::workflow_instance::PortMapping::Topic(topic.clone()),
+        }
     }
 
     pub fn parse_workflow_instance(
@@ -141,7 +169,16 @@ impl WorkflowInstanceConverters {
                     &crate_function.function_class_specification,
                 ),
             ),
-            output_mapping: crate_function.output_mapping.clone(),
+            output_mapping: crate_function
+                .output_mapping
+                .iter()
+                .map(|(id, mapping)| (id.0.clone(), Self::serialize_port_mapping(mapping)))
+                .collect(),
+            input_mapping: crate_function
+                .input_mapping
+                .iter()
+                .map(|(id, mapping)| (id.0.clone(), Self::serialize_port_mapping(mapping)))
+                .collect(),
         }
     }
 
@@ -149,7 +186,16 @@ impl WorkflowInstanceConverters {
         crate::grpc_impl::api::WorkflowResource {
             name: crate_resource.name.clone(),
             class_type: crate_resource.class_type.clone(),
-            output_mapping: crate_resource.output_mapping.clone(),
+            output_mapping: crate_resource
+                .output_mapping
+                .iter()
+                .map(|(id, mapping)| (id.0.clone(), Self::serialize_port_mapping(mapping)))
+                .collect(),
+            input_mapping: crate_resource
+                .input_mapping
+                .iter()
+                .map(|(id, mapping)| (id.0.clone(), Self::serialize_port_mapping(mapping)))
+                .collect(),
             configurations: crate_resource.configurations.clone(),
         }
     }
@@ -202,6 +248,20 @@ impl WorkflowInstanceConverters {
         crate::grpc_impl::api::WorkflowFunctionMapping {
             name: crate_mapping.name.to_string(),
             domain_id: crate_mapping.domain_id.to_string(),
+        }
+    }
+
+    pub fn serialize_port_mapping(crate_mapping: &crate::workflow_instance::PortMapping) -> super::api::PortMapping {
+        super::api::PortMapping {
+            mapping_type: Some(match crate_mapping {
+                crate::workflow_instance::PortMapping::DirectTarget(component, port) => {
+                    super::api::port_mapping::MappingType::DirectTarget(super::api::WorkflowComponentPort {
+                        workflow_component_id: component.clone(),
+                        port_id: port.0.clone(),
+                    })
+                }
+                crate::workflow_instance::PortMapping::Topic(topic) => super::api::port_mapping::MappingType::Topic(topic.clone()),
+            }),
         }
     }
 }
@@ -367,6 +427,22 @@ mod tests {
 
     #[test]
     fn serialize_deserialize_workflow_function() {
+        let out_prt_spec_1 = crate::function_instance::Port {
+            id: crate::function_instance::PortId("out1".to_string()),
+            method: crate::function_instance::PortMethod::Cast,
+            data_type: crate::function_instance::PortDataType("d1".to_string()),
+            return_data_type: None,
+        };
+
+        let mut out_port_spec_2 = out_prt_spec_1.clone();
+        out_port_spec_2.id = crate::function_instance::PortId("out1".to_string());
+
+        let mut in_port_spec_1 = out_prt_spec_1.clone();
+        in_port_spec_1.id = crate::function_instance::PortId("in1".to_string());
+
+        let mut in_port_spec_2 = out_prt_spec_1.clone();
+        in_port_spec_2.id = crate::function_instance::PortId("in2".to_string());
+
         let messages = vec![WorkflowFunction {
             name: "f1".to_string(),
             function_class_specification: FunctionClassSpecification {
@@ -374,9 +450,40 @@ mod tests {
                 function_class_type: "my_fun_class_type".to_string(),
                 function_class_version: "0.0.1".to_string(),
                 function_class_code: "byte-code".to_string().as_bytes().to_vec(),
-                function_class_outputs: vec!["out1".to_string(), "out2".to_string()],
+                function_class_outputs: HashMap::from([
+                    (crate::function_instance::PortId("out1".to_string()), out_prt_spec_1.clone()),
+                    (crate::function_instance::PortId("out2".to_string()), out_port_spec_2.clone()),
+                ]),
+                function_class_inputs: HashMap::from([
+                    (crate::function_instance::PortId("in1".to_string()), in_port_spec_1.clone()),
+                    (crate::function_instance::PortId("in2".to_string()), in_port_spec_2.clone()),
+                ]),
+                function_class_inner_structure: HashMap::from([
+                    (
+                        crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in1".to_string())),
+                        vec![crate::function_instance::MappingNode::Port(crate::function_instance::PortId(
+                            "out1".to_string(),
+                        ))],
+                    ),
+                    (
+                        crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in2".to_string())),
+                        vec![crate::function_instance::MappingNode::Port(crate::function_instance::PortId(
+                            "out2".to_string(),
+                        ))],
+                    ),
+                ]),
             },
-            output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),
+            output_mapping: HashMap::from([
+                (
+                    crate::function_instance::PortId("out1".to_string()),
+                    crate::workflow_instance::PortMapping::DirectTarget("f2".to_string(), crate::function_instance::PortId("in3".to_string())),
+                ),
+                (
+                    crate::function_instance::PortId("out2".to_string()),
+                    crate::workflow_instance::PortMapping::DirectTarget("f2".to_string(), crate::function_instance::PortId("in4".to_string())),
+                ),
+            ]),
+            input_mapping: HashMap::new(),
             annotations: HashMap::from([("ann1".to_string(), "val1".to_string()), ("ann2".to_string(), "val2".to_string())]),
         }];
 
@@ -393,7 +500,17 @@ mod tests {
         let messages = vec![WorkflowResource {
             name: "res1".to_string(),
             class_type: "my_res_class_type".to_string(),
-            output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),
+            output_mapping: HashMap::from([
+                (
+                    crate::function_instance::PortId("out1".to_string()),
+                    crate::workflow_instance::PortMapping::DirectTarget("f2".to_string(), crate::function_instance::PortId("in3".to_string())),
+                ),
+                (
+                    crate::function_instance::PortId("out2".to_string()),
+                    crate::workflow_instance::PortMapping::DirectTarget("f2".to_string(), crate::function_instance::PortId("in4".to_string())),
+                ),
+            ]),
+            input_mapping: HashMap::new(),
             configurations: HashMap::from([("conf1".to_string(), "val1".to_string()), ("conf2".to_string(), "val2".to_string())]),
         }];
 
@@ -407,6 +524,22 @@ mod tests {
 
     #[test]
     fn serialize_deserialize_workflow_workflow_spawn_request() {
+        let out_prt_spec_1 = crate::function_instance::Port {
+            id: crate::function_instance::PortId("out1".to_string()),
+            method: crate::function_instance::PortMethod::Cast,
+            data_type: crate::function_instance::PortDataType("d1".to_string()),
+            return_data_type: None,
+        };
+
+        let mut out_port_spec_2 = out_prt_spec_1.clone();
+        out_port_spec_2.id = crate::function_instance::PortId("out1".to_string());
+
+        let mut in_port_spec_1 = out_prt_spec_1.clone();
+        in_port_spec_1.id = crate::function_instance::PortId("in1".to_string());
+
+        let mut in_port_spec_2 = out_prt_spec_1.clone();
+        in_port_spec_2.id = crate::function_instance::PortId("in2".to_string());
+
         let messages = vec![SpawnWorkflowRequest {
             workflow_functions: vec![WorkflowFunction {
                 name: "f1".to_string(),
@@ -415,16 +548,57 @@ mod tests {
                     function_class_type: "my_fun_class_type".to_string(),
                     function_class_version: "0.0.1".to_string(),
                     function_class_code: "byte-code".to_string().as_bytes().to_vec(),
-                    function_class_outputs: vec!["out1".to_string(), "out2".to_string()],
+                    function_class_outputs: HashMap::from([
+                        (crate::function_instance::PortId("out1".to_string()), out_prt_spec_1.clone()),
+                        (crate::function_instance::PortId("out2".to_string()), out_port_spec_2.clone()),
+                    ]),
+                    function_class_inputs: HashMap::from([
+                        (crate::function_instance::PortId("in1".to_string()), in_port_spec_1.clone()),
+                        (crate::function_instance::PortId("in2".to_string()), in_port_spec_2.clone()),
+                    ]),
+                    function_class_inner_structure: HashMap::from([
+                        (
+                            crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in1".to_string())),
+                            vec![crate::function_instance::MappingNode::Port(crate::function_instance::PortId(
+                                "out1".to_string(),
+                            ))],
+                        ),
+                        (
+                            crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in2".to_string())),
+                            vec![crate::function_instance::MappingNode::Port(crate::function_instance::PortId(
+                                "out2".to_string(),
+                            ))],
+                        ),
+                    ]),
                 },
-                output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),
+                output_mapping: HashMap::from([
+                    (
+                        crate::function_instance::PortId("out1".to_string()),
+                        crate::workflow_instance::PortMapping::DirectTarget("f2".to_string(), crate::function_instance::PortId("in3".to_string())),
+                    ),
+                    (
+                        crate::function_instance::PortId("out2".to_string()),
+                        crate::workflow_instance::PortMapping::DirectTarget("f2".to_string(), crate::function_instance::PortId("in4".to_string())),
+                    ),
+                ]),
+                input_mapping: HashMap::new(),
                 annotations: HashMap::from([("ann1".to_string(), "val1".to_string()), ("ann2".to_string(), "val2".to_string())]),
             }],
             annotations: HashMap::from([("ann1".to_string(), "val1".to_string()), ("ann2".to_string(), "val2".to_string())]),
             workflow_resources: vec![WorkflowResource {
                 name: "res1".to_string(),
                 class_type: "my_res_class_type".to_string(),
-                output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),
+                output_mapping: HashMap::from([
+                    (
+                        crate::function_instance::PortId("out1".to_string()),
+                        crate::workflow_instance::PortMapping::DirectTarget("f2".to_string(), crate::function_instance::PortId("in3".to_string())),
+                    ),
+                    (
+                        crate::function_instance::PortId("out2".to_string()),
+                        crate::workflow_instance::PortMapping::DirectTarget("f2".to_string(), crate::function_instance::PortId("in4".to_string())),
+                    ),
+                ]),
+                input_mapping: HashMap::new(),
                 configurations: HashMap::from([("conf1".to_string(), "val1".to_string()), ("conf2".to_string(), "val2".to_string())]),
             }],
         }];

@@ -7,13 +7,43 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "code": "../../functions/pong_async/pong_async.wasm",
-                "outputs": [
-                    "pinger"
+                "outputs": {
+                    "pong": {
+                        "method": "CAST",
+                        "data_type": "edgeless.example.Pong"
+                    }
+                },
+                "inputs": {
+                    "ping": {
+                        "method": "CAST",
+                        "data_type": "edgeless.example.Ping" 
+                    }
+                }, 
+                "inner_structure": [
+                    {
+                        "source": {
+                            "type": "PORT",
+                            "port_id": "ping"
+                        },
+                        "dests": [
+                            {
+                                "type": "PORT",
+                                "port_id": "pong"
+                            }
+                        ]
+                    }
                 ]
             },
             "output_mapping": {
-                "pinger": "pinger"
+                "pong": {
+                    "type": "DIRECT",
+                    "config": {
+                        "target_component": "pinger",
+                        "port": "pong"
+                    }
+                }
             },
+            "input_mapping": {},
             "annotations": {}
         },
         {
@@ -23,13 +53,53 @@
                 "function_type": "RUST_WASM",
                 "version": "0.1",
                 "code": "../../functions/ping_async/ping_async.wasm",
-                "outputs": [
-                    "ponger"
+                "outputs": {
+                    "ping": {
+                        "method": "CAST",
+                        "data_type": "edgeless.example.Ping"
+                    }
+                },
+                "inputs": {
+                    "pong": {
+                        "method": "CAST",
+                        "data_type": "edgeless.example.Pong" 
+                    }
+                },
+                "inner_structure": [
+                    {
+                        "source": {
+                            "type": "SIDE_EFFECT"
+                        },
+                        "dests": [
+                            {
+                                "type": "PORT",
+                                "port_id": "pong"
+                            }
+                        ]
+                    },
+                    {
+                        "source": {
+                            "type": "PORT",
+                            "port_id": "pong"
+                        },
+                        "dests": [
+                            {
+                                "type": "SIDE_EFFECT"
+                            }
+                        ]
+                    }
                 ]
             },
             "output_mapping": {
-                "ponger": "ponger"
+                "ping": {
+                    "type": "DIRECT",
+                    "config": {
+                        "target_component": "ponger",
+                        "port": "ping"
+                    }
+                }
             },
+            "input_mapping": {},
             "annotations": {}
         }
     ],

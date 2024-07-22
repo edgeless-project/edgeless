@@ -14,7 +14,41 @@ impl FunctonInstanceConverters {
             function_class_type: api_spec.function_class_type.clone(),
             function_class_version: api_spec.function_class_version.clone(),
             function_class_code: api_spec.function_class_code().to_vec(),
-            function_class_outputs: api_spec.function_class_outputs.clone(),
+            function_class_outputs: api_spec
+                .function_class_outputs
+                .iter()
+                .map(|(key, raw_port)| (crate::function_instance::PortId(key.clone()), Self::parse_port(raw_port).unwrap()))
+                .collect(),
+            function_class_inputs: api_spec
+                .function_class_inputs
+                .iter()
+                .map(|(key, raw_port)| (crate::function_instance::PortId(key.clone()), Self::parse_port(raw_port).unwrap()))
+                .collect(),
+            function_class_inner_structure: api_spec
+                .function_class_inner_structure
+                .iter()
+                .map(|mapping| {
+                    (
+                        // crate::function_instance::PortId(source.clone()),
+                        match &mapping.source.as_ref().unwrap().mapping_node_type.as_ref().unwrap() {
+                            super::api::mapping_node_variant::MappingNodeType::Port(port_id) => {
+                                crate::function_instance::MappingNode::Port(crate::function_instance::PortId(port_id.clone()))
+                            }
+                            super::api::mapping_node_variant::MappingNodeType::SideEffect(_) => crate::function_instance::MappingNode::SideEffect,
+                        },
+                        mapping
+                            .dest
+                            .iter()
+                            .map(|id| match &id.mapping_node_type.as_ref().unwrap() {
+                                super::api::mapping_node_variant::MappingNodeType::Port(port_id) => {
+                                    crate::function_instance::MappingNode::Port(crate::function_instance::PortId(port_id.clone()))
+                                }
+                                super::api::mapping_node_variant::MappingNodeType::SideEffect(_) => crate::function_instance::MappingNode::SideEffect,
+                            })
+                            .collect(),
+                    )
+                })
+                .collect(),
         })
     }
 
@@ -55,6 +89,24 @@ impl FunctonInstanceConverters {
         })
     }
 
+    pub fn parse_port(api_port: &crate::grpc_impl::api::Port) -> anyhow::Result<crate::function_instance::Port> {
+        Ok(crate::function_instance::Port {
+            id: crate::function_instance::PortId(api_port.port_id.clone()),
+            method: match api_port.method {
+                0 => crate::function_instance::PortMethod::Cast,
+                1 => crate::function_instance::PortMethod::Call,
+                _ => {
+                    return Err(anyhow::anyhow!("Unknown Port Method"));
+                }
+            },
+            data_type: crate::function_instance::PortDataType(api_port.data_type.clone()),
+            return_data_type: api_port
+                .return_data_type
+                .clone()
+                .and_then(|dt| Some(crate::function_instance::PortDataType(dt))),
+        })
+    }
+
     pub fn serialize_function_class_specification(
         spec: &crate::function_instance::FunctionClassSpecification,
     ) -> crate::grpc_impl::api::FunctionClassSpecification {
@@ -63,7 +115,45 @@ impl FunctonInstanceConverters {
             function_class_type: spec.function_class_type.clone(),
             function_class_version: spec.function_class_version.clone(),
             function_class_code: Some(spec.function_class_code.clone()),
-            function_class_outputs: spec.function_class_outputs.clone(),
+            function_class_outputs: spec
+                .function_class_outputs
+                .iter()
+                .map(|(key, port)| (key.0.clone(), Self::serialize_port(port)))
+                .collect(),
+            function_class_inputs: spec
+                .function_class_inputs
+                .iter()
+                .map(|(key, port)| (key.0.clone(), Self::serialize_port(port)))
+                .collect(),
+            function_class_inner_structure: spec
+                .function_class_inner_structure
+                .iter()
+                .map(|(input, outputs)| super::api::Mapping {
+                    source: Some(match input {
+                        crate::function_instance::MappingNode::Port(port_id) => super::api::MappingNodeVariant {
+                            mapping_node_type: Some(super::api::mapping_node_variant::MappingNodeType::Port(port_id.0.clone())),
+                        },
+                        crate::function_instance::MappingNode::SideEffect => super::api::MappingNodeVariant {
+                            mapping_node_type: Some(super::api::mapping_node_variant::MappingNodeType::SideEffect(
+                                super::api::SideEffectMapping {},
+                            )),
+                        },
+                    }),
+                    dest: outputs
+                        .iter()
+                        .map(|item| match item {
+                            crate::function_instance::MappingNode::Port(port_id) => super::api::MappingNodeVariant {
+                                mapping_node_type: Some(super::api::mapping_node_variant::MappingNodeType::Port(port_id.0.clone())),
+                            },
+                            crate::function_instance::MappingNode::SideEffect => super::api::MappingNodeVariant {
+                                mapping_node_type: Some(super::api::mapping_node_variant::MappingNodeType::SideEffect(
+                                    super::api::SideEffectMapping {},
+                                )),
+                            },
+                        })
+                        .collect(),
+                })
+                .collect(),
         }
     }
 
@@ -87,6 +177,18 @@ impl FunctonInstanceConverters {
                 crate::function_instance::StatePolicy::Global => crate::grpc_impl::api::StatePolicy::Global as i32,
                 crate::function_instance::StatePolicy::NodeLocal => crate::grpc_impl::api::StatePolicy::NodeLocal as i32,
             },
+        }
+    }
+
+    pub fn serialize_port(crate_port: &crate::function_instance::Port) -> crate::grpc_impl::api::Port {
+        crate::grpc_impl::api::Port {
+            port_id: crate_port.id.0.clone(),
+            method: match crate_port.method {
+                crate::function_instance::PortMethod::Cast => 0,
+                crate::function_instance::PortMethod::Call => 1,
+            },
+            data_type: crate_port.data_type.0.clone(),
+            return_data_type: crate_port.return_data_type.as_ref().and_then(|dt| Some(dt.0.clone())),
         }
     }
 }
@@ -261,6 +363,19 @@ mod tests {
 
     #[test]
     fn serialize_deserialize_spawn_function_request() {
+        let out_prt_spec_1 = crate::function_instance::Port {
+            id: crate::function_instance::PortId("out".to_string()),
+            method: crate::function_instance::PortMethod::Cast,
+            data_type: crate::function_instance::PortDataType("d1".to_string()),
+            return_data_type: None,
+        };
+
+        let mut out_port_spec_err = out_prt_spec_1.clone();
+        out_port_spec_err.id = crate::function_instance::PortId("err".to_string());
+
+        let mut in_port_spec_1 = out_prt_spec_1.clone();
+        in_port_spec_1.id = crate::function_instance::PortId("in".to_string());
+
         let messages = vec![SpawnFunctionRequest {
             instance_id: Some(InstanceId {
                 node_id: uuid::Uuid::new_v4(),
@@ -271,7 +386,21 @@ mod tests {
                 function_class_type: "WASM".to_string(),
                 function_class_version: "1.0.0".to_string(),
                 function_class_code: "binary-code".as_bytes().to_vec(),
-                function_class_outputs: vec!["out".to_string(), "err".to_string()],
+                function_class_outputs: std::collections::HashMap::from([
+                    (crate::function_instance::PortId("out".to_string()), out_prt_spec_1.clone()),
+                    (crate::function_instance::PortId("err".to_string()), out_port_spec_err.clone()),
+                ]),
+                function_class_inputs: std::collections::HashMap::from([(
+                    crate::function_instance::PortId("in1".to_string()),
+                    in_port_spec_1.clone(),
+                )]),
+                function_class_inner_structure: std::collections::HashMap::from([(
+                    crate::function_instance::MappingNode::Port(crate::function_instance::PortId("in".to_string())),
+                    vec![
+                        crate::function_instance::MappingNode::Port(crate::function_instance::PortId("out1".to_string())),
+                        crate::function_instance::MappingNode::Port(crate::function_instance::PortId("err".to_string())),
+                    ],
+                )]),
             },
             annotations: std::collections::HashMap::from([("key1".to_string(), "value1".to_string())]),
             state_specification: StateSpecification {

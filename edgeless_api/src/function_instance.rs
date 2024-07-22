@@ -26,6 +26,32 @@ impl Default for StateSpecification {
     }
 }
 
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Eq)]
+pub struct PortDataType(pub String);
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Eq, Hash)]
+pub struct PortId(pub String);
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
+pub enum PortMethod {
+    Cast,
+    Call,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
+pub struct Port {
+    pub id: PortId,
+    pub method: PortMethod,
+    pub data_type: PortDataType,
+    pub return_data_type: Option<PortDataType>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Eq, Hash)]
+pub enum MappingNode {
+    Port(PortId),
+    SideEffect,
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
 pub struct FunctionClassSpecification {
     /// Function class identifier.
@@ -37,7 +63,11 @@ pub struct FunctionClassSpecification {
     /// Inline function's code (if present).
     pub function_class_code: Vec<u8>,
     /// Output channels in which the function may generate new. Can be empty.
-    pub function_class_outputs: Vec<String>,
+    pub function_class_outputs: std::collections::HashMap<PortId, Port>,
+
+    pub function_class_inputs: std::collections::HashMap<PortId, Port>,
+
+    pub function_class_inner_structure: std::collections::HashMap<MappingNode, Vec<MappingNode>>,
 }
 
 impl Default for FunctionClassSpecification {
@@ -47,7 +77,9 @@ impl Default for FunctionClassSpecification {
             function_class_type: "".to_string(),
             function_class_version: "".to_string(),
             function_class_code: vec![],
-            function_class_outputs: vec![],
+            function_class_outputs: std::collections::HashMap::new(),
+            function_class_inputs: std::collections::HashMap::new(),
+            function_class_inner_structure: std::collections::HashMap::new(),
         }
     }
 }

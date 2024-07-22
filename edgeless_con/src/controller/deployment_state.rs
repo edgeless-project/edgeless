@@ -72,7 +72,17 @@ impl ActiveWorkflow {
             .iter()
             .find(|wf_function| wf_function.name == component_name)
         {
-            return function.output_mapping.clone();
+            return function
+                .output_mapping
+                .iter()
+                .filter_map(|(port, dest_mapping)| {
+                    if let edgeless_api::workflow_instance::PortMapping::DirectTarget(component, _port) = dest_mapping {
+                        Some((port.0.clone(), component.clone()))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
         }
 
         if let Some(resource) = self
@@ -81,7 +91,17 @@ impl ActiveWorkflow {
             .iter()
             .find(|wf_resource| wf_resource.name == component_name)
         {
-            return resource.output_mapping.clone();
+            return resource
+                .output_mapping
+                .iter()
+                .filter_map(|(port, dest_mapping)| {
+                    if let edgeless_api::workflow_instance::PortMapping::DirectTarget(component, _port) = dest_mapping {
+                        Some((port.0.clone(), component.clone()))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
         }
 
         std::collections::HashMap::new()

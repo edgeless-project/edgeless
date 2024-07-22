@@ -159,13 +159,16 @@ async fn single_function_start_stop() {
         function_class_type: "RUST_WASM".to_string(),
         function_class_version: "0.1".to_string(),
         function_class_code: vec![],
-        function_class_outputs: vec![],
+        function_class_outputs: std::collections::HashMap::new(),
+        function_class_inputs: std::collections::HashMap::new(),
+        function_class_inner_structure: std::collections::HashMap::new(),
     };
     let start_workflow_request = edgeless_api::workflow_instance::SpawnWorkflowRequest {
         workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
             name: "f1".to_string(),
             function_class_specification: function_class_specification.clone(),
             output_mapping: std::collections::HashMap::new(),
+            input_mapping: std::collections::HashMap::new(),
             annotations: std::collections::HashMap::new(),
         }],
         workflow_resources: vec![],
@@ -216,6 +219,13 @@ async fn resource_to_function_start_stop() {
 
     assert!(mock_orc_receiver.try_next().is_err());
 
+    let input_port = edgeless_api::function_instance::Port {
+        id: edgeless_api::function_instance::PortId("input_port_1".to_string()),
+        method: edgeless_api::function_instance::PortMethod::Cast,
+        data_type: edgeless_api::function_instance::PortDataType("d1".to_string()),
+        return_data_type: None,
+    };
+
     let response = wf_client
         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
             workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
@@ -225,15 +235,28 @@ async fn resource_to_function_start_stop() {
                     function_class_type: "RUST_WASM".to_string(),
                     function_class_version: "0.1".to_string(),
                     function_class_code: vec![],
-                    function_class_outputs: vec![],
+                    function_class_outputs: std::collections::HashMap::new(),
+                    function_class_inputs: std::collections::HashMap::from([(
+                        edgeless_api::function_instance::PortId("input_port_1".to_string()),
+                        input_port,
+                    )]),
+                    function_class_inner_structure: std::collections::HashMap::new(),
                 },
                 output_mapping: std::collections::HashMap::new(),
+                input_mapping: std::collections::HashMap::new(),
                 annotations: std::collections::HashMap::new(),
             }],
             workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
                 name: "r1".to_string(),
                 class_type: "test-res".to_string(),
-                output_mapping: std::collections::HashMap::from([("test_out".to_string(), "f1".to_string())]),
+                output_mapping: std::collections::HashMap::from([(
+                    edgeless_api::function_instance::PortId("test_out".to_string()),
+                    edgeless_api::workflow_instance::PortMapping::DirectTarget(
+                        "f1".to_string(),
+                        edgeless_api::function_instance::PortId("input_port_1".to_string()),
+                    ),
+                )]),
+                input_mapping: std::collections::HashMap::new(),
                 configurations: std::collections::HashMap::new(),
             }],
             annotations: std::collections::HashMap::new(),
@@ -312,11 +335,26 @@ async fn resource_to_function_start_stop() {
     assert!(mock_orc_receiver.try_next().is_err());
 }
 
+//TOOD(raphaelhetzel) This mapped loop should probably not exist.
 #[tokio::test]
 async fn function_link_loop_start_stop() {
     let (mut wf_client, mut mock_orc_receiver, _node_id) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
+
+    let port1 = edgeless_api::function_instance::Port {
+        id: edgeless_api::function_instance::PortId("port1".to_string()),
+        method: edgeless_api::function_instance::PortMethod::Cast,
+        data_type: edgeless_api::function_instance::PortDataType("d1".to_string()),
+        return_data_type: None,
+    };
+
+    let port2 = edgeless_api::function_instance::Port {
+        id: edgeless_api::function_instance::PortId("port2".to_string()),
+        method: edgeless_api::function_instance::PortMethod::Cast,
+        data_type: edgeless_api::function_instance::PortDataType("d2".to_string()),
+        return_data_type: None,
+    };
 
     let response = wf_client
         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
@@ -328,9 +366,30 @@ async fn function_link_loop_start_stop() {
                         function_class_type: "RUST_WASM".to_string(),
                         function_class_version: "0.1".to_string(),
                         function_class_code: vec![],
-                        function_class_outputs: vec!["output-1".to_string()],
+                        function_class_outputs: std::collections::HashMap::from([(
+                            edgeless_api::function_instance::PortId("port1".to_string()),
+                            port1.clone(),
+                        )]),
+                        function_class_inputs: std::collections::HashMap::from([(
+                            edgeless_api::function_instance::PortId("port2".to_string()),
+                            port2.clone(),
+                        )]),
+                        // as the loop should not exist, this should most likely be empty.
+                        function_class_inner_structure: std::collections::HashMap::from([(
+                            edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("port2".to_string())),
+                            vec![edgeless_api::function_instance::MappingNode::Port(
+                                edgeless_api::function_instance::PortId("port1".to_string()),
+                            )],
+                        )]),
                     },
-                    output_mapping: std::collections::HashMap::from([("output-1".to_string(), "f2".to_string())]),
+                    output_mapping: std::collections::HashMap::from([(
+                        edgeless_api::function_instance::PortId("port1".to_string()),
+                        edgeless_api::workflow_instance::PortMapping::DirectTarget(
+                            "f2".to_string(),
+                            edgeless_api::function_instance::PortId("port1".to_string()),
+                        ),
+                    )]),
+                    input_mapping: std::collections::HashMap::new(),
                     annotations: std::collections::HashMap::new(),
                 },
                 edgeless_api::workflow_instance::WorkflowFunction {
@@ -340,9 +399,29 @@ async fn function_link_loop_start_stop() {
                         function_class_type: "RUST_WASM".to_string(),
                         function_class_version: "0.1".to_string(),
                         function_class_code: vec![],
-                        function_class_outputs: vec!["output-2".to_string()],
+                        function_class_outputs: std::collections::HashMap::from([(
+                            edgeless_api::function_instance::PortId("port2".to_string()),
+                            port2.clone(),
+                        )]),
+                        function_class_inputs: std::collections::HashMap::from([(
+                            edgeless_api::function_instance::PortId("port1".to_string()),
+                            port1.clone(),
+                        )]),
+                        function_class_inner_structure: std::collections::HashMap::from([(
+                            edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("port1".to_string())),
+                            vec![edgeless_api::function_instance::MappingNode::Port(
+                                edgeless_api::function_instance::PortId("port2".to_string()),
+                            )],
+                        )]),
                     },
-                    output_mapping: std::collections::HashMap::from([("output-2".to_string(), "f1".to_string())]),
+                    output_mapping: std::collections::HashMap::from([(
+                        edgeless_api::function_instance::PortId("port2".to_string()),
+                        edgeless_api::workflow_instance::PortMapping::DirectTarget(
+                            "f1".to_string(),
+                            edgeless_api::function_instance::PortId("port2".to_string()),
+                        ),
+                    )]),
+                    input_mapping: std::collections::HashMap::new(),
                     annotations: std::collections::HashMap::new(),
                 },
             ],
@@ -385,8 +464,8 @@ async fn function_link_loop_start_stop() {
         panic!();
     }
 
-    let mut label1 = "output-1".to_string();
-    let mut label2 = "output-2".to_string();
+    let mut label1 = "port1".to_string();
+    let mut label2 = "port2".to_string();
     if let MockFunctionInstanceEvent::Patch(update_req) = mock_orc_receiver.try_next().unwrap().unwrap() {
         if new_func1_id != update_req.function_id {
             std::mem::swap(&mut new_func1_id, &mut new_func2_id);

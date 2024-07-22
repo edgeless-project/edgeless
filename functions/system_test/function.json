@@ -3,10 +3,29 @@
     "function_type": "RUST_WASM",
     "version": "0.1",
     "build": "Cargo.toml",
-    "outputs": [
-        "out1",
-        "out2",
-        "err",
-        "log"
-    ]
+    "outputs": {
+        "out1": {
+            "method": "CAST",
+            "data_type": "String"
+        },
+        "out2": {
+            "method": "CAST",
+            "data_type": "String"
+        },
+        "err": {
+            "method": "CAST",
+            "data_type": "String"
+        },
+        "log": {
+            "method": "CAST",
+            "data_type": "String"
+        }
+        
+    },
+    "inputs": {
+        "in1": {
+            "method": "CAST",
+            "data_type": "String"
+        }
+    }
 }

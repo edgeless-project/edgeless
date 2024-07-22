@@ -138,12 +138,62 @@ mod tests {
     }
 
     fn fixture_spec() -> edgeless_api::function_instance::FunctionClassSpecification {
+        let out_1 = edgeless_api::function_instance::Port {
+            id: edgeless_api::function_instance::PortId("out1".to_string()),
+            method: edgeless_api::function_instance::PortMethod::Cast,
+            data_type: edgeless_api::function_instance::PortDataType("String".to_string()),
+            return_data_type: None,
+        };
+
+        let out_2 = edgeless_api::function_instance::Port {
+            id: edgeless_api::function_instance::PortId("out2".to_string()),
+            method: edgeless_api::function_instance::PortMethod::Cast,
+            data_type: edgeless_api::function_instance::PortDataType("String".to_string()),
+            return_data_type: None,
+        };
+
+        let out_err = edgeless_api::function_instance::Port {
+            id: edgeless_api::function_instance::PortId("err".to_string()),
+            method: edgeless_api::function_instance::PortMethod::Cast,
+            data_type: edgeless_api::function_instance::PortDataType("String".to_string()),
+            return_data_type: None,
+        };
+
+        let out_log = edgeless_api::function_instance::Port {
+            id: edgeless_api::function_instance::PortId("log".to_string()),
+            method: edgeless_api::function_instance::PortMethod::Cast,
+            data_type: edgeless_api::function_instance::PortDataType("String".to_string()),
+            return_data_type: None,
+        };
+
+        let in_1 = edgeless_api::function_instance::Port {
+            id: edgeless_api::function_instance::PortId("in1".to_string()),
+            method: edgeless_api::function_instance::PortMethod::Cast,
+            data_type: edgeless_api::function_instance::PortDataType("String".to_string()),
+            return_data_type: None,
+        };
+
         edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "system_test".to_string(),
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
             function_class_code: include_bytes!("fixtures/system_test.wasm").to_vec(),
-            function_class_outputs: vec!["out1".to_string(), "out2".to_string(), "err".to_string(), "log".to_string()],
+            function_class_outputs: std::collections::HashMap::from([
+                (edgeless_api::function_instance::PortId("out1".to_string()), out_1),
+                (edgeless_api::function_instance::PortId("out2".to_string()), out_2),
+                (edgeless_api::function_instance::PortId("err".to_string()), out_err),
+                (edgeless_api::function_instance::PortId("log".to_string()), out_log),
+            ]),
+            function_class_inputs: std::collections::HashMap::from([(edgeless_api::function_instance::PortId("in1".to_string()), in_1)]),
+            function_class_inner_structure: std::collections::HashMap::from([(
+                edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("in1".to_string())),
+                vec![
+                    edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("out1".to_string())),
+                    edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("out2".to_string())),
+                    edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("err".to_string())),
+                    edgeless_api::function_instance::MappingNode::Port(edgeless_api::function_instance::PortId("log".to_string())),
+                ],
+            )]),
         }
     }
 
@@ -173,6 +223,7 @@ mod tests {
                         name: "f1".to_string(),
                         function_class_specification: fixture_spec(),
                         output_mapping: std::collections::HashMap::new(),
+                        input_mapping: std::collections::HashMap::new(),
                         annotations: std::collections::HashMap::new(),
                     }],
                     workflow_resources: vec![],
@@ -251,22 +302,55 @@ mod tests {
                             name: "f1".to_string(),
                             function_class_specification: fixture_spec(),
                             output_mapping: std::collections::HashMap::from([
-                                ("out1".to_string(), "f2".to_string()),
-                                ("out2".to_string(), "f3".to_string()),
-                                ("log".to_string(), "log".to_string()),
+                                (
+                                    edgeless_api::function_instance::PortId("out1".to_string()),
+                                    edgeless_api::workflow_instance::PortMapping::DirectTarget(
+                                        "f2".to_string(),
+                                        edgeless_api::function_instance::PortId("in1".to_string()),
+                                    ),
+                                ),
+                                (
+                                    edgeless_api::function_instance::PortId("out2".to_string()),
+                                    edgeless_api::workflow_instance::PortMapping::DirectTarget(
+                                        "f3".to_string(),
+                                        edgeless_api::function_instance::PortId("in1".to_string()),
+                                    ),
+                                ),
+                                (
+                                    edgeless_api::function_instance::PortId("log".to_string()),
+                                    edgeless_api::workflow_instance::PortMapping::DirectTarget(
+                                        "log".to_string(),
+                                        edgeless_api::function_instance::PortId("log".to_string()),
+                                    ),
+                                ),
                             ]),
+                            input_mapping: std::collections::HashMap::new(),
                             annotations: std::collections::HashMap::from([("init-payload".to_string(), "8".to_string())]),
                         },
                         edgeless_api::workflow_instance::WorkflowFunction {
                             name: "f2".to_string(),
                             function_class_specification: fixture_spec(),
-                            output_mapping: std::collections::HashMap::from([("log".to_string(), "log".to_string())]),
+                            output_mapping: std::collections::HashMap::from([(
+                                edgeless_api::function_instance::PortId("log".to_string()),
+                                edgeless_api::workflow_instance::PortMapping::DirectTarget(
+                                    "log".to_string(),
+                                    edgeless_api::function_instance::PortId("log".to_string()),
+                                ),
+                            )]),
+                            input_mapping: std::collections::HashMap::new(),
                             annotations: std::collections::HashMap::new(),
                         },
                         edgeless_api::workflow_instance::WorkflowFunction {
                             name: "f3".to_string(),
                             function_class_specification: fixture_spec(),
-                            output_mapping: std::collections::HashMap::from([("log".to_string(), "log".to_string())]),
+                            output_mapping: std::collections::HashMap::from([(
+                                edgeless_api::function_instance::PortId("log".to_string()),
+                                edgeless_api::workflow_instance::PortMapping::DirectTarget(
+                                    "log".to_string(),
+                                    edgeless_api::function_instance::PortId("log".to_string()),
+                                ),
+                            )]),
+                            input_mapping: std::collections::HashMap::new(),
                             annotations: std::collections::HashMap::new(),
                         },
                     ],
@@ -274,6 +358,7 @@ mod tests {
                         name: "log".to_string(),
                         class_type: "file-log".to_string(),
                         output_mapping: std::collections::HashMap::new(),
+                        input_mapping: std::collections::HashMap::new(),
                         configurations: std::collections::HashMap::from([("filename".to_string(), removeme_filename(workflow_i))]),
                     }],
                     annotations: std::collections::HashMap::new(),
@@ -397,21 +482,48 @@ mod tests {
                         name: "f1".to_string(),
                         function_class_specification: fixture_spec(),
                         output_mapping: std::collections::HashMap::from([
-                            ("out1".to_string(), "f2".to_string()),
-                            ("out2".to_string(), "f3".to_string()),
+                            (
+                                edgeless_api::function_instance::PortId("out1".to_string()),
+                                edgeless_api::workflow_instance::PortMapping::DirectTarget(
+                                    "f2".to_string(),
+                                    edgeless_api::function_instance::PortId("in1".to_string()),
+                                ),
+                            ),
+                            (
+                                edgeless_api::function_instance::PortId("out2".to_string()),
+                                edgeless_api::workflow_instance::PortMapping::DirectTarget(
+                                    "f3".to_string(),
+                                    edgeless_api::function_instance::PortId("in1".to_string()),
+                                ),
+                            ),
                         ]),
+                        input_mapping: std::collections::HashMap::new(),
                         annotations: std::collections::HashMap::from([("init-payload".to_string(), "8".to_string())]),
                     },
                     edgeless_api::workflow_instance::WorkflowFunction {
                         name: "f2".to_string(),
                         function_class_specification: fixture_spec(),
-                        output_mapping: std::collections::HashMap::from([("log".to_string(), "log".to_string())]),
+                        output_mapping: std::collections::HashMap::from([(
+                            edgeless_api::function_instance::PortId("log".to_string()),
+                            edgeless_api::workflow_instance::PortMapping::DirectTarget(
+                                "log".to_string(),
+                                edgeless_api::function_instance::PortId("log".to_string()),
+                            ),
+                        )]),
+                        input_mapping: std::collections::HashMap::new(),
                         annotations: std::collections::HashMap::new(),
                     },
                     edgeless_api::workflow_instance::WorkflowFunction {
                         name: "f3".to_string(),
                         function_class_specification: fixture_spec(),
-                        output_mapping: std::collections::HashMap::from([("log".to_string(), "log".to_string())]),
+                        output_mapping: std::collections::HashMap::from([(
+                            edgeless_api::function_instance::PortId("log".to_string()),
+                            edgeless_api::workflow_instance::PortMapping::DirectTarget(
+                                "log".to_string(),
+                                edgeless_api::function_instance::PortId("log".to_string()),
+                            ),
+                        )]),
+                        input_mapping: std::collections::HashMap::new(),
                         annotations: std::collections::HashMap::new(),
                     },
                 ],

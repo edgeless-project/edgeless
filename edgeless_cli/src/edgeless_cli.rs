@@ -148,9 +148,106 @@ async fn main() -> anyhow::Result<()> {
                                                 function_class_type: func_spec.class_specification.function_type,
                                                 function_class_version: func_spec.class_specification.version,
                                                 function_class_code,
-                                                function_class_outputs: func_spec.class_specification.outputs,
+                                                function_class_outputs: func_spec
+                                                    .class_specification
+                                                    .outputs
+                                                    .iter()
+                                                    .map(|(port_id, port_spec)| {
+                                                        (
+                                                            edgeless_api::function_instance::PortId(port_id.clone()),
+                                                            edgeless_api::function_instance::Port {
+                                                                id: edgeless_api::function_instance::PortId(port_id.clone()),
+                                                                method: match port_spec.method {
+                                                                    workflow_spec::PortMethod::CALL => {
+                                                                        edgeless_api::function_instance::PortMethod::Call
+                                                                    }
+                                                                    workflow_spec::PortMethod::CAST => {
+                                                                        edgeless_api::function_instance::PortMethod::Cast
+                                                                    }
+                                                                },
+                                                                data_type: edgeless_api::function_instance::PortDataType(port_spec.data_type.clone()),
+                                                                return_data_type: port_spec
+                                                                    .return_data_type
+                                                                    .clone()
+                                                                    .and_then(|dt| Some(edgeless_api::function_instance::PortDataType(dt))),
+                                                            },
+                                                        )
+                                                    })
+                                                    .collect(),
+                                                function_class_inputs: func_spec
+                                                    .class_specification
+                                                    .inputs
+                                                    .iter()
+                                                    .map(|(port_id, port_spec)| {
+                                                        (
+                                                            edgeless_api::function_instance::PortId(port_id.clone()),
+                                                            edgeless_api::function_instance::Port {
+                                                                id: edgeless_api::function_instance::PortId(port_id.clone()),
+                                                                method: match port_spec.method {
+                                                                    workflow_spec::PortMethod::CALL => {
+                                                                        edgeless_api::function_instance::PortMethod::Call
+                                                                    }
+                                                                    workflow_spec::PortMethod::CAST => {
+                                                                        edgeless_api::function_instance::PortMethod::Cast
+                                                                    }
+                                                                },
+                                                                data_type: edgeless_api::function_instance::PortDataType(port_spec.data_type.clone()),
+                                                                return_data_type: port_spec
+                                                                    .return_data_type
+                                                                    .clone()
+                                                                    .and_then(|dt| Some(edgeless_api::function_instance::PortDataType(dt))),
+                                                            },
+                                                        )
+                                                    })
+                                                    .collect(),
+                                                function_class_inner_structure: func_spec
+                                                    .class_specification
+                                                    .inner_structure
+                                                    .iter()
+                                                    .map(|mapping| {
+                                                        (
+                                                            match &mapping.source {
+                                                                workflow_spec::MappingNode::PORT(port_id) => {
+                                                                    edgeless_api::function_instance::MappingNode::Port(
+                                                                        edgeless_api::function_instance::PortId(port_id.clone()),
+                                                                    )
+                                                                }
+                                                                workflow_spec::MappingNode::SIDE_EFFECT => {
+                                                                    edgeless_api::function_instance::MappingNode::SideEffect
+                                                                }
+                                                            },
+                                                            mapping
+                                                                .dests
+                                                                .iter()
+                                                                .map(|dest| match dest {
+                                                                    workflow_spec::MappingNode::PORT(port_id) => {
+                                                                        edgeless_api::function_instance::MappingNode::Port(
+                                                                            edgeless_api::function_instance::PortId(port_id.clone()),
+                                                                        )
+                                                                    }
+                                                                    workflow_spec::MappingNode::SIDE_EFFECT => {
+                                                                        edgeless_api::function_instance::MappingNode::SideEffect
+                                                                    }
+                                                                })
+                                                                .collect(),
+                                                        )
+                                                    })
+                                                    .collect(),
                                             },
-                                            output_mapping: func_spec.output_mapping,
+                                            output_mapping: func_spec
+                                                .output_mapping
+                                                .iter()
+                                                .map(|(port_id, mapping)| {
+                                                    (edgeless_api::function_instance::PortId(port_id.clone()), parse_port_mapping(mapping))
+                                                })
+                                                .collect(),
+                                            input_mapping: func_spec
+                                                .input_mapping
+                                                .iter()
+                                                .map(|(port_id, mapping)| {
+                                                    (edgeless_api::function_instance::PortId(port_id.clone()), parse_port_mapping(mapping))
+                                                })
+                                                .collect(),
                                             annotations: func_spec.annotations,
                                         }
                                     })
@@ -161,7 +258,20 @@ async fn main() -> anyhow::Result<()> {
                                     .map(|res_spec| edgeless_api::workflow_instance::WorkflowResource {
                                         name: res_spec.name,
                                         class_type: res_spec.class_type,
-                                        output_mapping: res_spec.output_mapping,
+                                        output_mapping: res_spec
+                                            .output_mapping
+                                            .iter()
+                                            .map(|(port_id, mapping)| {
+                                                (edgeless_api::function_instance::PortId(port_id.clone()), parse_port_mapping(mapping))
+                                            })
+                                            .collect(),
+                                        input_mapping: res_spec
+                                            .input_mapping
+                                            .iter()
+                                            .map(|(port_id, mapping)| {
+                                                (edgeless_api::function_instance::PortId(port_id.clone()), parse_port_mapping(mapping))
+                                            })
+                                            .collect(),
                                         configurations: res_spec.configurations,
                                     })
                                     .collect(),
@@ -441,4 +551,14 @@ async fn main() -> anyhow::Result<()> {
         },
     }
     Ok(())
+}
+
+fn parse_port_mapping(mapping: &workflow_spec::PortMapping) -> edgeless_api::workflow_instance::PortMapping {
+    match mapping {
+        crate::workflow_spec::PortMapping::DIRECT(direct_target) => edgeless_api::workflow_instance::PortMapping::DirectTarget(
+            direct_target.target_component.clone(),
+            edgeless_api::function_instance::PortId(direct_target.port.clone()),
+        ),
+        crate::workflow_spec::PortMapping::TOPIC(topic_target) => edgeless_api::workflow_instance::PortMapping::Topic(topic_target.topic.clone()),
+    }
 }

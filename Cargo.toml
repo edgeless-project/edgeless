@@ -6,7 +6,7 @@ members = [
     "edgeless_api",
     "edgeless_api_core",
     "edgeless_bal",
-    "edgeless_benchmark",
+    #"edgeless_benchmark",
     "edgeless_cli",
     "edgeless_container_function",
     "edgeless_function",
