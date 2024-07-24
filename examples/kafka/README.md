@@ -8,7 +8,7 @@ These instructions will guide you through setting up a testing environment with 
 - Rust and Cargo installed to build and run Edgeless node
 - Git to clone Edgeless repository
 
-### STEP 1: start kafka+zookeeper with Docker
+### STEP 1: tart kafka+zookeeper with Docker
 
 1. Create a directory with Docker configuration files and move on it: 
     
