@@ -372,7 +372,7 @@ impl ControllerTask {
         &mut self,
         wf_id: &edgeless_api::workflow_instance::WorkflowId,
         component_name: &str,
-    ) -> std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> {
+    ) -> std::collections::HashMap<String, edgeless_api::common::Output> {
         let workflow_mapping: std::collections::HashMap<String, String> =
             self.active_workflows.get(wf_id).unwrap().component_output_mapping(&component_name);
 
@@ -394,10 +394,10 @@ impl ControllerTask {
                 // overwriting the same entry.
                 output_mapping.insert(
                     from_channel.clone(),
-                    edgeless_api::function_instance::InstanceId {
+                    edgeless_api::common::Output::Single(edgeless_api::function_instance::InstanceId {
                         node_id: uuid::Uuid::nil(),
                         function_id: target_fid,
-                    },
+                    }),
                 );
             }
         }
@@ -410,7 +410,7 @@ impl ControllerTask {
         origin_domain: &str,
         origin_id: uuid::Uuid,
         origin_type: super::ComponentType,
-        output_mapping: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId>,
+        output_mapping: std::collections::HashMap<String, edgeless_api::common::Output>,
         name_in_workflow: &str,
     ) -> Result<(), String> {
         match origin_type {

@@ -255,7 +255,9 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         }
 
         // Add/update the mapping of the resource provider to the target.
-        let _ = lck.sender.send(OllamaCommand::Patch(update.function_id, target)).await;
+        if let edgeless_api::common::Output::Single(id) = target {
+            let _ = lck.sender.send(OllamaCommand::Patch(update.function_id, id)).await;
+        }
 
         Ok(())
     }

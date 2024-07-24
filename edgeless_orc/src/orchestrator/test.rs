@@ -565,10 +565,10 @@ async fn test_orc_patch() {
             function_id: ext_function_id.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out-1".to_string(),
-                edgeless_api::function_instance::InstanceId {
+                edgeless_api::common::Output::Single(edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_resource_id.clone(),
-                },
+                }),
             )]),
         })
         .await
@@ -585,7 +585,11 @@ async fn test_orc_patch() {
         assert_eq!(1, patch_request.output_mapping.len());
         let mapping = patch_request.output_mapping.get("out-1");
         assert!(mapping.is_some());
-        assert_eq!(int_resource_id.unwrap(), mapping.unwrap().clone());
+        if let edgeless_api::common::Output::Single(id) = mapping.unwrap() {
+            assert_eq!(int_resource_id.unwrap(), *id);
+        } else {
+            panic!("Wrong Output Type");
+        }
     } else {
         panic!("wrong event received");
     }
@@ -595,10 +599,10 @@ async fn test_orc_patch() {
             function_id: ext_resource_id.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out-2".to_string(),
-                edgeless_api::function_instance::InstanceId {
+                edgeless_api::common::Output::Single(edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_function_id.clone(),
-                },
+                }),
             )]),
         })
         .await
@@ -615,7 +619,11 @@ async fn test_orc_patch() {
         assert_eq!(1, patch_request.output_mapping.len());
         let mapping = patch_request.output_mapping.get("out-2");
         assert!(mapping.is_some());
-        assert_eq!(int_function_id.unwrap(), mapping.unwrap().clone());
+        if let edgeless_api::common::Output::Single(id) = mapping.unwrap() {
+            assert_eq!(int_function_id.unwrap(), *id);
+        } else {
+            panic!("Wrong Output Type");
+        }
     } else {
         panic!("wrong event received");
     }
@@ -703,10 +711,10 @@ async fn test_orc_node_with_fun_disconnects() {
             function_id: ext_fid_1.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
-                edgeless_api::function_instance::InstanceId {
+                edgeless_api::common::Output::Single(edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_2.clone(),
-                },
+                }),
             )]),
         })
         .await
@@ -726,10 +734,10 @@ async fn test_orc_node_with_fun_disconnects() {
             function_id: ext_fid_2.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
-                edgeless_api::function_instance::InstanceId {
+                edgeless_api::common::Output::Single(edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_3.clone(),
-                },
+                }),
             )]),
         })
         .await
@@ -749,10 +757,10 @@ async fn test_orc_node_with_fun_disconnects() {
             function_id: ext_fid_3.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
-                edgeless_api::function_instance::InstanceId {
+                edgeless_api::common::Output::Single(edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_4.clone(),
-                },
+                }),
             )]),
         })
         .await
@@ -835,9 +843,17 @@ async fn test_orc_node_with_fun_disconnects() {
     let patch_request_1 = patch_request_1.unwrap();
     let patch_request_2 = patch_request_2.unwrap();
     assert_eq!(int_fid_1, patch_request_1.function_id);
-    assert_eq!(int_fid_2, patch_request_1.output_mapping.get("out").unwrap().function_id);
+    if let edgeless_api::common::Output::Single(id) = patch_request_1.output_mapping.get("out").unwrap() {
+        assert_eq!(int_fid_2, id.function_id);
+    } else {
+        panic!("Wrong Output Type");
+    }
     assert_eq!(int_fid_2, patch_request_2.function_id);
-    assert_eq!(int_fid_3, patch_request_2.output_mapping.get("out").unwrap().function_id);
+    if let edgeless_api::common::Output::Single(id) = patch_request_2.output_mapping.get("out").unwrap() {
+        assert_eq!(int_fid_3, id.function_id);
+    } else {
+        panic!("Wrong Output Type");
+    }
 
     no_function_event(&mut nodes).await;
 }
@@ -919,10 +935,10 @@ async fn orc_node_with_res_disconnects() {
             function_id: ext_fid_1.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
-                edgeless_api::function_instance::InstanceId {
+                edgeless_api::common::Output::Single(edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_res.clone(),
-                },
+                }),
             )]),
         })
         .await
@@ -934,8 +950,12 @@ async fn orc_node_with_res_disconnects() {
     };
     if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
         assert!(patch_request.output_mapping.contains_key("out"));
-        assert_eq!(unstable_node_id, patch_request.output_mapping.get("out").unwrap().node_id);
-        assert_eq!(int_fid_res, patch_request.output_mapping.get("out").unwrap().function_id);
+        if let edgeless_api::common::Output::Single(id) = patch_request.output_mapping.get("out").unwrap() {
+            assert_eq!(unstable_node_id, id.node_id);
+            assert_eq!(int_fid_res, id.function_id);
+        } else {
+            panic!("Wrong Output Type");
+        }
     }
 
     // Make sure there are no pending events around.
@@ -1000,7 +1020,11 @@ async fn orc_node_with_res_disconnects() {
     assert!(!new_node_id.is_nil());
     let patch_request_rcv = patch_request_rcv.unwrap();
     assert_eq!(int_fid_1, patch_request_rcv.function_id);
-    assert_eq!(int_fid_res, patch_request_rcv.output_mapping.get("out").unwrap().function_id);
+    if let edgeless_api::common::Output::Single(id) = patch_request_rcv.output_mapping.get("out").unwrap() {
+        assert_eq!(int_fid_res, id.function_id);
+    } else {
+        panic!("Wrong Output Type");
+    }
 
     no_function_event(&mut nodes).await;
 }
@@ -1059,10 +1083,10 @@ async fn test_patch_after_fun_stop() {
         for i in 0..ext_fid_pair.1.len() {
             output_mapping.insert(
                 format!("out{}", i),
-                edgeless_api::function_instance::InstanceId {
+                edgeless_api::common::Output::Single(edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_pair.1[i],
-                },
+                }),
             );
         }
         match fun_client
@@ -1080,12 +1104,17 @@ async fn test_patch_after_fun_stop() {
         if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
             assert_eq!(patch_instructions_int[j].0, patch_request.function_id);
             assert!(patch_request.output_mapping.contains_key("out0"));
-            assert_eq!(
-                patch_request.output_mapping.get("out0").unwrap().function_id,
-                patch_instructions_int[j].1[0]
-            );
-            if let Some(val) = patch_request.output_mapping.get("out1") {
-                assert_eq!(val.function_id, patch_instructions_int[j].1[1]);
+            if let edgeless_api::common::Output::Single(id) = patch_request.output_mapping.get("out0").unwrap() {
+                assert_eq!(id.function_id, patch_instructions_int[j].1[0]);
+            } else {
+                panic!();
+            }
+            if let Some(output) = patch_request.output_mapping.get("out1") {
+                if let edgeless_api::common::Output::Single(id) = output {
+                    assert_eq!(id.function_id, patch_instructions_int[j].1[1]);
+                } else {
+                    panic!();
+                }
             }
         }
     }
@@ -1192,10 +1221,10 @@ async fn test_recreate_fun_after_disconnect() {
             function_id: ext_fid_1.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
-                edgeless_api::function_instance::InstanceId {
+                edgeless_api::common::Output::Single(edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_2.clone(),
-                },
+                }),
             )]),
         })
         .await
@@ -1215,10 +1244,10 @@ async fn test_recreate_fun_after_disconnect() {
             function_id: ext_fid_2.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
-                edgeless_api::function_instance::InstanceId {
+                edgeless_api::common::Output::Single(edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_3.clone(),
-                },
+                }),
             )]),
         })
         .await

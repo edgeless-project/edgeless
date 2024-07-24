@@ -7,10 +7,31 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<crate::common::StartComponentResponse<edgeless_api_core::instance_id::InstanceId>> {
-        let mut outputs = heapless::Vec::<(&str, edgeless_api_core::instance_id::InstanceId), 16>::new();
+        let mut outputs = heapless::Vec::<(&str, edgeless_api_core::common::Output), 16>::new();
         let mut configuration = heapless::Vec::<(&str, &str), 16>::new();
         for (key, val) in &instance_specification.output_mapping {
-            outputs.push((&key, val.clone())).map_err(|_| anyhow::anyhow!("Too many outputs"))?;
+            outputs
+                .push((
+                    &key,
+                    match val {
+                        crate::common::Output::Single(id) => edgeless_api_core::common::Output::Single(id.clone()),
+                        crate::common::Output::Any(ids) => {
+                            let mut id_vec = edgeless_api_core::instance_id::InstanceIdVec::<4>(heapless::Vec::new());
+                            for i in ids {
+                                id_vec.0.push(i.clone()).unwrap();
+                            }
+                            edgeless_api_core::common::Output::Any(id_vec)
+                        }
+                        crate::common::Output::All(ids) => {
+                            let mut id_vec = edgeless_api_core::instance_id::InstanceIdVec::<4>(heapless::Vec::new());
+                            for i in ids {
+                                id_vec.0.push(i.clone()).unwrap();
+                            }
+                            edgeless_api_core::common::Output::Any(id_vec)
+                        }
+                    },
+                ))
+                .map_err(|_| anyhow::anyhow!("Too many outputs"))?;
         }
 
         for (key, val) in &instance_specification.configuration {
@@ -55,12 +76,31 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
     }
 
     async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()> {
-        let mut outputs: [Option<(&str, edgeless_api_core::instance_id::InstanceId)>; 16] = [None; 16];
-        let mut outputs_i: usize = 0;
+        let mut outputs = heapless::Vec::<(&str, edgeless_api_core::common::Output), 16>::new();
 
         for (key, val) in &update.output_mapping {
-            outputs[outputs_i] = Some((key, val.clone()));
-            outputs_i = outputs_i + 1;
+            outputs.push((
+                key,
+                match val {
+                    crate::common::Output::Single(id) => edgeless_api_core::common::Output::Single(id.clone()),
+                    crate::common::Output::Any(ids) => {
+                        let mut id_vec = edgeless_api_core::instance_id::InstanceIdVec::<4>(heapless::Vec::new());
+                        for i in ids {
+                            id_vec.0.push(i.clone()).unwrap();
+                        }
+                        edgeless_api_core::common::Output::Any(id_vec)
+                    }
+                    crate::common::Output::All(ids) => {
+                        let mut id_vec = edgeless_api_core::instance_id::InstanceIdVec::<4>(heapless::Vec::new());
+                        for i in ids {
+                            id_vec.0.push(i.clone()).unwrap();
+                        }
+                        edgeless_api_core::common::Output::Any(id_vec)
+                    }
+                },
+            ));
+            //     outputs[outputs_i] = Some((key, val.clone()));
+            //     outputs_i = outputs_i + 1;
         }
 
         let encoded_patch_req = edgeless_api_core::resource_configuration::EncodedPatchRequest {

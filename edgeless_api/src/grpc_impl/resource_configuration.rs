@@ -15,8 +15,8 @@ impl ResourceConfigurationConverters {
             output_mapping: api_spec
                 .output_mapping
                 .iter()
-                .flat_map(|(name, id)| {
-                    let id = CommonConverters::parse_instance_id(id);
+                .flat_map(|(name, output)| {
+                    let id = CommonConverters::parse_output(output);
                     match id {
                         Ok(val) => Some((name.to_string(), val)),
                         Err(_) => None,
@@ -35,7 +35,7 @@ impl ResourceConfigurationConverters {
             output_mapping: crate_spec
                 .output_mapping
                 .iter()
-                .map(|(name, id)| (name.to_string(), CommonConverters::serialize_instance_id(id)))
+                .map(|(name, output)| (name.to_string(), CommonConverters::serialize_output(output)))
                 .collect(),
         }
     }

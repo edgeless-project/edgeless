@@ -54,6 +54,7 @@ base64 = "0.21.5"
 rs-docker = "0.0.58"
 chrono = "0.4.38"
 ollama-rs = { version = "0.2.0", features = ["chat-history"] }
+rand = "0.8"
 
 [build-dependencies]
 tonic-build = "0.10"

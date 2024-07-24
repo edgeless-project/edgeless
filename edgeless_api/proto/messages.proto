@@ -46,9 +46,7 @@ message Port {
     optional string return_data_type = 4;
 }
 
-message SideEffectMapping {
-
-}
+message SideEffectMapping {}
 
 message MappingNodeVariant {
     oneof MappingNodeType {
@@ -209,7 +207,19 @@ message PatchRequest {
     // The function instance identifier.
     string function_id = 1;
     // Mapping of the outputs to concrete function/resource instances.
-    map<string, InstanceId> output_mapping = 3;
+    map<string, InstanceOutput> output_mapping = 3;
+}
+
+message InstanceIdVec {
+    repeated InstanceId data = 1;
+}
+
+message InstanceOutput {
+    oneof OutputType {
+        InstanceId single = 1;
+        InstanceIdVec any  = 2;
+        InstanceIdVec all = 3;
+    }
 }
 
 message WorkflowComponentPort {
@@ -353,7 +363,7 @@ message ResourceInstanceSpecification {
     // Resource configuration (depends on the type).
     map<string, string> configuration = 2;
     // Mapping of the outputs to concrete function/resource instances.
-    map<string, InstanceId> output_mapping = 3;
+    map<string, InstanceOutput> output_mapping = 3;
 }
 
 // Message containing information provided as response to failed request.

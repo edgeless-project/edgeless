@@ -223,17 +223,22 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                 return Err(anyhow::anyhow!("Patching a non-existing resource: {}", update.function_id));
             }
         };
-        lck.interests.push(HTTPIngressInterest {
-            resource_id: InstanceId {
-                node_id: self.own_node_id.clone(),
-                function_id: update.function_id.clone(),
-            },
-            host,
-            allow,
-            target,
-        });
 
-        Ok(())
+        if let edgeless_api::common::Output::Single(target) = target {
+            lck.interests.push(HTTPIngressInterest {
+                resource_id: InstanceId {
+                    node_id: self.own_node_id.clone(),
+                    function_id: update.function_id.clone(),
+                },
+                host,
+                allow,
+                target,
+            });
+
+            Ok(())
+        } else {
+            return Err(anyhow::anyhow!("Unsupported Output Type"));
+        }
     }
 }
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 use futures::FutureExt;
+use rand::seq::SliceRandom;
 
 /// Each function instance can import a set of functions that need to be implemented on the host-side.
 /// This provides the generic host-side implementation of these functions.
@@ -28,7 +29,24 @@ impl GuestAPIHost {
             self.data_plane.send(self.instance_id.clone(), msg.to_string()).await;
             Ok(())
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            self.data_plane.send(target.clone(), msg.to_string()).await;
+            match target {
+                edgeless_api::common::Output::Single(id) => {
+                    self.data_plane.send(id, msg.to_string()).await;
+                }
+                edgeless_api::common::Output::Any(ids) => {
+                    let id = ids.choose(&mut rand::thread_rng());
+                    if let Some(id) = id {
+                        self.data_plane.send(id.clone(), msg.to_string()).await;
+                    } else {
+                        return Err(GuestAPIError::UnknownAlias);
+                    }
+                }
+                edgeless_api::common::Output::All(ids) => {
+                    for id in ids {
+                        self.data_plane.send(id, msg.to_string()).await;
+                    }
+                }
+            }
             Ok(())
         } else {
             Err(GuestAPIError::UnknownAlias)
@@ -45,8 +63,26 @@ impl GuestAPIHost {
             return self.call_raw(self.instance_id.clone(), msg).await;
             // return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            return self.call_raw(target, msg).await;
-            // return Ok(self.data_plane.call(target.clone(), msg.to_string()).await);
+            // return self.call_raw(target, msg).await;
+            match target {
+                edgeless_api::common::Output::Single(id) => {
+                    // self.data_plane.send(id, msg.to_string()).await;
+                    return self.call_raw(id, msg).await;
+                }
+                edgeless_api::common::Output::Any(ids) => {
+                    let id = ids.choose(&mut rand::thread_rng());
+                    if let Some(id) = id {
+                        // self.data_plane.send(id.clone(), msg.to_string()).await;
+                        return self.call_raw(id.clone(), msg).await;
+                    } else {
+                        return Err(GuestAPIError::UnknownAlias);
+                    }
+                }
+                edgeless_api::common::Output::All(_ids) => {
+                    // TODO(raphaelhetzel) introduce new error for this
+                    return Err(GuestAPIError::UnknownAlias);
+                }
+            }
         } else {
             log::warn!("Unknown alias.");
             Err(GuestAPIError::UnknownAlias)
@@ -83,8 +119,8 @@ impl GuestAPIHost {
         let mut cloned_plane = self.data_plane.clone();
         let cloned_msg = payload.to_string();
 
-        let target_instance_id = if target_alias == "self" {
-            self.instance_id.clone()
+        let target = if target_alias == "self" {
+            edgeless_api::common::Output::Single(self.instance_id.clone())
         } else if let Some(targted_id) = self.callback_table.get_mapping(target_alias).await {
             targted_id
         } else {
@@ -94,7 +130,24 @@ impl GuestAPIHost {
 
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
-            cloned_plane.send(target_instance_id, cloned_msg).await;
+            match target {
+                edgeless_api::common::Output::Single(id) => {
+                    cloned_plane.send(id, cloned_msg).await;
+                }
+                edgeless_api::common::Output::Any(ids) => {
+                    let id = ids.choose(&mut rand::thread_rng());
+                    if let Some(id) = id {
+                        cloned_plane.send(id.clone(), cloned_msg).await;
+                    } else {
+                        log::warn!("Unhandled Situation");
+                    }
+                }
+                edgeless_api::common::Output::All(ids) => {
+                    for id in ids {
+                        cloned_plane.send(id.clone(), cloned_msg.clone()).await;
+                    }
+                }
+            }
         });
 
         Ok(())

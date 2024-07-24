@@ -10,7 +10,7 @@ pub struct Measurement {
 
 pub struct SCD30SensorInner {
     pub instance_id: Option<edgeless_api_core::instance_id::InstanceId>,
-    pub data_out_id: Option<edgeless_api_core::instance_id::InstanceId>,
+    pub data_out_id: Option<edgeless_api_core::common::Output>,
     pub data_receiver: Option<embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, Measurement, 2>>,
     // pub delay: u8,
 }
@@ -21,7 +21,7 @@ pub trait Sensor {
 }
 
 pub struct SCD30SensorConfiguration {
-    pub data_out_id: Option<edgeless_api_core::instance_id::InstanceId>,
+    pub data_out_id: Option<edgeless_api_core::common::Output>,
 }
 
 pub struct SCD30Sensor {
@@ -32,7 +32,7 @@ impl SCD30Sensor {
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<SCD30SensorConfiguration, edgeless_api_core::common::ErrorResponse> {
-        let mut out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
+        let mut out_id: Option<edgeless_api_core::common::Output> = None;
 
         if data.class_type != "scd30-sensor" {
             return Err(edgeless_api_core::common::ErrorResponse {
@@ -141,7 +141,7 @@ pub async fn scd30_sensor_task(
         let tmp = state.borrow_mut();
         let lck = tmp.lock().await;
 
-        if let (Some(instance_id), Some(data_out_id)) = (lck.instance_id, lck.data_out_id) {
+        if let (Some(instance_id), Some(data_out_id)) = (lck.instance_id, lck.data_out_id.clone()) {
             let mut buffer = heapless::String::<150>::new();
             if core::fmt::write(
                 &mut buffer,
@@ -149,7 +149,24 @@ pub async fn scd30_sensor_task(
             )
             .is_ok()
             {
-                dataplane_handle.send(instance_id, data_out_id, buffer.as_str()).await;
+                match data_out_id {
+                    edgeless_api_core::common::Output::Single(id) => {
+                        dataplane_handle.send(instance_id, id, buffer.as_str()).await;
+                    }
+                    edgeless_api_core::common::Output::Any(ids) => {
+                        let id = ids.0.get(0);
+                        if let Some(id) = id {
+                            dataplane_handle.send(instance_id, id.clone(), buffer.as_str()).await;
+                        } else {
+                            // return Err(GuestAPIError::UnknownAlias)
+                        }
+                    }
+                    edgeless_api_core::common::Output::All(ids) => {
+                        for id in ids.0 {
+                            dataplane_handle.send(instance_id, id, buffer.as_str()).await;
+                        }
+                    }
+                }
             }
         }
     }
@@ -216,15 +233,12 @@ impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;
 
-        for output_callback in patch_req.output_mapping {
-            if let Some((key, val)) = output_callback {
-                if key == "data_out" {
-                    lck.data_out_id = Some(val);
-                    break;
-                }
+        for (output_key, output_val) in patch_req.output_mapping {
+            if output_key == "data_out" {
+                lck.data_out_id = Some(output_val);
+                break;
             }
         }
-
         Ok(())
     }
 }

@@ -314,8 +314,18 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
 
     //always gets called after instantiation
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
+        let mut output_targets = std::collections::HashMap::<String, edgeless_api::function_instance::InstanceId>::new();
+
+        for (id, output) in update.output_mapping {
+            if let edgeless_api::common::Output::Single(target) = output {
+                output_targets.insert(id, target);
+            } else {
+                return Err(anyhow::anyhow!("Unsupported Output Type"));
+            }
+        }
+
         let mut lck = self.inner.lock().await;
-        lck.output_mapping = update.output_mapping.clone();
+        lck.output_mapping = output_targets;
         Ok(())
     }
 }

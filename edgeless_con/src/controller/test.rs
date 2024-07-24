@@ -475,8 +475,12 @@ async fn function_link_loop_start_stop() {
         assert_eq!(1, update_req.output_mapping.len());
         assert!(update_req.output_mapping.contains_key(&label1));
         let mapping = update_req.output_mapping.get(&label1).unwrap();
-        assert!(mapping.node_id.is_nil());
-        assert_eq!(new_func2_id, mapping.function_id);
+        if let edgeless_api::common::Output::Single(id) = mapping {
+            assert!(id.node_id.is_nil());
+            assert_eq!(new_func2_id, id.function_id);
+        } else {
+            panic!("Wrong Type of Output");
+        }
     } else {
         panic!();
     }
@@ -486,8 +490,12 @@ async fn function_link_loop_start_stop() {
         assert_eq!(1, update_req.output_mapping.len());
         assert!(update_req.output_mapping.contains_key(&label2));
         let mapping = update_req.output_mapping.get(&label2).unwrap();
-        assert!(mapping.node_id.is_nil());
-        assert_eq!(new_func1_id, mapping.function_id);
+        if let edgeless_api::common::Output::Single(id) = mapping {
+            assert!(id.node_id.is_nil());
+            assert_eq!(new_func1_id, id.function_id);
+        } else {
+            panic!("Wrong Type of Output");
+        }
     } else {
         panic!();
     }

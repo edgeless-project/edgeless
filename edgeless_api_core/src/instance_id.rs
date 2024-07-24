@@ -1,3 +1,5 @@
+use minicbor::decode;
+
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
@@ -13,6 +15,9 @@ pub struct InstanceId {
     pub node_id: NodeId,
     pub function_id: ComponentId,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstanceIdVec<const N: usize>(pub heapless::Vec<InstanceId, N>);
 
 impl<C> minicbor::Encode<C> for InstanceId {
     fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
@@ -69,6 +74,31 @@ impl InstanceId {
         } else {
             false
         }
+    }
+}
+
+impl<C, const N: usize> minicbor::Encode<C> for InstanceIdVec<N> {
+    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+        e.encode(&self.0[..])?;
+        Ok(())
+    }
+}
+
+impl<C, const N: usize> minicbor::CborLen<C> for InstanceIdVec<N> {
+    fn cbor_len(&self, _ctx: &mut C) -> usize {
+        minicbor::len(&self.0[..])
+    }
+}
+
+impl<C, const N: usize> minicbor::Decode<'_, C> for InstanceIdVec<N> {
+    fn decode(d: &mut decode::Decoder<'_>, _ctx: &mut C) -> Result<Self, decode::Error> {
+        let mut s = Self(heapless::Vec::<InstanceId, N>::new());
+        for item in d.array_iter::<InstanceId>().unwrap() {
+            if let Ok(item) = item {
+                s.0.push(item);
+            }
+        }
+        Ok(s)
     }
 }
 

@@ -488,7 +488,7 @@ impl Orchestrator {
     ///    must be applied.
     async fn apply_patches(
         active_instances: &std::collections::HashMap<edgeless_api::function_instance::ComponentId, ActiveInstance>,
-        dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
+        dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, edgeless_api::common::Output>>,
         clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
         origin_ext_fids: Vec<edgeless_api::function_instance::ComponentId>,
     ) {
@@ -502,15 +502,33 @@ impl Orchestrator {
             // internal ones.
             for source in Self::ext_to_int(&active_instances, origin_ext_fid) {
                 let mut int_output_mapping = std::collections::HashMap::new();
-                for (channel, target_ext_fid) in ext_output_mapping {
-                    for target in Self::ext_to_int(&active_instances, target_ext_fid) {
-                        // [TODO] Issue#96 The output_mapping structure
-                        // should be changed so that multiple
-                        // values are possible (with weights), and
-                        // this change must be applied to runners,
-                        // as well. For now, we just keep
-                        // overwriting the same entry.
-                        int_output_mapping.insert(channel.clone(), target.instance_id());
+                for (channel, target_ext_output) in ext_output_mapping {
+                    match target_ext_output {
+                        edgeless_api::common::Output::Single(id) => {
+                            let targets = Self::ext_to_int(&active_instances, &id.function_id);
+                            if targets.len() == 1 {
+                                int_output_mapping.insert(channel.clone(), edgeless_api::common::Output::Single(targets[0].instance_id()));
+                            } else if targets.len() > 0 {
+                                int_output_mapping.insert(
+                                    channel.clone(),
+                                    edgeless_api::common::Output::Any(targets.iter().map(|t| t.instance_id()).collect()),
+                                );
+                            }
+                        }
+                        edgeless_api::common::Output::Any(ids) => {
+                            let targets: Vec<_> = ids.iter().flat_map(|id| Self::ext_to_int(active_instances, &id.function_id)).collect();
+                            int_output_mapping.insert(
+                                channel.clone(),
+                                edgeless_api::common::Output::Any(targets.iter().map(|t| t.instance_id()).collect()),
+                            );
+                        }
+                        edgeless_api::common::Output::All(ids) => {
+                            let targets: Vec<_> = ids.iter().flat_map(|id| Self::ext_to_int(active_instances, &id.function_id)).collect();
+                            int_output_mapping.insert(
+                                channel.clone(),
+                                edgeless_api::common::Output::All(targets.iter().map(|t| t.instance_id()).collect()),
+                            );
+                        }
                     }
                 }
 
@@ -793,15 +811,31 @@ impl Orchestrator {
     /// this function will return all the ingress vertices of the vertex
     /// identified by `ext_fid`.
     fn dependencies(
-        dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
+        dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, edgeless_api::common::Output>>,
         ext_fid: &uuid::Uuid,
     ) -> Vec<uuid::Uuid> {
         let mut dependencies = vec![];
         for (origin_ext_fid, output_mapping) in dependency_graph.iter() {
-            for (_output, target_ext_fid) in output_mapping.iter() {
-                if target_ext_fid == ext_fid {
-                    dependencies.push(origin_ext_fid.clone());
-                    break;
+            for (_output, target_ext_output) in output_mapping.iter() {
+                match target_ext_output {
+                    edgeless_api::common::Output::Single(id) => {
+                        if id.function_id == *ext_fid {
+                            dependencies.push(origin_ext_fid.clone());
+                            break;
+                        }
+                    }
+                    edgeless_api::common::Output::Any(ids) => {
+                        if ids.iter().find(|id| id.function_id == *ext_fid).is_some() {
+                            dependencies.push(origin_ext_fid.clone());
+                            break;
+                        }
+                    }
+                    edgeless_api::common::Output::All(ids) => {
+                        if ids.iter().find(|id| id.function_id == *ext_fid).is_some() {
+                            dependencies.push(origin_ext_fid.clone());
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -990,8 +1024,8 @@ impl Orchestrator {
                     let output_mapping = update
                         .output_mapping
                         .iter()
-                        .map(|x| (x.0.clone(), x.1.function_id.clone()))
-                        .collect::<std::collections::HashMap<String, edgeless_api::function_instance::ComponentId>>();
+                        .map(|x| (x.0.clone(), x.1.clone()))
+                        .collect::<std::collections::HashMap<String, edgeless_api::common::Output>>();
 
                     // Save the patch request into an internal data structure,
                     // keeping track only of the ext_fid for both origin
@@ -1282,12 +1316,21 @@ impl Orchestrator {
                     // Also schedule to repatch all the functions that
                     // depend on the functions/resources modified.
                     for (origin_ext_fid, output_mapping) in dependency_graph.iter() {
-                        for (_output, target_ext_fid) in output_mapping.iter() {
-                            if active_instances_to_be_updated.contains(target_ext_fid)
-                                || fun_to_be_created.contains_key(target_ext_fid)
-                                || res_to_be_created.contains_key(target_ext_fid)
-                            {
-                                to_be_repatched.push(origin_ext_fid.clone());
+                        for (_output, target_ext_output) in output_mapping.iter() {
+                            let target_ext_ids = match target_ext_output {
+                                edgeless_api::common::Output::Single(id) => vec![id.function_id.clone()],
+                                edgeless_api::common::Output::Any(ids) => ids.iter().map(|id| id.function_id.clone()).collect(),
+                                edgeless_api::common::Output::All(ids) => ids.iter().map(|id| id.function_id.clone()).collect(),
+                            };
+
+                            for target_ext_id in &target_ext_ids {
+                                if active_instances_to_be_updated.contains(target_ext_id)
+                                    || fun_to_be_created.contains_key(target_ext_id)
+                                    || res_to_be_created.contains_key(target_ext_id)
+                                {
+                                    to_be_repatched.push(origin_ext_fid.clone());
+                                    break;
+                                }
                             }
                         }
                     }
@@ -1381,7 +1424,8 @@ impl Orchestrator {
                         active_instances_changed = false;
                     }
                     if dependency_graph_changed {
-                        proxy.update_dependency_graph(&dependency_graph);
+                        //TODO(raphaelhetzel) fix if proxy is needed.
+                        // proxy.update_dependency_graph(&dependency_graph);
                         dependency_graph_changed = false;
                     }
                 }

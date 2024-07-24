@@ -261,7 +261,7 @@ async fn messaging_test_setup() -> (
     let res = client
         .patch(PatchRequest {
             function_id: instance_id.function_id.clone(),
-            output_mapping: std::collections::HashMap::from([("test".to_string(), next_fid.clone())]),
+            output_mapping: std::collections::HashMap::from([("test".to_string(), edgeless_api::common::Output::Single(next_fid.clone()))]),
         })
         .await;
 

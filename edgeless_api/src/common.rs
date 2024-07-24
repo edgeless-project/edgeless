@@ -16,9 +16,16 @@ pub enum StartComponentResponse<InstanceIdType> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Output {
+    Single(InstanceId),
+    Any(Vec<InstanceId>),
+    All(Vec<InstanceId>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct PatchRequest {
     pub function_id: ComponentId,
-    pub output_mapping: std::collections::HashMap<String, InstanceId>,
+    pub output_mapping: std::collections::HashMap<String, Output>,
 }
 
 impl std::fmt::Display for ResponseError {

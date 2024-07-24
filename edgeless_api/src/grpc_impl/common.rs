@@ -58,6 +58,18 @@ impl CommonConverters {
         })
     }
 
+    pub fn parse_output(api_output: &crate::grpc_impl::api::InstanceOutput) -> anyhow::Result<crate::common::Output> {
+        Ok(match api_output.output_type.as_ref().unwrap() {
+            crate::grpc_impl::api::instance_output::OutputType::Single(id) => crate::common::Output::Single(Self::parse_instance_id(id)?),
+            crate::grpc_impl::api::instance_output::OutputType::Any(ids) => {
+                crate::common::Output::Any(ids.data.iter().map(|id| Self::parse_instance_id(id).unwrap()).collect())
+            }
+            crate::grpc_impl::api::instance_output::OutputType::All(ids) => {
+                crate::common::Output::All(ids.data.iter().map(|id| Self::parse_instance_id(id).unwrap()).collect())
+            }
+        })
+    }
+
     pub fn parse_instance_id(api_id: &crate::grpc_impl::api::InstanceId) -> anyhow::Result<crate::function_instance::InstanceId> {
         Ok(crate::function_instance::InstanceId {
             node_id: uuid::Uuid::parse_str(&api_id.node_id)?,
@@ -100,7 +112,7 @@ impl CommonConverters {
             output_mapping: api_update
                 .output_mapping
                 .iter()
-                .filter_map(|(key, value)| match CommonConverters::parse_instance_id(value) {
+                .filter_map(|(key, value)| match CommonConverters::parse_output(value) {
                     Ok(val) => Some((key.clone(), val)),
                     Err(_) => None,
                 })
@@ -149,8 +161,28 @@ impl CommonConverters {
             output_mapping: crate_update
                 .output_mapping
                 .iter()
-                .map(|(key, value)| (key.clone(), CommonConverters::serialize_instance_id(value)))
+                .map(|(key, value)| (key.clone(), Self::serialize_output(value)))
                 .collect(),
+        }
+    }
+
+    pub fn serialize_output(crate_output: &crate::common::Output) -> super::api::InstanceOutput {
+        match crate_output {
+            crate::common::Output::Single(id) => super::api::InstanceOutput {
+                output_type: Some(super::api::instance_output::OutputType::Single(CommonConverters::serialize_instance_id(
+                    id,
+                ))),
+            },
+            crate::common::Output::Any(ids) => super::api::InstanceOutput {
+                output_type: Some(super::api::instance_output::OutputType::Any(super::api::InstanceIdVec {
+                    data: ids.iter().map(|id| CommonConverters::serialize_instance_id(id)).collect(),
+                })),
+            },
+            crate::common::Output::All(ids) => super::api::InstanceOutput {
+                output_type: Some(super::api::instance_output::OutputType::All(super::api::InstanceIdVec {
+                    data: ids.iter().map(|id| CommonConverters::serialize_instance_id(id)).collect(),
+                })),
+            },
         }
     }
 }
@@ -170,17 +202,17 @@ mod tests {
                 output_mapping: std::collections::HashMap::from([
                     (
                         "out".to_string(),
-                        InstanceId {
+                        crate::common::Output::Single(InstanceId {
                             node_id: uuid::Uuid::new_v4(),
                             function_id: uuid::Uuid::new_v4(),
-                        },
+                        }),
                     ),
                     (
                         "err".to_string(),
-                        InstanceId {
+                        crate::common::Output::Single(InstanceId {
                             node_id: uuid::Uuid::new_v4(),
                             function_id: uuid::Uuid::new_v4(),
-                        },
+                        }),
                     ),
                 ]),
             },
@@ -189,17 +221,17 @@ mod tests {
                 output_mapping: std::collections::HashMap::from([
                     (
                         "out".to_string(),
-                        InstanceId {
+                        crate::common::Output::Single(InstanceId {
                             node_id: uuid::Uuid::nil(),
                             function_id: uuid::Uuid::new_v4(),
-                        },
+                        }),
                     ),
                     (
                         "err".to_string(),
-                        InstanceId {
+                        crate::common::Output::Single(InstanceId {
                             node_id: uuid::Uuid::nil(),
                             function_id: uuid::Uuid::new_v4(),
-                        },
+                        }),
                     ),
                 ]),
             },
