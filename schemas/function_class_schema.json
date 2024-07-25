@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WorkflowSpecFunctionClass",
+  "description": "Defines the function class; required by the edgeless_cli to build the function",
+  "type": "object",
+  "required": [
+    "function_type",
+    "id",
+    "outputs",
+    "version"
+  ],
+  "properties": {
+    "build": {
+      "description": "(optional) WARNING: this field is currently not used anywhere: TODO: deprecate; only relevant for edgeless_cli build system; identifies the entry point for the function build system; in case of Rust/WASM should be Cargo.toml",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "code": {
+      "description": "(optional) only relevant in a workflow; For WASM: specifies the path to an object file that should be used as the function's code. For CONTAINER: specified the image:tag",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "function_type": {
+      "description": "One of: RUST_WASM or CONTAINER;",
+      "type": "string"
+    },
+    "id": {
+      "description": "ID / Class name of the function",
+      "type": "string"
+    },
+    "outputs": {
+      "description": "Defines the outputs of this function; these outputs can be then mapped in the workflow. Should not contain duplicated outputs",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "version": {
+      "description": "Semantic versioning; defined by the function developer",
+      "type": "string"
+    }
+  }
+}
