@@ -70,6 +70,16 @@ pub fn parse_init_payload(payload: &str) -> std::collections::HashMap<&str, &str
     arguments
 }
 
+#[cfg(feature = "std")]
+pub fn init_payload_to_args(payload: Option<&[u8]>) -> std::collections::HashMap<&str, &str> {
+    if let Some(payload) = payload {
+        let str_payload = core::str::from_utf8(payload).unwrap();
+        parse_init_payload(str_payload)
+    } else {
+        std::collections::HashMap::new()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
