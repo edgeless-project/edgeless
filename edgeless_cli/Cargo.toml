@@ -6,6 +6,7 @@ name = "edgeless_cli"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
 edition = "2021"
+build = "build.rs"
 
 [[bin]]
 name = "edgeless_cli"
@@ -36,3 +37,9 @@ rand_pcg = { version = "0.3" }
 reqwest = { version = "0.11", features = ["multipart", "json", "stream"] }
 tokio-util = "0.7.10"
 mailparse="0.15.0"
+schemars = "0.8.21"
+
+[build-dependencies]
+schemars = "0.8.21"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

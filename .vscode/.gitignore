@@ -1,0 +1,2 @@
+# override the global settings.json ignore
+!settings.json
