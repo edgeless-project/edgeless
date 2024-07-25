@@ -1,0 +1,10 @@
+{
+    "id": "trigger",
+    "function_type": "RUST_WASM",
+    "version": "0.1",
+    "build": "Cargo.toml",
+    "outputs": [
+        "out",
+        "err"
+    ]
+}

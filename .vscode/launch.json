@@ -18,7 +18,9 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}",
-            "env":{"RUST_LOG":"debug"}
+            "env": {
+                "RUST_LOG": "debug"
+            }
         },
     ]
 }

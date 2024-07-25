@@ -1,0 +1,36 @@
+{
+    "functions": [
+        {
+            "name": "trigger",
+            "class_specification": {
+                "id": "trigger",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "trigger.wasm",
+                "outputs": [
+                    "out",
+                    "err"
+                ]
+            },
+            "output_mapping": {
+                "out": "file-log",
+                "err": "file-log"
+            },
+            "annotations": {
+                "init-payload": "out_type=counter,arrival=u(1000;2000)"
+            }
+        }
+    ],
+    "resources": [
+        {
+            "name": "file-log",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "my-local-file.log",
+                "add-timestamp": "true"
+            }
+        }
+    ],
+    "annotations": {}
+}
