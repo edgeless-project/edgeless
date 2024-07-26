@@ -1,0 +1,69 @@
+{
+    "functions": [
+        {
+            "name": "dda_com_test",
+            "class_specification": {
+                "id": "dda_com_test",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/dda_com_test/dda_com_test.wasm",
+                "outputs": [
+                    "dda"
+                ]
+            },
+            "output_mapping": {
+                "dda": "dda-1"
+            },
+            "annotations": {}
+        },
+        {
+            "name": "dda_state_test",
+            "class_specification": {
+                "id": "dda_state_test",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/dda_state_test/dda_state_test.wasm",
+                "outputs": [
+                    "dda"
+                ]
+            },
+            "output_mapping": {
+                "dda": "dda-1"
+            },
+            "annotations": {}
+        },
+        {
+            "name": "dda_store_test",
+            "class_specification": {
+                "id": "dda_store_test",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/dda_store_test/dda_store_test.wasm",
+                "outputs": [
+                    "dda"
+                ]
+            },
+            "output_mapping": {
+                "dda": "dda-1"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "dda-1",
+            "class_type": "dda",
+            "output_mapping": {
+                "dda_com_test": "dda_com_test",
+                "dda_state_test": "dda_state_test",
+                "dda_store_test": "dda_store_test"
+            },
+            "configurations": {
+                "dda_url": "http://localhost:12000",
+                "dda_com_subscription_mapping": "[{\"topic\": \"com.sub.event\", \"pattern\": \"event\", \"method\": \"cast\", \"target\": \"dda_com_test\"}, {\"topic\": \"com.sub.action\", \"pattern\": \"action\", \"method\": \"cast\", \"target\": \"dda_com_test\"}, {\"topic\": \"com.sub.query\", \"pattern\": \"query\", \"method\": \"cast\", \"target\": \"dda_com_test\"}, {\"topic\": \"com.dda.input\", \"pattern\": \"input\", \"method\": \"cast\", \"target\": \"dda_state_test\"}, {\"topic\": \"com.dda.membership\", \"pattern\": \"membership\", \"method\": \"cast\", \"target\": \"dda_state_test\"}]",
+                "dda_com_publication_mapping": "[{\"topic\": \"com.pub.event\", \"pattern\": \"event\", \"alias\": \"event_alias\"}, {\"topic\": \"com.pub.action\", \"pattern\": \"action\", \"alias\": \"action_alias\"}, {\"topic\": \"com.pub.query\", \"pattern\": \"query\", \"alias\": \"query_alias\"}]"
+            }
+        }
+    ],
+    "annotations": {}
+}

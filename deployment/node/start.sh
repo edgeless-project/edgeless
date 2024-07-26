@@ -26,11 +26,29 @@ num_cpus = 1
 clock_freq_cpu = 1000
 num_cores = $NUM_CORES
 EOF
+
 elif [ $"$NODE_TYPE" == "FILE_LOG" ] ; then
     cat >> node.toml << EOF
 [resources]
 file_log_provider = "file-log-1"
 EOF
+
+# DDA type activates the dda resource provider and wasm runtime
+elif [ $"$NODE_TYPE" == "DDA" ] ; then
+    cat >> node.toml << EOF
+[wasm_runtime]
+enabled = true
+
+[user_node_capabilities]
+labels = $LABELS
+num_cpus = 1
+clock_freq_cpu = 1000
+num_cores = $NUM_CORES
+
+[resources]
+dda_provider = "dda-1"
+EOF
+
 else
     echo "invalid NODE_TYPE: $NODE_TYPE"
     exit 1

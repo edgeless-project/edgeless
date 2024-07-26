@@ -17,5 +17,7 @@ members = [
     "edgeless_systemtests",
     "edgeless_telemetry",
     "edgeless_embedded",
-    "edgeless_embedded_emu"
+    "edgeless_embedded_emu",
+    # "edgeless_embedded"
+    "dda", 
 ]

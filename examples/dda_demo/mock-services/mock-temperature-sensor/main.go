@@ -16,15 +16,37 @@ import (
 )
 
 const measurementType = "com.edgeless.temperature"
-const minVal float32 = 0
-const maxVal float32 = 100
+
+// const minVal float32 = 0
+// const maxVal float32 = 100
 
 var inst *dda.Dda
 
 func publishSensorData() {
 	// continuously publish sensor data of a mocked temperature sensor in Celsius
 	id := 0
+	overheating := false
+	minVal := float32(0.0)
+	maxVal := float32(40.0)
+	periodLength := 0
+
 	for {
+		// start a new period if needed
+		if periodLength == 0 {
+			// flip the switch
+			overheating = !overheating
+			periodLength = 3 + rand.Intn(7)
+		}
+		// decrement the period counter
+		periodLength -= 1
+
+		if overheating {
+			minVal = 60.0
+			maxVal = 80.0
+		} else {
+			minVal = 0.0
+			maxVal = 40.0
+		}
 		randVal := minVal + rand.Float32()*(maxVal-minVal)
 		byteArray := []byte(strconv.FormatFloat(float64(randVal), 'f', 2, 32))
 		event := api.Event{
@@ -37,7 +59,7 @@ func publishSensorData() {
 		if err := inst.PublishEvent(event); err != nil {
 			println("Error publishing event" + err.Error())
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(1000 * time.Millisecond)
 		id += 1
 	}
 }
@@ -45,8 +67,9 @@ func publishSensorData() {
 func main() {
 	cfg := config.New()
 	cfg.Identity.Name = "mock-temperature-sensor"
-	cfg.Apis.Grpc.Disabled = true
-	cfg.Apis.GrpcWeb.Disabled = true
+	cfg.Apis.Grpc.Disabled = false
+	cfg.Apis.GrpcWeb.Disabled = false
+	println("grpc: " + cfg.Apis.GrpcWeb.Address)
 	cfg.Services.Com.Protocol = "mqtt5"
 	cfg.Services.Com.Url = os.Getenv("MQTT_DDA")
 

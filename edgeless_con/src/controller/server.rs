@@ -109,6 +109,7 @@ impl ControllerTask {
         // Start the functions on the orchestration domain.
         for function in &spawn_workflow_request.workflow_functions {
             if res.is_err() {
+                log::error!("Could not start a function {}", res.clone().unwrap_err());
                 break;
             }
 
@@ -120,6 +121,7 @@ impl ControllerTask {
         // Start the resources on the orchestration domain.
         for resource in &spawn_workflow_request.workflow_resources {
             if res.is_err() {
+                log::error!("Could not start a resource {}", res.clone().unwrap_err());
                 break;
             }
 
@@ -136,6 +138,7 @@ impl ControllerTask {
         // Loop on all the functions and resources of the workflow.
         for component_name in &active_workflow.components() {
             if res.is_err() {
+                log::error!("Could not patch the component {}, reason: {}", component_name, res.clone().unwrap_err());
                 break;
             }
 
@@ -166,6 +169,7 @@ impl ControllerTask {
         //
 
         if res.is_err() {
+            log::error!("Workflow start failed, stopping");
             self.stop_workflow(&wf_id).await;
         }
 
