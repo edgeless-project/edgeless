@@ -365,7 +365,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 // load the atual output param
                 let out_raw = self.memory.data_mut(&mut self.store)[out_ptr as usize..(out_ptr as usize) + out_len as usize].to_vec();
                 // TODO(raphaelhetzel) This unwrap can be removed after we migrate the dataplane to use string slices.
-                let out = std::string::String::from_utf8(out_raw).unwrap();
+                let out = unsafe { std::string::String::from_utf8_unchecked(out_raw) };
                 Ok(edgeless_dataplane::core::CallRet::Reply(out))
             }
             _ => Ok(edgeless_dataplane::core::CallRet::Err),

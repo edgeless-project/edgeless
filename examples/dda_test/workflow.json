@@ -1,0 +1,52 @@
+{
+    "functions": [
+        {
+            "name": "dda_com_test",
+            "class_specification": {
+                "id": "dda_com_test",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/dda_com_test/dda_com_test.wasm",
+                "outputs": [
+                    "dda"
+                ]
+            },
+            "output_mapping": {
+                "dda": "dda-1"
+            },
+            "annotations": {}
+        },
+        {
+            "name": "dda_state_store_test",
+            "class_specification": {
+                "id": "dda_state_store_test",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/dda_state_store_test/dda_state_store_test.wasm",
+                "outputs": [
+                    "dda"
+                ]
+            },
+            "output_mapping": {
+                "dda": "dda-1"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "dda-1",
+            "class_type": "dda",
+            "output_mapping": {
+                "dda_com_test": "dda_com_test",
+                "dda_state_store_test": "dda_state_store_test"
+            },
+            "configurations": {
+                "dda_url": "http://localhost:12000",
+                "dda_com_subscription_mapping": "[{\"topic\": \"com.dda.event\", \"pattern\": \"event\", \"method\": \"cast\", \"target\": \"dda_com_test\"}, {\"topic\": \"com.dda.action\", \"pattern\": \"action\", \"method\": \"call\", \"target\": \"dda_com_test\"}, {\"topic\": \"\", \"pattern\": \"input\", \"method\": \"cast\", \"target\": \"dda_state_store_test\"}, {\"topic\": \"\", \"pattern\": \"membership\", \"method\": \"call\", \"target\": \"dda_state_store_test\"}]",
+                "dda_com_publication_mapping": "[{\"topic\": \"com.pub.event\", \"pattern\": \"event\", \"id\": \"eve\"}, {\"topic\": \"com.pub.action\", \"pattern\": \"action\", \"id\": \"act\"}]"
+            }
+        }
+    ],
+    "annotations": {}
+}

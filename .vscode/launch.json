@@ -18,7 +18,32 @@
             },
             "args": [],
             "cwd": "${workspaceFolder}",
-            "env":{"RUST_LOG":"debug"}
+            "env": {
+                "RUST_LOG": "info"
+            }
         },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "DDA debugging",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--package=edgeless_inabox",
+                    "--bin=edgeless_inabox"
+                ],
+                "filter": {
+                    "name": "edgeless_inabox",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "preLaunchTask": "start_dda",
+            "postDebugTask": "Terminate All Tasks",
+            "cwd": "${workspaceFolder}",
+            "env": {
+                "RUST_LOG": "info"
+            }
+        }
     ]
 }
