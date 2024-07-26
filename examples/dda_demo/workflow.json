@@ -48,7 +48,7 @@
                 "move_arm": "move_arm"
             },
             "configurations": {
-                "dda_url": "http://127.0.0.1:12000",
+                "dda_url": "http://dda_sidecar:8900",
                 "dda_com_subscription_mapping": "[{\"ddatopic\": \"com.edgeless.temperature\", \"ddapattern\": \"event\", \"cast_mapping\": \"check_temperature\"}, {\"ddatopic\": \"com.edgeless.someddatopic\", \"ddapattern\": \"action\", \"cast_mapping\": \"some_functioncall\"}]",
                 "dda_com_publication_mapping": "[{\"pubid\":\"dda_move_arm\", \"ddatopic\": \"com.edgeless.moveRobotArm\"}]"
             }

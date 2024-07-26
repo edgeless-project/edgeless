@@ -14,6 +14,7 @@ struct Args {
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
+    // console_subscriber::init();
 
     let args = Args::parse();
     if !args.template.is_empty() {
