@@ -97,8 +97,6 @@ pub struct EdgelessNodeResourceSettings {
     /// value of a given given, as specified in the resource configuration
     /// at run-time.
     pub redis_provider: Option<String>,
-    /// The URL of DDA used by this node, used for communication via the DDA resources
-    pub dda_url: Option<String>,
     /// If not empty, a DDA resource with that name is created.
     pub dda_provider: Option<String>,
     /// The ollama resource provider settings.
@@ -367,9 +365,9 @@ async fn fill_resources(
             }
         }
 
-        if let (Some(dda_url), Some(provider_id)) = (&settings.dda_url, &settings.dda_provider) {
-            if !dda_url.is_empty() && !provider_id.is_empty() {
-                log::info!("Creating resource '{}' at {}", provider_id, dda_url);
+        if let Some(provider_id) = &settings.dda_provider {
+            if !provider_id.is_empty() {
+                log::info!("Creating dda resource provider '{}'", provider_id);
                 let class_type = "dda".to_string();
                 ret.insert(
                     provider_id.clone(),

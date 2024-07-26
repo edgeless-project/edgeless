@@ -152,7 +152,10 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             })
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
 
-        let instance = linker.instantiate_async(&mut store, &module).await.unwrap();
+        let instance = linker
+            .instantiate_async(&mut store, &module)
+            .await
+            .expect("could not instantiate async linker");
 
         Ok(Box::new(Self {
             edgeless_mem_alloc: instance
@@ -245,7 +248,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         self.edgeless_mem_clear
             .call_async(&mut self.store, ())
             .await
-            .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
+            .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: mem_clear {}", e)))?;
 
         let component_id_ptr = super::helpers::copy_to_vm(
             &mut self.store.as_context_mut(),
@@ -254,7 +257,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             src.function_id.as_bytes(),
         )
         .await
-        .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
+        .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: copy_to_vm1 {}", e)))?;
         let node_id_ptr = super::helpers::copy_to_vm(
             &mut self.store.as_context_mut(),
             &self.memory,
@@ -262,18 +265,18 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             src.node_id.as_bytes(),
         )
         .await
-        .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
+        .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: copy_to_vm2 {}", e)))?;
 
         let payload_len = msg.as_bytes().len();
         let payload_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg.as_bytes())
             .await
-            .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
+            .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: copy_to_vm3 {}", e)))?;
 
         let ret = {
             self.edgefunctione_handle_cast
                 .call_async(&mut self.store, (node_id_ptr, component_id_ptr, payload_ptr, payload_len as i32))
                 .await
-                .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
+                .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: call_async {}", e)))?;
             Ok(())
         };
 
@@ -366,7 +369,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 // load the atual output param
                 let out_raw = self.memory.data_mut(&mut self.store)[out_ptr as usize..(out_ptr as usize) + out_len as usize].to_vec();
                 // TODO(raphaelhetzel) This unwrap can be removed after we migrate the dataplane to use string slices.
-                let out = std::string::String::from_utf8(out_raw).unwrap();
+                let out = unsafe { std::string::String::from_utf8_unchecked(out_raw) };
                 Ok(edgeless_dataplane::core::CallRet::Reply(out))
             }
             _ => Ok(edgeless_dataplane::core::CallRet::Err),
