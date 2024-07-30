@@ -386,7 +386,7 @@ impl DDAResource {
                                 // NOTE: uncomment this to see messages when the
                                 // dda is blocking - this could also be an
                                 // option in configs or smth.
-                                println!("DDA resource is blocking the dataplane of a function for another second...");
+                                log::info!("DDA resource is blocking the dataplane of a function for another second...");
                             }
                         }
                     }
