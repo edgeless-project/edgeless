@@ -17,9 +17,9 @@ pub enum StartComponentResponse<InstanceIdType> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Output {
-    Single(InstanceId),
-    Any(Vec<InstanceId>),
-    All(Vec<InstanceId>),
+    Single(InstanceId, crate::function_instance::PortId),
+    Any(Vec<(InstanceId, crate::function_instance::PortId)>),
+    All(Vec<(InstanceId, crate::function_instance::PortId)>),
 }
 
 #[derive(Debug, Clone, PartialEq)]

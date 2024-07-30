@@ -6,20 +6,31 @@
 macro_rules! export {
     ( $fun:ident ) => {
         #[no_mangle]
-        pub unsafe extern "C" fn handle_cast_asm(node_id_ptr: *mut u8, component_id_ptr: *mut u8, payload_ptr: *mut u8, payload_len: usize) {
+        pub unsafe extern "C" fn handle_cast_asm(
+            node_id_ptr: *mut u8,
+            component_id_ptr: *mut u8,
+            port_ptr: *const u8,
+            port_len: usize,
+            payload_ptr: *mut u8,
+            payload_len: usize,
+        ) {
             let payload: &[u8] = core::slice::from_raw_parts(payload_ptr, payload_len);
             let instance_id = InstanceId {
                 node_id: core::slice::from_raw_parts(node_id_ptr, 16).try_into().unwrap(),
                 component_id: core::slice::from_raw_parts(component_id_ptr, 16).try_into().unwrap(),
             };
 
-            $fun::handle_cast(instance_id, payload);
+            let port: &str = core::str::from_utf8(core::slice::from_raw_parts(port_ptr, port_len)).unwrap();
+
+            $fun::handle_cast(instance_id, port, payload);
         }
 
         #[no_mangle]
         pub unsafe extern "C" fn handle_call_asm(
             node_id_ptr: *mut u8,
             component_id_ptr: *mut u8,
+            port_ptr: *const u8,
+            port_len: usize,
             payload_ptr: *mut u8,
             payload_len: usize,
             out_ptr_ptr: *mut *const u8,
@@ -32,7 +43,9 @@ macro_rules! export {
                 component_id: core::slice::from_raw_parts(node_id_ptr, 16).try_into().unwrap(),
             };
 
-            let ret = $fun::handle_call(instance_id, payload);
+            let port: &str = core::str::from_utf8(core::slice::from_raw_parts(port_ptr, port_len)).unwrap();
+
+            let ret = $fun::handle_call(instance_id, port, payload);
 
             let (ret, output_params) = match ret {
                 CallRet::NoReply => (0, None),

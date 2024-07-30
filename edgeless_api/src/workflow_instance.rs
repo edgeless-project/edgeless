@@ -59,6 +59,8 @@ pub struct WorkflowResource {
 #[derive(Clone, Debug, serde::Deserialize, PartialEq)]
 pub enum PortMapping {
     DirectTarget(String, super::function_instance::PortId),
+    AnyOfTargets(Vec<(String, super::function_instance::PortId)>),
+    AllOfTargets(Vec<(String, super::function_instance::PortId)>),
     Topic(String),
 }
 

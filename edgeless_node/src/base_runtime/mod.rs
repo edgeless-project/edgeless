@@ -25,10 +25,11 @@ pub trait FunctionInstance: Send + 'static {
         code: &[u8],
     ) -> Result<Box<Self>, FunctionInstanceError>;
     async fn init(&mut self, init_payload: Option<&str>, serialized_state: Option<&str>) -> Result<(), FunctionInstanceError>;
-    async fn cast(&mut self, src: &edgeless_api::function_instance::InstanceId, msg: &str) -> Result<(), FunctionInstanceError>;
+    async fn cast(&mut self, src: &edgeless_api::function_instance::InstanceId, port: &str, msg: &str) -> Result<(), FunctionInstanceError>;
     async fn call(
         &mut self,
         src: &edgeless_api::function_instance::InstanceId,
+        port: &str,
         msg: &str,
     ) -> Result<edgeless_dataplane::core::CallRet, FunctionInstanceError>;
     async fn stop(&mut self) -> Result<(), FunctionInstanceError>;

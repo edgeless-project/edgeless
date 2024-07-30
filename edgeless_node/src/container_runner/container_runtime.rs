@@ -114,7 +114,14 @@ impl ContainerRuntime {
                 ContainerRuntimeRequest::CASTRAW(event) => {
                     log::debug!("cast-raw, dst {}, msg {} bytes", event.dst, event.msg.len());
                     if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
-                        if let Err(_) = runtime.cast_raw(event.dst, String::from_utf8(event.msg).unwrap().as_str()).await {
+                        if let Err(_) = runtime
+                            .cast_raw(
+                                event.dst,
+                                edgeless_api::function_instance::PortId("direct".to_string()),
+                                String::from_utf8(event.msg).unwrap().as_str(),
+                            )
+                            .await
+                        {
                             log::error!("error occurred when raw-casting an event towards {}", event.dst);
                         }
                     } else {
@@ -161,7 +168,14 @@ impl ContainerRuntime {
                     log::debug!("call-raw, dst {}, msg {} bytes", event.dst, event.msg.len());
                     let mut res = edgeless_api::guest_api_function::CallReturn::Err;
                     if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
-                        match runtime.call_raw(event.dst, String::from_utf8(event.msg).unwrap().as_str()).await {
+                        match runtime
+                            .call_raw(
+                                event.dst,
+                                edgeless_api::function_instance::PortId("TODO".to_string()),
+                                String::from_utf8(event.msg).unwrap().as_str(),
+                            )
+                            .await
+                        {
                             Ok(ret) => {
                                 res = match ret {
                                     edgeless_dataplane::core::CallRet::NoReply => edgeless_api::guest_api_function::CallReturn::NoRet,

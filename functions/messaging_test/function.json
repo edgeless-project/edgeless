@@ -2,6 +2,27 @@
     "id": "messaging_test",
     "function_type": "RUST_WASM",
     "version": "0.1",
-    "build": "Cargo.toml",
-    "outputs": []
+    "code": "./pong_async.wasm",
+    "outputs": {
+        "test_cast": {
+            "method": "CAST",
+            "data_type": "String"
+        },
+        "test_call": {
+            "method": "CALL",
+            "data_type": "String"
+        }
+    },
+    "inputs": {
+        "test_cast_input": {
+            "method": "CAST",
+            "data_type": "String"
+        },
+        "test_call_input": {
+            "method": "CALL",
+            "data_type": "String"
+        }
+    }, 
+    "inner_structure": [
+    ]
 }

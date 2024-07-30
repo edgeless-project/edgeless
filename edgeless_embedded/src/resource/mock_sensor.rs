@@ -120,19 +120,25 @@ pub async fn mock_sensor_task(
             log::info!("Sensor send!");
             match data_out_id {
                 edgeless_api_core::common::Output::Single(id) => {
-                    dataplane_handle.send(instance_id, id, "800.12345;50.12345;20.12345").await;
+                    dataplane_handle
+                        .send(instance_id, id.instance_id, id.port_id, "800.12345;50.12345;20.12345")
+                        .await;
                 }
                 edgeless_api_core::common::Output::Any(ids) => {
                     let id = ids.0.get(0);
                     if let Some(id) = id {
-                        dataplane_handle.send(instance_id, id.clone(), "800.12345;50.12345;20.12345").await;
+                        dataplane_handle
+                            .send(instance_id, id.instance_id, id.port_id.clone(), "800.12345;50.12345;20.12345")
+                            .await;
                     } else {
                         // return Err(GuestAPIError::UnknownAlias)
                     }
                 }
                 edgeless_api_core::common::Output::All(ids) => {
                     for id in ids.0 {
-                        dataplane_handle.send(instance_id, id, "800.12345;50.12345;20.12345").await;
+                        dataplane_handle
+                            .send(instance_id, id.instance_id, id.port_id, "800.12345;50.12345;20.12345")
+                            .await;
                     }
                 }
             }

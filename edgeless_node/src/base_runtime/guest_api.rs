@@ -26,24 +26,30 @@ pub enum GuestAPIError {
 impl GuestAPIHost {
     pub async fn cast_alias(&mut self, alias: &str, msg: &str) -> Result<(), GuestAPIError> {
         if alias == "self" {
-            self.data_plane.send(self.instance_id.clone(), msg.to_string()).await;
+            self.data_plane
+                .send(
+                    self.instance_id.clone(),
+                    edgeless_api::function_instance::PortId("INTERNAL".to_string()),
+                    msg.to_string(),
+                )
+                .await;
             Ok(())
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
             match target {
-                edgeless_api::common::Output::Single(id) => {
-                    self.data_plane.send(id, msg.to_string()).await;
+                edgeless_api::common::Output::Single(instance_id, port_id) => {
+                    self.data_plane.send(instance_id, port_id.clone(), msg.to_string()).await;
                 }
                 edgeless_api::common::Output::Any(ids) => {
                     let id = ids.choose(&mut rand::thread_rng());
-                    if let Some(id) = id {
-                        self.data_plane.send(id.clone(), msg.to_string()).await;
+                    if let Some((instance_id, port_id)) = id {
+                        self.data_plane.send(instance_id.clone(), port_id.clone(), msg.to_string()).await;
                     } else {
                         return Err(GuestAPIError::UnknownAlias);
                     }
                 }
                 edgeless_api::common::Output::All(ids) => {
-                    for id in ids {
-                        self.data_plane.send(id, msg.to_string()).await;
+                    for (instance_id, port_id) in ids {
+                        self.data_plane.send(instance_id, port_id.clone(), msg.to_string()).await;
                     }
                 }
             }
@@ -53,27 +59,38 @@ impl GuestAPIHost {
         }
     }
 
-    pub async fn cast_raw(&mut self, target: edgeless_api::function_instance::InstanceId, msg: &str) -> Result<(), GuestAPIError> {
-        self.data_plane.send(target, msg.to_string()).await;
+    pub async fn cast_raw(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+        target_port: edgeless_api::function_instance::PortId,
+        msg: &str,
+    ) -> Result<(), GuestAPIError> {
+        self.data_plane.send(target, target_port, msg.to_string()).await;
         Ok(())
     }
 
     pub async fn call_alias(&mut self, alias: &str, msg: &str) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         if alias == "self" {
-            return self.call_raw(self.instance_id.clone(), msg).await;
+            return self
+                .call_raw(
+                    self.instance_id.clone(),
+                    edgeless_api::function_instance::PortId("INTERNAL".to_string()),
+                    msg,
+                )
+                .await;
             // return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
             // return self.call_raw(target, msg).await;
             match target {
-                edgeless_api::common::Output::Single(id) => {
+                edgeless_api::common::Output::Single(instance_id, port_id) => {
                     // self.data_plane.send(id, msg.to_string()).await;
-                    return self.call_raw(id, msg).await;
+                    return self.call_raw(instance_id, port_id, msg).await;
                 }
                 edgeless_api::common::Output::Any(ids) => {
                     let id = ids.choose(&mut rand::thread_rng());
-                    if let Some(id) = id {
+                    if let Some((instance_id, port_id)) = id {
                         // self.data_plane.send(id.clone(), msg.to_string()).await;
-                        return self.call_raw(id.clone(), msg).await;
+                        return self.call_raw(instance_id.clone(), port_id.clone(), msg).await;
                     } else {
                         return Err(GuestAPIError::UnknownAlias);
                     }
@@ -92,13 +109,14 @@ impl GuestAPIHost {
     pub async fn call_raw(
         &mut self,
         target: edgeless_api::function_instance::InstanceId,
+        target_port: edgeless_api::function_instance::PortId,
         msg: &str,
     ) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         futures::select! {
             _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
                 return Ok(edgeless_dataplane::core::CallRet::Err)
             },
-            call_res = Box::pin(self.data_plane.call(target, msg.to_string())).fuse() => {
+            call_res = Box::pin(self.data_plane.call(target, target_port, msg.to_string())).fuse() => {
                 return Ok(call_res)
             }
         }
@@ -120,7 +138,7 @@ impl GuestAPIHost {
         let cloned_msg = payload.to_string();
 
         let target = if target_alias == "self" {
-            edgeless_api::common::Output::Single(self.instance_id.clone())
+            edgeless_api::common::Output::Single(self.instance_id.clone(), edgeless_api::function_instance::PortId("INTERNAL".to_string()))
         } else if let Some(targted_id) = self.callback_table.get_mapping(target_alias).await {
             targted_id
         } else {
@@ -131,20 +149,20 @@ impl GuestAPIHost {
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
             match target {
-                edgeless_api::common::Output::Single(id) => {
-                    cloned_plane.send(id, cloned_msg).await;
+                edgeless_api::common::Output::Single(id, port_id) => {
+                    cloned_plane.send(id, port_id.clone(), cloned_msg).await;
                 }
                 edgeless_api::common::Output::Any(ids) => {
                     let id = ids.choose(&mut rand::thread_rng());
-                    if let Some(id) = id {
-                        cloned_plane.send(id.clone(), cloned_msg).await;
+                    if let Some((instance_id, port_id)) = id {
+                        cloned_plane.send(instance_id.clone(), port_id.clone(), cloned_msg).await;
                     } else {
                         log::warn!("Unhandled Situation");
                     }
                 }
                 edgeless_api::common::Output::All(ids) => {
-                    for id in ids {
-                        cloned_plane.send(id.clone(), cloned_msg.clone()).await;
+                    for (instance_id, port_id) in ids {
+                        cloned_plane.send(instance_id.clone(), port_id.clone(), cloned_msg.clone()).await;
                     }
                 }
             }

@@ -17,6 +17,8 @@ pub struct WASMIFunctionInstance {
         (
             i32, // node_id_ptr
             i32, // component_id_ptr
+            i32, // port_ptr,
+            i32, // port_len
             i32, // payload_ptr
             i32, // payload_len
             i32, // out_ptr_ptr
@@ -28,6 +30,8 @@ pub struct WASMIFunctionInstance {
         (
             i32, // node_id_ptr
             i32, // component_id_ptr
+            i32, // port_ptr,
+            i32, // port_len
             i32, // payload_ptr
             i32, // payload_len
         ),
@@ -113,10 +117,10 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
                 .get_typed_func::<(), ()>(&mut store, "edgeless_mem_clear")
                 .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?,
             edgefunctione_handle_call: instance
-                .get_typed_func::<(i32, i32, i32, i32, i32, i32), i32>(&mut store, "handle_call_asm")
+                .get_typed_func::<(i32, i32, i32, i32, i32, i32, i32, i32), i32>(&mut store, "handle_call_asm")
                 .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?,
             edgefunctione_handle_cast: instance
-                .get_typed_func::<(i32, i32, i32, i32), ()>(&mut store, "handle_cast_asm")
+                .get_typed_func::<(i32, i32, i32, i32, i32, i32), ()>(&mut store, "handle_cast_asm")
                 .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?,
             edgefunctione_handle_init: instance
                 .get_typed_func::<(i32, i32, i32, i32), ()>(&mut store, "handle_init_asm")
@@ -182,7 +186,12 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
         ret
     }
 
-    async fn cast(&mut self, src: &edgeless_api::function_instance::InstanceId, msg: &str) -> Result<(), crate::base_runtime::FunctionInstanceError> {
+    async fn cast(
+        &mut self,
+        src: &edgeless_api::function_instance::InstanceId,
+        port: &str,
+        msg: &str,
+    ) -> Result<(), crate::base_runtime::FunctionInstanceError> {
         // Depending on the Function, we might employ a basic arena/bump allocator that we must reset at the end of a transaction.
         // This might be a noop if the function defines a working version of `edgeless_mem_free`.
         self.edgeless_mem_clear
@@ -204,13 +213,20 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
         )
         .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
 
+        let port_len = port.as_bytes().len();
+        let port_ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, port.as_bytes())
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+
         let payload_len = msg.as_bytes().len();
         let payload_ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg.as_bytes())
             .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
 
         let ret = tokio::task::block_in_place(|| {
             self.edgefunctione_handle_cast
-                .call(&mut self.store, (node_id_ptr, component_id_ptr, payload_ptr, payload_len as i32))
+                .call(
+                    &mut self.store,
+                    (node_id_ptr, component_id_ptr, port_ptr, port_len as i32, payload_ptr, payload_len as i32),
+                )
                 .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
             Ok(())
         });
@@ -232,6 +248,7 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
     async fn call(
         &mut self,
         src: &edgeless_api::function_instance::InstanceId,
+        port: &str,
         msg: &str,
     ) -> Result<edgeless_dataplane::core::CallRet, crate::base_runtime::FunctionInstanceError> {
         self.edgeless_mem_clear
@@ -254,6 +271,10 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
         )
         .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
 
+        let port_len = port.as_bytes().len();
+        let port_ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, port.as_bytes())
+            .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
+
         let payload_len = msg.as_bytes().len();
         let payload_ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg.as_bytes())
             .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)?;
@@ -272,7 +293,16 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
             self.edgefunctione_handle_call
                 .call(
                     &mut self.store,
-                    (node_id_ptr, component_id_ptr, payload_ptr, payload_len as i32, out_ptr_ptr, out_len_ptr),
+                    (
+                        node_id_ptr,
+                        component_id_ptr,
+                        port_ptr,
+                        port_len as i32,
+                        payload_ptr,
+                        payload_len as i32,
+                        out_ptr_ptr,
+                        out_len_ptr,
+                    ),
                 )
                 .map_err(|_| crate::base_runtime::FunctionInstanceError::BadCode)
         })?;

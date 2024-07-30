@@ -97,6 +97,20 @@ impl WorkflowInstanceConverters {
                 target.workflow_component_id.clone(),
                 crate::function_instance::PortId(target.port_id.clone()),
             ),
+            super::api::port_mapping::MappingType::AnyTargets(targets) => crate::workflow_instance::PortMapping::AnyOfTargets(
+                targets
+                    .data
+                    .iter()
+                    .map(|port| (port.workflow_component_id.clone(), crate::function_instance::PortId(port.port_id.clone())))
+                    .collect(),
+            ),
+            super::api::port_mapping::MappingType::AllTargets(targets) => crate::workflow_instance::PortMapping::AllOfTargets(
+                targets
+                    .data
+                    .iter()
+                    .map(|port| (port.workflow_component_id.clone(), crate::function_instance::PortId(port.port_id.clone())))
+                    .collect(),
+            ),
             super::api::port_mapping::MappingType::Topic(topic) => crate::workflow_instance::PortMapping::Topic(topic.clone()),
         }
     }
@@ -258,6 +272,28 @@ impl WorkflowInstanceConverters {
                     super::api::port_mapping::MappingType::DirectTarget(super::api::WorkflowComponentPort {
                         workflow_component_id: component.clone(),
                         port_id: port.0.clone(),
+                    })
+                }
+                crate::workflow_instance::PortMapping::AnyOfTargets(targets) => {
+                    super::api::port_mapping::MappingType::AnyTargets(super::api::WorkflowComponentPortVec {
+                        data: targets
+                            .iter()
+                            .map(|(component, port)| super::api::WorkflowComponentPort {
+                                workflow_component_id: component.clone(),
+                                port_id: port.0.clone(),
+                            })
+                            .collect(),
+                    })
+                }
+                crate::workflow_instance::PortMapping::AllOfTargets(targets) => {
+                    super::api::port_mapping::MappingType::AnyTargets(super::api::WorkflowComponentPortVec {
+                        data: targets
+                            .iter()
+                            .map(|(component, port)| super::api::WorkflowComponentPort {
+                                workflow_component_id: component.clone(),
+                                port_id: port.0.clone(),
+                            })
+                            .collect(),
                     })
                 }
                 crate::workflow_instance::PortMapping::Topic(topic) => super::api::port_mapping::MappingType::Topic(topic.clone()),

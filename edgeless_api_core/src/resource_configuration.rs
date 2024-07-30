@@ -133,7 +133,10 @@ mod test {
         outputs
             .push((
                 "foo",
-                crate::common::Output::Single(crate::instance_id::InstanceId::new(uuid::Uuid::new_v4())),
+                crate::common::Output::Single(crate::common::Target {
+                    instance_id: crate::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
+                    port_id: crate::port::Port::<32>(heapless::String::<32>::new()),
+                }),
             ))
             .unwrap();
 

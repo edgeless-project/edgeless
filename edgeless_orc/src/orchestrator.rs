@@ -504,30 +504,41 @@ impl Orchestrator {
                 let mut int_output_mapping = std::collections::HashMap::new();
                 for (channel, target_ext_output) in ext_output_mapping {
                     match target_ext_output {
-                        edgeless_api::common::Output::Single(id) => {
+                        edgeless_api::common::Output::Single(id, port_id) => {
                             let targets = Self::ext_to_int(&active_instances, &id.function_id);
                             if targets.len() == 1 {
-                                int_output_mapping.insert(channel.clone(), edgeless_api::common::Output::Single(targets[0].instance_id()));
+                                int_output_mapping.insert(
+                                    channel.clone(),
+                                    edgeless_api::common::Output::Single(targets[0].instance_id(), port_id.clone()),
+                                );
                             } else if targets.len() > 0 {
                                 int_output_mapping.insert(
                                     channel.clone(),
-                                    edgeless_api::common::Output::Any(targets.iter().map(|t| t.instance_id()).collect()),
+                                    edgeless_api::common::Output::Any(targets.iter().map(|t| (t.instance_id(), port_id.clone())).collect()),
                                 );
                             }
                         }
                         edgeless_api::common::Output::Any(ids) => {
-                            let targets: Vec<_> = ids.iter().flat_map(|id| Self::ext_to_int(active_instances, &id.function_id)).collect();
-                            int_output_mapping.insert(
-                                channel.clone(),
-                                edgeless_api::common::Output::Any(targets.iter().map(|t| t.instance_id()).collect()),
-                            );
+                            let targets: Vec<_> = ids
+                                .iter()
+                                .flat_map(|(id, port_id)| {
+                                    Self::ext_to_int(active_instances, &id.function_id)
+                                        .into_iter()
+                                        .map(|x| (x.instance_id(), port_id.clone()))
+                                })
+                                .collect();
+                            int_output_mapping.insert(channel.clone(), edgeless_api::common::Output::Any(targets));
                         }
                         edgeless_api::common::Output::All(ids) => {
-                            let targets: Vec<_> = ids.iter().flat_map(|id| Self::ext_to_int(active_instances, &id.function_id)).collect();
-                            int_output_mapping.insert(
-                                channel.clone(),
-                                edgeless_api::common::Output::All(targets.iter().map(|t| t.instance_id()).collect()),
-                            );
+                            let targets: Vec<_> = ids
+                                .iter()
+                                .flat_map(|(id, port_id)| {
+                                    Self::ext_to_int(active_instances, &id.function_id)
+                                        .into_iter()
+                                        .map(|x| (x.instance_id(), port_id.clone()))
+                                })
+                                .collect();
+                            int_output_mapping.insert(channel.clone(), edgeless_api::common::Output::All(targets));
                         }
                     }
                 }
@@ -818,20 +829,20 @@ impl Orchestrator {
         for (origin_ext_fid, output_mapping) in dependency_graph.iter() {
             for (_output, target_ext_output) in output_mapping.iter() {
                 match target_ext_output {
-                    edgeless_api::common::Output::Single(id) => {
+                    edgeless_api::common::Output::Single(id, _port_id) => {
                         if id.function_id == *ext_fid {
                             dependencies.push(origin_ext_fid.clone());
                             break;
                         }
                     }
                     edgeless_api::common::Output::Any(ids) => {
-                        if ids.iter().find(|id| id.function_id == *ext_fid).is_some() {
+                        if ids.iter().find(|(id, _port_id)| id.function_id == *ext_fid).is_some() {
                             dependencies.push(origin_ext_fid.clone());
                             break;
                         }
                     }
                     edgeless_api::common::Output::All(ids) => {
-                        if ids.iter().find(|id| id.function_id == *ext_fid).is_some() {
+                        if ids.iter().find(|(id, _port_id)| id.function_id == *ext_fid).is_some() {
                             dependencies.push(origin_ext_fid.clone());
                             break;
                         }
@@ -1318,9 +1329,9 @@ impl Orchestrator {
                     for (origin_ext_fid, output_mapping) in dependency_graph.iter() {
                         for (_output, target_ext_output) in output_mapping.iter() {
                             let target_ext_ids = match target_ext_output {
-                                edgeless_api::common::Output::Single(id) => vec![id.function_id.clone()],
-                                edgeless_api::common::Output::Any(ids) => ids.iter().map(|id| id.function_id.clone()).collect(),
-                                edgeless_api::common::Output::All(ids) => ids.iter().map(|id| id.function_id.clone()).collect(),
+                                edgeless_api::common::Output::Single(id, _port_id) => vec![id.function_id.clone()],
+                                edgeless_api::common::Output::Any(ids) => ids.iter().map(|(id, _port_id)| id.function_id.clone()).collect(),
+                                edgeless_api::common::Output::All(ids) => ids.iter().map(|(id, _port_id)| id.function_id.clone()).collect(),
                             };
 
                             for target_ext_id in &target_ext_ids {

@@ -319,6 +319,7 @@ impl CoapMultiplexer {
                     edgeless_api_core::invocation::EventData::CallNoRet => edgeless_api_core::invocation::EventData::CallNoRet,
                     edgeless_api_core::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,
                 },
+                target_port: event.target_port.clone(),
             };
 
             let ((data, endpoint), _tail) =

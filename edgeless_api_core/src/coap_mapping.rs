@@ -16,6 +16,7 @@ impl COAPEncoder {
         let new_event: crate::invocation::Event<&minicbor::bytes::ByteSlice> = crate::invocation::Event::<&minicbor::bytes::ByteSlice> {
             target: event.target,
             source: event.source,
+            target_port: event.target_port.clone(),
             stream_id: event.stream_id,
             data: match event.data {
                 crate::invocation::EventData::Cast(val) => crate::invocation::EventData::Cast(val.into()),
@@ -245,6 +246,7 @@ impl CoapDecoder {
                 let new_event: crate::invocation::Event<&[u8]> = crate::invocation::Event::<&[u8]> {
                     target: event.target,
                     source: event.source,
+                    target_port: event.target_port,
                     stream_id: event.stream_id,
                     data: match event.data {
                         crate::invocation::EventData::Cast(val) => crate::invocation::EventData::Cast(val),

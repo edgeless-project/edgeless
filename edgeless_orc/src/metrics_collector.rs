@@ -170,6 +170,7 @@ impl MetricsCollectorResource {
                     source_id,
                     channel_id,
                     message,
+                    target_port,
                 } = dataplane_handle.receive_next().await;
 
                 let mut need_reply = false;

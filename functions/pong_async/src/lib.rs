@@ -5,13 +5,13 @@ use edgeless_function::*;
 struct PongerFun;
 
 impl EdgeFunction for PongerFun {
-    fn handle_cast(src: InstanceId, encoded_message: &[u8]) {
+    fn handle_cast(src: InstanceId, port: &str, encoded_message: &[u8]) {
         log::info!("AsyncPonger: 'Cast' called, MSG: {:?}", encoded_message);
-        cast_raw(src, b"PONG2");
-        //OR cast("pinger", b"PONG2");
+        // cast_raw(src, "pong", b"PONG2");
+        cast("pong", b"PONG2");
     }
 
-    fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
+    fn handle_call(_src: InstanceId, port: &str, encoded_message: &[u8]) -> CallRet {
         log::info!("AsyncPonger: 'Call' called, MSG: {:?}", encoded_message);
         CallRet::NoReply
     }

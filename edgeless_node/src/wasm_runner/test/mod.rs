@@ -118,7 +118,9 @@ async fn basic_lifecycle() {
     // wait for lifetime events created during spawn
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
+    println!("Pre Spawn Wait");
     let res = telemetry_mock_receiver.recv();
+    println!("Post Spawn Wait");
     assert!(res.is_ok());
     let (event, _tags) = res.unwrap();
     assert_eq!(
@@ -261,7 +263,10 @@ async fn messaging_test_setup() -> (
     let res = client
         .patch(PatchRequest {
             function_id: instance_id.function_id.clone(),
-            output_mapping: std::collections::HashMap::from([("test".to_string(), edgeless_api::common::Output::Single(next_fid.clone()))]),
+            output_mapping: std::collections::HashMap::from([(
+                "test".to_string(),
+                edgeless_api::common::Output::Single(next_fid.clone(), edgeless_api::function_instance::PortId("test".to_string())),
+            )]),
         })
         .await;
 
@@ -290,7 +295,13 @@ async fn messaging_test_setup() -> (
 #[tokio::test]
 async fn messaging_cast_raw_input() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
-    test_peer_handle.send(instance_id.clone(), "some_message".to_string()).await;
+    test_peer_handle
+        .send(
+            instance_id.clone(),
+            edgeless_api::function_instance::PortId("trigger".to_string()),
+            "some_message".to_string(),
+        )
+        .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(telemetry_mock_receiver.try_recv().is_ok());
@@ -303,7 +314,13 @@ async fn messaging_cast_raw_input() {
 async fn messaging_cast_raw_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id.clone(), "test_cast_raw_output".to_string()).await;
+    test_peer_handle
+        .send(
+            instance_id.clone(),
+            edgeless_api::function_instance::PortId("trigger".to_string()),
+            "test_cast_raw_output".to_string(),
+        )
+        .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     let telemetry_event = telemetry_mock_receiver.try_recv();
@@ -328,7 +345,13 @@ async fn messaging_cast_raw_output() {
 async fn messaging_call_raw_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id.clone(), "test_call_raw_output".to_string()).await;
+    test_peer_handle
+        .send(
+            instance_id.clone(),
+            edgeless_api::function_instance::PortId("trigger".to_string()),
+            "test_call_raw_output".to_string(),
+        )
+        .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // This won't have completed here.
@@ -361,7 +384,13 @@ async fn messaging_call_raw_output() {
 async fn messaging_delayed_cast_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id.clone(), "test_delayed_cast_output".to_string()).await;
+    test_peer_handle
+        .send(
+            instance_id.clone(),
+            edgeless_api::function_instance::PortId("trigger".to_string()),
+            "test_delayed_cast_output".to_string(),
+        )
+        .await;
     let start = tokio::time::Instant::now();
 
     let test_message = next_handle.receive_next().await;
@@ -390,7 +419,13 @@ async fn messaging_delayed_cast_output() {
 async fn messaging_cast_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id.clone(), "test_cast_output".to_string()).await;
+    test_peer_handle
+        .send(
+            instance_id.clone(),
+            edgeless_api::function_instance::PortId("trigger".to_string()),
+            "test_cast_output".to_string(),
+        )
+        .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     let telemetry_event = telemetry_mock_receiver.try_recv();
@@ -412,7 +447,13 @@ async fn messaging_cast_output() {
 async fn messaging_call_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id.clone(), "test_call_output".to_string()).await;
+    test_peer_handle
+        .send(
+            instance_id.clone(),
+            edgeless_api::function_instance::PortId("trigger".to_string()),
+            "test_call_output".to_string(),
+        )
+        .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // This won't have completed here.
@@ -441,7 +482,13 @@ async fn function_in_call_can_be_stopped() {
     let (mut client, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, telemetry_mock_receiver) =
         messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id.clone(), "test_call_output".to_string()).await;
+    test_peer_handle
+        .send(
+            instance_id.clone(),
+            edgeless_api::function_instance::PortId("trigger".to_string()),
+            "test_call_output".to_string(),
+        )
+        .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     // This won't have completed here.
@@ -464,7 +511,13 @@ async fn function_in_call_can_be_stopped() {
 async fn messaging_call_raw_input_noreply() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
 
-    let ret = test_peer_handle.call(instance_id.clone(), "some_cast".to_string()).await;
+    let ret = test_peer_handle
+        .call(
+            instance_id.clone(),
+            edgeless_api::function_instance::PortId("trigger".to_string()),
+            "some_cast".to_string(),
+        )
+        .await;
     assert_eq!(ret, CallRet::NoReply);
 
     let telemetry_event = telemetry_mock_receiver.try_recv();
@@ -482,7 +535,13 @@ async fn messaging_call_raw_input_noreply() {
 async fn messaging_call_raw_input_reply() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
 
-    let ret = test_peer_handle.call(instance_id.clone(), "test_ret".to_string()).await;
+    let ret = test_peer_handle
+        .call(
+            instance_id.clone(),
+            edgeless_api::function_instance::PortId("trigger".to_string()),
+            "test_ret".to_string(),
+        )
+        .await;
     assert_eq!(ret, CallRet::Reply("test_reply".to_string()));
 
     let telemetry_event = telemetry_mock_receiver.try_recv();
@@ -500,7 +559,13 @@ async fn messaging_call_raw_input_reply() {
 async fn messaging_call_raw_input_err() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
 
-    let ret = test_peer_handle.call(instance_id.clone(), "test_err".to_string()).await;
+    let ret = test_peer_handle
+        .call(
+            instance_id.clone(),
+            edgeless_api::function_instance::PortId("trigger".to_string()),
+            "test_err".to_string(),
+        )
+        .await;
     assert_eq!(ret, CallRet::Err);
 
     let telemetry_event = telemetry_mock_receiver.try_recv();
@@ -582,7 +647,7 @@ async fn state_management() {
         init_log_event,
         TelemetryEvent::FunctionLogEntry(
             edgeless_telemetry::telemetry_events::TelemetryLogLevel::Info,
-            "edgeless_test_state".to_string(),
+            "state_test".to_string(),
             "no_state".to_string()
         )
     );
@@ -591,7 +656,13 @@ async fn state_management() {
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
     // trigger sync
-    test_peer_handle.send(instance_id.clone(), "test_cast_raw_output".to_string()).await;
+    test_peer_handle
+        .send(
+            instance_id.clone(),
+            edgeless_api::function_instance::PortId("trigger".to_string()),
+            "test_cast_raw_output".to_string(),
+        )
+        .await;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let (state_set_id, state_set_value) = state_mock_receiver.try_next().unwrap().unwrap();

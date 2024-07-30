@@ -108,7 +108,7 @@ Output mapping:
 }
 ```
 
-Output mapping:
+Input mapping:
 ```json
 "port_name": {
     "type": "TOPIC",

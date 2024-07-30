@@ -89,12 +89,16 @@ impl ControllerTask {
             workflow_id: uuid::Uuid::new_v4(),
         };
 
+        let mut wf = super::deployment_state::ActiveWorkflow {
+            desired_state: spawn_workflow_request.clone(),
+            domain_mapping: std::collections::HashMap::new(),
+        };
+
+        wf.optimize_logical();
+
         self.active_workflows.insert(
             wf_id.clone(),
-            super::deployment_state::ActiveWorkflow {
-                desired_state: spawn_workflow_request.clone(),
-                domain_mapping: std::collections::HashMap::new(),
-            },
+            wf,
         );
 
         let active_workflow = self.active_workflows.get(&wf_id).unwrap().clone();
@@ -373,32 +377,98 @@ impl ControllerTask {
         wf_id: &edgeless_api::workflow_instance::WorkflowId,
         component_name: &str,
     ) -> std::collections::HashMap<String, edgeless_api::common::Output> {
-        let workflow_mapping: std::collections::HashMap<String, String> =
+        let workflow_mapping: std::collections::HashMap<String, super::deployment_state::LogicalOutput> =
             self.active_workflows.get(wf_id).unwrap().component_output_mapping(&component_name);
 
         let mut output_mapping = std::collections::HashMap::new();
 
         // Loop on all the channels that needed to be
         // mapped for this function/resource.
-        for (from_channel, to_name) in workflow_mapping {
+        for (from_channel, logical_output) in workflow_mapping {
             // Loop on all the identifiers for the
             // target function/resource (once for each
             // assigned orchestration domain).
-            for target_fid in self.active_workflows.get(&wf_id).unwrap().mapped_fids(&to_name).unwrap() {
-                // [TODO] Issue#96 The output_mapping
-                // structure should be changed so that
-                // multiple values are possible (with
-                // weights), and this change must be applied
-                // to runners, as well.
-                // For now, we just keep
-                // overwriting the same entry.
-                output_mapping.insert(
-                    from_channel.clone(),
-                    edgeless_api::common::Output::Single(edgeless_api::function_instance::InstanceId {
-                        node_id: uuid::Uuid::nil(),
-                        function_id: target_fid,
-                    }),
-                );
+            match logical_output {
+                super::deployment_state::LogicalOutput::Single((component_name, port_id)) => {
+                    let fids = self.active_workflows.get(&wf_id).unwrap().mapped_fids(&component_name).unwrap();
+
+                    assert!(fids.len() == 1);
+
+                    output_mapping.insert(
+                        from_channel.clone(),
+                        edgeless_api::common::Output::Single(
+                            edgeless_api::function_instance::InstanceId {
+                                node_id: uuid::Uuid::nil(),
+                                function_id: fids[0],
+                            },
+                            port_id,
+                        ),
+                    );
+                }
+                super::deployment_state::LogicalOutput::Any(ids) => {
+                    let mut all_fids = Vec::new();
+                    for (component_name, port_id) in ids {
+                        let mut fids = self
+                            .active_workflows
+                            .get(&wf_id)
+                            .unwrap()
+                            .mapped_fids(&component_name)
+                            .unwrap()
+                            .iter()
+                            .map(|x| (x.clone(), port_id.clone()))
+                            .collect();
+                        all_fids.append(&mut fids);
+                    }
+                    output_mapping.insert(
+                        from_channel.clone(),
+                        edgeless_api::common::Output::Any(
+                            all_fids
+                                .iter()
+                                .map(|(fid, port)| {
+                                    (
+                                        edgeless_api::function_instance::InstanceId {
+                                            node_id: uuid::Uuid::nil(),
+                                            function_id: fid.clone(),
+                                        },
+                                        port.clone(),
+                                    )
+                                })
+                                .collect(),
+                        ),
+                    );
+                }
+                super::deployment_state::LogicalOutput::All(ids) => {
+                    let mut all_fids = Vec::new();
+                    for (component_name, port_id) in ids {
+                        let mut fids = self
+                            .active_workflows
+                            .get(&wf_id)
+                            .unwrap()
+                            .mapped_fids(&component_name)
+                            .unwrap()
+                            .iter()
+                            .map(|x| (x.clone(), port_id.clone()))
+                            .collect();
+                        all_fids.append(&mut fids);
+                    }
+                    output_mapping.insert(
+                        from_channel.clone(),
+                        edgeless_api::common::Output::All(
+                            all_fids
+                                .iter()
+                                .map(|(fid, port)| {
+                                    (
+                                        edgeless_api::function_instance::InstanceId {
+                                            node_id: uuid::Uuid::nil(),
+                                            function_id: fid.clone(),
+                                        },
+                                        port.clone(),
+                                    )
+                                })
+                                .collect(),
+                        ),
+                    );
+                }
             }
         }
 

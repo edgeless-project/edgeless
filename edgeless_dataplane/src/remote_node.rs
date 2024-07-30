@@ -19,6 +19,7 @@ impl DataPlaneLink for RemoteLink {
         msg: Message,
         src: &edgeless_api::function_instance::InstanceId,
         stream_id: u64,
+        target_port: edgeless_api::function_instance::PortId,
     ) -> LinkProcessingResult {
         return self
             .remotes
@@ -35,6 +36,7 @@ impl DataPlaneLink for RemoteLink {
                     Message::CallNoRet => edgeless_api::invocation::EventData::CallNoRet,
                     Message::Err => edgeless_api::invocation::EventData::Err,
                 },
+                target_port: target_port,
             })
             .await
             .unwrap();
@@ -155,6 +157,7 @@ mod test {
             source: fid_source.clone(),
             stream_id: 0,
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
+            target_port: edgeless_api::function_instance::PortId("test".to_string()),
         })
         .await
         .unwrap();
@@ -166,7 +169,8 @@ mod test {
                 target: fid_wrong_node_id.clone(),
                 source: fid_source.clone(),
                 stream_id: 0,
-                data: edgeless_api::invocation::EventData::Cast("Test".to_string())
+                data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
+                target_port: edgeless_api::function_instance::PortId("test".to_string())
             })
             .await
             .is_err());
@@ -178,6 +182,7 @@ mod test {
             source: fid_source.clone(),
             stream_id: 0,
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
+            target_port: edgeless_api::function_instance::PortId("test".to_string()),
         })
         .await
         .unwrap();
@@ -229,23 +234,51 @@ mod test {
         let (sender_1, _receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
         let mut link = provider.new_link(fid_source.clone(), sender_1).await;
 
-        let res = link.handle_send(&fid_target, Message::Cast("Test".to_string()), &fid_source, 0).await;
-        assert_eq!(res, LinkProcessingResult::FINAL);
-        assert!(api_receiver_node_2.try_next().unwrap().is_some());
-
         let res = link
-            .handle_send(&fid_wrong_component_id, Message::Cast("Test".to_string()), &fid_source, 0)
+            .handle_send(
+                &fid_target,
+                Message::Cast("Test".to_string()),
+                &fid_source,
+                0,
+                edgeless_api::function_instance::PortId("test".to_string()),
+            )
             .await;
         assert_eq!(res, LinkProcessingResult::FINAL);
         assert!(api_receiver_node_2.try_next().unwrap().is_some());
 
         let res = link
-            .handle_send(&fid_wrong_node_id, Message::Cast("Test".to_string()), &fid_source, 0)
+            .handle_send(
+                &fid_wrong_component_id,
+                Message::Cast("Test".to_string()),
+                &fid_source,
+                0,
+                edgeless_api::function_instance::PortId("test".to_string()),
+            )
+            .await;
+        assert_eq!(res, LinkProcessingResult::FINAL);
+        assert!(api_receiver_node_2.try_next().unwrap().is_some());
+
+        let res = link
+            .handle_send(
+                &fid_wrong_node_id,
+                Message::Cast("Test".to_string()),
+                &fid_source,
+                0,
+                edgeless_api::function_instance::PortId("test".to_string()),
+            )
             .await;
         assert_eq!(res, LinkProcessingResult::PASSED);
         assert!(api_receiver_node_2.try_next().is_err());
 
-        let res = link.handle_send(&fid_target, Message::Cast("Test".to_string()), &fid_source, 0).await;
+        let res = link
+            .handle_send(
+                &fid_target,
+                Message::Cast("Test".to_string()),
+                &fid_source,
+                0,
+                edgeless_api::function_instance::PortId("test".to_string()),
+            )
+            .await;
         assert_eq!(res, LinkProcessingResult::FINAL);
         assert!(api_receiver_node_2.try_next().unwrap().is_some());
     }

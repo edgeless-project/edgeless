@@ -60,14 +60,26 @@ impl CommonConverters {
 
     pub fn parse_output(api_output: &crate::grpc_impl::api::InstanceOutput) -> anyhow::Result<crate::common::Output> {
         Ok(match api_output.output_type.as_ref().unwrap() {
-            crate::grpc_impl::api::instance_output::OutputType::Single(id) => crate::common::Output::Single(Self::parse_instance_id(id)?),
-            crate::grpc_impl::api::instance_output::OutputType::Any(ids) => {
-                crate::common::Output::Any(ids.data.iter().map(|id| Self::parse_instance_id(id).unwrap()).collect())
+            crate::grpc_impl::api::instance_output::OutputType::Single(target) => {
+                let (instance, port) = Self::parse_target(target)?;
+                crate::common::Output::Single(instance, port)
             }
-            crate::grpc_impl::api::instance_output::OutputType::All(ids) => {
-                crate::common::Output::All(ids.data.iter().map(|id| Self::parse_instance_id(id).unwrap()).collect())
+            crate::grpc_impl::api::instance_output::OutputType::Any(targets) => {
+                crate::common::Output::Any(targets.data.iter().map(|target| Self::parse_target(target).unwrap()).collect())
+            }
+            crate::grpc_impl::api::instance_output::OutputType::All(targets) => {
+                crate::common::Output::All(targets.data.iter().map(|target| Self::parse_target(target).unwrap()).collect())
             }
         })
+    }
+
+    pub fn parse_target(
+        api_target: &crate::grpc_impl::api::Target,
+    ) -> anyhow::Result<(crate::function_instance::InstanceId, crate::function_instance::PortId)> {
+        Ok((
+            Self::parse_instance_id(api_target.instance_id.as_ref().unwrap())?,
+            crate::function_instance::PortId(api_target.port_id.clone()),
+        ))
     }
 
     pub fn parse_instance_id(api_id: &crate::grpc_impl::api::InstanceId) -> anyhow::Result<crate::function_instance::InstanceId> {
@@ -168,21 +180,35 @@ impl CommonConverters {
 
     pub fn serialize_output(crate_output: &crate::common::Output) -> super::api::InstanceOutput {
         match crate_output {
-            crate::common::Output::Single(id) => super::api::InstanceOutput {
-                output_type: Some(super::api::instance_output::OutputType::Single(CommonConverters::serialize_instance_id(
-                    id,
+            crate::common::Output::Single(instance_id, port_id) => super::api::InstanceOutput {
+                output_type: Some(super::api::instance_output::OutputType::Single(Self::serialize_target(
+                    instance_id,
+                    port_id,
                 ))),
             },
-            crate::common::Output::Any(ids) => super::api::InstanceOutput {
-                output_type: Some(super::api::instance_output::OutputType::Any(super::api::InstanceIdVec {
-                    data: ids.iter().map(|id| CommonConverters::serialize_instance_id(id)).collect(),
+            crate::common::Output::Any(targets) => super::api::InstanceOutput {
+                output_type: Some(super::api::instance_output::OutputType::Any(super::api::TargetVec {
+                    data: targets
+                        .iter()
+                        .map(|(instance_id, port_id)| CommonConverters::serialize_target(instance_id, port_id))
+                        .collect(),
                 })),
             },
-            crate::common::Output::All(ids) => super::api::InstanceOutput {
-                output_type: Some(super::api::instance_output::OutputType::All(super::api::InstanceIdVec {
-                    data: ids.iter().map(|id| CommonConverters::serialize_instance_id(id)).collect(),
+            crate::common::Output::All(targets) => super::api::InstanceOutput {
+                output_type: Some(super::api::instance_output::OutputType::All(super::api::TargetVec {
+                    data: targets
+                        .iter()
+                        .map(|(instance_id, port_id)| CommonConverters::serialize_target(instance_id, port_id))
+                        .collect(),
                 })),
             },
+        }
+    }
+
+    pub fn serialize_target(instance_id: &crate::function_instance::InstanceId, port_id: &crate::function_instance::PortId) -> super::api::Target {
+        super::api::Target {
+            instance_id: Some(CommonConverters::serialize_instance_id(instance_id)),
+            port_id: port_id.0.clone(),
         }
     }
 }
@@ -202,17 +228,23 @@ mod tests {
                 output_mapping: std::collections::HashMap::from([
                     (
                         "out".to_string(),
-                        crate::common::Output::Single(InstanceId {
-                            node_id: uuid::Uuid::new_v4(),
-                            function_id: uuid::Uuid::new_v4(),
-                        }),
+                        crate::common::Output::Single(
+                            InstanceId {
+                                node_id: uuid::Uuid::new_v4(),
+                                function_id: uuid::Uuid::new_v4(),
+                            },
+                            crate::function_instance::PortId("test".to_string()),
+                        ),
                     ),
                     (
                         "err".to_string(),
-                        crate::common::Output::Single(InstanceId {
-                            node_id: uuid::Uuid::new_v4(),
-                            function_id: uuid::Uuid::new_v4(),
-                        }),
+                        crate::common::Output::Single(
+                            InstanceId {
+                                node_id: uuid::Uuid::new_v4(),
+                                function_id: uuid::Uuid::new_v4(),
+                            },
+                            crate::function_instance::PortId("test".to_string()),
+                        ),
                     ),
                 ]),
             },
@@ -221,17 +253,23 @@ mod tests {
                 output_mapping: std::collections::HashMap::from([
                     (
                         "out".to_string(),
-                        crate::common::Output::Single(InstanceId {
-                            node_id: uuid::Uuid::nil(),
-                            function_id: uuid::Uuid::new_v4(),
-                        }),
+                        crate::common::Output::Single(
+                            InstanceId {
+                                node_id: uuid::Uuid::nil(),
+                                function_id: uuid::Uuid::new_v4(),
+                            },
+                            crate::function_instance::PortId("test".to_string()),
+                        ),
                     ),
                     (
                         "err".to_string(),
-                        crate::common::Output::Single(InstanceId {
-                            node_id: uuid::Uuid::nil(),
-                            function_id: uuid::Uuid::new_v4(),
-                        }),
+                        crate::common::Output::Single(
+                            InstanceId {
+                                node_id: uuid::Uuid::nil(),
+                                function_id: uuid::Uuid::new_v4(),
+                            },
+                            crate::function_instance::PortId("test".to_string()),
+                        ),
                     ),
                 ]),
             },

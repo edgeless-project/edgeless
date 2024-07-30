@@ -41,6 +41,8 @@ pub struct TopicTarget {
 #[serde(tag = "type", content = "config")]
 pub enum PortMapping {
     DIRECT(DirectTarget),
+    ANY_OF(Vec<DirectTarget>),
+    ALL_OF(Vec<DirectTarget>),
     TOPIC(TopicTarget),
 }
 

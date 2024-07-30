@@ -33,6 +33,7 @@ enum FunctionCommands {
         node_id: String,
         function_id: String,
         payload: String,
+        target_port: String,
     },
     Get {
         function_name: String,
@@ -387,8 +388,16 @@ async fn main() -> anyhow::Result<()> {
                     node_id,
                     function_id,
                     payload,
+                    target_port,
                 } => {
-                    log::info!("invoking function: {} {} {} {}", event_type, node_id, function_id, payload);
+                    log::info!(
+                        "invoking function: {} {} {} {} {}",
+                        event_type,
+                        node_id,
+                        function_id,
+                        payload,
+                        target_port
+                    );
                     let mut client = edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&invocation_url).await;
                     let event = edgeless_api::invocation::Event {
                         target: edgeless_api::function_instance::InstanceId {
@@ -401,6 +410,7 @@ async fn main() -> anyhow::Result<()> {
                             "cast" => edgeless_api::invocation::EventData::Cast(payload),
                             _ => return Err(anyhow::anyhow!("invalid event type: {}", event_type)),
                         },
+                        target_port: edgeless_api::function_instance::PortId(target_port),
                     };
                     match edgeless_api::invocation::InvocationAPI::handle(&mut client, event).await {
                         Ok(_) => println!("event casted"),
@@ -558,6 +568,18 @@ fn parse_port_mapping(mapping: &workflow_spec::PortMapping) -> edgeless_api::wor
         crate::workflow_spec::PortMapping::DIRECT(direct_target) => edgeless_api::workflow_instance::PortMapping::DirectTarget(
             direct_target.target_component.clone(),
             edgeless_api::function_instance::PortId(direct_target.port.clone()),
+        ),
+        crate::workflow_spec::PortMapping::ANY_OF(targets) => edgeless_api::workflow_instance::PortMapping::AnyOfTargets(
+            targets
+                .iter()
+                .map(|t| (t.target_component.clone(), edgeless_api::function_instance::PortId(t.port.clone())))
+                .collect(),
+        ),
+        crate::workflow_spec::PortMapping::ALL_OF(targets) => edgeless_api::workflow_instance::PortMapping::AllOfTargets(
+            targets
+                .iter()
+                .map(|t| (t.target_component.clone(), edgeless_api::function_instance::PortId(t.port.clone())))
+                .collect(),
         ),
         crate::workflow_spec::PortMapping::TOPIC(topic_target) => edgeless_api::workflow_instance::PortMapping::Topic(topic_target.topic.clone()),
     }

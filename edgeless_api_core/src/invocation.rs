@@ -24,6 +24,8 @@ pub struct Event<T> {
     pub stream_id: u64,
     #[n(3)]
     pub data: EventData<T>,
+    #[n(4)]
+    pub target_port: super::port::Port<32>,
 }
 
 #[derive(Debug, PartialEq, Eq)]

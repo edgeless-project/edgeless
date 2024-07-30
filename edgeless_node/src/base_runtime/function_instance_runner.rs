@@ -198,11 +198,12 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
                     return self.stop().await;
                 },
                 // Receive a normal event from the dataplane and invoke the function instance
-                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message} =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, target_port} =  Box::pin(self.data_plane.receive_next()).fuse() => {
                     self.process_message(
                         source_id,
                         channel_id,
                         message,
+                        target_port
                     ).await?;
                 }
             }
@@ -214,10 +215,11 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         source_id: edgeless_api::function_instance::InstanceId,
         channel_id: u64,
         message: edgeless_dataplane::core::Message,
+        target_port: edgeless_api::function_instance::PortId,
     ) -> Result<(), super::FunctionInstanceError> {
         match message {
-            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id.clone(), payload).await,
-            edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, payload, channel_id).await,
+            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id.clone(), target_port, payload).await,
+            edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, target_port, payload, channel_id).await,
             _ => {
                 log::debug!("Unprocessed Message");
                 Ok(())
@@ -228,6 +230,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     async fn process_cast_message(
         &mut self,
         source_id: edgeless_api::function_instance::InstanceId,
+        target_port: edgeless_api::function_instance::PortId,
         payload: String,
     ) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
@@ -235,7 +238,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         self.function_instance
             .as_mut()
             .ok_or(super::FunctionInstanceError::InternalError)?
-            .cast(&source_id, &payload)
+            .cast(&source_id, target_port.0.as_str(), &payload)
             .await?;
 
         self.telemetry_handle.observe(
@@ -248,6 +251,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     async fn process_call_message(
         &mut self,
         source_id: edgeless_api::function_instance::InstanceId,
+        target_port: edgeless_api::function_instance::PortId,
         payload: String,
         channel_id: u64,
     ) -> Result<(), super::FunctionInstanceError> {
@@ -257,7 +261,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             .function_instance
             .as_mut()
             .ok_or(super::FunctionInstanceError::InternalError)?
-            .call(&source_id, &payload)
+            .call(&source_id, target_port.0.as_str(), &payload)
             .await?;
 
         self.telemetry_handle.observe(

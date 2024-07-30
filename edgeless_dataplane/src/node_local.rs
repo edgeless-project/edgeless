@@ -20,6 +20,7 @@ impl DataPlaneLink for NodeLocalLink {
         msg: Message,
         src: &edgeless_api::function_instance::InstanceId,
         stream_id: u64,
+        target_port: edgeless_api::function_instance::PortId,
     ) -> LinkProcessingResult {
         if target.node_id == self.node_id {
             return self
@@ -37,6 +38,7 @@ impl DataPlaneLink for NodeLocalLink {
                         Message::CallNoRet => edgeless_api::invocation::EventData::CallNoRet,
                         Message::Err => edgeless_api::invocation::EventData::Err,
                     },
+                    target_port: target_port,
                 })
                 .await
                 .unwrap();
@@ -67,6 +69,7 @@ impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
                     source_id: event.source.clone(),
                     channel_id: event.stream_id,
                     message: msg,
+                    target_port: event.target_port.clone(),
                 })
                 .await
             {
@@ -131,7 +134,13 @@ mod test {
         assert!(receiver_2.try_next().is_err());
 
         let ret_1 = handle_1
-            .handle_send(&fid_3, crate::core::Message::Cast("".to_string()), &fid_1, 0)
+            .handle_send(
+                &fid_3,
+                crate::core::Message::Cast("".to_string()),
+                &fid_1,
+                0,
+                edgeless_api::function_instance::PortId("test".to_string()),
+            )
             .as_mut()
             .await;
 
@@ -140,7 +149,13 @@ mod test {
         assert!(receiver_2.try_next().is_err());
 
         let ret_2 = handle_1
-            .handle_send(&fid_2, crate::core::Message::Cast("".to_string()), &fid_1, 0)
+            .handle_send(
+                &fid_2,
+                crate::core::Message::Cast("".to_string()),
+                &fid_1,
+                0,
+                edgeless_api::function_instance::PortId("test".to_string()),
+            )
             .as_mut()
             .await;
 

@@ -32,6 +32,8 @@ pub async fn cast_raw(
     mut caller: wasmtime::Caller<'_, GuestAPI>,
     instance_node_id_ptr: i32,
     instance_component_id_ptr: i32,
+    port_ptr: i32,
+    port_len: i32,
     payload_ptr: i32,
     payload_len: i32,
 ) -> wasmtime::Result<()> {
@@ -42,12 +44,14 @@ pub async fn cast_raw(
         node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmtime::Error::msg("uuid error"))?),
         function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmtime::Error::msg("uuid error"))?),
     };
+
+    let port = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, port_ptr, port_len)?;
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     caller
         .data_mut()
         .host
-        .cast_raw(instance_id, &payload)
+        .cast_raw(instance_id, edgeless_api::function_instance::PortId(port), &payload)
         .await
         .map_err(|_| wasmtime::Error::msg("string error"))?;
     Ok(())
@@ -57,6 +61,8 @@ pub async fn call_raw(
     mut caller: wasmtime::Caller<'_, GuestAPI>,
     instance_node_id_ptr: i32,
     instance_component_id_ptr: i32,
+    port_ptr: i32,
+    port_len: i32,
     payload_ptr: i32,
     payload_len: i32,
     out_ptr_ptr: i32,
@@ -70,12 +76,14 @@ pub async fn call_raw(
         node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmtime::Error::msg("uuid error"))?),
         function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmtime::Error::msg("uuid error"))?),
     };
+
+    let port = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, port_ptr, port_len)?;
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     let call_ret = caller
         .data_mut()
         .host
-        .call_raw(instance_id, &payload)
+        .call_raw(instance_id, edgeless_api::function_instance::PortId(port), &payload)
         .await
         .map_err(|_| wasmtime::Error::msg("call error"))?;
     match call_ret {

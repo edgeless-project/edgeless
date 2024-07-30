@@ -6,19 +6,19 @@ use edgeless_function::*;
 struct PingerFun;
 
 impl EdgeFunction for PingerFun {
-    fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
+    fn handle_cast(_src: InstanceId, port: &str, encoded_message: &[u8]) {
         let msg = core::str::from_utf8(encoded_message);
 
         if msg.unwrap() == "wakeup" {
             log::info!("AsyncPinger: 'Cast' Wakeup");
-            cast("ponger", b"PING");
+            cast("ping", b"PING");
             delayed_cast(1000, "self", b"wakeup");
         } else {
             log::info!("AsyncPinger: 'Cast' Got Response");
         }
     }
 
-    fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
+    fn handle_call(_src: InstanceId, _port: &str, encoded_message: &[u8]) -> CallRet {
         log::info!("AsyncPinger: 'Call' called, MSG: {}", core::str::from_utf8(encoded_message).unwrap());
         CallRet::NoReply
     }

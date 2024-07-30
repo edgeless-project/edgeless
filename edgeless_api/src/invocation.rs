@@ -27,6 +27,7 @@ impl std::fmt::Display for EventData {
 pub struct Event {
     pub target: crate::function_instance::InstanceId,
     pub source: crate::function_instance::InstanceId,
+    pub target_port: crate::function_instance::PortId,
     pub stream_id: u64,
     pub data: EventData,
 }

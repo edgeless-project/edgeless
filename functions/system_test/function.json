@@ -27,5 +27,6 @@
             "method": "CAST",
             "data_type": "String"
         }
-    }
+    },
+    "inner_structure": []
 }

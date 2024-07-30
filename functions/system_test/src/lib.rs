@@ -6,7 +6,7 @@ use edgeless_function::*;
 struct SystemTest;
 
 impl EdgeFunction for SystemTest {
-    fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
+    fn handle_cast(_src: InstanceId, port: &str, encoded_message: &[u8]) {
         let str_message = core::str::from_utf8(encoded_message).unwrap();
         log::info!("cast {:?}: {}", _src.component_id, str_message);
 
@@ -20,7 +20,7 @@ impl EdgeFunction for SystemTest {
         cast("log", encoded_message);
     }
 
-    fn handle_call(_src: InstanceId, _encoded_message: &[u8]) -> CallRet {
+    fn handle_call(_src: InstanceId, port: &str, _encoded_message: &[u8]) -> CallRet {
         CallRet::NoReply
     }
 

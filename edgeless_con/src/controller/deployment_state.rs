@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use edgeless_api::grpc_impl::api::port_mapping;
+
 #[derive(Clone)]
 pub struct ActiveWorkflow {
     // Workflow as it was requested by the client.
@@ -25,6 +27,12 @@ pub struct ActiveComponent {
 
     // Identifier returned by the e-ORC.
     pub fid: edgeless_api::function_instance::ComponentId,
+}
+
+pub enum LogicalOutput {
+    Single((String, edgeless_api::function_instance::PortId)),
+    Any(Vec<(String, edgeless_api::function_instance::PortId)>),
+    All(Vec<(String, edgeless_api::function_instance::PortId)>),
 }
 
 impl ActiveWorkflow {
@@ -65,7 +73,68 @@ impl ActiveWorkflow {
         component_names
     }
 
-    pub fn component_output_mapping(&self, component_name: &str) -> std::collections::HashMap<String, String> {
+    pub fn optimize_logical(&mut self) {
+        self.convert_topic_ports();
+    }
+
+    fn convert_topic_ports(&mut self) {
+        let mut targets = std::collections::HashMap::<String, Vec<(String, edgeless_api::function_instance::PortId)>>::new();
+
+        // Find Targets
+        for function in &mut self.desired_state.workflow_functions {
+            function.input_mapping.retain(|port_id, port_mapping| match port_mapping {
+                edgeless_api::workflow_instance::PortMapping::Topic(topic) => {
+                    targets
+                        .entry(topic.clone())
+                        .or_insert(Vec::new())
+                        .push((function.name.clone(), port_id.clone()));
+                    false
+                }
+                _ => true,
+            })
+        }
+        for resource in &mut self.desired_state.workflow_resources {
+            resource.input_mapping.retain(|port_id, port_mapping| match port_mapping {
+                edgeless_api::workflow_instance::PortMapping::Topic(topic) => {
+                    targets
+                        .entry(topic.clone())
+                        .or_insert(Vec::new())
+                        .push((resource.name.clone(), port_id.clone()));
+                    false
+                }
+                _ => true,
+            })
+        }
+
+        // Create Outputs
+        for function in &mut self.desired_state.workflow_functions {
+            function.output_mapping.iter_mut().for_each(|(_port_id, port_mapping)| {
+                if let edgeless_api::workflow_instance::PortMapping::Topic(topic) = port_mapping.clone() {
+                    *port_mapping = edgeless_api::workflow_instance::PortMapping::AllOfTargets(
+                        targets
+                            .get(&topic)
+                            .unwrap_or(&Vec::<(String, edgeless_api::function_instance::PortId)>::new())
+                            .clone(),
+                    );
+                }
+            });
+        }
+        for resource in &mut self.desired_state.workflow_resources {
+            resource.output_mapping.iter_mut().for_each(|(_port_id, port_mapping)| {
+                if let edgeless_api::workflow_instance::PortMapping::Topic(topic) = port_mapping.clone() {
+                    *port_mapping = edgeless_api::workflow_instance::PortMapping::AllOfTargets(
+                        targets
+                            .get(&topic)
+                            .unwrap_or(&Vec::<(String, edgeless_api::function_instance::PortId)>::new())
+                            .clone(),
+                    );
+                }
+            });
+        }
+    }
+
+    pub fn component_output_mapping(&self, component_name: &str) -> std::collections::HashMap<String, LogicalOutput> {
+        
         if let Some(function) = self
             .desired_state
             .workflow_functions
@@ -75,12 +144,17 @@ impl ActiveWorkflow {
             return function
                 .output_mapping
                 .iter()
-                .filter_map(|(port, dest_mapping)| {
-                    if let edgeless_api::workflow_instance::PortMapping::DirectTarget(component, _port) = dest_mapping {
-                        Some((port.0.clone(), component.clone()))
-                    } else {
-                        None
+                .filter_map(|(port, dest_mapping)| match dest_mapping {
+                    edgeless_api::workflow_instance::PortMapping::DirectTarget(component, dest_port) => {
+                        Some((port.0.clone(), LogicalOutput::Single((component.clone(), dest_port.clone()))))
                     }
+                    edgeless_api::workflow_instance::PortMapping::AnyOfTargets(targets) => {
+                        Some((port.0.clone(), LogicalOutput::Any(targets.clone())))
+                    }
+                    edgeless_api::workflow_instance::PortMapping::AllOfTargets(targets) => {
+                        Some((port.0.clone(), LogicalOutput::All(targets.clone())))
+                    }
+                    _ => None,
                 })
                 .collect();
         }
@@ -94,12 +168,17 @@ impl ActiveWorkflow {
             return resource
                 .output_mapping
                 .iter()
-                .filter_map(|(port, dest_mapping)| {
-                    if let edgeless_api::workflow_instance::PortMapping::DirectTarget(component, _port) = dest_mapping {
-                        Some((port.0.clone(), component.clone()))
-                    } else {
-                        None
+                .filter_map(|(port, dest_mapping)| match dest_mapping {
+                    edgeless_api::workflow_instance::PortMapping::DirectTarget(component, port) => {
+                        Some((port.0.clone(), LogicalOutput::Single((component.clone(), port.clone()))))
                     }
+                    edgeless_api::workflow_instance::PortMapping::AnyOfTargets(targets) => {
+                        Some((port.0.clone(), LogicalOutput::Any(targets.clone())))
+                    }
+                    edgeless_api::workflow_instance::PortMapping::AllOfTargets(targets) => {
+                        Some((port.0.clone(), LogicalOutput::All(targets.clone())))
+                    }
+                    _ => None,
                 })
                 .collect();
         }

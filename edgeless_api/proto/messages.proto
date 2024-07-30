@@ -210,15 +210,20 @@ message PatchRequest {
     map<string, InstanceOutput> output_mapping = 3;
 }
 
-message InstanceIdVec {
-    repeated InstanceId data = 1;
+message Target {
+    InstanceId instance_id = 1;
+    string port_id = 2;
+}
+
+message TargetVec {
+    repeated Target data = 1;
 }
 
 message InstanceOutput {
     oneof OutputType {
-        InstanceId single = 1;
-        InstanceIdVec any  = 2;
-        InstanceIdVec all = 3;
+        Target single = 1;
+        TargetVec any  = 2;
+        TargetVec all = 3;
     }
 }
 
@@ -227,10 +232,16 @@ message WorkflowComponentPort {
     string port_id = 2;
 }
 
+message WorkflowComponentPortVec {
+    repeated WorkflowComponentPort data = 1;
+}
+
 message PortMapping {
     oneof MappingType {
         WorkflowComponentPort direct_target = 1;
-        string topic = 2;
+        WorkflowComponentPortVec any_targets = 2;
+        WorkflowComponentPortVec all_targets = 3;
+        string topic = 4;
     }
 }
 
@@ -344,6 +355,8 @@ message Event {
     uint64 stream_id  = 3;
     // Event data.
     EventData msg     = 4;
+
+    string target_port = 5;
 }
 
 // Resource provider specification.

@@ -44,9 +44,9 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
             let method = edgeless_http::hyper_method_to_edgeless(&parts.method)?;
             let data = body.collect().await?.to_bytes();
 
-            if let Some((host, target)) = lck.interests.iter().find_map(|intr| {
+            if let Some((host, target, target_port)) = lck.interests.iter().find_map(|intr| {
                 if host == intr.host && intr.allow.contains(&method) {
-                    Some((intr.host.clone(), intr.target.clone()))
+                    Some((intr.host.clone(), intr.target.clone(), intr.target_port.clone()))
                 } else {
                     None
                 }
@@ -70,7 +70,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                         .collect(),
                 };
                 let serialized_msg = serde_json::to_string(&msg)?;
-                let res = lck.dataplane.call(target.clone(), serialized_msg).await;
+                let res = lck.dataplane.call(target.clone(), target_port, serialized_msg).await;
                 match res {
                     edgeless_dataplane::core::CallRet::Reply(data) => {
                         let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_str(&data)?;
@@ -224,7 +224,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             }
         };
 
-        if let edgeless_api::common::Output::Single(target) = target {
+        if let edgeless_api::common::Output::Single(target, port_id) = target {
             lck.interests.push(HTTPIngressInterest {
                 resource_id: InstanceId {
                     node_id: self.own_node_id.clone(),
@@ -233,6 +233,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                 host,
                 allow,
                 target,
+                target_port: port_id,
             });
 
             Ok(())
@@ -247,4 +248,5 @@ struct HTTPIngressInterest {
     host: String,
     allow: std::collections::HashSet<edgeless_http::EdgelessHTTPMethod>,
     target: edgeless_api::function_instance::InstanceId,
+    target_port: edgeless_api::function_instance::PortId,
 }

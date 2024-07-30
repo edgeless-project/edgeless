@@ -8,7 +8,7 @@ use log;
 struct StateTest;
 
 impl EdgeFunction for StateTest {
-    fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
+    fn handle_cast(_src: InstanceId, port: &str, encoded_message: &[u8]) {
         match core::str::from_utf8(encoded_message).unwrap() {
             "test_cast_raw_output" => {
                 sync("new_state".as_bytes());
@@ -19,7 +19,7 @@ impl EdgeFunction for StateTest {
         }
     }
 
-    fn handle_call(_src: InstanceId, _encoded_message: &[u8]) -> CallRet {
+    fn handle_call(_src: InstanceId, port: &str, _encoded_message: &[u8]) -> CallRet {
         CallRet::NoReply
     }
 

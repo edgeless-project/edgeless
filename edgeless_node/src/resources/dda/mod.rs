@@ -40,7 +40,7 @@ struct DDAResourceProviderInner {
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     dda_resource: DDAResource,
     //target_id: Vec<edgeless_api::function_instance::InstanceId>,
-    output_mapping: std::collections::HashMap<String, InstanceId>,
+    output_mapping: std::collections::HashMap<String, (InstanceId, edgeless_api::function_instance::PortId)>,
 }
 
 pub struct DDAResource {
@@ -140,9 +140,9 @@ impl DDAResource {
                                         let inner = dda_resource_provider.inner.lock().await;
 
                                         //TODO: In future, this should be iterated upon since multiple outputs might be mapped
-                                        if let Some(target_id) = inner.output_mapping.get(&dda_sub.cast_mapping.to_string()) {
+                                        if let Some((target_id, target_port)) = inner.output_mapping.get(&dda_sub.cast_mapping.to_string()) {
                                             log::info!("target id for data {} from subscription is {}", str, target_id);
-                                            dataplane_handle.send(target_id.clone(), str.to_string()).await;
+                                            dataplane_handle.send(target_id.clone(), target_port.clone(), str.to_string()).await;
                                         } else {
                                             log::info!("target id unknwon for data {} from subscription", str);
                                         }
@@ -175,6 +175,7 @@ impl DDAResource {
                     source_id,
                     channel_id,
                     message,
+                    target_port,
                 } = dataplane_handle.receive_next().await;
 
                 let mut need_reply = false;
@@ -314,11 +315,12 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
 
     //always gets called after instantiation
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
-        let mut output_targets = std::collections::HashMap::<String, edgeless_api::function_instance::InstanceId>::new();
+        let mut output_targets =
+            std::collections::HashMap::<String, (edgeless_api::function_instance::InstanceId, edgeless_api::function_instance::PortId)>::new();
 
         for (id, output) in update.output_mapping {
-            if let edgeless_api::common::Output::Single(target) = output {
-                output_targets.insert(id, target);
+            if let edgeless_api::common::Output::Single(target, port_id) = output {
+                output_targets.insert(id, (target, port_id));
             } else {
                 return Err(anyhow::anyhow!("Unsupported Output Type"));
             }

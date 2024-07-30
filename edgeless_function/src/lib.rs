@@ -45,8 +45,8 @@ pub struct InstanceId {
 }
 
 pub trait EdgeFunction {
-    fn handle_cast(src: InstanceId, encoded_message: &[u8]);
-    fn handle_call(src: InstanceId, encoded_message: &[u8]) -> CallRet;
+    fn handle_cast(src: InstanceId, port: &str, encoded_message: &[u8]);
+    fn handle_call(src: InstanceId, port: &str, encoded_message: &[u8]) -> CallRet;
     fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>);
     fn handle_stop();
 }

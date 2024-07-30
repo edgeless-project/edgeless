@@ -39,6 +39,7 @@ impl DataplaneHandle {
                     source_id,
                     channel_id,
                     message,
+                    target_port,
                 }) = receiver.next().await
                 {
                     if let Some(sender) = clone_overwrites.lock().await.temporary_receivers.remove(&channel_id) {
@@ -56,6 +57,7 @@ impl DataplaneHandle {
                             source_id,
                             channel_id,
                             message,
+                            target_port,
                         })
                         .await
                     {
@@ -85,6 +87,7 @@ impl DataplaneHandle {
                 source_id,
                 channel_id,
                 message,
+                target_port: target_channel,
             }) = self.receiver.lock().await.next().await
             {
                 if std::mem::discriminant(&message) == std::mem::discriminant(&Message::Cast("".to_string()))
@@ -94,6 +97,7 @@ impl DataplaneHandle {
                         source_id,
                         channel_id,
                         message,
+                        target_port: target_channel,
                     };
                 }
                 log::error!("Unprocesses other message");
@@ -102,19 +106,29 @@ impl DataplaneHandle {
     }
 
     /// Send a `cast` event.
-    pub async fn send(&mut self, target: edgeless_api::function_instance::InstanceId, msg: String) {
-        self.send_inner(target, Message::Cast(msg), 0).await;
+    pub async fn send(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+        target_port: edgeless_api::function_instance::PortId,
+        msg: String,
+    ) {
+        self.send_inner(target, Message::Cast(msg), target_port, 0).await;
     }
 
     // Send a `call` event and wait for the return event.
     // Internally, this sets up a receiver override to handle the message before it would be sent to the `receive_next` function.
-    pub async fn call(&mut self, target: edgeless_api::function_instance::InstanceId, msg: String) -> CallRet {
+    pub async fn call(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+        target_port: edgeless_api::function_instance::PortId,
+        msg: String,
+    ) -> CallRet {
         let (sender, receiver) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
         let channel_id = self.next_id;
         self.next_id += 1;
         // Potential Leak: This is only received if a message is received (or the handle is dropped)
         self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
-        self.send_inner(target, Message::Call(msg), channel_id).await;
+        self.send_inner(target, Message::Call(msg), target_port, channel_id).await;
         match receiver.await {
             Ok((_src, msg)) => match msg {
                 Message::CallRet(ret) => CallRet::Reply(ret),
@@ -134,15 +148,22 @@ impl DataplaneHandle {
                 CallRet::NoReply => Message::CallNoRet,
                 CallRet::Err => Message::Err,
             },
+            edgeless_api::function_instance::PortId("reply".to_string()),
             channel_id,
         )
         .await;
     }
 
-    async fn send_inner(&mut self, target: edgeless_api::function_instance::InstanceId, msg: Message, channel_id: u64) {
+    async fn send_inner(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+        msg: Message,
+        target_port: edgeless_api::function_instance::PortId,
+        channel_id: u64,
+    ) {
         let mut lck = self.output_chain.lock().await;
         for link in &mut lck.iter_mut() {
-            match link.handle_send(&target, msg.clone(), &self.slf, channel_id).await {
+            match link.handle_send(&target, msg.clone(), &self.slf, channel_id, target_port.clone()).await {
                 LinkProcessingResult::FINAL => {
                     return;
                 }
@@ -240,7 +261,9 @@ mod test {
         let mut handle_1 = provider.get_handle_for(fid_1.clone()).await;
         let mut handle_2 = provider.get_handle_for(fid_2.clone()).await;
 
-        handle_1.send(fid_2, "Test".to_string()).await;
+        handle_1
+            .send(fid_2, edgeless_api::function_instance::PortId("test".to_string()), "Test".to_string())
+            .await;
 
         let res = handle_2.receive_next().await;
         assert_eq!(
@@ -260,7 +283,11 @@ mod test {
         let mut handle_1 = provider.get_handle_for(fid_1.clone()).await;
         let mut handle_2 = provider.get_handle_for(fid_2.clone()).await;
 
-        let return_handle = tokio::spawn(async move { handle_1.call(fid_2, "Test".to_string()).await });
+        let return_handle = tokio::spawn(async move {
+            handle_1
+                .call(fid_2, edgeless_api::function_instance::PortId("test".to_string()), "Test".to_string())
+                .await
+        });
 
         let req = handle_2.receive_next().await;
         assert_eq!(
@@ -315,7 +342,13 @@ mod test {
         let mut handle_1 = provider_1.get_handle_for(fid_1.clone()).await;
         let mut handle_2 = provider_2.get_handle_for(fid_2.clone()).await;
 
-        handle_1.send(fid_2.clone(), "Test".to_string()).await;
+        handle_1
+            .send(
+                fid_2.clone(),
+                edgeless_api::function_instance::PortId("test".to_string()),
+                "Test".to_string(),
+            )
+            .await;
         let cast_req = handle_2.receive_next().await;
         assert_eq!(
             std::mem::discriminant(&cast_req.message),
@@ -325,7 +358,15 @@ mod test {
         let cloned_id_1 = fid_1.clone();
         let mut cloned_handle_2 = handle_2.clone();
 
-        let return_handle = tokio::spawn(async move { cloned_handle_2.call(cloned_id_1, "Test".to_string()).await });
+        let return_handle = tokio::spawn(async move {
+            cloned_handle_2
+                .call(
+                    cloned_id_1,
+                    edgeless_api::function_instance::PortId("test".to_string()),
+                    "Test".to_string(),
+                )
+                .await
+        });
 
         let call_req = handle_1.receive_next().await;
         assert_eq!(

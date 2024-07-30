@@ -43,7 +43,14 @@
                     }
                 }
             },
-            "input_mapping": {},
+            "input_mapping": {
+                "ping": {
+                    "type": "TOPIC",
+                    "config": {
+                        "topic": "/foo/bar"
+                    }
+                }
+            },
             "annotations": {}
         },
         {
@@ -92,10 +99,9 @@
             },
             "output_mapping": {
                 "ping": {
-                    "type": "DIRECT",
+                    "type": "TOPIC",
                     "config": {
-                        "target_component": "ponger",
-                        "port": "ping"
+                        "topic": "/foo/bar"
                     }
                 }
             },

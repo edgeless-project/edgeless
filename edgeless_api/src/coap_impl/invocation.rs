@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+use std::str::FromStr;
+
 pub struct CoapInvocationServer {
     sock: tokio::net::UdpSocket,
     root_api: Box<dyn crate::invocation::InvocationAPI>,
@@ -46,6 +48,7 @@ impl CoapInvocationServer {
                                 edgeless_api_core::invocation::EventData::CallNoRet => crate::invocation::EventData::CallNoRet,
                                 edgeless_api_core::invocation::EventData::Err => crate::invocation::EventData::Err,
                             },
+                            target_port: crate::function_instance::PortId(String::from_str(invocation_event.target_port.0.as_str()).unwrap()),
                         };
 
                         let key_entry = received_tokens.entry(sender.ip());
@@ -80,6 +83,7 @@ impl crate::invocation::InvocationAPI for super::CoapClient {
         let encoded_event = edgeless_api_core::invocation::Event::<&[u8]> {
             target: event.target,
             source: event.source,
+            target_port: edgeless_api_core::port::Port(heapless::String::from_str(&event.target_port.0).unwrap()),
             stream_id: event.stream_id,
             data: match &event.data {
                 crate::invocation::EventData::Cast(val) => edgeless_api_core::invocation::EventData::Cast(val.as_bytes().into()),

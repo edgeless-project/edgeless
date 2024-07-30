@@ -28,6 +28,8 @@ pub fn cast_raw(
     mut caller: wasmi::Caller<'_, GuestAPI>,
     instance_node_id_ptr: i32,
     instance_component_id_ptr: i32,
+    port_ptr: i32,
+    port_len: i32,
     payload_ptr: i32,
     payload_len: i32,
 ) -> Result<(), wasmi::core::Trap> {
@@ -38,10 +40,18 @@ pub fn cast_raw(
         node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmi::core::Trap::new("uuid error"))?),
         function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmi::core::Trap::new("uuid error"))?),
     };
+
+    let port = load_string_from_vm(&mut caller.as_context_mut(), &mem, port_ptr, port_len)?;
+
     let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     tokio::runtime::Handle::current()
-        .block_on(caller.data_mut().host.cast_raw(instance_id, &payload))
+        .block_on(
+            caller
+                .data_mut()
+                .host
+                .cast_raw(instance_id, edgeless_api::function_instance::PortId(port), &payload),
+        )
         .map_err(|_| wasmi::core::Trap::new("string error"))?;
     Ok(())
 }
@@ -50,6 +60,8 @@ pub fn call_raw(
     mut caller: wasmi::Caller<'_, GuestAPI>,
     instance_node_id_ptr: i32,
     instance_component_id_ptr: i32,
+    port_ptr: i32,
+    port_len: i32,
     payload_ptr: i32,
     payload_len: i32,
     out_ptr_ptr: i32,
@@ -63,10 +75,17 @@ pub fn call_raw(
         node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmi::core::Trap::new("uuid error"))?),
         function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmi::core::Trap::new("uuid error"))?),
     };
+
+    let port = load_string_from_vm(&mut caller.as_context_mut(), &mem, port_ptr, port_len)?;
     let payload = load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
     let call_ret = tokio::runtime::Handle::current()
-        .block_on(caller.data_mut().host.call_raw(instance_id, &payload))
+        .block_on(
+            caller
+                .data_mut()
+                .host
+                .call_raw(instance_id, edgeless_api::function_instance::PortId(port), &payload),
+        )
         .map_err(|_| wasmi::core::Trap::new("call error"))?;
     match call_ret {
         edgeless_dataplane::core::CallRet::NoReply => Ok(0),

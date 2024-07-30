@@ -80,6 +80,7 @@ impl OllamaResource {
                     source_id: _,
                     channel_id: _,
                     message,
+                    target_port,
                 } = dataplane_handle.receive_next().await;
 
                 // Ignore any non-cast messages.
@@ -105,7 +106,7 @@ impl OllamaResource {
                 match reply_receiver.await {
                     Ok(response) => match response {
                         Ok((target, response)) => {
-                            let _ = dataplane_handle.send(target, response).await;
+                            let _ = dataplane_handle.send(target, target_port, response).await;
                         }
                         Err(err) => {
                             log::warn!("Error from ollama: {}", err)
@@ -255,7 +256,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         }
 
         // Add/update the mapping of the resource provider to the target.
-        if let edgeless_api::common::Output::Single(id) = target {
+        if let edgeless_api::common::Output::Single(id, port_id) = target {
             let _ = lck.sender.send(OllamaCommand::Patch(update.function_id, id)).await;
         }
 
