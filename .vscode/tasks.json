@@ -2,6 +2,11 @@
     "version": "2.0.0",
     "tasks": [
         {
+            "label": "start_mqtt_broker",
+            "type": "shell",
+            "command": "brew services start mosquitto",
+        },
+        {
             "label": "start_dda",
             "command": "./scripts/start_dda.sh",
             "type": "shell",
@@ -29,20 +34,28 @@
             ]
         },
         {
-            "label": "Terminate All Tasks",
+            "label": "build_dda_library",
+            "type": "shell",
+            "command": "cargo build --package dda"
+        },
+        {
+            "label": "dda_prelaunch",
+            "dependsOn": [
+                "start_mqtt_broker",
+                "start_dda",
+                "build_dda_library"
+            ],
+            "dependsOrder": "sequence",
+            "type": "shell",
+            "command": "echo Build completed and all prerequisites started!",
+            "problemMatcher": []
+        },
+        {
+            "label": "terminate_shell",
             "command": "echo ${input:terminate}",
             "type": "shell",
             "problemMatcher": []
         },
-        {
-            "label": "start_mqtt_broker",
-            "command": "brew services start mosquitto",
-            "type": "shell"
-        },
-        {
-            "label": "build dda library",
-            "command": "cargo build --package dda"
-        }
     ],
     "inputs": [
         {

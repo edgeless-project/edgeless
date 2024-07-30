@@ -106,8 +106,10 @@ impl DDAResource {
 
         // they are like dda subscription filters + method (subscribe_x)
         // TODO: (topic, pattern) -> (target, method) max 1 (injective) ->
-        // otherwise dda would need to send the same event multiple times? this
-        // could also be the semantics
+        // otherwise dda would need to send the same event multiple times?
+        // TODO: need to test the semantics of Golang DDA - does it allow to
+        // subscribe to the same event / action / query multiple times and does
+        // it then duplicate them?
         let dda_sub_array = match dcs {
             Ok(dda_array) => dda_array,
             Err(err) => {
@@ -179,7 +181,9 @@ impl DDAResource {
                                 // response to this call - the application
                                 // developer must ensure that he responds to
                                 // actions that he has executed - this
-                                // simplifies the logic
+                                // simplifies the logic for the programmer as a
+                                // missing return value will not cause a
+                                // function to block indefinitely
                                 let _ = dataplane_handle.call(target_id, encoded).await;
                             }
                             _ => {
@@ -342,8 +346,8 @@ impl DDAResource {
         }
 
         // Spawn asynchrounous task to handle edgeless dataplane events -
-        // these are events that are received by the dda resource from other
-        // components
+        // these are incoming events from e.g. edgeless functions that need to
+        // be sent out etc.
         let mut dataplane_handle = dataplane_handle.clone();
         let mut id: u128 = 0;
         let _dda_task = tokio::spawn(async move {
@@ -366,92 +370,150 @@ impl DDAResource {
                     }
                 };
 
+                // useful for debugging to see if DDA is blocking for too long
+                let (tx, mut rx) = tokio::sync::mpsc::channel::<edgeless_dataplane::core::CallRet>(1);
+                let mut ticker = tokio::time::interval(Duration::from_millis(1000));
+                let mut handle = dataplane_handle.clone();
+                tokio::spawn(async move {
+                    loop {
+                        tokio::select! {
+                            Some(message) = rx.recv() => {
+                                handle.reply(source_id, channel_id, message).await;
+                                break;
+                            }
+
+                            _ = ticker.tick() => {
+                                // NOTE: uncomment this to see messages when the
+                                // dda is blocking - this could also be an
+                                // option in configs or smth.
+                                println!("DDA resource is blocking the dataplane of a function for another second...");
+                            }
+                        }
+                    }
+                    log::info!("dataplane is not blocked anymore!");
+                });
+
+                let respond = {
+                    move |msg: edgeless_dataplane::core::CallRet| async move {
+                        match tx.send(msg).await {
+                            Ok(_) => log::info!("replying to dda call"),
+                            Err(_) => panic!("error for debugging"),
+                        }
+                    }
+                };
+
                 match message {
                     dda::DDA::ComPublishEvent(alias, data) => {
                         let p = dda_pub_map.get(&alias).expect("publication not specified");
                         if p.pattern != "event" {
                             log::warn!("wrong publication type");
-                            dataplane_handle
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
-                                .await;
+                            respond(edgeless_dataplane::core::CallRet::Err).await;
                             continue;
                         }
-                        let topic = p.topic.to_string();
-                        let msg_id = id.to_string();
-                        id += 1;
-                        let source = self_id.clone().to_string();
                         let mut event = dda_com::Event::default();
-                        event.source = source;
-                        event.id = msg_id;
-                        event.r#type = topic;
+                        event.source = self_id.clone().to_string();
+                        event.id = id.to_string();
+                        event.r#type = p.topic.to_string();
                         event.data = data;
+                        id += 1;
                         let _ = dda_com_client.publish_event(event).await;
                         // NoReply = success for event
-                        let _ = dataplane_handle
-                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::NoReply)
-                            .await;
+                        respond(edgeless_dataplane::core::CallRet::NoReply).await;
                     }
                     dda::DDA::ComPublishAction(alias, data) => {
-                        let p = dda_pub_map.get(&alias).expect("publication not specified");
+                        let p = match dda_pub_map.get(&alias) {
+                            Some(p) => p,
+                            None => {
+                                log::warn!("attempting to publish an action using an alias which is not mapped!");
+                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                continue;
+                            }
+                        };
                         if p.pattern != "action" {
                             log::warn!("wrong publication type");
-                            dataplane_handle
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
-                                .await;
+                            respond(edgeless_dataplane::core::CallRet::Err).await;
                             continue;
                         }
-                        let topic = p.topic.to_string();
-                        let msg_id = id.to_string();
-                        id += 1;
-                        let source = self_id.clone().to_string();
                         // construct the Action
                         let mut action = dda_com::Action::default();
-                        action.source = source;
-                        action.id = msg_id;
-                        action.r#type = topic;
+                        action.source = self_id.clone().to_string();
+                        action.id = id.to_string();
+                        action.r#type = p.topic.to_string();
                         action.params = data;
+                        id += 1;
 
-                        // wait for an action response as specified in the
-                        // parameters
-                        // match
-                        // tokio::time::timeout(Duration::from_secs(1),
-                        // dda_com_client.publish_action(action)).await {
+                        // wait for an action response (currently 1)
                         match dda_com_client.publish_action(action).await {
                             Ok(res) => {
                                 let mut stream = res.into_inner();
-                                // TODO: add polling using tokio::select
                                 match stream.message().await {
                                     Ok(response) => {
                                         let action_result = response.expect("expected an action result!").data;
                                         let res = dda::DDA::ComSubscribeActionResult(action_result);
                                         let r = serde_json::to_string(&res).expect("wrong");
                                         log::info!("returning to the dda library {:?}", r);
-                                        dataplane_handle
-                                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(r))
-                                            .await;
+                                        respond(edgeless_dataplane::core::CallRet::Reply(r)).await;
                                     }
                                     Err(status) => {
                                         log::error!("could not retrieve an action within the timeout {:?}", status);
-                                        dataplane_handle
-                                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::NoReply)
-                                            .await;
+                                        respond(edgeless_dataplane::core::CallRet::NoReply).await;
                                     }
                                 }
                             }
                             Err(status) => {
                                 log::error!("gRPC call to sidecar failed {:?}", status);
-                                dataplane_handle
-                                    .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::NoReply)
-                                    .await;
+                                respond(edgeless_dataplane::core::CallRet::Err).await;
                                 continue;
                             }
                         };
                     }
                     dda::DDA::ComPublishQuery(alias, data) => {
-                        dataplane_handle
-                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
-                            .await;
-                        todo!("finish")
+                        let p = match dda_pub_map.get(&alias) {
+                            Some(p) => p,
+                            None => {
+                                log::warn!("attempting to publish a query using an alias which is not mapped!");
+                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                continue;
+                            }
+                        };
+                        if p.pattern != "query" {
+                            log::warn!("can not publish a query using alias={:?}. Mapping specifies: {:?}", alias, p.pattern);
+                            respond(edgeless_dataplane::core::CallRet::Err).await;
+                            continue;
+                        }
+                        // construct the Query
+                        let mut query = dda_com::Query::default();
+
+                        query.source = self_id.clone().to_string();
+                        query.id = id.to_string();
+                        query.r#type = p.topic.to_string();
+                        query.data = data;
+                        id += 1;
+
+                        // wait for an action response as specified in the
+                        // parameters - currently waiting for one response
+                        match dda_com_client.publish_query(query).await {
+                            Ok(res) => {
+                                let mut stream = res.into_inner();
+                                match stream.message().await {
+                                    Ok(response) => {
+                                        let query_result = response.expect("expected a query result!").data;
+                                        let res = dda::DDA::ComSubscribeQueryResult(query_result);
+                                        let r = serde_json::to_string(&res).expect("should never happen");
+                                        respond(edgeless_dataplane::core::CallRet::Reply(r)).await;
+                                    }
+                                    Err(status) => {
+                                        log::error!("could not get any result for a query{:?}", status);
+                                        respond(edgeless_dataplane::core::CallRet::NoReply).await;
+                                    }
+                                }
+                            }
+                            Err(status) => {
+                                log::error!("gRPC call to sidecar failed {:?}", status);
+                                respond(edgeless_dataplane::core::CallRet::NoReply).await;
+                                continue;
+                            }
+                        };
                     }
                     dda::DDA::ComPublishActionResult(correlation_id, data) => {
                         let mut action_result = dda_com::ActionResult::default();
@@ -462,24 +524,119 @@ impl DDAResource {
                             correlation_id,
                         };
                         let _ = dda_com_client.publish_action_result(action_result_correlated).await;
-                        dataplane_handle
-                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::NoReply)
-                            .await;
+                        respond(edgeless_dataplane::core::CallRet::NoReply).await;
                     }
                     dda::DDA::ComPublishQueryResult(correlation_id, data) => {
-                        dataplane_handle
-                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
-                            .await;
-                        todo!("finish")
+                        let mut query_result = dda_com::QueryResult::default();
+                        query_result.data = data;
+                        query_result.sequence_number = 0; // one query result will be published
+                        let query_result_correlated = dda_com::QueryResultCorrelated {
+                            result: Some(query_result),
+                            correlation_id,
+                        };
+                        let _ = dda_com_client.publish_query_result(query_result_correlated).await;
+                        respond(edgeless_dataplane::core::CallRet::NoReply).await;
                     }
-
+                    dda::DDA::StatePublishSet(key, value) => {
+                        let set_input = dda_state::Input {
+                            op: dda_state::InputOperation::Set as i32,
+                            key,
+                            value,
+                        };
+                        match dda_state_client.propose_input(set_input).await {
+                            Ok(_) => {
+                                respond(edgeless_dataplane::core::CallRet::NoReply).await;
+                            }
+                            Err(e) => {
+                                log::error!("DDA: StatePublishSet: {:?}", e.message());
+                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                            }
+                        }
+                    }
+                    dda::DDA::StatePublishDelete(key) => {
+                        let delete_input = dda_state::Input {
+                            op: dda_state::InputOperation::Delete as i32,
+                            key,
+                            value: vec![], // empty
+                        };
+                        match dda_state_client.propose_input(delete_input).await {
+                            Ok(_) => {
+                                respond(edgeless_dataplane::core::CallRet::NoReply).await;
+                            }
+                            Err(e) => {
+                                log::error!("DDA: StatePublishDelete: {:?}", e.message());
+                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                            }
+                        }
+                    }
+                    dda::DDA::StoreGet(key) => {
+                        let get = dda_store::Key { key };
+                        match dda_store_client.get(get).await {
+                            Ok(val) => match val.into_inner().value {
+                                Some(v) => {
+                                    let v_as_str = String::from_utf8(v).expect("should never happen");
+                                    respond(edgeless_dataplane::core::CallRet::Reply(v_as_str)).await;
+                                }
+                                None => {
+                                    respond(edgeless_dataplane::core::CallRet::NoReply).await;
+                                }
+                            },
+                            Err(e) => {
+                                log::error!("DDA: StoreGet: {:?}", e.message());
+                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                            }
+                        };
+                    }
+                    dda::DDA::StoreSet(key, value) => {
+                        let set = dda_store::KeyValue { key, value };
+                        match dda_store_client.set(set).await {
+                            Ok(_) => {
+                                respond(edgeless_dataplane::core::CallRet::NoReply).await;
+                            }
+                            Err(e) => {
+                                log::error!("DDA: StoreSet: {:?}", e.message());
+                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                            }
+                        };
+                    }
+                    dda::DDA::StoreDelete(key) => {
+                        let delete = dda_store::Key { key };
+                        match dda_store_client.delete(delete).await {
+                            Ok(_) => {
+                                respond(edgeless_dataplane::core::CallRet::NoReply).await;
+                            }
+                            Err(e) => {
+                                log::error!("DDA: StoreDelete: {:?}", e.message());
+                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                            }
+                        }
+                    }
+                    dda::DDA::StoreDeleteAll() => {
+                        let delete_all = dda_store::DeleteAllParams {};
+                        match dda_store_client.delete_all(delete_all).await {
+                            Ok(_) => {
+                                respond(edgeless_dataplane::core::CallRet::NoReply).await;
+                            }
+                            Err(e) => {
+                                log::error!("DDA: StoreDeleteAll: {:?}", e.message());
+                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                            }
+                        }
+                    }
+                    // TODO: implement this
+                    dda::DDA::StoreDeletePrefix(_) => todo!(),
+                    dda::DDA::StoreDeleteRange(_, _) => todo!(),
+                    dda::DDA::StoreScanPrefix(_) => todo!(),
+                    dda::DDA::StoreScanRange(_, _) => todo!(),
                     _ => {
-                        dataplane_handle
-                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
-                            .await;
-                        panic!("orphan publication");
+                        log::warn!(
+                            "this should never happen - dda received an unexpected message over the dataplane from a function / other component!"
+                        );
+                        continue;
                     }
                 }
+                // TODO: ensure that some response was sent over the dataplane -
+                // to avoid dataplane calls that block forever
             }
         });
         sub_tasks.push(_dda_task);

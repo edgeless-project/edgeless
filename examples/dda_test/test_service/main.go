@@ -99,6 +99,7 @@ func subscribeAction(ctx context.Context) {
 		println("could not subscribe to actions")
 	}
 	for action := range actions {
+		time.Sleep(time.Second * 5) // simulates long executing action to show how dda dataplane can be blocked
 		println("got an action")
 		// respond to an action with some probability - some actions will not
 		// receive a response

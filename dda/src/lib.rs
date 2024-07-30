@@ -24,23 +24,23 @@ type CorrelationId = String;
 /// perfect vessel for any needed logic
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum DDA {
-    // sent from a function to the outside
+    // send a DDA message from a function to the outside over an alias
     ComPublishEvent(PublicationAlias, Vec<u8>),  // event data
     ComPublishAction(PublicationAlias, Vec<u8>), // action data
     ComPublishQuery(PublicationAlias, Vec<u8>),  // query data
 
-    // TODO: add options for publishing directly to a topic too, not only
-    // through publication alias
+    // TODO: add publication using topic
     ComPublishActionResult(CorrelationId, Vec<u8>), // correlation_id, data
     ComPublishQueryResult(CorrelationId, Vec<u8>),  // correlation_id, data
 
     // based on the configured subscription, sent from the outside to a function
     // results to calls made from within a function
     // in the future they can be expanded to contain multiple responses
-    ComSubscribeEvent(Vec<u8>),          // analogous
-    ComSubscribeAction(String, Vec<u8>), // correlation_id, data
-    ComSubscribeQuery(String, Vec<u8>),  // correlation_id, data
+    ComSubscribeEvent(Vec<u8>),                 // data
+    ComSubscribeAction(CorrelationId, Vec<u8>), // correlation_id, data
+    ComSubscribeQuery(CorrelationId, Vec<u8>),  // correlation_id, data
 
+    //
     ComSubscribeActionResult(Vec<u8>),
     ComSubscribeQueryResult(Vec<u8>),
 
@@ -49,12 +49,12 @@ pub enum DDA {
     StateSubscribeDelete(String),                 // key
     StateSubscribeMembershipChange(String, bool), // id, joined
 
-    StatePublishSet(String, String),
+    StatePublishSet(String, Vec<u8>),
     StatePublishDelete(String),
 
     // api for the store -> from function to dda
-    StoreGet(String),         // key
-    StoreSet(String, String), // key, value
+    StoreGet(String),          // key
+    StoreSet(String, Vec<u8>), // key, value
     StoreDelete(String),
     StoreDeleteAll(),
     StoreDeletePrefix(String),
@@ -141,7 +141,7 @@ pub fn publish_query_result(correlation_id: String, result_data: Vec<u8>) -> Res
     todo!("implement")
 }
 
-pub fn state_propose_set(key: String, value: String) -> Result<(), &'static str> {
+pub fn state_propose_set(key: String, value: Vec<u8>) -> Result<(), &'static str> {
     let msg = DDA::StatePublishSet(key, value);
     match call("dda", encode(msg).as_slice()) {
         CallRet::Err => {
@@ -181,7 +181,7 @@ pub fn store_get(key: String) {
     }
 }
 
-pub fn store_set(key: String, value: String) {
+pub fn store_set(key: String, value: Vec<u8>) {
     let msg = DDA::StoreSet(key, value);
     match call("dda", encode(msg).as_slice()) {
         CallRet::Err => {

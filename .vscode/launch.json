@@ -38,8 +38,8 @@
                 }
             },
             "args": [],
-            "preLaunchTask": "start_dda",
-            "postDebugTask": "Terminate All Tasks",
+            "preLaunchTask": "dda_prelaunch",
+            "postDebugTask": "terminate_shell",
             "cwd": "${workspaceFolder}",
             "env": {
                 "RUST_LOG": "info"
