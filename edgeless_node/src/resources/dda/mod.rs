@@ -348,8 +348,8 @@ impl DDAResource {
         // Spawn asynchrounous task to handle edgeless dataplane events -
         // these are incoming events from e.g. edgeless functions that need to
         // be sent out etc.
-        let mut dataplane_handle = dataplane_handle.clone();
         let mut id: u128 = 0;
+        let mut dataplane_handle = dataplane_handle.clone();
         let _dda_task = tokio::spawn(async move {
             loop {
                 let edgeless_dataplane::core::DataplaneEvent {
@@ -370,32 +370,12 @@ impl DDAResource {
                     }
                 };
 
-                // useful for debugging to see if DDA is blocking for too long
-                let (tx, mut rx) = tokio::sync::mpsc::channel::<edgeless_dataplane::core::CallRet>(1);
-                let mut ticker = tokio::time::interval(Duration::from_millis(1000));
+                // this is not too smart since it will allocate a new handle
+                // each time - for now it's fine
                 let mut handle = dataplane_handle.clone();
-                tokio::spawn(async move {
-                    loop {
-                        tokio::select! {
-                            Some(message) = rx.recv() => {
-                                handle.reply(source_id, channel_id, message).await;
-                                break;
-                            }
-
-                            // NOTE: uncomment this to see messages when the
-                            // dda is blocking - this could also be an option in configs or smth.
-                            // _ = ticker.tick() => {
-
-                            //     log::info!("DDA resource is blocking the dataplane of a function for another second...");
-                            // }
-                        }
-                    }
-                    // log::info!("dataplane is not blocked anymore!");
-                });
-
                 let respond = {
                     move |msg: edgeless_dataplane::core::CallRet| async move {
-                        tx.send(msg).await;
+                        let _ = handle.reply(source_id, channel_id, msg).await;
                     }
                 };
 
