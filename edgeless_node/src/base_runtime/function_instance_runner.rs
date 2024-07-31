@@ -300,7 +300,11 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionExit(match exit_status {
                 Ok(_) => edgeless_telemetry::telemetry_events::FunctionExitStatus::Ok,
                 Err(exit_err) => match exit_err {
-                    FunctionInstanceError::BadCode => edgeless_telemetry::telemetry_events::FunctionExitStatus::CodeError,
+                    FunctionInstanceError::BadCode(_) => {
+                        // NOTE: eventually pass the error message to the
+                        // telemetry endpoint
+                        edgeless_telemetry::telemetry_events::FunctionExitStatus::CodeError
+                    }
                     _ => edgeless_telemetry::telemetry_events::FunctionExitStatus::InternalError,
                 },
             }),

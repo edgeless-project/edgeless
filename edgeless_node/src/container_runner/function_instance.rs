@@ -32,7 +32,10 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
         if let Some((fun_type, fun_addr)) = fun_spec.split_once(':') {
             if fun_type != "grpc" && fun_type != "container" {
                 log::error!("container function type not implemented: {}", fun_type);
-                return Err(crate::base_runtime::FunctionInstanceError::BadCode);
+                return Err(crate::base_runtime::FunctionInstanceError::BadCode(format!(
+                    "container function type not implemented: {}",
+                    fun_type,
+                )));
             }
 
             let mut grpc_address = fun_addr.to_string();
@@ -109,7 +112,10 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
             }
         } else {
             log::error!("invalid container function specifier: {}", fun_spec);
-            Err(crate::base_runtime::FunctionInstanceError::BadCode)
+            Err(crate::base_runtime::FunctionInstanceError::BadCode(format!(
+                "invalid container function specifier: {}",
+                fun_spec
+            )))
         }
     }
 
