@@ -382,23 +382,20 @@ impl DDAResource {
                                 break;
                             }
 
-                            _ = ticker.tick() => {
-                                // NOTE: uncomment this to see messages when the
-                                // dda is blocking - this could also be an
-                                // option in configs or smth.
-                                log::info!("DDA resource is blocking the dataplane of a function for another second...");
-                            }
+                            // NOTE: uncomment this to see messages when the
+                            // dda is blocking - this could also be an option in configs or smth.
+                            // _ = ticker.tick() => {
+
+                            //     log::info!("DDA resource is blocking the dataplane of a function for another second...");
+                            // }
                         }
                     }
-                    log::info!("dataplane is not blocked anymore!");
+                    // log::info!("dataplane is not blocked anymore!");
                 });
 
                 let respond = {
                     move |msg: edgeless_dataplane::core::CallRet| async move {
-                        match tx.send(msg).await {
-                            Ok(_) => log::info!("replying to dda call"),
-                            Err(_) => panic!("error for debugging"),
-                        }
+                        tx.send(msg).await;
                     }
                 };
 
@@ -451,7 +448,6 @@ impl DDAResource {
                                         let action_result = response.expect("expected an action result!").data;
                                         let res = dda::DDA::ComSubscribeActionResult(action_result);
                                         let r = serde_json::to_string(&res).expect("wrong");
-                                        log::info!("returning to the dda library {:?}", r);
                                         respond(edgeless_dataplane::core::CallRet::Reply(r)).await;
                                     }
                                     Err(status) => {

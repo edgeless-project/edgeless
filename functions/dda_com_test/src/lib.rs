@@ -12,7 +12,7 @@ impl EdgeFunction for DDAComTest {
         log::info!("com: cast called");
         // incoming cast contains an event (as specified in workflow)
         let data = match dda::parse(encoded_message) {
-            dda::DDA::ComSubscribeEvent(event) => String::from_utf8(event),
+            dda::DDA::ComSubscribeEvent(event_data) => String::from_utf8(event_data),
             _ => {
                 log::error!("this should never happen");
                 return;

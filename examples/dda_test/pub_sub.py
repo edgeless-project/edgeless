@@ -65,6 +65,5 @@ subs2 = []
 pubs2 = []
 
 subs2.append(sub("com.edgeless.temperature", "event", "cast", "check_temperature"))
-subs2.append(sub("com.edgeless.someddatopic", "action", "cast", "some_functioncall"))
-pubs2.append(pub("action", "com.edgeless.moveRobotArm", "dda_move_arm"))
+pubs2.append(pub("com.edgeless.moveRobotArm", "action", "move_arm"))
 output(subs2, pubs2)
