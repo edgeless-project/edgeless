@@ -135,9 +135,6 @@ impl EdgeFunction for Trigger {
 
     fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         // edgeless_function::init_logger();
-        if let Some(message) = payload {
-            cast("out", message);
-        }
 
         let arguments = edgeless_function::init_payload_to_args(payload);
 
