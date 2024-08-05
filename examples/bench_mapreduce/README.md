@@ -16,6 +16,12 @@ To start a workflow using only the `bench_mapreduce` function:
 ID=$(target/debug/edgeless_cli workflow start examples/bench_mapreduce/workflow-mapreduce-only.json)
 ```
 
+To start a workflow also using `bench_process` function instances:
+
+```
+ID=$(target/debug/edgeless_cli workflow start examples/bench_mapreduce/workflow-mapreduce-process.json)
+```
+
 To stop the worfklow:
 
 ```
