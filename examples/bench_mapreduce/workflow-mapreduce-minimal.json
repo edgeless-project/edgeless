@@ -1,0 +1,88 @@
+{
+    "functions": [
+        {
+            "name": "trigger",
+            "class_specification": {
+                "id": "trigger",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/trigger/trigger.wasm",
+                "outputs": [
+                    "out",
+                    "err"
+                ]
+            },
+            "output_mapping": {
+                "out": "first",
+                "err": "err"
+            },
+            "annotations": {
+                "init-payload": "out_type=rand_vec,size=1000,arrival=c(1000)"
+            }
+        },
+        {
+            "name": "first",
+            "class_specification": {
+                "id": "bench_mapreduce",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/bench_mapreduce/bench_mapreduce.wasm",
+                "outputs": [
+                    "metric",
+                    "err",
+                    "out-0"
+                ]
+            },
+            "output_mapping": {
+                "metric": "metric",
+                "err": "err",
+                "out-0": "last"
+            },
+            "annotations": {
+                "init-payload": "is_first=true,is_last=false,inputs=,outputs=0"
+            }
+        },
+        {
+            "name": "last",
+            "class_specification": {
+                "id": "bench_mapreduce",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/bench_mapreduce/bench_mapreduce.wasm",
+                "outputs": [
+                    "metric",
+                    "err"
+                ]
+            },
+            "output_mapping": {
+                "metric": "metric",
+                "err": "err"
+            },
+            "annotations": {
+                "init-payload": "is_first=false,is_last=true,inputs=0,outputs="
+            }
+        }
+    ],
+    "resources": [
+        {
+            "name": "err",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "err.log",
+                "add-source-id": "true",
+                "add-timestamp": "true"
+            }
+        },
+        {
+            "name": "metric",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "metric.log",
+                "add-timestamp": "true"
+            }
+        }
+    ],
+    "annotations": {}
+}
