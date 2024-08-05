@@ -26,3 +26,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 edgeless_function = { path = "../../edgeless_function" }
+base64 = "0.22.1"
