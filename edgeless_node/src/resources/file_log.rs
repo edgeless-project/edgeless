@@ -26,7 +26,12 @@ impl Drop for FileLogResource {
 }
 
 impl FileLogResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, filename: &str, add_timestamp: bool) -> anyhow::Result<Self> {
+    async fn new(
+        dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+        filename: &str,
+        add_source_id: bool,
+        add_timestamp: bool,
+    ) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
 
         let mut outfile = std::fs::OpenOptions::new().create(true).write(true).append(true).open(filename)?;
@@ -52,16 +57,23 @@ impl FileLogResource {
                     }
                 };
 
-                let line = match add_timestamp {
-                    true => format!("{} {}", chrono::Utc::now().to_rfc3339(), message_data),
-                    false => message_data,
-                };
+                // Compose the line piece by piece.
+                let mut line = "".to_string();
+                if add_timestamp {
+                    line.push_str(format!("{} ", chrono::Utc::now().to_rfc3339()).as_str());
+                }
+                if add_source_id {
+                    line.push_str(format!("{} ", source_id).as_str());
+                }
+                line.push_str(&message_data);
 
+                // Dump the line to the output file.
                 log::debug!("{}", line);
                 if let Err(e) = writeln!(outfile, "{}", line) {
                     log::error!("Could not write to file the message '{}': {}", line, e);
                 }
 
+                // Reply to the caller if the resource instance was called.
                 if need_reply {
                     dataplane_handle
                         .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
@@ -104,6 +116,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             match FileLogResource::new(
                 dataplane_handle,
                 filename,
+                instance_specification.configuration.contains_key("add-source-id"),
                 instance_specification.configuration.contains_key("add-timestamp"),
             )
             .await
