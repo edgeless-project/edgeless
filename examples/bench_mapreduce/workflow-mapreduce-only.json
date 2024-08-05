@@ -17,7 +17,7 @@
                 "err": "err"
             },
             "annotations": {
-                "init-payload": "out_type=rand_vec,size=1000,arrival=c(1000)"
+                "init-payload": "out_type=rand_vec,use_base64=true,size=1000,arrival=c(1000)"
             }
         },
         {
@@ -43,7 +43,7 @@
                 "out-2": "middle"
             },
             "annotations": {
-                "init-payload": "is_first=true,is_last=false,inputs=,outputs=0:1:2"
+                "init-payload": "is_first=true,is_last=false,use_base64=true,inputs=,outputs=0:1:2"
             }
         },
         {
@@ -67,7 +67,7 @@
                 "out-1": "last"
             },
             "annotations": {
-                "init-payload": "is_first=false,is_last=false,inputs=0:1:2,outputs=0:1"
+                "init-payload": "is_first=false,is_last=false,use_base64=true,inputs=0:1:2,outputs=0:1"
             }
         },
         {
@@ -87,7 +87,7 @@
                 "err": "err"
             },
             "annotations": {
-                "init-payload": "is_first=false,is_last=true,inputs=0:1,outputs="
+                "init-payload": "is_first=false,is_last=true,use_base64=true,inputs=0:1,outputs="
             }
         }
     ],
