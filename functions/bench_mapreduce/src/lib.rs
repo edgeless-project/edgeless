@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
+use base64::Engine;
 use edgeless_function::*;
 
 #[derive(Debug, PartialEq)]
@@ -11,7 +12,14 @@ struct Message {
 }
 
 impl Message {
-    fn new(encoded_message: &[u8]) -> Self {
+    fn new(message: &[u8], use_base64: bool) -> Self {
+        let bytes;
+        let encoded_message = if use_base64 {
+            bytes = Some(base64::engine::general_purpose::STANDARD.decode(message).unwrap());
+            &bytes.unwrap()
+        } else {
+            message
+        };
         let mut iter = encoded_message.chunks_exact(4);
         let mut data = vec![];
         loop {
@@ -30,7 +38,14 @@ impl Message {
         }
     }
 
-    fn from(encoded_message: &[u8]) -> Option<Self> {
+    fn from(message: &[u8], use_base64: bool) -> Option<Self> {
+        let bytes;
+        let encoded_message = if use_base64 {
+            bytes = Some(base64::engine::general_purpose::STANDARD.decode(message).unwrap());
+            &bytes.unwrap()
+        } else {
+            message
+        };
         let mut iter = encoded_message.chunks_exact(4);
         let transaction_id = match iter.next() {
             Some(buf) => {
@@ -69,18 +84,23 @@ impl Message {
         })
     }
 
-    fn encode(&self) -> Vec<u8> {
+    fn encode(&self, use_base64: bool) -> Vec<u8> {
         let mut ret = vec![];
         ret.append(&mut self.transaction_id.to_be_bytes().to_vec());
         ret.append(&mut self.source_id.to_be_bytes().to_vec());
         ret.append(&mut self.data.iter().map(|x| x.to_be_bytes()).flatten().collect::<Vec<u8>>());
-        ret
+        if use_base64 {
+            base64::engine::general_purpose::STANDARD.encode(ret).as_bytes().to_vec()
+        } else {
+            ret
+        }
     }
 }
 
 struct Conf {
     is_first: bool,
     is_last: bool,
+    use_base64: bool,
     inputs: Vec<u32>,
     outputs: Vec<u32>,
 }
@@ -112,6 +132,7 @@ static STATE: std::sync::OnceLock<std::sync::Mutex<State>> = std::sync::OnceLock
 ///
 /// - is_first: true if this is the first element of the workflow
 /// - is_last: true if this is the last element of the workflow
+/// - use_base64: true if the messages are base64-encoded/decoded
 /// - inputs: colon-separated list of numerical identifiers of expected sources
 /// - outputs: colon-separated list of numerical identifiers of output channels
 ///
@@ -126,9 +147,9 @@ impl EdgeFunction for BenchMapReduce {
         // - first element: the entire payload is assumed as data input;
         // - otherwise: a structured Message is expected.
         let mut message = if conf.is_first {
-            Message::new(encoded_message)
+            Message::new(encoded_message, conf.use_base64)
         } else {
-            if let Some(message) = Message::from(encoded_message) {
+            if let Some(message) = Message::from(encoded_message, conf.use_base64) {
                 message
             } else {
                 cast(
@@ -145,7 +166,7 @@ impl EdgeFunction for BenchMapReduce {
             state.transaction_id += 1;
             for output in &conf.outputs {
                 message.source_id = *output;
-                cast(format!("out-{}", output).as_str(), &message.encode());
+                cast(format!("out-{}", output).as_str(), &message.encode(conf.use_base64));
             }
         } else {
             // Discard the message if coming from an expected source.
@@ -195,7 +216,7 @@ impl EdgeFunction for BenchMapReduce {
                     // Fan-out.
                     for output in &conf.outputs {
                         first.source_id = *output;
-                        cast(format!("out-{}", output).as_str(), &first.encode());
+                        cast(format!("out-{}", output).as_str(), &first.encode(conf.use_base64));
                     }
 
                     // Clear the queue of pending messages.
@@ -217,6 +238,7 @@ impl EdgeFunction for BenchMapReduce {
         let arguments = edgeless_function::init_payload_to_args(payload);
         let is_first = edgeless_function::arg_to_bool("is_first", &arguments);
         let is_last = edgeless_function::arg_to_bool("is_last", &arguments);
+        let use_base64 = edgeless_function::arg_to_bool("use_base64", &arguments);
         let inputs = edgeless_function::arg_to_vec::<u32>("inputs", ":", &arguments);
         let outputs = edgeless_function::arg_to_vec::<u32>("outputs", ":", &arguments);
 
@@ -241,6 +263,7 @@ impl EdgeFunction for BenchMapReduce {
         let _ = CONF.set(Conf {
             is_first,
             is_last,
+            use_base64,
             inputs,
             outputs,
         });
@@ -268,13 +291,15 @@ mod tests {
             data: vec![1.0, 2.0, 3.0],
         };
 
-        let encoded = message.encode();
+        for use_base64 in vec![true, false] {
+            let encoded = message.encode(use_base64);
 
-        println!("{:?}", encoded);
+            println!("{:?}", encoded);
 
-        let decoded = Message::from(encoded.as_slice());
+            let decoded = Message::from(encoded.as_slice(), use_base64);
 
-        println!("{:?}", decoded);
-        assert_eq!(decoded.unwrap(), message);
+            println!("{:?}", decoded);
+            assert_eq!(decoded.unwrap(), message);
+        }
     }
 }
