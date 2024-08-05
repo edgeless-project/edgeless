@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
+use base64::Engine;
 use edgeless_function::*;
 
 enum OutType {
@@ -138,6 +139,8 @@ impl EdgeFunction for Trigger {
 
         let arguments = edgeless_function::init_payload_to_args(payload);
 
+        let use_base64 = edgeless_function::arg_to_bool("use_base64", &arguments);
+
         let seed = arguments.get("seed").unwrap_or(&"0").parse::<u32>().unwrap_or(0);
         let mut lcg = edgeless_function::lcg::Lcg::new(seed);
 
@@ -152,7 +155,13 @@ impl EdgeFunction for Trigger {
                     Some(size) => match size.parse::<usize>() {
                         Ok(size) => {
                             let rnd_vec = edgeless_function::lcg::random_vector(&mut lcg, size);
-                            Ok(OutType::RandVec(rnd_vec.iter().map(|x| x.to_be_bytes()).flatten().collect::<Vec<u8>>()))
+                            let rand_vec = rnd_vec.iter().map(|x| x.to_be_bytes()).flatten().collect::<Vec<u8>>();
+                            let bytes = if use_base64 {
+                                base64::engine::general_purpose::STANDARD.encode(rand_vec).as_bytes().to_vec()
+                            } else {
+                                rand_vec
+                            };
+                            Ok(OutType::RandVec(bytes))
                         }
                         Err(err) => Err(format!("{}", err)),
                     },
