@@ -1,0 +1,11 @@
+{
+    "id": "bench_process",
+    "function_type": "RUST_WASM",
+    "version": "0.1",
+    "build": "Cargo.toml",
+    "outputs": [
+        "metric",
+        "out",
+        "err"
+    ]
+}
