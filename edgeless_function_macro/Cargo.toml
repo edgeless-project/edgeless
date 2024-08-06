@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
+[package]
+name = "edgeless_function_macro"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1.0"
+quote = "1"
+syn = "2.0"
+edgeless_function_core = {path = "../edgeless_function_core" }
+serde = { version = "1.0", features = ["derive"] }

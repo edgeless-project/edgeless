@@ -17,5 +17,8 @@ members = [
     "edgeless_systemtests",
     "edgeless_telemetry",
     "edgeless_embedded",
-    "edgeless_embedded_emu"
+    "edgeless_embedded_emu",
+    "edgeless_build",
+    "edgeless_function_core",
+    "edgeless_function_macro"
 ]

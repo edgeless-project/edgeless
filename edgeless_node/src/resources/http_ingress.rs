@@ -210,6 +210,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
+        log::info!("{:?}", update.output_mapping);
         let target = match update.output_mapping.get("new_request") {
             Some(val) => val.clone(),
             None => {

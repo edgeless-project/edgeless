@@ -6,9 +6,8 @@
 #[cfg(feature = "std")]
 pub mod lcg;
 
-/// Provides the FunctionSpecific exports (using the crate-global `export` macro).
-/// Other exported functions come from the `memory` module.
-pub mod export;
+/// Guest Codegen based on function.json
+pub use edgeless_function_macro::generate;
 
 /// These functions are imported by the WASM module.
 pub mod imports;

@@ -3,8 +3,6 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::grpc_impl::api::port_mapping;
-
 #[derive(Clone)]
 pub struct ActiveWorkflow {
     // Workflow as it was requested by the client.
@@ -48,6 +46,69 @@ impl ActiveWorkflow {
         } else {
             return None;
         }
+    }
+
+    pub fn active_inputs(&self, component_name: &str) -> Vec<edgeless_api::function_instance::PortId> {
+        let mut items = std::collections::HashSet::new();
+
+        let mut outputs: Vec<_> = self
+            .desired_state
+            .workflow_functions
+            .iter()
+            .flat_map(|wf| wf.output_mapping.values().collect::<Vec<_>>())
+            .collect();
+        outputs.append(
+            &mut self
+                .desired_state
+                .workflow_resources
+                .iter()
+                .flat_map(|wr| wr.output_mapping.values().collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+        );
+        for port_mapping in outputs.iter() {
+            match port_mapping {
+                edgeless_api::workflow_instance::PortMapping::DirectTarget(component, port) => {
+                    if component == component_name {
+                        items.insert(port.clone());
+                    }
+                }
+                edgeless_api::workflow_instance::PortMapping::AnyOfTargets(targets) => {
+                    for (component, port) in targets {
+                        if component == component_name {
+                            items.insert(port.clone());
+                        }
+                    }
+                }
+                edgeless_api::workflow_instance::PortMapping::AllOfTargets(targets) => {
+                    for (component, port) in targets {
+                        if component == component_name {
+                            items.insert(port.clone());
+                        }
+                    }
+                }
+                edgeless_api::workflow_instance::PortMapping::Topic(_) => {
+                    panic!("This should have been replaced!");
+                }
+            }
+        }
+
+        log::info!("{:?}", items);
+
+        items.into_iter().collect()
+    }
+
+    pub fn active_outputs(&self, component_name: &str) -> Vec<edgeless_api::function_instance::PortId> {
+        for wf in &self.desired_state.workflow_functions {
+            if wf.name == component_name {
+                return wf.output_mapping.keys().map(|port| port.clone()).collect();
+            }
+        }
+        for wr in &self.desired_state.workflow_resources {
+            if wr.name == component_name {
+                return wr.output_mapping.keys().map(|port| port.clone()).collect();
+            }
+        }
+        return Vec::new();
     }
 
     pub fn domain_mapping(&self) -> Vec<edgeless_api::workflow_instance::WorkflowFunctionMapping> {
@@ -134,7 +195,6 @@ impl ActiveWorkflow {
     }
 
     pub fn component_output_mapping(&self, component_name: &str) -> std::collections::HashMap<String, LogicalOutput> {
-        
         if let Some(function) = self
             .desired_state
             .workflow_functions
@@ -169,8 +229,8 @@ impl ActiveWorkflow {
                 .output_mapping
                 .iter()
                 .filter_map(|(port, dest_mapping)| match dest_mapping {
-                    edgeless_api::workflow_instance::PortMapping::DirectTarget(component, port) => {
-                        Some((port.0.clone(), LogicalOutput::Single((component.clone(), port.clone()))))
+                    edgeless_api::workflow_instance::PortMapping::DirectTarget(component, dest_port) => {
+                        Some((port.0.clone(), LogicalOutput::Single((component.clone(), dest_port.clone()))))
                     }
                     edgeless_api::workflow_instance::PortMapping::AnyOfTargets(targets) => {
                         Some((port.0.clone(), LogicalOutput::Any(targets.clone())))

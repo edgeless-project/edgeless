@@ -1,42 +1,42 @@
 {
-    "id": "ping_async",
-    "function_type": "RUST_WASM",
-    "version": "0.1",
-    "code": "./ping_async.wasm",
-    "outputs": {
-        "ping": {
-            "method": "CAST",
-            "data_type": "edgeless.example.Ping"
-        }
-    },
-    "inputs": {
-        "pong": {
-            "method": "CAST",
-            "data_type": "edgeless.example.Pong" 
-        }
-    },
-    "inner_structure": [
+  "id": "ping_async",
+  "function_type": "RUST_WASM",
+  "version": "0.1",
+  "code": "./ping_async.wasm",
+  "outputs": {
+    "ping": {
+      "method": "CAST",
+      "data_type": "edgeless.example.Ping"
+    }
+  },
+  "inputs": {
+    "pong": {
+      "method": "CAST",
+      "data_type": "edgeless.example.Pong"
+    }
+  },
+  "inner_structure": [
+    {
+      "source": {
+        "type": "SIDE_EFFECT"
+      },
+      "dests": [
         {
-            "source": {
-                "type": "SIDE_EFFECT"
-            },
-            "dests": [
-                {
-                    "type": "PORT",
-                    "port_id": "pong"
-                }
-            ]
-        },
-        {
-            "source": {
-                "type": "PORT",
-                "port_id": "pong"
-            },
-            "dests": [
-                {
-                    "type": "SIDE_EFFECT"
-                }
-            ]
+          "type": "PORT",
+          "port_id": "pong"
         }
-    ]
+      ]
+    },
+    {
+      "source": {
+        "type": "PORT",
+        "port_id": "pong"
+      },
+      "dests": [
+        {
+          "type": "SIDE_EFFECT"
+        }
+      ]
+    }
+  ]
 }

@@ -4,12 +4,24 @@
             "name": "http_processor",
             "class_specification": {
                 "id": "http_processor",
-                "function_type": "RUST_WASM",
+                "function_type": "RUST",
                 "version": "0.1",
-                "code": "../../functions/http_processor/http_processor.wasm",
-                "outputs": []
+                "code": "../../functions/http_processor/http_processor.tar.gz",
+                "outputs": {},
+                "inputs": {
+                    "new_req": {
+                        "method": "CALL",
+                        "data_type": "edgeless.http.Request",
+                        "return_data_type": "edgeless.http.Response"
+                    }
+                },
+                "inner_structure": [
+                ]
             },
             "output_mapping": {},
+            "input_mapping": {
+
+            },
             "annotations": {}
         }
     ],
@@ -18,7 +30,16 @@
             "name": "http-ingress-1-1",
             "class_type": "http-ingress",
             "output_mapping": {
-                "new_request": "http_processor"
+                "new_request": {
+                    "type": "DIRECT",
+                    "config": {
+                        "target_component": "http_processor",
+                        "port": "new_req"
+                    }
+                }
+            },
+            "input_mapping": {
+
             },
             "configurations": {
                 "host": "demo.edgeless.com",

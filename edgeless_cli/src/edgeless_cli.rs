@@ -27,6 +27,9 @@ enum FunctionCommands {
     Build {
         spec_file: String,
     },
+    Package {
+        spec_file: String,
+    },
     Invoke {
         event_type: String,
         invocation_url: String,
@@ -132,6 +135,13 @@ async fn main() -> anyhow::Result<()> {
                                     .map(|func_spec| {
                                         let function_class_code = match func_spec.class_specification.function_type.as_str() {
                                             "RUST_WASM" => std::fs::read(
+                                                std::path::Path::new(&spec_file)
+                                                    .parent()
+                                                    .unwrap()
+                                                    .join(func_spec.class_specification.code.unwrap()),
+                                            )
+                                            .unwrap(),
+                                            "RUST" => std::fs::read(
                                                 std::path::Path::new(&spec_file)
                                                     .parent()
                                                     .unwrap()
@@ -321,66 +331,33 @@ async fn main() -> anyhow::Result<()> {
                 FunctionCommands::Build { spec_file } => {
                     let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
                     let cargo_project_path = spec_file_path.parent().unwrap().to_path_buf();
-                    let cargo_manifest = cargo_project_path.join("Cargo.toml");
 
                     let function_spec: workflow_spec::WorkflowSpecFunctionClass = serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
-                    let build_dir = std::env::temp_dir().join(format!("edgeless-{}-{}", function_spec.id, uuid::Uuid::new_v4()));
 
-                    let config = &cargo::util::config::Config::default()?;
-                    let mut ws = cargo::core::Workspace::new(&cargo_manifest, config)?;
-                    ws.set_target_dir(cargo::util::Filesystem::new(build_dir.clone()));
-
-                    let pack = ws.current()?;
-
-                    let lib_name = match pack.library() {
-                        Some(val) => val.name(),
-                        None => {
-                            return Err(anyhow::anyhow!("Cargo package does not contain library."));
-                        }
-                    };
-
-                    let mut build_config = cargo::core::compiler::BuildConfig::new(
-                        config,
-                        None,
-                        false,
-                        &vec!["wasm32-unknown-unknown".to_string()],
-                        cargo::core::compiler::CompileMode::Build,
-                    )?;
-                    build_config.requested_profile = cargo::util::interning::InternedString::new("release");
-
-                    let compile_options = cargo::ops::CompileOptions {
-                        build_config: build_config,
-                        cli_features: cargo::core::resolver::CliFeatures::new_all(false),
-                        spec: cargo::ops::Packages::Packages(Vec::new()),
-                        filter: cargo::ops::CompileFilter::Default {
-                            required_features_filterable: false,
-                        },
-                        target_rustdoc_args: None,
-                        target_rustc_args: None,
-                        target_rustc_crate_types: None,
-                        rustdoc_document_private_items: false,
-                        honor_rust_version: true,
-                    };
-
-                    cargo::ops::compile(&ws, &compile_options)?;
-
-                    let raw_result = build_dir
-                        .join(format!("wasm32-unknown-unknown/release/{}.wasm", lib_name))
-                        .to_str()
-                        .unwrap()
-                        .to_string();
                     let out_file = cargo_project_path
                         .join(format!("{}.wasm", function_spec.id))
                         .to_str()
                         .unwrap()
                         .to_string();
 
-                    println!(
-                        "{:?}",
-                        std::process::Command::new("wasm-opt")
-                            .args(["-Oz", &raw_result, "-o", &out_file])
-                            .status()?
-                    );
+                    let compiled = edgeless_build::rust_to_wasm(cargo_project_path.to_str().unwrap().to_string(), vec![], true, true)?;
+                    std::fs::copy(compiled, out_file).unwrap();
+                }
+
+                FunctionCommands::Package { spec_file } => {
+                    let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
+                    let cargo_project_path = spec_file_path.parent().unwrap().to_path_buf();
+
+                    let function_spec: workflow_spec::WorkflowSpecFunctionClass = serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
+
+                    let out_file = cargo_project_path
+                        .join(format!("{}.tar.gz", function_spec.id))
+                        .to_str()
+                        .unwrap()
+                        .to_string();
+
+                    let packaged = edgeless_build::package_rust(cargo_project_path.to_str().unwrap().to_string())?;
+                    std::fs::copy(packaged, out_file).unwrap();
                 }
                 FunctionCommands::Invoke {
                     event_type,

@@ -17,3 +17,4 @@ default = ["std"]
 
 [dependencies]
 log = "0.4"
+edgeless_function_macro = {path = "../edgeless_function_macro"}

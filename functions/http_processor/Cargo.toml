@@ -24,6 +24,11 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-edgeless_function = { path = "../../edgeless_function" }
-edgeless_http = { path = "../../edgeless_http" }
+edgeless_http = {git = "https://github.com/edgeless-project/edgeless.git", branch = "serverless_ir", package = "edgeless_http" }
 log = "0.4"
+
+edgeless_function = {git = "https://github.com/edgeless-project/edgeless.git", branch = "serverless_ir", package = "edgeless_function" }
+edgeless_function_core = {git = "https://github.com/edgeless-project/edgeless.git", branch = "serverless_ir", package = "edgeless_function_core" }
+
+[features]
+input_new_req = []

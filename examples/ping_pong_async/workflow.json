@@ -4,9 +4,9 @@
             "name": "ponger",
             "class_specification": {
                 "id": "pong_async",
-                "function_type": "RUST_WASM",
+                "function_type": "RUST",
                 "version": "0.1",
-                "code": "../../functions/pong_async/pong_async.wasm",
+                "code": "../../functions/pong_async/pong_async.tar.gz",
                 "outputs": {
                     "pong": {
                         "method": "CAST",
@@ -50,9 +50,9 @@
             "name": "pinger",
             "class_specification": {
                 "id": "ping_async",
-                "function_type": "RUST_WASM",
+                "function_type": "RUST",
                 "version": "0.1",
-                "code": "../../functions/ping_async/ping_async.wasm",
+                "code": "../../functions/ping_async/ping_async.tar.gz",
                 "outputs": {
                     "ping": {
                         "method": "CAST",

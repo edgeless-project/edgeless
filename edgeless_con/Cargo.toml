@@ -23,6 +23,7 @@ anyhow = "1.0"
 uuid = {version= "1.3", features = ["v4", "serde"] }
 async-trait = "0.1"
 edgeless_api = {path = "../edgeless_api", features = ["grpc_impl"]}
+edgeless_build = {path = "../edgeless_build"}
 serde = "1.0"
 clap = { version = "4.3", features=["derive"] }
 toml = "0.7"

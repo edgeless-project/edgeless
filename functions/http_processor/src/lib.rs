@@ -4,19 +4,19 @@
 use edgeless_function::*;
 use edgeless_http::*;
 
-struct ProcesorFun;
+struct ProcessorFun;
 
-impl EdgeFunction for ProcesorFun {
-    fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
-        log::info!("HTTP_Processor: 'Cast' called, MSG: {:?}", encoded_message);
-    }
+edgeless_function::generate!(ProcessorFun);
 
-    fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
-        let str_message = core::str::from_utf8(encoded_message).unwrap();
-        log::info!("HTTP_Processor: 'Call' called, MSG: {}", str_message);
-        let req: EdgelessHTTPRequest = edgeless_http::request_from_string(str_message).unwrap();
+impl HttpProcessorAPI for ProcessorFun {
 
-        let resp = if req.path == "/hello" {
+    type EDGELESS_HTTP_REQUEST = edgeless_http::EdgelessHTTPRequest;
+    type EDGELESS_HTTP_RESPONSE = edgeless_http::EdgelessHTTPResponse;
+
+    fn handle_call_new_req(_src: InstanceId, req: EdgelessHTTPRequest) -> EdgelessHTTPResponse {
+        log::info!("HTTP_Processor: 'Call' called, MSG: {:?}", req);
+
+        if req.path == "/hello" {
             EdgelessHTTPResponse {
                 status: 200,
                 body: Some(Vec::<u8>::from("World")),
@@ -28,10 +28,10 @@ impl EdgeFunction for ProcesorFun {
                 body: Some(Vec::<u8>::from("Not Found")),
                 headers: std::collections::HashMap::<String, String>::new(),
             }
-        };
-
-        CallRet::Reply(OwnedByteBuff::new_from_slice(edgeless_http::response_to_string(&resp).as_bytes()))
+        }
     }
+
+    fn handle_internal(_: &[u8]) {}
 
     fn handle_init(_payload: Option<&[u8]>, serialized_state: Option<&[u8]>) {
         log::info!("HTTP_Processor: 'Init' called");
@@ -41,5 +41,3 @@ impl EdgeFunction for ProcesorFun {
         log::info!("HTTP_Processor: 'Stop' called");
     }
 }
-
-edgeless_function::export!(ProcesorFun);

@@ -96,10 +96,7 @@ impl ControllerTask {
 
         wf.optimize_logical();
 
-        self.active_workflows.insert(
-            wf_id.clone(),
-            wf,
-        );
+        self.active_workflows.insert(wf_id.clone(), wf);
 
         let active_workflow = self.active_workflows.get(&wf_id).unwrap().clone();
 
@@ -118,7 +115,15 @@ impl ControllerTask {
 
             let function_domain = self.orchestrators.iter_mut().next().unwrap().0.clone();
 
-            res = self.start_workflow_function_in_domain(&wf_id, function, &function_domain).await;
+            res = self
+                .start_workflow_function_in_domain(
+                    &wf_id,
+                    function,
+                    &function_domain,
+                    active_workflow.active_inputs(&function.name),
+                    active_workflow.active_outputs(&function.name),
+                )
+                .await;
         }
 
         // Start the resources on the orchestration domain.
@@ -283,7 +288,27 @@ impl ControllerTask {
         wf_id: &edgeless_api::workflow_instance::WorkflowId,
         function: &edgeless_api::workflow_instance::WorkflowFunction,
         domain: &str,
+        enabled_inputs: Vec<edgeless_api::function_instance::PortId>,
+        enabled_outputs: Vec<edgeless_api::function_instance::PortId>,
     ) -> Result<(), String> {
+        let mut function = function.clone();
+
+        let mut enabled_features: Vec<String> = Vec::new();
+        for input in enabled_inputs {
+            enabled_features.push(format!("input_{}", input.0))
+        }
+        for output in enabled_outputs {
+            enabled_features.push(format!("output_{}", output.0))
+        }
+
+        if function.function_class_specification.function_class_type == "RUST" {
+            let rust_dir = edgeless_build::unpack_rust_package(&function.function_class_specification.function_class_code).unwrap();
+            let wasm_file = edgeless_build::rust_to_wasm(rust_dir, enabled_features, true, false).unwrap();
+            let wasm_code = std::fs::read(wasm_file).unwrap();
+            function.function_class_specification.function_class_code = wasm_code;
+            function.function_class_specification.function_class_type = "RUST_WASM".to_string();
+        }
+
         // [TODO] Issue#95
         // The state_specification configuration should be
         // read from the function annotations.

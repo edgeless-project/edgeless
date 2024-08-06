@@ -511,6 +511,7 @@ impl Orchestrator {
                                     channel.clone(),
                                     edgeless_api::common::Output::Single(targets[0].instance_id(), port_id.clone()),
                                 );
+                            // TODO (raphaelhetzel): Should this be allowed?
                             } else if targets.len() > 0 {
                                 int_output_mapping.insert(
                                     channel.clone(),

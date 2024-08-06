@@ -4,16 +4,42 @@
 use edgeless_function::*;
 struct PongerFun;
 
-impl EdgeFunction for PongerFun {
-    fn handle_cast(src: InstanceId, port: &str, encoded_message: &[u8]) {
-        log::info!("AsyncPonger: 'Cast' called, MSG: {:?}", encoded_message);
-        // cast_raw(src, "pong", b"PONG2");
-        cast("pong", b"PONG2");
+struct PongType {
+    msg: String,
+}
+
+#[derive(Debug)]
+struct PingType {
+    msg: String,
+}
+
+impl edgeless_function_core::Deserialize for PingType {
+    fn deserialize(data: &[u8]) -> Self {
+        PingType {
+            msg: String::from_utf8(data.to_vec()).unwrap(),
+        }
+    }
+}
+
+impl edgeless_function_core::Serialize for PongType {
+    fn serialize(&self) -> Vec<u8> {
+        self.msg.as_bytes().to_vec()
+    }
+}
+
+edgeless_function::generate!(PongerFun);
+
+impl PongAsyncAPI for PongerFun {
+    type EDGELESS_EXAMPLE_PING = PingType;
+    type EDGELESS_EXAMPLE_PONG = PongType;
+
+    fn handle_cast_ping(src: InstanceId, ping_msg: PingType) {
+        log::info!("AsyncPonger: 'Cast' called, MSG: {:?}", ping_msg);
+        cast_pong(&PongType { msg: "PONG2".to_string() });
     }
 
-    fn handle_call(_src: InstanceId, port: &str, encoded_message: &[u8]) -> CallRet {
-        log::info!("AsyncPonger: 'Call' called, MSG: {:?}", encoded_message);
-        CallRet::NoReply
+    fn handle_internal(_msg: &[u8]) {
+        // NOOP
     }
 
     fn handle_init(_payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
@@ -25,6 +51,3 @@ impl EdgeFunction for PongerFun {
         log::info!("AsyncPonger: 'Stop' called");
     }
 }
-
-edgeless_function::export!(PongerFun);
-

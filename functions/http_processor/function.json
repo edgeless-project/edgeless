@@ -3,5 +3,25 @@
     "function_type": "RUST_WASM",
     "version": "0.1",
     "build": "Cargo.toml",
-    "outputs": []
+    "outputs": {},
+    "inputs": {
+        "new_req": {
+            "method": "CALL",
+            "data_type": "edgeless.http.Request",
+            "return_data_type": "edgeless.http.Response"
+        }
+    },
+    "inner_structure": [
+        {
+            "source": {
+                "type": "PORT",
+                "port_id": "new_req"
+            },
+            "dests": [
+                {
+                    "type": "SIDE_EFFECT"
+                }
+            ]
+        }
+    ]
 }
