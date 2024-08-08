@@ -49,8 +49,8 @@
             },
             "configurations": {
                 "dda_url": "http://127.0.0.1:12000",
-                "dda_com_subscription_mapping": "[{\"ddatopic\": \"com.edgeless.temperature\", \"ddapattern\": \"event\", \"cast_mapping\": \"check_temperature\"}, {\"ddatopic\": \"com.edgeless.someddatopic\", \"ddapattern\": \"action\", \"cast_mapping\": \"some_functioncall\"}]",
-                "dda_com_publication_mapping": "[{\"pubid\":\"dda_move_arm\", \"ddatopic\": \"com.edgeless.moveRobotArm\"}]"
+                "dda_com_subscription_mapping": "[{\"topic\": \"com.edgeless.temperature\", \"pattern\": \"event\", \"method\": \"cast\", \"target\": \"check_temperature\"}]",
+                "dda_com_publication_mapping": "[{\"topic\": \"com.edgeless.moveRobotArm\", \"pattern\": \"action\", \"id\": \"dda_move_arm\"}]"
             }
         },
         {
