@@ -27,7 +27,7 @@ struct Args {
     period: u64,
 
     /// Name of the output file
-    #[clap(long, default_value = "output.txt")]
+    #[clap(long, default_value = "bench.prod")]
     output: String,
 }
 
@@ -51,6 +51,13 @@ async fn main() -> io::Result<()> {
 
     // Apertura del file di output
     let mut file = File::create(&args.output)?;
+
+     // Scrivi gli argomenti della riga di comando nella prima riga del file
+     writeln!(
+        file,
+        "# ./producer --broker: {} --topic: {} --duration: {} --period: {} --output: {}",
+        args.broker, args.topic, args.duration, args.period, args.output
+    )?;
 
     // Durata e intervallo di produzione dei messaggi
     let duration = Duration::from_secs(args.duration); // Durata fissa

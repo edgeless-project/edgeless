@@ -51,6 +51,13 @@ fn main() -> io::Result<()> {
     // Open the output file
     let mut file = File::create(&args.output)?;
 
+     // Scrivi gli argomenti della riga di comando nella prima riga del file
+     writeln!(
+        file,
+        "# ./consumer --broker: {} --topic: {} --output: {}",
+        args.broker, args.topic, args.output
+    )?;
+
     // Consume messages
     loop {
         match consumer.poll(Duration::from_millis(100)) {
