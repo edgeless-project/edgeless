@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2024 Yuan Yuan Luo
+// SPDX-License-Identifier: MIT
+
 #[derive(Clone)]
 pub struct KafkaEgressResourceProvider {
     inner: std::sync::Arc<tokio::sync::Mutex<KafkaEgressResourceProviderInner>>,
