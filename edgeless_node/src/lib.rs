@@ -92,6 +92,10 @@ pub struct EdgelessNodeResourceSettings {
     pub dda_provider: Option<String>,
     /// The ollama resource provider settings.
     pub ollama_provider: Option<OllamaProviderSettings>,
+    /// If not empty, a kafka-egress resource provider with that name is created.
+    /// The resource will connect to a remote Kafka server to stream the
+    /// messages received on a given topic.
+    pub kafka_egress_provider: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -408,6 +412,31 @@ async fn fill_resources(
                 });
             }
         }
+
+        if let Some(provider_id) = &settings.kafka_egress_provider {
+            if !provider_id.is_empty() {
+                log::info!("Creating resource '{}'", provider_id);
+                let class_type = "kafka-egress".to_string();
+                ret.insert(
+                    provider_id.clone(),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::kafka_egress::KafkaEgressResourceProvider::new(
+                                data_plane.clone(),
+                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                            )
+                            .await,
+                        ),
+                    },
+                );
+                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id: provider_id.clone(),
+                    class_type,
+                    outputs: vec![],
+                });
+            }
+        }
     }
 
     ret
@@ -584,6 +613,7 @@ file_log_provider = "file-log-1"
 redis_provider = "redis-1"
 dda_url = "http://127.0.0.1:10000"
 dda_provider = "dda-1"
+kafka_egress_provider = "kafka-egress-1"
 
 [resources.ollama_provider]
 host = "localhost"

@@ -104,6 +104,7 @@ mod tests {
                             dda_url: None,
                             dda_provider: None,
                             ollama_provider: None,
+                            kafka_egress_provider: None,
                         }),
                         user_node_capabilities: None,
                     },
