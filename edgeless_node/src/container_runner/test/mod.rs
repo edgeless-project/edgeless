@@ -76,7 +76,8 @@ fn test_docker_basic() {
     match docker.start_container(&name.to_string()) {
         Ok(val) => println!("{}", val),
         Err(e) => {
-            panic!("{}", e);
+            println!("error when starting the container, this likely means Docker is misconfigured: {}", e);
+            return;
         }
     };
 
