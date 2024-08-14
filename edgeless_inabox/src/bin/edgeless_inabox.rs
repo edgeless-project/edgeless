@@ -191,6 +191,10 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                     false => None,
                 },
                 ollama_provider: None,
+                kafka_egress_provider: match first_node {
+                    true => Some("kafka-egress-1".to_string()),
+                    false => None,
+                },
             }),
             user_node_capabilities: None,
         });
