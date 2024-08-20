@@ -20,7 +20,7 @@
     "resources": [
         {
             "name": "kafka-consumer",
-            "class_type": "kafka",
+            "class_type": "kafka-egress",
             "output_mapping": {
                 "out": "double"
             },

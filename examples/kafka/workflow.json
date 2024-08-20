@@ -20,7 +20,7 @@
     "resources": [
         {
             "name": "my-kafka",
-            "class_type": "kafka",
+            "class_type": "kafka-egress",
             "output_mapping": {},
             "configurations": {
                 "brokers": "localhost:9092",                
