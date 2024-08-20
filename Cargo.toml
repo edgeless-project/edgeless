@@ -20,5 +20,6 @@ members = [
     "edgeless_embedded_emu",
     "edgeless_build",
     "edgeless_function_core",
-    "edgeless_function_macro"
+    "edgeless_function_macro",
+    "edgeless_config"
 ]

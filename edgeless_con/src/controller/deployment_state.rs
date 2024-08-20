@@ -92,7 +92,6 @@ impl ActiveWorkflow {
             }
         }
 
-
         items.into_iter().collect()
     }
 
@@ -148,15 +147,18 @@ impl ActiveWorkflow {
     }
 
     fn remove_unused_outputs(&mut self) -> bool {
-
         let mut changed = false;
 
-        let active_inputs : std::collections::HashMap<_, _> = self.desired_state.workflow_functions.iter().map(|wf| (wf.name.to_string(), self.active_inputs(&wf.name))).collect();
+        let active_inputs: std::collections::HashMap<_, _> = self
+            .desired_state
+            .workflow_functions
+            .iter()
+            .map(|wf| (wf.name.to_string(), self.active_inputs(&wf.name)))
+            .collect();
 
         self.desired_state.workflow_functions.iter_mut().for_each(|wf| {
             let active_inputs = active_inputs.get(&wf.name).unwrap();
             wf.output_mapping.retain(|output_id, output_mapping| {
-                
                 for (source, dests) in wf.function_class_specification.function_class_inner_structure.clone() {
                     if dests.contains(&edgeless_api::function_instance::MappingNode::Port(output_id.clone())) {
                         match source {
@@ -165,7 +167,7 @@ impl ActiveWorkflow {
                                     return true;
                                 }
                                 log::debug!("Not an Active Input");
-                            },
+                            }
                             edgeless_api::function_instance::MappingNode::SideEffect => {
                                 return true;
                             }
@@ -183,8 +185,12 @@ impl ActiveWorkflow {
     }
 
     fn remove_unused_inputs(&mut self) -> bool {
-        
-        let active_outputs : std::collections::HashMap<_, _> = self.desired_state.workflow_functions.iter().map(|wf|  (wf.name.to_string(), self.active_outputs(&wf.name))).collect();
+        let active_outputs: std::collections::HashMap<_, _> = self
+            .desired_state
+            .workflow_functions
+            .iter()
+            .map(|wf| (wf.name.to_string(), self.active_outputs(&wf.name)))
+            .collect();
 
         let mut inputs_to_be_removed = std::collections::HashSet::<(String, String)>::new();
         let mut changed = false;
@@ -212,46 +218,39 @@ impl ActiveWorkflow {
         });
 
         self.desired_state.workflow_functions.iter_mut().for_each(|wf| {
-            wf.output_mapping.retain(|_output_id, output_mapping| {
-                match output_mapping {
-                    edgeless_api::workflow_instance::PortMapping::DirectTarget(component, port) => {
-                        if inputs_to_be_removed.contains(&(component.clone(), port.0.clone())) {
-                            changed = true;
-                            false
-                        } else {
-                            true
-                        }
-                    },
-                    edgeless_api::workflow_instance::PortMapping::AnyOfTargets(targets) => {
-                        let old_len =  targets.len();
-                        targets.retain(|(t_c, t_p)| {
-                            !inputs_to_be_removed.contains(&(t_c.clone(), t_p.0.clone())) 
-                        });
-                        if old_len != targets.len() {
-                            log::error!("remove output: {:?}", targets);
-                            changed = true;
-                        }
-                        targets.len() > 0
-                    },
-                    edgeless_api::workflow_instance::PortMapping::AllOfTargets(targets) => {
-                        let old_len =  targets.len();
-                        targets.retain(|(t_c, t_p)| {
-                            !inputs_to_be_removed.contains(&(t_c.clone(), t_p.0.clone())) 
-                        });
-                        if old_len != targets.len() {
-                            log::error!("remove output: {:?}", targets);
-                            changed = true;
-                        }
-                        targets.len() > 0
-                    },
-                    edgeless_api::workflow_instance::PortMapping::Topic(_) => {
-                        panic!("Topic Port shoud not exist anymore");
-                    },
+            wf.output_mapping.retain(|_output_id, output_mapping| match output_mapping {
+                edgeless_api::workflow_instance::PortMapping::DirectTarget(component, port) => {
+                    if inputs_to_be_removed.contains(&(component.clone(), port.0.clone())) {
+                        changed = true;
+                        false
+                    } else {
+                        true
+                    }
+                }
+                edgeless_api::workflow_instance::PortMapping::AnyOfTargets(targets) => {
+                    let old_len = targets.len();
+                    targets.retain(|(t_c, t_p)| !inputs_to_be_removed.contains(&(t_c.clone(), t_p.0.clone())));
+                    if old_len != targets.len() {
+                        log::error!("remove output: {:?}", targets);
+                        changed = true;
+                    }
+                    targets.len() > 0
+                }
+                edgeless_api::workflow_instance::PortMapping::AllOfTargets(targets) => {
+                    let old_len = targets.len();
+                    targets.retain(|(t_c, t_p)| !inputs_to_be_removed.contains(&(t_c.clone(), t_p.0.clone())));
+                    if old_len != targets.len() {
+                        log::error!("remove output: {:?}", targets);
+                        changed = true;
+                    }
+                    targets.len() > 0
+                }
+                edgeless_api::workflow_instance::PortMapping::Topic(_) => {
+                    panic!("Topic Port shoud not exist anymore");
                 }
             });
         });
         changed
-
     }
 
     fn convert_topic_ports(&mut self) {

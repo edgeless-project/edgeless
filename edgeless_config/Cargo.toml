@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
+[package]
+name = "edgeless_config"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+edition = "2021"
+
+[lib]
+name = "edgeless_config"
+path = "src/lib.rs"
+
+[features]
+
+[dependencies]
+log = "0.4"
+edgeless_api = { path = "../edgeless_api" }
+starlark = "0.12.0"
+allocative = "0.3"
+anyhow = "1"
+serde = {version = "1", features = ["rc"]}

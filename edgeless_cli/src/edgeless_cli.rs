@@ -23,6 +23,11 @@ enum WorkflowCommands {
 }
 
 #[derive(Debug, clap::Subcommand)]
+enum DescriptionCommands {
+    Transpile { file: String },
+}
+
+#[derive(Debug, clap::Subcommand)]
 enum FunctionCommands {
     Build {
         spec_file: String,
@@ -59,6 +64,10 @@ enum Commands {
     Function {
         #[command(subcommand)]
         function_command: FunctionCommands,
+    },
+    Description {
+        #[command(subcommand)]
+        description_command: DescriptionCommands,
     },
 }
 
@@ -125,42 +134,40 @@ async fn main() -> anyhow::Result<()> {
                 match workflow_command {
                     WorkflowCommands::Start { spec_file } => {
                         log::debug!("Start Workflow");
-                        let workflow: workflow_spec::WorkflowSpec =
-                            serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
+
+                        let p = std::path::PathBuf::from(spec_file.clone());
+                        let workflow: edgeless_config::workflow::EdgelessWorkflow = if p.extension().unwrap() == "json" {
+                            serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap()
+                        } else {
+                            match edgeless_config::load(p).unwrap() {
+                                edgeless_config::LoadResult::Workflow(wf) => wf,
+                                _ => {
+                                    panic!("Can't Spawn Function as Workflow");
+                                }
+                            }
+                        };
                         let res = con_wf_client
                             .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
                                 workflow_functions: workflow
-                                    .functions
+                                    .actors
                                     .into_iter()
                                     .map(|func_spec| {
-                                        let function_class_code = match func_spec.class_specification.function_type.as_str() {
-                                            "RUST_WASM" => std::fs::read(
-                                                std::path::Path::new(&spec_file)
-                                                    .parent()
-                                                    .unwrap()
-                                                    .join(func_spec.class_specification.code.unwrap()),
-                                            )
-                                            .unwrap(),
-                                            "RUST" => std::fs::read(
-                                                std::path::Path::new(&spec_file)
-                                                    .parent()
-                                                    .unwrap()
-                                                    .join(func_spec.class_specification.code.unwrap()),
-                                            )
-                                            .unwrap(),
-                                            "CONTAINER" => func_spec.class_specification.code.unwrap().as_bytes().to_vec(),
-                                            _ => panic!("unknown function class type: {}", func_spec.class_specification.function_type),
+                                        let function_class_code = match func_spec.klass.id.as_str() {
+                                            "RUST_WASM" => std::fs::read(func_spec.klass.code.unwrap().path).unwrap(),
+                                            "RUST" => std::fs::read(func_spec.klass.code.unwrap().path).unwrap(),
+                                            "CONTAINER" => func_spec.klass.code.unwrap().path.as_bytes().to_vec(),
+                                            _ => panic!("unknown function class type: {}", func_spec.klass.id),
                                         };
 
                                         edgeless_api::workflow_instance::WorkflowFunction {
-                                            name: func_spec.name,
+                                            name: func_spec.id,
                                             function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                                                function_class_id: func_spec.class_specification.id,
-                                                function_class_type: func_spec.class_specification.function_type,
-                                                function_class_version: func_spec.class_specification.version,
+                                                function_class_id: func_spec.klass.id,
+                                                function_class_type: func_spec.klass.code_type,
+                                                function_class_version: func_spec.klass.version,
                                                 function_class_code,
                                                 function_class_outputs: func_spec
-                                                    .class_specification
+                                                    .klass
                                                     .outputs
                                                     .iter()
                                                     .map(|(port_id, port_spec)| {
@@ -169,10 +176,10 @@ async fn main() -> anyhow::Result<()> {
                                                             edgeless_api::function_instance::Port {
                                                                 id: edgeless_api::function_instance::PortId(port_id.clone()),
                                                                 method: match port_spec.method {
-                                                                    workflow_spec::PortMethod::CALL => {
+                                                                    edgeless_config::port_class::Method::Call => {
                                                                         edgeless_api::function_instance::PortMethod::Call
                                                                     }
-                                                                    workflow_spec::PortMethod::CAST => {
+                                                                    edgeless_config::port_class::Method::Cast => {
                                                                         edgeless_api::function_instance::PortMethod::Cast
                                                                     }
                                                                 },
@@ -186,7 +193,7 @@ async fn main() -> anyhow::Result<()> {
                                                     })
                                                     .collect(),
                                                 function_class_inputs: func_spec
-                                                    .class_specification
+                                                    .klass
                                                     .inputs
                                                     .iter()
                                                     .map(|(port_id, port_spec)| {
@@ -195,10 +202,10 @@ async fn main() -> anyhow::Result<()> {
                                                             edgeless_api::function_instance::Port {
                                                                 id: edgeless_api::function_instance::PortId(port_id.clone()),
                                                                 method: match port_spec.method {
-                                                                    workflow_spec::PortMethod::CALL => {
+                                                                    edgeless_config::port_class::Method::Call => {
                                                                         edgeless_api::function_instance::PortMethod::Call
                                                                     }
-                                                                    workflow_spec::PortMethod::CAST => {
+                                                                    edgeless_config::port_class::Method::Cast => {
                                                                         edgeless_api::function_instance::PortMethod::Cast
                                                                     }
                                                                 },
@@ -212,18 +219,18 @@ async fn main() -> anyhow::Result<()> {
                                                     })
                                                     .collect(),
                                                 function_class_inner_structure: func_spec
-                                                    .class_specification
+                                                    .klass
                                                     .inner_structure
                                                     .iter()
                                                     .map(|mapping| {
                                                         (
                                                             match &mapping.source {
-                                                                workflow_spec::MappingNode::PORT(port_id) => {
+                                                                edgeless_config::inner_structure::MappingNode::Port(port_id) => {
                                                                     edgeless_api::function_instance::MappingNode::Port(
                                                                         edgeless_api::function_instance::PortId(port_id.clone()),
                                                                     )
                                                                 }
-                                                                workflow_spec::MappingNode::SIDE_EFFECT => {
+                                                                edgeless_config::inner_structure::MappingNode::SideEffect => {
                                                                     edgeless_api::function_instance::MappingNode::SideEffect
                                                                 }
                                                             },
@@ -231,12 +238,12 @@ async fn main() -> anyhow::Result<()> {
                                                                 .dests
                                                                 .iter()
                                                                 .map(|dest| match dest {
-                                                                    workflow_spec::MappingNode::PORT(port_id) => {
+                                                                    edgeless_config::inner_structure::MappingNode::Port(port_id) => {
                                                                         edgeless_api::function_instance::MappingNode::Port(
                                                                             edgeless_api::function_instance::PortId(port_id.clone()),
                                                                         )
                                                                     }
-                                                                    workflow_spec::MappingNode::SIDE_EFFECT => {
+                                                                    edgeless_config::inner_structure::MappingNode::SideEffect => {
                                                                         edgeless_api::function_instance::MappingNode::SideEffect
                                                                     }
                                                                 })
@@ -246,17 +253,23 @@ async fn main() -> anyhow::Result<()> {
                                                     .collect(),
                                             },
                                             output_mapping: func_spec
-                                                .output_mapping
+                                                .outputs
                                                 .iter()
                                                 .map(|(port_id, mapping)| {
-                                                    (edgeless_api::function_instance::PortId(port_id.clone()), parse_port_mapping(mapping))
+                                                    (
+                                                        edgeless_api::function_instance::PortId(port_id.clone()),
+                                                        parse_port_mapping(&mapping.mapping),
+                                                    )
                                                 })
                                                 .collect(),
                                             input_mapping: func_spec
-                                                .input_mapping
+                                                .inputs
                                                 .iter()
                                                 .map(|(port_id, mapping)| {
-                                                    (edgeless_api::function_instance::PortId(port_id.clone()), parse_port_mapping(mapping))
+                                                    (
+                                                        edgeless_api::function_instance::PortId(port_id.clone()),
+                                                        parse_port_mapping(&mapping.mapping),
+                                                    )
                                                 })
                                                 .collect(),
                                             annotations: func_spec.annotations,
@@ -267,20 +280,26 @@ async fn main() -> anyhow::Result<()> {
                                     .resources
                                     .into_iter()
                                     .map(|res_spec| edgeless_api::workflow_instance::WorkflowResource {
-                                        name: res_spec.name,
-                                        class_type: res_spec.class_type,
+                                        name: res_spec.id,
+                                        class_type: res_spec.klass.id,
                                         output_mapping: res_spec
-                                            .output_mapping
+                                            .outputs
                                             .iter()
                                             .map(|(port_id, mapping)| {
-                                                (edgeless_api::function_instance::PortId(port_id.clone()), parse_port_mapping(mapping))
+                                                (
+                                                    edgeless_api::function_instance::PortId(port_id.clone()),
+                                                    parse_port_mapping(&mapping.mapping),
+                                                )
                                             })
                                             .collect(),
                                         input_mapping: res_spec
-                                            .input_mapping
+                                            .inputs
                                             .iter()
                                             .map(|(port_id, mapping)| {
-                                                (edgeless_api::function_instance::PortId(port_id.clone()), parse_port_mapping(mapping))
+                                                (
+                                                    edgeless_api::function_instance::PortId(port_id.clone()),
+                                                    parse_port_mapping(&mapping.mapping),
+                                                )
                                             })
                                             .collect(),
                                         configurations: res_spec.configurations,
@@ -332,7 +351,8 @@ async fn main() -> anyhow::Result<()> {
                     let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
                     let cargo_project_path = spec_file_path.parent().unwrap().to_path_buf();
 
-                    let function_spec: workflow_spec::WorkflowSpecFunctionClass = serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
+                    let function_spec: edgeless_config::actor_class::EdgelessActorClass =
+                        serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
 
                     let out_file = cargo_project_path
                         .join(format!("{}.wasm", function_spec.id))
@@ -348,7 +368,8 @@ async fn main() -> anyhow::Result<()> {
                     let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
                     let cargo_project_path = spec_file_path.parent().unwrap().to_path_buf();
 
-                    let function_spec: workflow_spec::WorkflowSpecFunctionClass = serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
+                    let function_spec: edgeless_config::actor_class::EdgelessActorClass =
+                        serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
 
                     let out_file = cargo_project_path
                         .join(format!("{}.tar.gz", function_spec.id))
@@ -535,29 +556,117 @@ async fn main() -> anyhow::Result<()> {
                     println!("post_response body: {:?}", post_response);
                 }
             },
+            Commands::Description { description_command } => match description_command {
+                DescriptionCommands::Transpile { file } => {
+                    let path = std::path::PathBuf::from(file.clone());
+                    let parent = path.parent().unwrap().to_path_buf();
+                    let res = edgeless_config::load(std::path::PathBuf::from(file.clone())).unwrap();
+                    match res {
+                        edgeless_config::LoadResult::Workflow(wf) => {
+                            let out = serde_json::to_string(&wf).unwrap();
+                            std::fs::write(parent.join(std::path::PathBuf::from("workflow.json")), out.as_bytes()).unwrap();
+                        }
+                        edgeless_config::LoadResult::ActorClass(a) => {}
+                    }
+                }
+            },
         },
     }
     Ok(())
 }
 
-fn parse_port_mapping(mapping: &workflow_spec::PortMapping) -> edgeless_api::workflow_instance::PortMapping {
+fn parse_port_mapping(mapping: &edgeless_config::port::Mapping) -> edgeless_api::workflow_instance::PortMapping {
     match mapping {
-        crate::workflow_spec::PortMapping::DIRECT(direct_target) => edgeless_api::workflow_instance::PortMapping::DirectTarget(
+        edgeless_config::port::Mapping::Direct(direct_target) => edgeless_api::workflow_instance::PortMapping::DirectTarget(
             direct_target.target_component.clone(),
             edgeless_api::function_instance::PortId(direct_target.port.clone()),
         ),
-        crate::workflow_spec::PortMapping::ANY_OF(targets) => edgeless_api::workflow_instance::PortMapping::AnyOfTargets(
+        edgeless_config::port::Mapping::Any(targets) => edgeless_api::workflow_instance::PortMapping::AnyOfTargets(
             targets
                 .iter()
                 .map(|t| (t.target_component.clone(), edgeless_api::function_instance::PortId(t.port.clone())))
                 .collect(),
         ),
-        crate::workflow_spec::PortMapping::ALL_OF(targets) => edgeless_api::workflow_instance::PortMapping::AllOfTargets(
+        edgeless_config::port::Mapping::All(targets) => edgeless_api::workflow_instance::PortMapping::AllOfTargets(
             targets
                 .iter()
                 .map(|t| (t.target_component.clone(), edgeless_api::function_instance::PortId(t.port.clone())))
                 .collect(),
         ),
-        crate::workflow_spec::PortMapping::TOPIC(topic_target) => edgeless_api::workflow_instance::PortMapping::Topic(topic_target.topic.clone()),
+        edgeless_config::port::Mapping::Topic(topic_target) => edgeless_api::workflow_instance::PortMapping::Topic(topic_target.clone()),
+        _ => {
+            panic!("Bad Mapping");
+        }
     }
 }
+
+// fn parse_config_workflow(cwf: edgeless_config::workflow::EdgelessWorkflow) -> {
+
+// }
+
+// fn parse_config_actor(
+//     ca: edgeless_config::actor_class::EdgelessActorClass,
+//     parent: &std::path::PathBuf,
+// ) -> workflow_spec::WorkflowSpecFunctionClass {
+//     workflow_spec::WorkflowSpecFunctionClass {
+//         id: ca.id.clone(),
+//         function_type: "RUST".to_string(),
+//         version: ca.version,
+//         code: Some(String::from_str(parent.join(std::path::PathBuf::from(format!("{}.tar.gz", ca.id))).to_str().unwrap()).unwrap()),
+//         build: None,
+//         outputs: ca.ouputs.into_iter().map(|(oid, o)| {
+//             (
+//                 oid,
+//                 workflow_spec::PortDefinition {
+//                     method: match o.method {
+//                         edgeless_config::port_class::Method::Call => {
+//                             workflow_spec::PortMethod::CALL
+//                         },
+//                         edgeless_config::port_class::Method::Cast => {
+//                             workflow_spec::PortMethod::CAST
+//                         }
+//                     },
+//                     data_type: o.data_type,
+//                     return_data_type: o.return_data_type
+//                 }
+//             )
+//         }).collect(),
+//         inputs: ca.inputs.into_iter().map(|(oid, o)| {
+//             (
+//                 oid,
+//                 workflow_spec::PortDefinition {
+//                     method: match o.method {
+//                         edgeless_config::port_class::Method::Call => {
+//                             workflow_spec::PortMethod::CALL
+//                         },
+//                         edgeless_config::port_class::Method::Cast => {
+//                             workflow_spec::PortMethod::CAST
+//                         }
+//                     },
+//                     data_type: o.data_type,
+//                     return_data_type: o.return_data_type
+//                 }
+//             )
+//         }).collect(),
+//         inner_structure: ca.inner_structure.into_iter().map(|cm| {
+//             workflow_spec::Mapping {
+//                 source: match cm.source {
+//                     edgeless_config::inner_structure::MappingNode::Port(pid) => {
+//                         workflow_spec::MappingNode::PORT(pid)
+//                     },
+//                     edgeless_config::inner_structure::MappingNode::SideEffect => {
+//                         workflow_spec::MappingNode::SIDE_EFFECT
+//                     }
+//                 },
+//                 dests: cm.dests.into_iter().map(|dest| match dest {
+//                     edgeless_config::inner_structure::MappingNode::Port(pid) => {
+//                         workflow_spec::MappingNode::PORT(pid)
+//                     },
+//                     edgeless_config::inner_structure::MappingNode::SideEffect => {
+//                         workflow_spec::MappingNode::SIDE_EFFECT
+//                     }
+//                 }).collect()
+//             }
+//         }).collect(),
+//     }
+// }
