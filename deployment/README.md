@@ -37,6 +37,12 @@ NUM_NODES=5 ./make-docker-compose.sh
 docker-compose up
 ```
 
+Additional node with DDA resources can be started by doing:
+```bash
+DDA=true NUM_NODES=5 ./make-docker-compose.sh
+```
+This will start 6 nodes in total.
+
 ### Example
 
 Deploy a cluster in one shell:

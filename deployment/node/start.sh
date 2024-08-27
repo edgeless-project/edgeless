@@ -10,8 +10,12 @@ agent_url = "http://0.0.0.0:${agent_addr_port[1]}"
 agent_url_announced = "http://$AGENT_ENDPOINT"
 invocation_url = "http://0.0.0.0:${invocation_addr_port[1]}"
 invocation_url_announced = "http://$INVOCATION_ENDPOINT"
-metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://$ORCHESTRATOR_ENDPOINT"
+
+[telemetry]
+metrics_url = "http://0.0.0.0:7003"
+log_level = "info"
+performance_samples = true
 
 EOF
 
@@ -27,6 +31,7 @@ clock_freq_cpu = 1000
 num_cores = $NUM_CORES
 EOF
 
+# node with the file log does not offer a wasm runtime
 elif [ $"$NODE_TYPE" == "FILE_LOG" ] ; then
     cat >> node.toml << EOF
 [resources]
@@ -47,6 +52,7 @@ num_cores = $NUM_CORES
 
 [resources]
 dda_provider = "dda-1"
+dda_url = "http://127.0.0.1:12000"
 EOF
 
 else

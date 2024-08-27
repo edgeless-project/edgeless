@@ -718,7 +718,6 @@ http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"
 file_log_provider = "file-log-1"
 redis_provider = "redis-1"
-dda_url = "http://127.0.0.1:10000"
 dda_provider = "dda-1"
 kafka_egress_provider = "kafka-egress-1"
 

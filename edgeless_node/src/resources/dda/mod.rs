@@ -7,8 +7,8 @@ use edgeless_api::function_instance::InstanceId;
 use edgeless_api::resource_configuration::ResourceConfigurationAPI;
 use serde::Deserialize;
 use serde_json::Error;
-use std::{collections::HashMap, sync::Arc, time::Duration};
-use tokio::{sync::Mutex, time::interval};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 // imports the generated proto file for dda
@@ -276,7 +276,7 @@ impl DDAResource {
                         }
                         "call" => {
                             panic!("do not use calls - they will probably be removed later on");
-                            let _ = handle.call(target_function_id, encoded_event).await;
+                            // let _ = handle.call(target_function_id, encoded_event).await;
                         }
                         _ => {
                             panic!("Unexpected method used in DDA mapping");
