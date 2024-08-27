@@ -241,7 +241,6 @@ services:
     #   connectTimeout - millis to wait for the connection process to complete (defaults to 10000)
     #   noLocal - if true, publications are not forwarded to the originating MQTT client (defaults to false)
     opts:
-      debug: true
 
     # Indicates whether this service should be disabled within your DDA sidecar
     # or instance. Specify true to opt out from exposing this service.
