@@ -99,7 +99,7 @@ async fn basic_lifecycle() {
             function_class_id: "EXAMPLE_1".to_string(),
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
-            function_class_code: include_bytes!("fixtures/messaging_test.wasm").to_vec(),
+            function_class_code: include_bytes!("../../../../functions/messaging_test/messaging_test.wasm").to_vec(),
             function_class_outputs: vec![],
         },
         annotations: std::collections::HashMap::new(),
@@ -239,7 +239,7 @@ async fn messaging_test_setup() -> (
             function_class_id: "EXAMPLE_1".to_string(),
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
-            function_class_code: include_bytes!("fixtures/messaging_test.wasm").to_vec(),
+            function_class_code: include_bytes!("../../../../functions/messaging_test/messaging_test.wasm").to_vec(),
             function_class_outputs: vec!["test".to_string()],
         },
         annotations: std::collections::HashMap::new(),
@@ -552,7 +552,7 @@ async fn state_management() {
             function_class_id: "EXAMPLE_1".to_string(),
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
-            function_class_code: include_bytes!("fixtures/state_test.wasm").to_vec(),
+            function_class_code: include_bytes!("../../../../functions/state_test/state_test.wasm").to_vec(),
             function_class_outputs: Vec::new(),
         },
         annotations: std::collections::HashMap::new(),
@@ -576,7 +576,7 @@ async fn state_management() {
         init_log_event,
         TelemetryEvent::FunctionLogEntry(
             edgeless_telemetry::telemetry_events::TelemetryLogLevel::Info,
-            "edgeless_test_state".to_string(),
+            "state_test".to_string(),
             "no_state".to_string()
         )
     );
