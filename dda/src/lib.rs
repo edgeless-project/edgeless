@@ -95,6 +95,7 @@ fn encode(msg: DDA) -> Vec<u8> {
 }
 
 // NOTE: this is WIP
+#[allow(dead_code)]
 fn call_through_dda<T>(event_name: &str, event: DDA, transform: Option<fn(DDA) -> Result<T, String>>) -> Result<T, String>
 where
     T: Default,

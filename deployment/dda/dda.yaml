@@ -1,16 +1,10 @@
 # SPDX-FileCopyrightText: © 2024 Siemens AG
 # SPDX-License-Identifier: MIT
-
 # Data Distribution Agent (DDA) Configuration
 # https://github.com/coatyio/dda
 
-# DDA configuration version number as a string.
-#
-# The version number must conform to the YAML configuration schema version used
-# within the DDA module.
 version: "1"
 
-# Identity of a DDA.
 identity:
   # Name of agent.
   #
@@ -60,15 +54,14 @@ apis:
     # "unix:/tmp/mydda.sock".
     #
     # If not present, default address string is ":8900".
-    address:
+    address: :12000
 
-    # Indicates whether this API service should be disabled within your DDA
-    # sidecar or instance. Specify true to opt out from exposing this API
-    # service. This is useful if you embed the DDA as a library in your client
-    # application.
+    # Indicates whether this API service should be disabled within the DDA.
+    # Specify true to opt out from exposing this API service in your DDA. This
+    # is useful if you embed the DDA as a library in your client application.
     #
     # If not present, defaults to false.
-    disabled: false
+    disabled:
 
     # After a duration of this time if the server doesn't see any activity it
     # pings the client to see if the transport is still alive. If set below 1s,
@@ -111,16 +104,15 @@ apis:
     # [https://example.org,https://awesome.com:4200]
     access-control-allow-origin:
 
-    # Indicates whether this API service should be disabled within your DDA
-    # sidecar or instance. Specify true to opt out from exposing this API
-    # service. This is useful if you embed the DDA as a library in your client
-    # application.
+    # Indicates whether this API service should be disabled within the DDA.
+    # Specify true to opt out from exposing this API service in your DDA. This
+    # is useful if you embed the DDA as a library in your client application.
     #
     # Note that an enabled gRPC-Web API is only usable and reachable if the gRPC
     # API is also enabled.
     #
     # If not present, defaults to false.
-    disabled: false
+    disabled: true
 
   # Certificate file in PEM format used for TLS API server authentication.
   #
@@ -159,7 +151,7 @@ services:
     # If not present, a protocol-specific default is used:
     #
     # - mqtt5: tcp://localhost:1883
-    url: tcp://mqtt_broker:1883
+    url:
 
     # Authentication options.
     auth:
@@ -242,11 +234,11 @@ services:
     #   noLocal - if true, publications are not forwarded to the originating MQTT client (defaults to false)
     opts:
 
-    # Indicates whether this service should be disabled within your DDA sidecar
-    # or instance. Specify true to opt out from exposing this service.
+    # Indicates whether this service should be disabled within the DDA. Specify
+    # true to opt out from exposing this service in your DDA.
     #
     # If not present, defaults to false.
-    disabled: false
+    disabled:
 
   # Local persistent or in-memory key-value storage service for a single DDA
   # sidecar or instance.
@@ -278,97 +270,8 @@ services:
     # - pebble: "" (in-memory storage)
     location:
 
-    # Indicates whether this service should be disabled within your DDA sidecar
-    # or instance. Specify true to opt out from exposing this service.
+    # Indicates whether this service should be disabled within the DDA. Specify
+    # true to opt out from exposing this service in your DDA.
     #
     # If not present, defaults to true.
-    disabled: false
-
-  # State synchronization service based on a consensus protocol, like Raft or
-  # Paxos, that guarantees strong consistency on a replicated state.
-  #
-  # Configuration options are used to set up a local member belonging to a state
-  # synchronization group formed by the subset of agents in the configured DDA
-  # cluster which have enabled this service. All members within the same DDA
-  # cluster share replicated state. State synchronization groups in different
-  # clusters run isolated from each other and in parallel to provide
-  # cluster-specific replicated state.
-  #
-  # Note that each member of a state synchronization group is assigned a unique
-  # member ID as configured by the DDA identity id. To efficiently restore
-  # persisted member state after a DDA restart, this unique id should not change
-  # between restarts.
-  state:
-    # The consensus protocol to use. One of: "raft"
-    #
-    # If not present, "raft" is used by default.
-    protocol:
-
-    # Persistent storage location on a local file system used to store
-    # replicated state, snapshots, and log entries of the local state
-    # synchronization group member. In a containerized DDA sidecar use a volume
-    # or a bind mount and specify a destination path that corresponds with this
-    # storage location.
-    #
-    # Specify a directory given by an absolute pathname or a pathname relative
-    # to the working directory of the DDA sidecar or instance.
-    #
-    # You may also specify an empty string to indicate that the store is
-    # non-persistent and completely memory-backed as long as the DDA agent is
-    # running. Usually, you shouldn't use non-persistent storage in a production
-    # environment as all local state is lost when shutting down the DDA sidecar.
-    # Non-persistent storage is mainly used for testing purposes.
-    #
-    # If not present or empty, in-memory non-persistent storage is used.
-    store:
-
-    # Indicates whether the local member should initially create the state
-    # synchronization group within the configured DDA cluster. Specify true for
-    # exactly one member within the cluster; specify false for all other members
-    # within the cluster. Multiple members within the same cluster having this
-    # option set to true will lead to undefined behavior.
-    #
-    # Note that the member that creates the state synchronization group is not
-    # required to stay in the group. It is possible to use one designated member
-    # for creating the group that leaves the group after it is up and running.
-    # In this case it is important that at least one other member has joined the
-    # group before the creating member leaves.
-    #
-    # Also note that the member that creates the state synchronization group is
-    # required to be the first DDA instance to be started up. All other members
-    # must be started up after the bootstrapping member has been set up. Not
-    # respecting this requirement will lead to undefined behavior and may result
-    # in partitioned members that form their own group.
-    #
-    # Note that if you restart a bootstrapping member after a graceful or
-    # non-graceful shutdown the bootstrap flag should be reconfigured with false
-    # as the still existing group will have elected a different leading member
-    # in the meantime.
-    #
-    # If not present, defaults to false.
-    bootstrap: true
-
-    # Indicates whether this service should be disabled within your DDA sidecar
-    # or instance. Specify true to opt out from exposing this service.
-    #
-    # Note that if this service is enabled the com service must also be enabled
-    # since messaging between state synchronization group members makes use of
-    # the DDA communication service internally.
-    #
-    # If not present, defaults to true.
-    disabled: false
-
-    # Options related to the underlying consensus protocol implementation in the
-    # form of a Yaml object with dynamic key-value pairs.
-    #
-    # Supported options for protocol "raft":
-    #   debug - if true, enables debug logging for Raft library (defaults to false)
-    #   startupTimeout - millis to wait for startup of a new Raft node to complete (defaults to 10000)
-    #   lfwTimeout - millis to wait for a leader forwarded Propose/GetState response (defaults to 20000)
-    #   rpcTimeout - millis to wait for a remote operation on Raft transport to complete (defaults to 1000)
-    #   heartbeatTimeout - millis to wait in follower state before attempting an election (defaults to 1000)
-    #   electionTimeout - millis to wait in candidate state before attempting an election (defaults to 1000)
-    #   installSnapshotTimeoutScale - timeout scale factor in bytes for snapshot installations (defaults to 256*1024)
-    #   snapshotInterval - millis to check how often a snapshot should be performed (defaults to 120000)
-    #   snapshotThreshold - minimum number of outstanding logs to start snapshotting (defaults to 8192)
-    opts:
+    disabled:
