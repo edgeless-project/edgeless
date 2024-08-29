@@ -5,6 +5,7 @@ topic `test` of an [Apache Kafka server](https://kafka.apache.org/).
 
 1. Get the latest Kafka release and extract it in `$KAFKADIR` (see
    [instructions](https://kafka.apache.org/quickstart)).
+
 2. _If you don't have a Kafka cluster already_: install
    [docker-compose](https://docs.docker.com/compose/) and run:
 
@@ -14,27 +15,44 @@ docker-compose up -d
 cd -
 ```
  
-3. Build the `counter` WASM binary following the
-   [instructions](../../functions/README.md).
-4. Create a topic called `test`:
+3. Create a topic called `test`:
 
 ```shell
 $KAFKADIR/bin/kafka-topics.sh --create --bootstrap-server localhost:9092 --topic test
 ```
 
-5. Start the workflow with:
+4. Build the `counter` WASM binary:
+
+```shell
+target/debug/edgeless_cli function build functions/counter/function.json
+```
+
+5. Create the default configuration files for all the executables:
+
+```shell
+target/debug/edgeless_cli -t cli.toml
+target/debug/edgeless_inabox -t
+```
+
+6. Start EDGELESS-in-a-box:
+
+```shell
+target/debug/edgeless_inabox
+```
+
+7. In another shell, start the workflow with:
 
 ```shell
 ID=$(target/debug/edgeless_cli workflow start examples/redis/workflow.json)
 ```
 
-6. Check that the messages are being produced by the workflow:
+8. Check that the messages are being produced by the workflow:
 
 ```shell
 $KAFKADIR/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic test
 ```
 
-7. Stop the workflow:
+9. Stop the workflow:
 
 ```shell
 target/debug/edgeless_cli workflow stop $ID
