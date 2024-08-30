@@ -416,19 +416,25 @@ mod tests {
                         annotations: std::collections::HashMap::new(),
                     },
                 ],
-                workflow_resources: vec![],
+                workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
+                    name: "log".to_string(),
+                    class_type: "file-log".to_string(),
+                    output_mapping: std::collections::HashMap::new(),
+                    configurations: std::collections::HashMap::from([("filename".to_string(), removeme_filename())]),
+                }],
                 annotations: std::collections::HashMap::new(),
             })
             .await;
+        let expected_instance_names = std::collections::HashSet::from(["f1", "f2", "f3", "log"]);
         workflow_id = Some(match res {
             Ok(response) => match &response {
                 edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => {
                     panic!("workflow rejected: {}", err)
                 }
                 edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val) => {
-                    assert_eq!(3, val.domain_mapping.len());
-                    for i in 0..3 {
-                        assert_eq!(format!("f{}", i + 1), val.domain_mapping[i].name);
+                    assert_eq!(4, val.domain_mapping.len());
+                    for i in 0..4 {
+                        assert!(expected_instance_names.contains(val.domain_mapping[i].name.as_str()));
                         assert_eq!("domain-0", val.domain_mapping[i].domain_id);
                     }
                     val.workflow_id.clone()
