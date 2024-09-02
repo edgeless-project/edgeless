@@ -110,4 +110,17 @@ mod tests {
     fn test_fibonacci_n_th_element_single() {
         fibonacci_n_th_element(std::env::var("N").unwrap().parse::<u64>().unwrap());
     }
+
+    #[test]
+    #[ignore]
+    fn test_fibonacci_benchmark() {
+        let base = 2_u64;
+        for exp in 0_u32..64_u32 {
+            let now = std::time::Instant::now();
+            let n = base.pow(exp);
+            let _res = fibonacci_n_th_element(n);
+            let delta = std::time::Instant::now() - now;
+            println!("{} {} {}", exp, n, delta.as_secs_f32());
+        }
+    }
 }
