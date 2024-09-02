@@ -277,7 +277,7 @@ The simplest workflow consists of a single function, which does not interact wit
                 "id": "noop",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./noop_function/noop.wasm",
+                "code": "../../functions/noop/noop.wasm",
                 "outputs": []
             },
             "output_mapping": {},
@@ -291,9 +291,9 @@ The simplest workflow consists of a single function, which does not interact wit
 }
 ```
 
-This workflow creates a function called `noop`, whose bytecode is assumed to be in the local file `./noop_function/noop.wasm`.
+This workflow creates a function called `noop`, whose bytecode is assumed to be in the local file `noop.wasm`.
 
-If we want to start this workflow, we must build the `noop.wasm` function first. Such a function is bundled with the EDGELESS repository [here](../examples/noop/noop_function/src/lib.rs):
+If we want to start this workflow, we must build the `noop.wasm` function first. Such a function is bundled with the EDGELESS repository [here](../functions/noop/src/lib.rs):
 
 ```rust
 impl Edgefunction for NoopFunction {
@@ -328,10 +328,10 @@ These four handlers are the basic programming model of EDGELESS functions:
 The WebAssembly bytecode can be built with the following command:
 
 ```bash
-./edgeless_cli function build ../../examples/noop/noop_function/function.json
+./edgeless_cli function build ../../functions/noop/function.json
 ```
 
-which produces the file `../../examples/noop/noop_function/noop.wasm` that is needed by our workflow.
+which produces the file `../../functions/noop/noop.wasm` that is needed by our workflow.
 
 We can now create the default CLI configuration:
 
