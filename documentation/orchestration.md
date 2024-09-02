@@ -204,14 +204,13 @@ target/debug/edgeless_node_d -c node-2.toml
 Compile the WASM bytecode of the `vector_mul` function, which performs the multiplication of an internal random matrix by the vector received as input:
 
 ```bash
-target/debug/edgeless_cli function build \
-  edgeless_benchmark/functions/vector_mul/function.json
+target/debug/edgeless_cli function build functions/vector_mul/function.json
 ```
 
 Start a workflow consisting of three `vector_mul` functions in a chain:
 
 ```bash
-target/debug/edgeless_cli workflow start edgeless_benchmark/functions/vector_mul/workflow-chain.json
+target/debug/edgeless_cli workflow start functions/vector_mul/workflow-chain.json
 ```
 
 The full status of the in-memory database, including a mirror of the ε-ORC internal data structures of the application metrics sampled, can be dumped with a script provided:
