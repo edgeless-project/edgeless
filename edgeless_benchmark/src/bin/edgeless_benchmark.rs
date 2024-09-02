@@ -46,10 +46,10 @@ struct Args {
     #[arg(short, long, default_value_t = 42)]
     seed: u64,
     /// Workflow type, use "help" to list possible examples.
-    #[arg(short, long, default_value_t = String::from("single;examples/noop/noop_function/function.json;examples/noop/noop_function/noop.wasm"))]
+    #[arg(short, long, default_value_t = String::from("single;functions/noop/function.json;functions/noop/noop.wasm"))]
     wf_type: String,
     /// Location of the single_trigger function.
-    #[arg(long, default_value_t = String::from("edgeless_benchmark/functions/single_trigger/single_trigger.wasm"))]
+    #[arg(long, default_value_t = String::from("functions/single_trigger/single_trigger.wasm"))]
     single_trigger_wasm: String,
     /// URL of the Redis server to use for metrics.
     #[arg(short, long, default_value_t = String::from("redis://127.0.0.1:6379/"))]
@@ -174,19 +174,9 @@ impl WorkflowType {
     fn examples() -> Vec<Self> {
         vec![
             WorkflowType::None,
-            WorkflowType::Single(
-                "examples/noop/noop_function/function.json".to_string(),
-                "examples/noop/noop_function/noop.wasm".to_string(),
-            ),
-            WorkflowType::VectorMulChain(3, 5, 1000, 1000, "edgeless_benchmark/functions/vector_mul/vector_mul.wasm".to_string()),
-            WorkflowType::MatrixMulChain(
-                3,
-                5,
-                100,
-                200,
-                1000,
-                "edgeless_benchmark/functions/matrix_mul/matrix_mul.wasm".to_string(),
-            ),
+            WorkflowType::Single("functions/noop/function.json".to_string(), "functions/noop/noop.wasm".to_string()),
+            WorkflowType::VectorMulChain(3, 5, 1000, 1000, "functions/vector_mul/vector_mul.wasm".to_string()),
+            WorkflowType::MatrixMulChain(3, 5, 100, 200, 1000, "functions/matrix_mul/matrix_mul.wasm".to_string()),
         ]
     }
 }

@@ -21,7 +21,7 @@ Redis is running (see
 First, build the `vector_mul.wasm` bytecode:
 
 ```bash
-target/debug/edgeless_cli function build edgeless_benchmark/functions/vector_mul/function.json
+target/debug/edgeless_cli function build functions/vector_mul/function.json
 ```
 
 Then, create the configuration files:
@@ -43,7 +43,7 @@ target/debug/edgeless_inabox
 In another run the following benchmark, which lasts 30 seconds:
 
 ```bash
-target/debug/edgeless_benchmark -w "vector-mul-chain;5;5;1000;2000;edgeless_benchmark/functions/vector_mul/vector_mul.wasm
+target/debug/edgeless_benchmark -w "vector-mul-chain;5;5;1000;2000;functions/vector_mul/vector_mul.wasm
 ```
 
 At the end you will find a file `out.csv` that contains the dump of the
