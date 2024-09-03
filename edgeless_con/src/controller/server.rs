@@ -249,6 +249,7 @@ impl ControllerTask {
                         .iter()
                         .map(|(_name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
                             name: component.name.to_string(),
+                            function_id: component.fid.clone(),
                             domain_id: component.domain_id.clone(),
                         })
                         .collect(),
@@ -265,6 +266,7 @@ impl ControllerTask {
                         .iter()
                         .map(|(_name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
                             name: component.name.to_string(),
+                            function_id: component.fid.clone(),
                             domain_id: component.domain_id.clone(),
                         })
                         .collect(),

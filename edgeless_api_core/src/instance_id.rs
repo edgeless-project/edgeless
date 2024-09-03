@@ -1,9 +1,11 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
+
 // TODO(raphaelhetzel) These should be actual types in the future to allow for type-safety.
 pub type NodeId = uuid::Uuid;
 pub type ComponentId = uuid::Uuid;
+pub type DomainManagedInstanceId = uuid::Uuid;
 
 pub const NODE_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-fffe00000000");
 pub const FUNCTION_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-fffd00000000");

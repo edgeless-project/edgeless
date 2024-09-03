@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use super::common::CommonConverters;
 
+use std::str::FromStr;
 pub struct WorkflowInstanceConverters {}
 
 impl WorkflowInstanceConverters {
@@ -69,6 +69,7 @@ impl WorkflowInstanceConverters {
     ) -> anyhow::Result<crate::workflow_instance::WorkflowFunctionMapping> {
         Ok(crate::workflow_instance::WorkflowFunctionMapping {
             name: api_mapping.name.to_string(),
+            function_id: uuid::Uuid::from_str(api_mapping.function_id.as_str())?,
             domain_id: api_mapping.domain_id.to_string(),
         })
     }
@@ -104,7 +105,7 @@ impl WorkflowInstanceConverters {
                 Err(err) => Err(anyhow::anyhow!(err.to_string())),
             },
             None => match api_instance.response_error.as_ref() {
-                Some(val) => match CommonConverters::parse_response_error(val) {
+                Some(val) => match crate::grpc_impl::common::CommonConverters::parse_response_error(val) {
                     Ok(val) => Ok(crate::workflow_instance::SpawnWorkflowResponse::ResponseError(val)),
                     Err(err) => Err(anyhow::anyhow!(err.to_string())),
                 },
@@ -169,7 +170,7 @@ impl WorkflowInstanceConverters {
     ) -> crate::grpc_impl::api::SpawnWorkflowResponse {
         match crate_request {
             crate::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => crate::grpc_impl::api::SpawnWorkflowResponse {
-                response_error: Some(CommonConverters::serialize_response_error(err)),
+                response_error: Some(crate::grpc_impl::common::CommonConverters::serialize_response_error(err)),
                 workflow_status: None,
             },
             crate::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(instance) => crate::grpc_impl::api::SpawnWorkflowResponse {
@@ -201,6 +202,7 @@ impl WorkflowInstanceConverters {
     ) -> crate::grpc_impl::api::WorkflowFunctionMapping {
         crate::grpc_impl::api::WorkflowFunctionMapping {
             name: crate_mapping.name.to_string(),
+            function_id: crate_mapping.function_id.to_string(),
             domain_id: crate_mapping.domain_id.to_string(),
         }
     }
@@ -441,6 +443,7 @@ mod tests {
     fn serialize_deserialize_workflow_function_mapping() {
         let messages = vec![WorkflowFunctionMapping {
             name: "fun1".to_string(),
+            function_id: uuid::Uuid::new_v4(),
             domain_id: "domain1".to_string(),
         }];
 
@@ -462,10 +465,12 @@ mod tests {
             domain_mapping: vec![
                 WorkflowFunctionMapping {
                     name: "fun1".to_string(),
+                    function_id: uuid::Uuid::new_v4(),
                     domain_id: "domain1".to_string(),
                 },
                 WorkflowFunctionMapping {
                     name: "fun2".to_string(),
+                    function_id: uuid::Uuid::new_v4(),
                     domain_id: "domain2".to_string(),
                 },
             ],
@@ -488,10 +493,12 @@ mod tests {
             domain_mapping: vec![
                 WorkflowFunctionMapping {
                     name: "fun1".to_string(),
+                    function_id: uuid::Uuid::new_v4(),
                     domain_id: "domain1".to_string(),
                 },
                 WorkflowFunctionMapping {
                     name: "fun2".to_string(),
+                    function_id: uuid::Uuid::new_v4(),
                     domain_id: "domain2".to_string(),
                 },
             ],
@@ -514,10 +521,12 @@ mod tests {
             domain_mapping: vec![
                 WorkflowFunctionMapping {
                     name: "fun1".to_string(),
+                    function_id: uuid::Uuid::new_v4(),
                     domain_id: "domain1".to_string(),
                 },
                 WorkflowFunctionMapping {
                     name: "fun2".to_string(),
+                    function_id: uuid::Uuid::new_v4(),
                     domain_id: "domain2".to_string(),
                 },
             ],

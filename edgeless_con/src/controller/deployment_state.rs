@@ -47,6 +47,7 @@ impl ActiveWorkflow {
             .iter()
             .map(|(name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
                 name: name.clone(),
+                function_id: component.fid.clone(),
                 domain_id: component.domain_id.clone(),
             })
             .collect()

@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: MIT
 use std::str::FromStr;
 
-use crate::common::ResponseError;
-
 const WORKFLOW_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -38,6 +36,7 @@ impl WorkflowId {
 #[derive(Debug, Clone, PartialEq)]
 pub struct WorkflowFunctionMapping {
     pub name: String,
+    pub function_id: crate::function_instance::ComponentId,
     pub domain_id: String,
 }
 
@@ -72,7 +71,7 @@ pub struct SpawnWorkflowRequest {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum SpawnWorkflowResponse {
-    ResponseError(ResponseError),
+    ResponseError(crate::common::ResponseError),
     WorkflowInstance(WorkflowInstance),
 }
 
