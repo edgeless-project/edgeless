@@ -150,8 +150,18 @@ message UpdatePeersRequest {
     optional string invocation_url      = 3;
 }
 
+// Data structure representing samples associated with an identifier.
+message Samples {
+    string         id      = 1;
+    repeated float samples = 10;
+}
+
 // Response message of FunctionInstance::KeepAlive().
 message HealthStatus {
+    //
+    // Node info.
+    //
+
     // Global CPU usage, in percentage.
     int32 cpu_usage      = 10;
     // Load, as the sum of usage of all the CPUs.
@@ -170,6 +180,15 @@ message HealthStatus {
     int32 proc_memory    = 31;
     // Virtual memory occupied by this process, in kbytes.
     int32 proc_vmemory   = 32;
+
+    //
+    // Performance info.
+    //
+
+    // Function execution times.
+    // The identifier is the physical component identifier.
+    // Samples are execution times, in fractional seconds.
+    repeated Samples function_execution_times = 100;
 }
 
 // Message to request the update of a function instance.

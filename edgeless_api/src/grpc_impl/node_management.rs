@@ -124,6 +124,14 @@ pub fn parse_health_status(api_instance: &crate::grpc_impl::api::HealthStatus) -
         proc_cpu_usage: api_instance.proc_cpu_usage,
         proc_memory: api_instance.proc_memory,
         proc_vmemory: api_instance.proc_vmemory,
+        function_execution_times: api_instance
+            .function_execution_times
+            .iter()
+            .filter_map(|x| match uuid::Uuid::from_str(&x.id) {
+                Ok(val) => Some((val, x.samples.clone())),
+                _ => None,
+            })
+            .collect(),
     })
 }
 
@@ -158,6 +166,14 @@ fn serialize_health_status(req: &crate::node_management::HealthStatus) -> crate:
         proc_cpu_usage: req.proc_cpu_usage,
         proc_memory: req.proc_memory,
         proc_vmemory: req.proc_vmemory,
+        function_execution_times: req
+            .function_execution_times
+            .iter()
+            .map(|(id, samples)| crate::grpc_impl::api::Samples {
+                id: id.to_string(),
+                samples: samples.clone(),
+            })
+            .collect(),
     }
 }
 
@@ -197,6 +213,11 @@ mod test {
                 proc_cpu_usage: 7,
                 proc_memory: 8,
                 proc_vmemory: 9,
+                function_execution_times: std::collections::HashMap::from([
+                    (uuid::Uuid::new_v4(), vec![1.0, 2.5, 3.0]),
+                    (uuid::Uuid::new_v4(), vec![]),
+                    (uuid::Uuid::new_v4(), vec![0.1, 0.2, 999.0]),
+                ]),
             },
         ];
         for msg in messages {

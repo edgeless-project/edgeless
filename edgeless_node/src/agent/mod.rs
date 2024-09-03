@@ -309,6 +309,7 @@ impl Agent {
                         proc_cpu_usage: proc.cpu_usage() as i32,
                         proc_memory: to_kb(proc.memory()),
                         proc_vmemory: to_kb(proc.virtual_memory()),
+                        function_execution_times: std::collections::HashMap::new(), // XXX
                     };
                     responder.send(Ok(health_status)).unwrap_or_else(|_| log::warn!("Responder Send Error"));
                 }
