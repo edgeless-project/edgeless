@@ -27,7 +27,7 @@ struct Args {
     /// Address to use to bind servers
     #[arg(short, long, default_value_t = String::from("127.0.0.1"))]
     bind_address: String,
-    /// Arrival model, one of {poisson, incremental, incr-and-keep}
+    /// Arrival model, one of {poisson, incremental, incr-and-keep, single}
     #[arg(long, default_value_t = String::from("poisson"))]
     arrival_model: String,
     /// Warmup duration, in s
@@ -108,6 +108,8 @@ enum ArrivalModel {
     Incremental,
     /// Add workflows incrementally until the warm up period finishes, then keep until the end of the experiment.
     IncrAndKeep,
+    /// Add a single workflow.
+    Single,
 }
 
 static MEGA: u64 = 1000000;
@@ -141,34 +143,123 @@ enum WorkflowType {
     // 3: max input size
     // 4: vector_mul.wasm path
     VectorMulChain(u32, u32, u32, u32, String),
+    // 0:  min interval between consecutive transactions, in ms
+    // 1:  max interval between consecutive transactions, in ms
+    // 2:  min input vector size
+    // 3:  min input vector size
+    // 4:  min number of stages
+    // 5:  max number of stages
+    // 6:  min fan-out per stage
+    // 7:  max fan-out per stage
+    // 8:  min element of the Fibonacci sequence to compute
+    // 9:  max element of the Fibonacci sequence to compute
+    // 10: min memory allocation, in bytes
+    // 11: max memory allocation, in bytes
+    // 12: base path of the functions library
+    MapReduce(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, String),
 }
 
 impl WorkflowType {
-    fn new(wf_type: &str) -> anyhow::Result<WorkflowType> {
+    fn new(wf_type: &str) -> anyhow::Result<Self> {
         let tokens: Vec<&str> = wf_type.split(';').collect();
         if !tokens.is_empty() && tokens[0] == "none" {
-            return Ok(WorkflowType::None);
+            return WorkflowType::None.check();
         } else if !tokens.is_empty() && tokens[0] == "single" && tokens.len() == 3 {
-            return Ok(WorkflowType::Single(tokens[1].to_string(), tokens[2].to_string()));
+            return WorkflowType::Single(tokens[1].to_string(), tokens[2].to_string()).check();
         } else if !tokens.is_empty() && tokens[0] == "matrix-mul-chain" && tokens.len() == 7 {
-            return Ok(WorkflowType::MatrixMulChain(
+            return WorkflowType::MatrixMulChain(
                 tokens[1].parse::<u32>().unwrap_or_default(),
                 tokens[2].parse::<u32>().unwrap_or_default(),
                 tokens[3].parse::<u32>().unwrap_or_default(),
                 tokens[4].parse::<u32>().unwrap_or_default(),
                 tokens[5].parse::<u32>().unwrap_or_default(),
                 tokens[6].to_string(),
-            ));
+            )
+            .check();
         } else if !tokens.is_empty() && tokens[0] == "vector-mul-chain" && tokens.len() == 6 {
-            return Ok(WorkflowType::VectorMulChain(
+            return WorkflowType::VectorMulChain(
                 tokens[1].parse::<u32>().unwrap_or_default(),
                 tokens[2].parse::<u32>().unwrap_or_default(),
                 tokens[3].parse::<u32>().unwrap_or_default(),
                 tokens[4].parse::<u32>().unwrap_or_default(),
                 tokens[5].to_string(),
-            ));
+            )
+            .check();
+        } else if !tokens.is_empty() && tokens[0] == "map-reduce" && tokens.len() == 14 {
+            return WorkflowType::MapReduce(
+                tokens[1].parse::<u32>().unwrap_or_default(),
+                tokens[2].parse::<u32>().unwrap_or_default(),
+                tokens[3].parse::<u32>().unwrap_or_default(),
+                tokens[4].parse::<u32>().unwrap_or_default(),
+                tokens[5].parse::<u32>().unwrap_or_default(),
+                tokens[6].parse::<u32>().unwrap_or_default(),
+                tokens[7].parse::<u32>().unwrap_or_default(),
+                tokens[8].parse::<u32>().unwrap_or_default(),
+                tokens[9].parse::<u32>().unwrap_or_default(),
+                tokens[10].parse::<u32>().unwrap_or_default(),
+                tokens[11].parse::<u32>().unwrap_or_default(),
+                tokens[12].parse::<u32>().unwrap_or_default(),
+                tokens[13].to_string(),
+            )
+            .check();
         }
         Err(anyhow!("unknown workflow type: {}", wf_type))
+    }
+
+    fn check(self) -> anyhow::Result<Self> {
+        match &self {
+            WorkflowType::None => {}
+            WorkflowType::Single(json, wasm) => {
+                anyhow::ensure!(!json.is_empty(), "empty JSON file path");
+                anyhow::ensure!(!wasm.is_empty(), "empty WASM file path");
+            }
+            WorkflowType::VectorMulChain(min_chain, max_chain, min_size, max_size, wasm) => {
+                anyhow::ensure!(*min_chain > 0, "vanishing min chain");
+                anyhow::ensure!(max_chain >= min_chain, "chain: min > max");
+                anyhow::ensure!(max_size >= min_size, "size: min > max");
+                anyhow::ensure!(!wasm.is_empty(), "empty WASM file path");
+            }
+            WorkflowType::MatrixMulChain(min_chain, max_chain, min_size, max_size, _interval, wasm) => {
+                anyhow::ensure!(*min_chain > 0, "vanishing min chain");
+                anyhow::ensure!(max_chain >= min_chain, "chain: min > max");
+                anyhow::ensure!(max_size >= min_size, "size: min > max");
+                anyhow::ensure!(!wasm.is_empty(), "empty WASM file path");
+            }
+            WorkflowType::MapReduce(
+                min_interval,
+                max_interval,
+                min_size,
+                max_size,
+                min_stages,
+                max_stages,
+                min_breadth,
+                max_breadth,
+                min_fibonacci,
+                max_fibonacci,
+                min_allocate,
+                max_allocate,
+                library_path,
+            ) => {
+                anyhow::ensure!(*min_interval > 0, "vanishing min interval");
+                anyhow::ensure!(max_interval >= min_interval, "interval: min > max");
+                anyhow::ensure!(max_size >= min_size, "rate: min > max");
+                anyhow::ensure!(*min_stages > 0, "vanishing min stages");
+                anyhow::ensure!(max_stages >= min_stages, "rate: min > max");
+                anyhow::ensure!(*min_breadth > 0, "vanishing min rate");
+                anyhow::ensure!(max_breadth >= min_breadth, "breadth: min > max");
+                anyhow::ensure!(max_fibonacci >= min_fibonacci, "fibonacci: min > max");
+                anyhow::ensure!(max_allocate >= min_allocate, "allocation: min > max");
+                anyhow::ensure!(!library_path.is_empty(), "empty library path");
+            }
+        }
+        Ok(self)
+    }
+
+    fn metrics_collector(&self) -> bool {
+        match self {
+            WorkflowType::None | WorkflowType::Single(_, _) => false,
+            _ => true,
+        }
     }
 
     fn examples() -> Vec<Self> {
@@ -177,6 +268,7 @@ impl WorkflowType {
             WorkflowType::Single("functions/noop/function.json".to_string(), "functions/noop/noop.wasm".to_string()),
             WorkflowType::VectorMulChain(3, 5, 1000, 1000, "functions/vector_mul/vector_mul.wasm".to_string()),
             WorkflowType::MatrixMulChain(3, 5, 100, 200, 1000, "functions/matrix_mul/matrix_mul.wasm".to_string()),
+            WorkflowType::MapReduce(1000, 1000, 500, 500, 3, 3, 2, 2, 10000, 10000, 0, 0, "functions/".to_string()),
         ]
     }
 }
@@ -194,6 +286,39 @@ impl std::fmt::Display for WorkflowType {
                     f,
                     "matrix-mul-chain;{};{};{};{};{};{}",
                     min_chain, max_chain, min_size, max_size, interval, wasm
+                )
+            }
+            WorkflowType::MapReduce(
+                min_interval,
+                max_interval,
+                min_size,
+                max_size,
+                min_stages,
+                max_stages,
+                min_breadth,
+                max_breadth,
+                min_fibonacci,
+                max_fibonacci,
+                min_allocate,
+                max_allocate,
+                library_path,
+            ) => {
+                write!(
+                    f,
+                    "map-reduce;{};{};{};{};{};{};{};{};{};{};{};{};{}",
+                    min_interval,
+                    max_interval,
+                    min_size,
+                    max_size,
+                    min_stages,
+                    max_stages,
+                    min_breadth,
+                    max_breadth,
+                    min_fibonacci,
+                    max_fibonacci,
+                    min_allocate,
+                    max_allocate,
+                    library_path,
                 )
             }
         }
@@ -266,27 +391,47 @@ impl ClientInterface {
 
         let wf_name = format!("wf{}", self.wf_id);
 
+        let mut draw = |lower: u32, higher: u32| {
+            assert!(lower <= higher);
+            if lower == higher {
+                lower
+            } else {
+                self.rng.gen_range(lower..=higher)
+            }
+        };
+
+        let to_true_false = |val: bool| {
+            if val {
+                "true"
+            } else {
+                "false"
+            }
+        };
+
+        let function_class_specification = |path_json: &std::path::Path, path_wasm: &std::path::Path| {
+            let func_spec: edgeless_cli::workflow_spec::WorkflowSpecFunctionClass =
+                serde_json::from_str(&std::fs::read_to_string(path_json).unwrap()).unwrap();
+            edgeless_api::function_instance::FunctionClassSpecification {
+                function_class_id: func_spec.id,
+                function_class_type: func_spec.function_type,
+                function_class_version: func_spec.version,
+                function_class_code: std::fs::read(path_wasm).unwrap(),
+                function_class_outputs: func_spec.outputs,
+            }
+        };
+
         match &self.wf_type {
             WorkflowType::None => {}
             WorkflowType::Single(path_json, path_wasm) => {
-                let func_spec: edgeless_cli::workflow_spec::WorkflowSpecFunctionClass =
-                    serde_json::from_str(&std::fs::read_to_string(path_json.clone()).unwrap()).unwrap();
-
                 functions.push(WorkflowFunction {
                     name: "single".to_string(),
-                    function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                        function_class_id: func_spec.id,
-                        function_class_type: func_spec.function_type,
-                        function_class_version: func_spec.version,
-                        function_class_code: std::fs::read(path_wasm).unwrap(),
-                        function_class_outputs: func_spec.outputs,
-                    },
+                    function_class_specification: function_class_specification(std::path::Path::new(path_json), std::path::Path::new(path_wasm)),
                     output_mapping: std::collections::HashMap::new(),
                     annotations: std::collections::HashMap::new(),
                 });
             }
             WorkflowType::MatrixMulChain(min_chain_size, max_chain_size, min_matrix_size, max_matrix_size, inter_arrival, path_wasm) => {
-                let chain_size: u32 = self.rng.gen_range(*min_chain_size..=*max_chain_size);
+                let chain_size: u32 = draw(*min_chain_size, *max_chain_size);
 
                 let mut matrix_sizes = vec![];
 
@@ -302,7 +447,7 @@ impl ClientInterface {
                         assert!(i == (chain_size - 1));
                         output_mapping.insert("out-0".to_string(), "f0".to_string());
                     }
-                    let matrix_size: u32 = self.rng.gen_range(*min_matrix_size..=*max_matrix_size);
+                    let matrix_size = draw(*min_matrix_size, *max_matrix_size);
                     matrix_sizes.push(matrix_size);
 
                     let name = format!("f{}", i);
@@ -349,17 +494,10 @@ impl ClientInterface {
                     chain_size,
                     matrix_sizes.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
                 );
-
-                resources.push(edgeless_api::workflow_instance::WorkflowResource {
-                    name: "metrics-collector".to_string(),
-                    class_type: "metrics-collector".to_string(),
-                    output_mapping: std::collections::HashMap::new(),
-                    configurations: std::collections::HashMap::from([("alpha".to_string(), format!("{}", ALPHA)), ("wf_name".to_string(), wf_name)]),
-                });
             }
             WorkflowType::VectorMulChain(min_chain_size, max_chain_size, min_input_size, max_input_size, path_wasm) => {
-                let chain_size: u32 = self.rng.gen_range(*min_chain_size..=*max_chain_size);
-                let input_size = self.rng.gen_range(*min_input_size..=*max_input_size);
+                let chain_size = draw(*min_chain_size, *max_chain_size);
+                let input_size = draw(*min_input_size, *max_input_size);
 
                 for i in 0..chain_size {
                     let name = match i {
@@ -405,15 +543,133 @@ impl ClientInterface {
                 }
 
                 log::info!("wf{}, chain size {}, input size {}", self.wf_id, chain_size, input_size);
+            }
+            WorkflowType::MapReduce(
+                min_interval,
+                max_interval,
+                min_size,
+                max_size,
+                min_stages,
+                max_stages,
+                min_breadth,
+                max_breadth,
+                min_fibonacci,
+                max_fibonacci,
+                min_allocate,
+                max_allocate,
+                library_path,
+            ) => {
+                //
+                //
+                //
+                //                                     ┌─────────┐                         ┌─────────┐
+                //                                     │         │                         │         │
+                //                         ┌──────────►│  p0-0   ├──────────┐  ┌──────────►│  p1-0   ├──────────┐
+                //                         │           │         │          │  │           │         │          │
+                //                         │           └─────────┘          │  │           └─────────┘          │
+                //                         │                                ▼  │                                ▼
+                // ┌─────────┐       ┌─────┴────┐      ┌─────────┐       ┌─────┴────┐      ┌─────────┐       ┌─────────┐
+                // │         │       │          │      │         │       │          │      │         │       │         │
+                // │ trigger │──────►│    s0    ├─────►│  p0-1   ├──────►│   s1     ├─────►│  p1-1   ├──────►│   s2    │
+                // │         │       │          │      │         │       │          │      │         │       │         │
+                // └─────────┘       └─────┬────┘      └─────────┘       └─────┬────┘      └─────────┘       └─────────┘
+                //                         │                                ▲  │                                ▲
+                //                         │           ┌─────────┐          │  │           ┌─────────┐          │
+                //                         │           │         │          │  │           │         │          │
+                //                         └──────────►│  p0-2   ├──────────┘  └──────────►│  p1-2   ├──────────┘
+                //                                     │         │                         │         │
+                //                                     └─────────┘                         └─────────┘
+                let interval = draw(*min_interval, *max_interval);
+                let size = draw(*min_size, *max_size);
+                let stages = draw(*min_stages, *max_stages);
 
-                resources.push(edgeless_api::workflow_instance::WorkflowResource {
-                    name: "metrics-collector".to_string(),
-                    class_type: "metrics-collector".to_string(),
-                    output_mapping: std::collections::HashMap::new(),
-                    configurations: std::collections::HashMap::from([("alpha".to_string(), format!("{}", ALPHA)), ("wf_name".to_string(), wf_name)]),
+                let path = std::path::Path::new(library_path);
+
+                functions.push(WorkflowFunction {
+                    name: "trigger".to_string(),
+                    function_class_specification: function_class_specification(
+                        path.join("trigger/function.json").as_path(),
+                        path.join("trigger/trigger.wasm").as_path(),
+                    ),
+                    output_mapping: std::collections::HashMap::from([("out".to_string(), "s0".to_string())]),
+                    annotations: std::collections::HashMap::from([(
+                        "init-payload".to_string(),
+                        format!("out_type=rand_vec,use_base64=true,size={},arrival=c({})", size, interval),
+                    )]),
                 });
+
+                let mut inputs: Vec<u32> = vec![];
+                let mut breadths = vec![];
+                for stage in 0..=stages {
+                    let breadth = draw(*min_breadth, *max_breadth);
+                    let first = stage == 0;
+                    let last = stage == stages;
+                    let outputs: Vec<u32> = if last { vec![] } else { (0..breadth).collect() };
+                    breadths.push(outputs.len());
+                    let mut output_mapping = std::collections::HashMap::new();
+                    if first || last {
+                        output_mapping.insert("metric".to_string(), "metrics-collector".to_string());
+                    }
+                    for out in &outputs {
+                        output_mapping.insert(format!("out-{}", out), format!("p{}-{}", stage, out));
+                    }
+                    functions.push(WorkflowFunction {
+                        name: format!("s{}", stage),
+                        function_class_specification: function_class_specification(
+                            path.join("bench_mapreduce/function.json").as_path(),
+                            path.join("bench_mapreduce/bench_mapreduce.wasm").as_path(),
+                        ),
+                        output_mapping,
+                        annotations: std::collections::HashMap::from([(
+                            "init-payload".to_string(),
+                            format!(
+                                "is_first={},is_last={},use_base64=true,inputs={},outputs={}",
+                                to_true_false(first),
+                                to_true_false(last),
+                                inputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(":"),
+                                outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(":")
+                            ),
+                        )]),
+                    });
+
+                    for out in &outputs {
+                        let fibonacci = draw(*min_fibonacci, *max_fibonacci);
+                        let allocate = draw(*min_allocate, *max_allocate);
+                        functions.push(WorkflowFunction {
+                            name: format!("p{}-{}", stage, out),
+                            function_class_specification: function_class_specification(
+                                path.join("bench_process/function.json").as_path(),
+                                path.join("bench_process/bench_process.wasm").as_path(),
+                            ),
+                            output_mapping: std::collections::HashMap::from([("out".to_string(), format!("s{}", stage + 1))]),
+                            annotations: std::collections::HashMap::from([(
+                                "init-payload".to_string(),
+                                format!("forward=true,fibonacci={},allocate={}", fibonacci, allocate),
+                            )]),
+                        });
+                    }
+
+                    inputs = outputs;
+                }
+                log::info!(
+                    "wf{}, average interval {} ms, input size {}, num stages {}, breadths [{}]",
+                    self.wf_id,
+                    interval,
+                    size,
+                    stages,
+                    breadths.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                );
             }
         };
+
+        if self.wf_type.metrics_collector() {
+            resources.push(edgeless_api::workflow_instance::WorkflowResource {
+                name: "metrics-collector".to_string(),
+                class_type: "metrics-collector".to_string(),
+                output_mapping: std::collections::HashMap::new(),
+                configurations: std::collections::HashMap::from([("alpha".to_string(), format!("{}", ALPHA)), ("wf_name".to_string(), wf_name)]),
+            });
+        }
 
         self.wf_id += 1;
 
@@ -478,6 +734,7 @@ async fn main() -> anyhow::Result<()> {
         "poisson" => ArrivalModel::Poisson,
         "incremental" => ArrivalModel::Incremental,
         "incr-and-keep" => ArrivalModel::IncrAndKeep,
+        "single" => ArrivalModel::Single,
         _ => panic!("unknown arrival model {}: ", args.arrival_model),
     };
 
@@ -555,7 +812,7 @@ async fn main() -> anyhow::Result<()> {
                             wf_started += 1;
                             let end_time = match arrival_model {
                                 ArrivalModel::Poisson => now + to_microseconds(lifetime_rv.sample(&mut rng)),
-                                ArrivalModel::Incremental | ArrivalModel::IncrAndKeep => to_microseconds(args.duration) - 1,
+                                _ => to_microseconds(args.duration) - 1,
                             };
                             assert!(end_time >= now);
                             log::info!(
@@ -572,6 +829,7 @@ async fn main() -> anyhow::Result<()> {
                         + to_microseconds(match arrival_model {
                             ArrivalModel::Poisson => interarrival_rv.sample(&mut rng),
                             ArrivalModel::Incremental | ArrivalModel::IncrAndKeep => args.interarrival,
+                            ArrivalModel::Single => args.duration + 1.0,
                         });
                     if new_arrival_time < to_microseconds(args.duration) {
                         // only add the event if it is before the end of the experiment
