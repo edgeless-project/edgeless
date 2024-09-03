@@ -19,6 +19,8 @@ pub mod wasmi_runner;
 pub struct EdgelessNodeSettings {
     /// General settings.
     pub general: EdgelessNodeGeneralSettings,
+    /// Telemetry settings.
+    pub telemetry: EdgelessNodeTelemetrySettings,
     /// WASM run-time settings. Disabled if not present.
     pub wasm_runtime: Option<EdgelessNodeWasmRuntimeSettings>,
     /// Container run-time settings.  Disabled if not present.
@@ -27,6 +29,12 @@ pub struct EdgelessNodeSettings {
     pub resources: Option<EdgelessNodeResourceSettings>,
     /// User-specific capabilities.
     pub user_node_capabilities: Option<NodeCapabilitiesUser>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct EdgelessNodeTelemetrySettings {
+    /// The URL exposed by this node to publish telemetry metrics collected.
+    pub metrics_url: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -63,8 +71,6 @@ pub struct EdgelessNodeGeneralSettings {
     /// The COAP invocation URL announced by the node.
     /// It can be different from `agent_url`, e.g., for NAT traversal.
     pub invocation_url_announced_coap: Option<String>,
-    /// The URL exposed by this node to publish telemetry metrics collected.
-    pub metrics_url: String,
     /// The URL of the orchestrator to which this node registers.
     pub orchestrator_url: String,
 }
@@ -153,8 +159,10 @@ impl EdgelessNodeSettings {
                 invocation_url_announced: invocation_url,
                 invocation_url_coap: invocation_url_coap.clone(),
                 invocation_url_announced_coap: invocation_url_coap,
-                metrics_url: format!("http://{}:{}", node_address, metrics_port),
                 orchestrator_url: orchestrator_url.to_string(),
+            },
+            telemetry: EdgelessNodeTelemetrySettings {
+                metrics_url: format!("http://{}:{}", node_address, metrics_port),
             },
             wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: None,
@@ -459,12 +467,10 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     // Create the telemetry provider.
     let telemetry_provider =
-        edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.general.metrics_url.clone(), Some(log::Level::Info))
-            .await
-            .expect(&format!(
-                "could not build the telemetry provider at URL {}",
-                &settings.general.metrics_url
-            ));
+        match edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.telemetry.metrics_url.clone(), Some(log::Level::Info)).await {
+            Ok(telemetry_provider) => telemetry_provider,
+            Err(err) => panic!("could not build the telemetry provider: {}", err),
+        };
 
     // List of runners supported by this node to be filled below depending on
     // the node's configuration.
@@ -596,8 +602,10 @@ invocation_url = "http://127.0.0.1:7002"
 invocation_url_announced = ""
 invocation_url_coap = "coap://127.0.0.1:7002"
 invocation_url_announced_coap = ""
-metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://127.0.0.1:7011"
+
+[telemetry]
+metrics_url = "http://127.0.0.1:7003"
 
 [wasm_runtime]
 enabled = true
