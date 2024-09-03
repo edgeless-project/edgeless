@@ -20,6 +20,7 @@ pub struct HealthStatus {
     pub proc_cpu_usage: i32,
     pub proc_memory: i32,
     pub proc_vmemory: i32,
+    pub function_execution_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<f32>>,
 }
 
 impl std::fmt::Display for HealthStatus {
@@ -52,6 +53,7 @@ impl HealthStatus {
             proc_cpu_usage: 0,
             proc_memory: 0,
             proc_vmemory: 0,
+            function_execution_times: std::collections::HashMap::new(),
         }
     }
 
@@ -66,6 +68,7 @@ impl HealthStatus {
             proc_cpu_usage: -1,
             proc_memory: -1,
             proc_vmemory: -1,
+            function_execution_times: std::collections::HashMap::new(),
         }
     }
 }
