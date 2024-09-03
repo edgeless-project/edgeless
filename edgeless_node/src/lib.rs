@@ -35,6 +35,8 @@ pub struct EdgelessNodeSettings {
 pub struct EdgelessNodeTelemetrySettings {
     /// The URL exposed by this node to publish telemetry metrics collected.
     pub metrics_url: String,
+    /// Log level to use for telemetry events, if enabled.
+    pub log_level: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -163,6 +165,7 @@ impl EdgelessNodeSettings {
             },
             telemetry: EdgelessNodeTelemetrySettings {
                 metrics_url: format!("http://{}:{}", node_address, metrics_port),
+                log_level: None,
             },
             wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: None,
@@ -467,7 +470,9 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     // Create the telemetry provider.
     let telemetry_provider =
-        match edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.telemetry.metrics_url.clone(), Some(log::Level::Info)).await {
+        match edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.telemetry.metrics_url.clone(), settings.telemetry.log_level)
+            .await
+        {
             Ok(telemetry_provider) => telemetry_provider,
             Err(err) => panic!("could not build the telemetry provider: {}", err),
         };
@@ -606,6 +611,7 @@ orchestrator_url = "http://127.0.0.1:7011"
 
 [telemetry]
 metrics_url = "http://127.0.0.1:7003"
+log_level = "info"
 
 [wasm_runtime]
 enabled = true
