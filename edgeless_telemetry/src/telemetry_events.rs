@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use std::str::FromStr;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum TelemetryLogLevel {
     Error,
@@ -153,8 +155,22 @@ impl TelemetryProcessor {
     /// (https://prometheus.io/); if empty then the server is not started
     /// - `log_level`: level used for log directives at each new event
     ///
-    pub async fn new(prometheus_url: String, log_level: Option<log::Level>) -> anyhow::Result<Self> {
+    pub async fn new(prometheus_url: String, log_level: Option<String>) -> anyhow::Result<Self> {
         let mut processing_chain: Vec<Box<dyn EventProcessor>> = vec![];
+
+        let log_level = match log_level {
+            Some(log_level) => {
+                if log_level.is_empty() {
+                    None
+                } else {
+                    match log::Level::from_str(&log_level) {
+                        Ok(log_level) => Some(log_level),
+                        Err(err) => anyhow::bail!("could not parse log_level: {}", err),
+                    }
+                }
+            }
+            None => None,
+        };
 
         if !prometheus_url.is_empty() {
             match edgeless_api::util::parse_http_host(&prometheus_url) {
@@ -163,7 +179,7 @@ impl TelemetryProcessor {
                         crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await,
                     ));
                 }
-                Err(err) => return Err(err),
+                Err(err) => anyhow::bail!("could not create Prometheus server: {}", err),
             }
         }
 
