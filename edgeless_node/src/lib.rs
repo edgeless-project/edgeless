@@ -458,12 +458,13 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     .await;
 
     // Create the telemetry provider.
-    let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.general.metrics_url.clone())
-        .await
-        .expect(&format!(
-            "could not build the telemetry provider at URL {}",
-            &settings.general.metrics_url
-        ));
+    let telemetry_provider =
+        edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.general.metrics_url.clone(), Some(log::Level::Info))
+            .await
+            .expect(&format!(
+                "could not build the telemetry provider at URL {}",
+                &settings.general.metrics_url
+            ));
 
     // List of runners supported by this node to be filled below depending on
     // the node's configuration.
