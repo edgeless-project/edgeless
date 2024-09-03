@@ -1,9 +1,8 @@
-use warp::filters::log::log;
-
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum TelemetryLogLevel {
     Error,
@@ -174,7 +173,7 @@ impl TelemetryProcessor {
         };
 
         // Create a channel to receive telemetry events and the processor that
-        // will handled them, spawned in a dedicated task.
+        // will handle them, spawned in a dedicated task.
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<TelemetryProcessorInput>();
         let inner = TelemetryProcessorInner { processing_chain, receiver };
         tokio::spawn(async move {
