@@ -158,7 +158,10 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 invocation_url_announced_coap: Some("".to_string()),
                 orchestrator_url: orc_conf.general.orchestrator_url.clone(),
             },
-            telemetry: EdgelessNodeTelemetrySettings { metrics_url: next_url() },
+            telemetry: EdgelessNodeTelemetrySettings {
+                metrics_url: next_url(),
+                log_level: None,
+            },
             wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: None,
             resources: Some(EdgelessNodeResourceSettings {
