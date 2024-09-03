@@ -230,9 +230,11 @@ message SpawnWorkflowResponse {
 // the orchestration domain to which they have been allocated.
 message WorkflowFunctionMapping {
     // Name of the function/resource within the workflow.
-    string name = 1;
-    // Unique identifier of the function.
-    string domain_id = 2;
+    string name        = 1;
+    // Unique identifier of the function/resource in an orchestration domain.
+    string function_id = 2;
+    // Unique identifier of the orchestration domain handling the function/resource.
+    string domain_id   = 3;
 }
 
 // Status of a workflow instance returned to a client when its request to create
