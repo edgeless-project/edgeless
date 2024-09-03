@@ -199,7 +199,6 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
                 invocation_url_announced: settings.general.invocation_url_announced,
                 invocation_url_coap: None,
                 invocation_url_announced_coap: None,
-                metrics_url: "".to_string(),
                 orchestrator_url: match settings.general.orchestrator_url_announced.is_empty() {
                     true => settings.general.orchestrator_url,
                     false => settings.general.orchestrator_url_announced.clone(),

@@ -90,8 +90,10 @@ mod tests {
                             invocation_url_announced: "".to_string(),
                             invocation_url_coap: None,
                             invocation_url_announced_coap: None,
-                            metrics_url: format!("http://{}:{}", address, next_port()),
                             orchestrator_url: orchestrator_url.to_string(),
+                        },
+                        telemetry: edgeless_node::EdgelessNodeTelemetrySettings {
+                            metrics_url: format!("http://{}:{}", address, next_port()),
                         },
                         wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
                         container_runtime: None,
