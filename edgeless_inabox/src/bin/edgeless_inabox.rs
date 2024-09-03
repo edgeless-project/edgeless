@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use clap::Parser;
 use edgeless_con::EdgelessConOrcConfig;
 use edgeless_inabox::InABoxConfig;
-use edgeless_node::{EdgelessNodeGeneralSettings, EdgelessNodeResourceSettings, EdgelessNodeSettings};
+use edgeless_node::{EdgelessNodeGeneralSettings, EdgelessNodeResourceSettings, EdgelessNodeSettings, EdgelessNodeTelemetrySettings};
 use std::fs;
 use uuid::Uuid;
 
@@ -156,9 +156,9 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 invocation_url_announced: "".to_string(),
                 invocation_url_coap: Some(node_coap_invocation_urls.get(node_id).expect("").clone()), // we are sure that it is there
                 invocation_url_announced_coap: Some("".to_string()),
-                metrics_url: next_url(),
                 orchestrator_url: orc_conf.general.orchestrator_url.clone(),
             },
+            telemetry: EdgelessNodeTelemetrySettings { metrics_url: next_url() },
             wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: None,
             resources: Some(EdgelessNodeResourceSettings {
