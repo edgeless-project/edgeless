@@ -161,6 +161,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
             telemetry: EdgelessNodeTelemetrySettings {
                 metrics_url: next_url(),
                 log_level: None,
+                performance_samples: false,
             },
             wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: None,

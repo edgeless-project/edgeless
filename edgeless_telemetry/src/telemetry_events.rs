@@ -158,6 +158,9 @@ impl TelemetryProcessor {
     pub async fn new(prometheus_url: String, log_level: Option<String>) -> anyhow::Result<Self> {
         let mut processing_chain: Vec<Box<dyn EventProcessor>> = vec![];
 
+        let inner = std::sync::Arc::new(std::sync::Mutex::new(crate::performance_target::PerformanceTarget::new()));
+        processing_chain.push(Box::new(crate::performance_target::PerformanceTargetOuter::new(inner)));
+
         let log_level = match log_level {
             Some(log_level) => {
                 if log_level.is_empty() {
