@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use edgeless_api::orc::OrchestratorAPI;
+use edgeless_telemetry::performance_target;
 
 pub mod agent;
 pub mod base_runtime;
@@ -471,14 +472,24 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     )
     .await;
 
+    // Create the performance target.
+    let telemetry_performance_target = edgeless_telemetry::performance_target::PerformanceTargetInner::new();
+
     // Create the telemetry provider.
-    let telemetry_provider =
-        match edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.telemetry.metrics_url.clone(), settings.telemetry.log_level)
-            .await
-        {
-            Ok(telemetry_provider) => telemetry_provider,
-            Err(err) => panic!("could not build the telemetry provider: {}", err),
-        };
+    let telemetry_provider = match edgeless_telemetry::telemetry_events::TelemetryProcessor::new(
+        settings.telemetry.metrics_url.clone(),
+        settings.telemetry.log_level,
+        if settings.telemetry.performance_samples {
+            Some(telemetry_performance_target.clone())
+        } else {
+            None
+        },
+    )
+    .await
+    {
+        Ok(telemetry_provider) => telemetry_provider,
+        Err(err) => panic!("could not build the telemetry provider: {}", err),
+    };
 
     // List of runners supported by this node to be filled below depending on
     // the node's configuration.
@@ -580,7 +591,13 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     // Create the agent.
     let runtimes = runners.keys().map(|x| x.to_string()).collect::<Vec<String>>();
-    let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.general.node_id.clone(), data_plane.clone());
+    let (mut agent, agent_task) = agent::Agent::new(
+        runners,
+        resources,
+        settings.general.node_id.clone(),
+        data_plane.clone(),
+        telemetry_performance_target,
+    );
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
 
     // Wait for all the tasks to complete.
@@ -615,6 +632,7 @@ orchestrator_url = "http://127.0.0.1:7011"
 [telemetry]
 metrics_url = "http://127.0.0.1:7003"
 log_level = "info"
+performance_samples = true
 
 [wasm_runtime]
 enabled = true

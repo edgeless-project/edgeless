@@ -4,10 +4,10 @@
 use std::str::FromStr;
 
 pub struct Metrics {
-    function_execution_times: std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<f32>>,
+    pub function_execution_times: std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<f32>>,
 }
 
-/// Data structure holding performance-related per-node metrics.
+/// Non thread-safe data structure holding performance-related per-node metrics.
 pub struct PerformanceTarget {
     metrics: Metrics,
 }
@@ -26,26 +26,6 @@ impl PerformanceTarget {
         Metrics {
             function_execution_times: std::mem::take(&mut self.metrics.function_execution_times),
         }
-    }
-}
-
-pub struct PerformanceTargetOuter {
-    inner: std::sync::Arc<std::sync::Mutex<PerformanceTarget>>,
-}
-
-impl PerformanceTargetOuter {
-    pub fn new(inner: std::sync::Arc<std::sync::Mutex<PerformanceTarget>>) -> Self {
-        Self { inner }
-    }
-}
-
-impl crate::telemetry_events::EventProcessor for PerformanceTargetOuter {
-    fn handle(
-        &mut self,
-        event: &crate::telemetry_events::TelemetryEvent,
-        event_tags: &std::collections::BTreeMap<String, String>,
-    ) -> crate::telemetry_events::TelemetryProcessingResult {
-        self.inner.lock().expect("Could not lock mutex").handle(event, event_tags)
     }
 }
 
@@ -69,6 +49,48 @@ impl crate::telemetry_events::EventProcessor for PerformanceTarget {
             }
         }
         crate::telemetry_events::TelemetryProcessingResult::PROCESSED
+    }
+}
+
+/// Thread-safe wrapper of `PerformanceTarget`.
+#[derive(Clone)]
+pub struct PerformanceTargetInner {
+    target: std::sync::Arc<std::sync::Mutex<PerformanceTarget>>,
+}
+
+impl PerformanceTargetInner {
+    /// Create a new empty `PerformanceTarget`.
+    pub fn new() -> Self {
+        Self {
+            target: std::sync::Arc::new(std::sync::Mutex::new(PerformanceTarget::new())),
+        }
+    }
+
+    /// Return the current metrics and reset them.
+    pub fn get_metrics(&mut self) -> Metrics {
+        self.target.lock().expect("Could not lock mutex").get_metrics()
+    }
+}
+
+/// Wrapper of `PerformanceTargetInner` that implemented the `EventProcessor`
+/// interface.
+pub struct PerformanceTargetOuter {
+    inner: PerformanceTargetInner,
+}
+
+impl PerformanceTargetOuter {
+    pub fn new(inner: PerformanceTargetInner) -> Self {
+        Self { inner }
+    }
+}
+
+impl crate::telemetry_events::EventProcessor for PerformanceTargetOuter {
+    fn handle(
+        &mut self,
+        event: &crate::telemetry_events::TelemetryEvent,
+        event_tags: &std::collections::BTreeMap<String, String>,
+    ) -> crate::telemetry_events::TelemetryProcessingResult {
+        self.inner.target.lock().expect("Could not lock mutex").handle(event, event_tags)
     }
 }
 
