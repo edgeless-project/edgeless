@@ -9,24 +9,43 @@ pub struct Metrics {
 
 /// Data structure holding performance-related per-node metrics.
 pub struct PerformanceTarget {
-    metrics: std::sync::Arc<std::sync::Mutex<Metrics>>,
+    metrics: Metrics,
 }
 
 impl PerformanceTarget {
     pub fn new() -> Self {
         Self {
-            metrics: std::sync::Arc::new(std::sync::Mutex::new(Metrics {
+            metrics: Metrics {
                 function_execution_times: std::collections::HashMap::new(),
-            })),
+            },
         }
     }
 
     /// Return the current metrics and reset them.
     pub fn get_metrics(&mut self) -> Metrics {
-        let mut metrics = self.metrics.lock().expect("Could not lock mutex");
         Metrics {
-            function_execution_times: std::mem::take(&mut metrics.function_execution_times),
+            function_execution_times: std::mem::take(&mut self.metrics.function_execution_times),
         }
+    }
+}
+
+pub struct PerformanceTargetOuter {
+    inner: std::sync::Arc<std::sync::Mutex<PerformanceTarget>>,
+}
+
+impl PerformanceTargetOuter {
+    pub fn new(inner: std::sync::Arc<std::sync::Mutex<PerformanceTarget>>) -> Self {
+        Self { inner }
+    }
+}
+
+impl crate::telemetry_events::EventProcessor for PerformanceTargetOuter {
+    fn handle(
+        &mut self,
+        event: &crate::telemetry_events::TelemetryEvent,
+        event_tags: &std::collections::BTreeMap<String, String>,
+    ) -> crate::telemetry_events::TelemetryProcessingResult {
+        self.inner.lock().expect("Could not lock mutex").handle(event, event_tags)
     }
 }
 
@@ -40,8 +59,7 @@ impl crate::telemetry_events::EventProcessor for PerformanceTarget {
             crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(lat) => {
                 if let Some(function_id) = event_tags.get("FUNCTION_ID") {
                     if let Ok(function_id) = uuid::Uuid::from_str(function_id) {
-                        let mut metrics = self.metrics.lock().expect("Could not lock mutex");
-                        let res = metrics.function_execution_times.entry(function_id).or_insert(vec![]);
+                        let res = self.metrics.function_execution_times.entry(function_id).or_insert(vec![]);
                         res.push(lat.as_secs_f32());
                     }
                 }
