@@ -153,7 +153,14 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     }
 
     // Create the agent of the node embedded in the orchestrator.
-    let (mut agent, agent_task) = edgeless_node::agent::Agent::new(std::collections::HashMap::new(), resources, node_id, data_plane.clone());
+    let telemetry_performance_target = edgeless_telemetry::performance_target::PerformanceTargetInner::new();
+    let (mut agent, agent_task) = edgeless_node::agent::Agent::new(
+        std::collections::HashMap::new(),
+        resources,
+        node_id,
+        data_plane.clone(),
+        telemetry_performance_target,
+    );
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
 
     // Create the orchestrator.
@@ -162,7 +169,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     let orchestrator_server =
         edgeless_api::grpc_impl::orc::OrchestratorAPIServer::run(orchestrator.get_api_client(), settings.general.orchestrator_url.clone());
 
-    let orchestrator_coap_server = if let Some(url) = settings.general.orchestrator_coap_url {
+    let orchestrator_coap_server = if let Some(_url) = settings.general.orchestrator_coap_url {
         edgeless_api::coap_impl::orchestration::CoapOrchestrationServer::run(
             orchestrator.get_api_client().node_registration_api(),
             std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), 7050),

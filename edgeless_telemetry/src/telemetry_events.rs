@@ -154,13 +154,17 @@ impl TelemetryProcessor {
     /// providing an interface suitable to be scraped by Prometheus
     /// (https://prometheus.io/); if empty then the server is not started
     /// - `log_level`: level used for log directives at each new event
+    /// - `performance_target`: optional target that collects samples about
+    /// performance-related events
     ///
-    pub async fn new(prometheus_url: String, log_level: Option<String>) -> anyhow::Result<Self> {
+    pub async fn new(
+        prometheus_url: String,
+        log_level: Option<String>,
+        performance_target: Option<crate::performance_target::PerformanceTargetInner>,
+    ) -> anyhow::Result<Self> {
         let mut processing_chain: Vec<Box<dyn EventProcessor>> = vec![];
 
-        let inner = std::sync::Arc::new(std::sync::Mutex::new(crate::performance_target::PerformanceTarget::new()));
-        processing_chain.push(Box::new(crate::performance_target::PerformanceTargetOuter::new(inner)));
-
+        // Argument check.
         let log_level = match log_level {
             Some(log_level) => {
                 if log_level.is_empty() {
@@ -175,6 +179,12 @@ impl TelemetryProcessor {
             None => None,
         };
 
+        // Add the performance target, if present.
+        if let Some(performance_target) = performance_target {
+            processing_chain.push(Box::new(crate::performance_target::PerformanceTargetOuter::new(performance_target)));
+        }
+
+        // Create and add the Prometheus target, if required.
         if !prometheus_url.is_empty() {
             match edgeless_api::util::parse_http_host(&prometheus_url) {
                 Ok((_, ip, port)) => {
@@ -186,6 +196,7 @@ impl TelemetryProcessor {
             }
         }
 
+        // Created and the log target, if required.
         match log_level {
             Some(log_level) => processing_chain.push(Box::new(EventLogger::new(log_level))),
             None => {}

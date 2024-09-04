@@ -1732,6 +1732,7 @@ dependencies = [
  "edgeless_api",
  "edgeless_dataplane",
  "edgeless_node",
+ "edgeless_telemetry",
  "env_logger",
  "futures 0.3.30",
  "itertools 0.13.0",
