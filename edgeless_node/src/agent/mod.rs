@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 use edgeless_api::node_management::UpdatePeersRequest;
 use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
+use edgeless_telemetry::performance_target;
 use futures::{Future, SinkExt, StreamExt};
 
 #[cfg(test)]
@@ -41,6 +42,7 @@ impl Agent {
         resources: std::collections::HashMap<String, ResourceDesc>,
         node_id: uuid::Uuid,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        telemetry_performance_target: edgeless_telemetry::performance_target::PerformanceTargetInner,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
@@ -49,7 +51,7 @@ impl Agent {
         }
 
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, runners, resources, data_plane_provider).await;
+            Self::main_task(receiver, runners, resources, data_plane_provider, telemetry_performance_target).await;
         });
 
         (Agent { sender, node_id }, main_task)
@@ -62,9 +64,11 @@ impl Agent {
         mut runners: std::collections::HashMap<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
         resources: std::collections::HashMap<String, ResourceDesc>,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        telemetry_performance_target: edgeless_telemetry::performance_target::PerformanceTargetInner,
     ) {
         let mut receiver = std::pin::pin!(receiver);
         let mut data_plane_provider = data_plane_provider;
+        let mut telemetry_performance_target = telemetry_performance_target;
 
         // key: provider_id
         // value: class_type
@@ -309,7 +313,7 @@ impl Agent {
                         proc_cpu_usage: proc.cpu_usage() as i32,
                         proc_memory: to_kb(proc.memory()),
                         proc_vmemory: to_kb(proc.virtual_memory()),
-                        function_execution_times: std::collections::HashMap::new(), // XXX
+                        function_execution_times: telemetry_performance_target.get_metrics().function_execution_times,
                     };
                     responder.send(Ok(health_status)).unwrap_or_else(|_| log::warn!("Responder Send Error"));
                 }
