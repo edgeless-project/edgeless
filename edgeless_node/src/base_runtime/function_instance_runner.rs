@@ -12,7 +12,7 @@ use super::{FunctionInstance, FunctionInstanceError};
 /// while the technology specific implementations implement `FunctionInstance` interact and bind a virtualization technology.
 pub struct FunctionInstanceRunner<FunctionInstanceType: FunctionInstance> {
     task_handle: Option<tokio::task::JoinHandle<()>>,
-    alias_mapping: super::alias_mapping::AliasMapping,
+    data_plane: edgeless_dataplane::handle::DataplaneHandle,
     poison_pill_sender: tokio::sync::broadcast::Sender<()>,
     _instance: PhantomData<FunctionInstanceType>,
 }
@@ -46,7 +46,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         let mut telemetry_handle = telemetry_handle;
         let mut state_handle = state_handle;
 
-        let alias_mapping = super::alias_mapping::AliasMapping::new();
         // alias_mapping.update(spawn_req.output_mapping).await;
         let (poison_pill_sender, poison_pill_receiver) = tokio::sync::broadcast::channel::<()>(1);
         let serialized_state = state_handle.get().await;
@@ -54,7 +53,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         let guest_api_host = crate::base_runtime::guest_api::GuestAPIHost {
             instance_id: instance_id.clone(),
             data_plane: data_plane.clone(),
-            callback_table: alias_mapping.clone(),
             state_handle,
             telemetry_handle: telemetry_handle.fork(std::collections::BTreeMap::new()),
             poison_pill_receiver: poison_pill_sender.subscribe(),
@@ -67,7 +65,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
                 guest_api_host_register,
                 guest_api_host,
                 spawn_req.code.function_class_code.clone(),
-                data_plane,
+                data_plane.clone(),
                 serialized_state,
                 spawn_req.annotations.get("init-payload").map(|x| x.clone()),
                 runtime_api,
@@ -83,8 +81,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
 
         Self {
             task_handle: Some(task_handle),
-            alias_mapping,
             poison_pill_sender,
+            data_plane: data_plane.clone(),
             _instance: PhantomData {},
         }
     }
@@ -98,7 +96,9 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
     }
 
     pub async fn patch(&mut self, update_request: edgeless_api::common::PatchRequest) {
-        self.alias_mapping.update(update_request.output_mapping).await;
+        self.data_plane
+            .update_mapping(update_request.input_mapping, update_request.output_mapping)
+            .await;
     }
 }
 

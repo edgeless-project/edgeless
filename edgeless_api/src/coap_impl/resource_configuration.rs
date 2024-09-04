@@ -48,6 +48,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
                             }
                             edgeless_api_core::common::Output::Any(id_vec)
                         }
+                        crate::common::Output::Link(link_id) => todo!(),
                     },
                 ))
                 .map_err(|_| anyhow::anyhow!("Too many outputs"))?;
@@ -133,6 +134,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
                         }
                         edgeless_api_core::common::Output::Any(id_vec)
                     }
+                    crate::common::Output::Link(link_id) => todo!(),
                 },
             ));
             //     outputs[outputs_i] = Some((key, val.clone()));

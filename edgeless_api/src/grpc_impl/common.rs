@@ -129,6 +129,7 @@ impl CommonConverters {
                     Err(_) => None,
                 })
                 .collect(),
+            input_mapping: todo!(),
         })
     }
 
@@ -202,6 +203,7 @@ impl CommonConverters {
                         .collect(),
                 })),
             },
+            crate::common::Output::Link(link_id) => todo!(),
         }
     }
 

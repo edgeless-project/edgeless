@@ -11,6 +11,7 @@ pub mod node_management;
 pub mod node_registration;
 pub mod orchestration;
 pub mod resource_configuration;
+pub mod link;
 
 #[derive(Clone)]
 pub struct CoapClient {

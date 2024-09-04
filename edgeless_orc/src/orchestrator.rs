@@ -489,11 +489,17 @@ impl Orchestrator {
     async fn apply_patches(
         active_instances: &std::collections::HashMap<edgeless_api::function_instance::ComponentId, ActiveInstance>,
         dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, edgeless_api::common::Output>>,
+        input_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, edgeless_api::common::Input>>,
         clients: &mut std::collections::HashMap<uuid::Uuid, ClientDesc>,
         origin_ext_fids: Vec<edgeless_api::function_instance::ComponentId>,
     ) {
         for origin_ext_fid in origin_ext_fids.iter() {
             let ext_output_mapping = match dependency_graph.get(origin_ext_fid) {
+                Some(x) => x,
+                None => continue,
+            };
+
+            let ext_input_mapping = match input_graph.get(origin_ext_fid) {
                 Some(x) => x,
                 None => continue,
             };
@@ -541,6 +547,9 @@ impl Orchestrator {
                                 .collect();
                             int_output_mapping.insert(channel.clone(), edgeless_api::common::Output::All(targets));
                         }
+                        edgeless_api::common::Output::Link(link) => {
+                            int_output_mapping.insert(channel.clone(), edgeless_api::common::Output::Link(link.clone()));
+                        }
                     }
                 }
 
@@ -553,6 +562,7 @@ impl Orchestrator {
                             .patch(edgeless_api::common::PatchRequest {
                                 function_id: instance_id.function_id.clone(),
                                 output_mapping: int_output_mapping,
+                                input_mapping: ext_input_mapping.clone(),
                             })
                             .await
                         {
@@ -579,6 +589,7 @@ impl Orchestrator {
                             .patch(edgeless_api::common::PatchRequest {
                                 function_id: instance_id.function_id.clone(),
                                 output_mapping: int_output_mapping,
+                                input_mapping: ext_input_mapping.clone(),
                             })
                             .await
                         {
@@ -848,6 +859,7 @@ impl Orchestrator {
                             break;
                         }
                     }
+                    edgeless_api::common::Output::Link(_) => {}
                 }
             }
         }
@@ -907,6 +919,9 @@ impl Orchestrator {
         let mut dependency_graph = std::collections::HashMap::new();
         let mut dependency_graph_changed = false;
 
+        let mut input_graph: std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, edgeless_api::common::Input>> =
+            std::collections::HashMap::new();
+
         // main orchestration loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
             match req {
@@ -952,12 +967,14 @@ impl Orchestrator {
                             Self::apply_patches(
                                 &mut active_instances,
                                 &dependency_graph,
+                                &input_graph,
                                 &mut nodes,
                                 Self::dependencies(&dependency_graph, &ext_fid),
                             )
                             .await;
                             dependency_graph.remove(&ext_fid);
                             dependency_graph_changed = true;
+                            input_graph.remove(&ext_fid);
                         }
                         None => {
                             log::error!("Request to stop a function that is not known: ext_fid {}", ext_fid);
@@ -1013,12 +1030,14 @@ impl Orchestrator {
                             Self::apply_patches(
                                 &mut active_instances,
                                 &dependency_graph,
+                                &input_graph,
                                 &mut nodes,
                                 Self::dependencies(&dependency_graph, &ext_fid),
                             )
                             .await;
                             dependency_graph.remove(&ext_fid);
                             dependency_graph_changed = true;
+                            input_graph.remove(&ext_fid);
                         }
                         None => {
                             log::error!("Request to stop a resource that is not known: ext_fid {}", ext_fid);
@@ -1043,10 +1062,11 @@ impl Orchestrator {
                     // keeping track only of the ext_fid for both origin
                     // and target (logical) functions.
                     dependency_graph.insert(origin_ext_fid, output_mapping);
+                    input_graph.insert(origin_ext_fid, update.input_mapping);
                     dependency_graph_changed = true;
 
                     // Apply the patch.
-                    Self::apply_patches(&active_instances, &dependency_graph, &mut nodes, vec![origin_ext_fid]).await;
+                    Self::apply_patches(&active_instances, &dependency_graph, &input_graph, &mut nodes, vec![origin_ext_fid]).await;
                 }
                 OrchestratorRequest::UPDATENODE(request, reply_channel) => {
                     // Update the map of clients and, at the same time, prepare
@@ -1333,6 +1353,7 @@ impl Orchestrator {
                                 edgeless_api::common::Output::Single(id, _port_id) => vec![id.function_id.clone()],
                                 edgeless_api::common::Output::Any(ids) => ids.iter().map(|(id, _port_id)| id.function_id.clone()).collect(),
                                 edgeless_api::common::Output::All(ids) => ids.iter().map(|(id, _port_id)| id.function_id.clone()).collect(),
+                                _ => Vec::new(),
                             };
 
                             for target_ext_id in &target_ext_ids {
@@ -1424,7 +1445,7 @@ impl Orchestrator {
                     }
 
                     // Repatch everything that needs to be repatched.
-                    Self::apply_patches(&mut active_instances, &dependency_graph, &mut nodes, to_be_repatched).await;
+                    Self::apply_patches(&mut active_instances, &dependency_graph, &input_graph, &mut nodes, to_be_repatched).await;
 
                     // Update the proxy, if necessary.
                     if resource_providers_changed {

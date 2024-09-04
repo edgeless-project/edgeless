@@ -20,12 +20,19 @@ pub enum Output {
     Single(InstanceId, crate::function_instance::PortId),
     Any(Vec<(InstanceId, crate::function_instance::PortId)>),
     All(Vec<(InstanceId, crate::function_instance::PortId)>),
+    Link(crate::link::LinkInstanceId),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Input {
+    Link(crate::link::LinkInstanceId),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatchRequest {
     pub function_id: ComponentId,
     pub output_mapping: std::collections::HashMap<String, Output>,
+    pub input_mapping: std::collections::HashMap<String, Input>,
 }
 
 impl std::fmt::Display for ResponseError {

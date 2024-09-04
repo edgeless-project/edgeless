@@ -32,3 +32,5 @@ pub mod workflow_instance;
 pub mod node_management;
 
 pub mod node_registration;
+
+pub mod link;

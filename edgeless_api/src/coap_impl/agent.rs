@@ -15,4 +15,8 @@ impl crate::agent::AgentAPI for super::CoapClient {
     ) -> Box<dyn crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::instance_id::InstanceId>> {
         crate::resource_configuration::ResourceConfigurationAPIClone::clone_box(self)
     }
+
+    fn link_instance_api(&mut self) -> Box<dyn crate::link::LinkInstanceAPI> {
+        crate::link::LinkInstanceAPIClone::clone_box(self)
+    }
 }

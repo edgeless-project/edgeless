@@ -162,7 +162,14 @@ impl ControllerTask {
 
                 let component_type = self.active_workflows.get_mut(&wf_id).unwrap().component_type(&component_name).unwrap();
                 res = self
-                    .patch_outputs(&origin_domain, origin_fid, component_type, output_mapping, &component_name)
+                    .patch_outputs(
+                        &origin_domain,
+                        origin_fid,
+                        component_type,
+                        output_mapping,
+                        std::collections::HashMap::new(),
+                        &component_name,
+                    )
                     .await;
             }
         }
@@ -506,6 +513,7 @@ impl ControllerTask {
         origin_id: uuid::Uuid,
         origin_type: super::ComponentType,
         output_mapping: std::collections::HashMap<String, edgeless_api::common::Output>,
+        input_mapping: std::collections::HashMap<String, edgeless_api::common::Input>,
         name_in_workflow: &str,
     ) -> Result<(), String> {
         match origin_type {
@@ -516,6 +524,7 @@ impl ControllerTask {
                     .patch(edgeless_api::common::PatchRequest {
                         function_id: origin_id,
                         output_mapping,
+                        input_mapping,
                     })
                     .await
                 {
@@ -532,6 +541,7 @@ impl ControllerTask {
                     .patch(edgeless_api::common::PatchRequest {
                         function_id: origin_id,
                         output_mapping,
+                        input_mapping,
                     })
                     .await
                 {

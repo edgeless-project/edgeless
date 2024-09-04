@@ -5,6 +5,7 @@ pub struct AgentAPIClient {
     function_instance_client: Box<dyn crate::function_instance::FunctionInstanceAPI<edgeless_api_core::instance_id::InstanceId>>,
     node_management_client: Box<dyn crate::node_management::NodeManagementAPI>,
     resource_management_client: Box<dyn crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::instance_id::InstanceId>>,
+    link_instance_client: Box<dyn crate::link::LinkInstanceAPI>,
 }
 
 impl AgentAPIClient {
@@ -21,6 +22,7 @@ impl AgentAPIClient {
                     .unwrap(),
             ),
             resource_management_client: Box::new(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(api_addr, Some(1)).await),
+            link_instance_client: Box::new(crate::grpc_impl::link::LinkInstanceClient::new(api_addr, Some(1)).await)
         }
     }
 }
@@ -38,6 +40,10 @@ impl crate::agent::AgentAPI for AgentAPIClient {
         &mut self,
     ) -> Box<dyn crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::instance_id::InstanceId>> {
         self.resource_management_client.clone()
+    }
+
+    fn link_instance_api(&mut self) -> Box<dyn crate::link::LinkInstanceAPI> {
+        self.link_instance_client.clone()
     }
 }
 

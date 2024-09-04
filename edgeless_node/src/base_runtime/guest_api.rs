@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MIT
 
 use futures::FutureExt;
-use rand::seq::SliceRandom;
 
 /// Each function instance can import a set of functions that need to be implemented on the host-side.
 /// This provides the generic host-side implementation of these functions.
@@ -10,7 +9,6 @@ use rand::seq::SliceRandom;
 pub struct GuestAPIHost {
     pub instance_id: edgeless_api::function_instance::InstanceId,
     pub data_plane: edgeless_dataplane::handle::DataplaneHandle,
-    pub callback_table: crate::base_runtime::alias_mapping::AliasMapping,
     pub state_handle: Box<dyn crate::state_management::StateHandleAPI>,
     pub telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     pub poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
@@ -25,38 +23,10 @@ pub enum GuestAPIError {
 
 impl GuestAPIHost {
     pub async fn cast_alias(&mut self, alias: &str, msg: &str) -> Result<(), GuestAPIError> {
-        if alias == "self" {
-            self.data_plane
-                .send(
-                    self.instance_id.clone(),
-                    edgeless_api::function_instance::PortId("INTERNAL".to_string()),
-                    msg.to_string(),
-                )
-                .await;
-            Ok(())
-        } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            match target {
-                edgeless_api::common::Output::Single(instance_id, port_id) => {
-                    self.data_plane.send(instance_id, port_id.clone(), msg.to_string()).await;
-                }
-                edgeless_api::common::Output::Any(ids) => {
-                    let id = ids.choose(&mut rand::thread_rng());
-                    if let Some((instance_id, port_id)) = id {
-                        self.data_plane.send(instance_id.clone(), port_id.clone(), msg.to_string()).await;
-                    } else {
-                        return Err(GuestAPIError::UnknownAlias);
-                    }
-                }
-                edgeless_api::common::Output::All(ids) => {
-                    for (instance_id, port_id) in ids {
-                        self.data_plane.send(instance_id, port_id.clone(), msg.to_string()).await;
-                    }
-                }
-            }
-            Ok(())
-        } else {
-            Err(GuestAPIError::UnknownAlias)
-        }
+        self.data_plane
+            .send_alias(alias.to_string(), msg.to_string())
+            .await
+            .map_err(|e| GuestAPIError::UnknownAlias)
     }
 
     pub async fn cast_raw(
@@ -70,40 +40,7 @@ impl GuestAPIHost {
     }
 
     pub async fn call_alias(&mut self, alias: &str, msg: &str) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
-        if alias == "self" {
-            return self
-                .call_raw(
-                    self.instance_id.clone(),
-                    edgeless_api::function_instance::PortId("INTERNAL".to_string()),
-                    msg,
-                )
-                .await;
-            // return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
-        } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            // return self.call_raw(target, msg).await;
-            match target {
-                edgeless_api::common::Output::Single(instance_id, port_id) => {
-                    // self.data_plane.send(id, msg.to_string()).await;
-                    return self.call_raw(instance_id, port_id, msg).await;
-                }
-                edgeless_api::common::Output::Any(ids) => {
-                    let id = ids.choose(&mut rand::thread_rng());
-                    if let Some((instance_id, port_id)) = id {
-                        // self.data_plane.send(id.clone(), msg.to_string()).await;
-                        return self.call_raw(instance_id.clone(), port_id.clone(), msg).await;
-                    } else {
-                        return Err(GuestAPIError::UnknownAlias);
-                    }
-                }
-                edgeless_api::common::Output::All(_ids) => {
-                    // TODO(raphaelhetzel) introduce new error for this
-                    return Err(GuestAPIError::UnknownAlias);
-                }
-            }
-        } else {
-            log::warn!("Unknown alias.");
-            Err(GuestAPIError::UnknownAlias)
-        }
+        Ok(self.data_plane.call_alias(alias.to_string(), msg.to_string()).await)
     }
 
     pub async fn call_raw(
@@ -136,36 +73,11 @@ impl GuestAPIHost {
     pub async fn delayed_cast(&mut self, delay: u64, target_alias: &str, payload: &str) -> Result<(), GuestAPIError> {
         let mut cloned_plane = self.data_plane.clone();
         let cloned_msg = payload.to_string();
-
-        let target = if target_alias == "self" {
-            edgeless_api::common::Output::Single(self.instance_id.clone(), edgeless_api::function_instance::PortId("INTERNAL".to_string()))
-        } else if let Some(targted_id) = self.callback_table.get_mapping(target_alias).await {
-            targted_id
-        } else {
-            log::warn!("Unknown alias.");
-            return Err(GuestAPIError::UnknownAlias);
-        };
+        let cloned_alias = target_alias.to_string();
 
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
-            match target {
-                edgeless_api::common::Output::Single(id, port_id) => {
-                    cloned_plane.send(id, port_id.clone(), cloned_msg).await;
-                }
-                edgeless_api::common::Output::Any(ids) => {
-                    let id = ids.choose(&mut rand::thread_rng());
-                    if let Some((instance_id, port_id)) = id {
-                        cloned_plane.send(instance_id.clone(), port_id.clone(), cloned_msg).await;
-                    } else {
-                        log::warn!("Unhandled Situation");
-                    }
-                }
-                edgeless_api::common::Output::All(ids) => {
-                    for (instance_id, port_id) in ids {
-                        cloned_plane.send(instance_id.clone(), port_id.clone(), cloned_msg.clone()).await;
-                    }
-                }
-            }
+            cloned_plane.send_alias(cloned_alias, cloned_msg).await.unwrap();
         });
 
         Ok(())

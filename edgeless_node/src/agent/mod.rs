@@ -23,6 +23,8 @@ enum AgentRequest {
     PatchResource(edgeless_api::common::PatchRequest, futures::channel::oneshot::Sender<anyhow::Result<()>>),
     UpdatePeers(edgeless_api::node_management::UpdatePeersRequest),
     HealthStatus(futures::channel::oneshot::Sender<anyhow::Result<edgeless_api::node_management::HealthStatus>>),
+    CreateLink(edgeless_api::link::CreateLinkRequest),
+    RemoveLink(edgeless_api::link::LinkInstanceId),
 }
 
 pub struct Agent {
@@ -311,6 +313,12 @@ impl Agent {
                         proc_vmemory: to_kb(proc.virtual_memory()),
                     };
                     responder.send(Ok(health_status)).unwrap_or_else(|_| log::warn!("Responder Send Error"));
+                },
+                AgentRequest::CreateLink(req) => {
+                    edgeless_api::link::LinkInstanceAPI::create(&mut data_plane_provider, req).await.unwrap_or_else(|_| log::warn!("Unreported error while creating a link"));
+                },
+                AgentRequest::RemoveLink(id) => {
+                    edgeless_api::link::LinkInstanceAPI::remove(&mut data_plane_provider, id).await.unwrap_or_else(|_| log::warn!("Unreported error while removing a link"));
                 }
             }
         }
@@ -324,6 +332,7 @@ impl Agent {
             }),
             node_management_client: Box::new(NodeManagementClient { sender: self.sender.clone() }),
             resource_configuration_client: Box::new(ResourceConfigurationClient { sender: self.sender.clone() }),
+            link_instance_client: Box::new(LinkInstanceAPIClient{ sender: self.sender.clone() })
         })
     }
 }
@@ -343,6 +352,10 @@ pub struct NodeManagementClient {
 pub struct ResourceConfigurationClient {
     sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
 }
+#[derive(Clone)]
+pub struct LinkInstanceAPIClient {
+    sender: futures::channel::mpsc::UnboundedSender<AgentRequest> 
+}
 
 #[derive(Clone)]
 pub struct AgentClient {
@@ -350,6 +363,7 @@ pub struct AgentClient {
     node_management_client: Box<dyn edgeless_api::node_management::NodeManagementAPI>,
     resource_configuration_client:
         Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
+    link_instance_client: Box<dyn edgeless_api::link::LinkInstanceAPI>
 }
 
 #[async_trait::async_trait]
@@ -462,6 +476,18 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 }
 
+#[async_trait::async_trait]
+impl edgeless_api::link::LinkInstanceAPI for LinkInstanceAPIClient {
+    async fn create(&mut self, req: edgeless_api::link::CreateLinkRequest) -> anyhow::Result<()> {
+        self.sender.send(AgentRequest::CreateLink(req)).await.map_err(|err| anyhow::anyhow!("Agent channel error when creating a link: {}", err.to_string()))?;
+        Ok(())
+    }
+    async fn remove(&mut self, id: edgeless_api::link::LinkInstanceId) -> anyhow::Result<()> {
+        self.sender.send(AgentRequest::RemoveLink(id)).await.map_err(|err| anyhow::anyhow!("Agent channel error when  removing a link: {}", err.to_string()))?;
+        Ok(())
+    }
+}
+
 impl edgeless_api::agent::AgentAPI for AgentClient {
     fn function_instance_api(
         &mut self,
@@ -477,5 +503,11 @@ impl edgeless_api::agent::AgentAPI for AgentClient {
         &mut self,
     ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>> {
         self.resource_configuration_client.clone()
+    }
+
+    fn link_instance_api(
+        &mut self,
+    ) -> Box<dyn edgeless_api::link::LinkInstanceAPI> {
+        self.link_instance_client.clone()
     }
 }

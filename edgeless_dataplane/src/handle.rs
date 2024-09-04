@@ -6,13 +6,44 @@ use futures::{SinkExt, StreamExt};
 use crate::core::*;
 use crate::node_local::*;
 use crate::remote_node::*;
+use rand::seq::SliceRandom;
+
+#[derive(Clone)]
+struct IncommingLink {
+    sender: futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
+    target_id: edgeless_api::function_instance::InstanceId,
+    target_port: edgeless_api::function_instance::PortId,
+}
+
+#[async_trait::async_trait]
+impl edgeless_api::link::LinkWriter for IncommingLink {
+    async fn handle(&mut self, msg: Vec<u8>) {
+        self.sender
+            .send(DataplaneEvent {
+                source_id: edgeless_api::function_instance::InstanceId {
+                    node_id: edgeless_api::function_instance::NODE_ID_NONE,
+                    function_id: edgeless_api::function_instance::FUNCTION_ID_NONE,
+                },
+                target_port: self.target_port.clone(),
+                channel_id: 0,
+                message: crate::core::Message::Call(String::from_utf8(msg).unwrap()),
+            })
+            .await
+            .unwrap();
+    }
+}
 
 /// The main handle representing an element (identified by a `InstanceId`) across the dataplane.
 /// The dataplane might require multiple links which are processed in a chain-like fashion.
 #[derive(Clone)]
 pub struct DataplaneHandle {
+    alias_mapping: crate::alias_mapping::AliasMapping,
     slf: edgeless_api::function_instance::InstanceId,
+    incomming_links: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkInstanceId, Box<IncommingLink>>>>,
+    sender: futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
     receiver: std::sync::Arc<tokio::sync::Mutex<futures::channel::mpsc::UnboundedReceiver<DataplaneEvent>>>,
+    link_manager: Box<dyn edgeless_api::link::LinkManager>,
+    links: std::collections::HashMap<edgeless_api::link::LinkInstanceId, std::sync::Arc<tokio::sync::Mutex<Box<dyn edgeless_api::link::LinkWriter>>>>,
     output_chain: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn DataPlaneLink>>>>,
     receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
     next_id: u64,
@@ -21,6 +52,7 @@ pub struct DataplaneHandle {
 impl DataplaneHandle {
     async fn new(
         receiver_id: edgeless_api::function_instance::InstanceId,
+        link_manager: Box<dyn edgeless_api::link::LinkManager>,
         output_chain: Vec<Box<dyn DataPlaneLink>>,
         receiver: futures::channel::mpsc::UnboundedReceiver<DataplaneEvent>,
     ) -> Self {
@@ -31,9 +63,11 @@ impl DataplaneHandle {
 
         let clone_overwrites = receiver_overwrites.clone();
         // This task intercepts the messages received and routes responses towards temporary receivers while routing other events towards the main receiver used in `receive_next`.
+
+        let mut cloned_sender = main_sender.clone();
+
         tokio::spawn(async move {
             let mut receiver = receiver;
-            let mut main_sender = main_sender;
             loop {
                 if let Some(DataplaneEvent {
                     source_id,
@@ -52,7 +86,7 @@ impl DataplaneHandle {
                             }
                         }
                     }
-                    match main_sender
+                    match cloned_sender
                         .send(DataplaneEvent {
                             source_id,
                             channel_id,
@@ -71,9 +105,14 @@ impl DataplaneHandle {
         });
 
         DataplaneHandle {
+            alias_mapping: crate::alias_mapping::AliasMapping::new(),
             slf: receiver_id,
+            sender: main_sender.clone(),
+            incomming_links: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
             receiver: std::sync::Arc::new(tokio::sync::Mutex::new(main_receiver)),
             output_chain: std::sync::Arc::new(tokio::sync::Mutex::new(output_chain)),
+            link_manager: link_manager,
+            links: std::collections::HashMap::new(),
             receiver_overwrites,
             next_id: 1,
         }
@@ -102,6 +141,128 @@ impl DataplaneHandle {
                 }
                 log::error!("Unprocesses other message");
             }
+        }
+    }
+
+    pub async fn update_mapping(
+        &mut self,
+        new_input_mapping: std::collections::HashMap<String, edgeless_api::common::Input>,
+        new_output_mapping: std::collections::HashMap<String, edgeless_api::common::Output>,
+    ) {
+        let ((removed_inputs, removed_output), (added_inputs, added_outputs)) =
+            self.alias_mapping.update(new_input_mapping, new_output_mapping).await;
+
+        for (added_i_id, i) in added_inputs {
+            if let edgeless_api::common::Input::Link(l) = i {
+                self.add_incomming_link(edgeless_api::function_instance::PortId(added_i_id), &l).await;
+            }
+        }
+
+        for (added_o_id, o) in added_outputs {
+            if let edgeless_api::common::Output::Link(l) = o {
+                self.add_incomming_link(edgeless_api::function_instance::PortId(added_o_id), &l).await;
+            }
+        }
+    }
+
+    async fn add_incomming_link(&mut self, port: edgeless_api::function_instance::PortId, link_id: &edgeless_api::link::LinkInstanceId) {
+        let incomming_link = Box::new(IncommingLink {
+            sender: self.sender.clone(),
+            target_id: self.slf,
+            target_port: port,
+        });
+
+        self.link_manager.register_reader(link_id, incomming_link.clone()).await.unwrap();
+
+        self.incomming_links.lock().await.insert(link_id.clone(), incomming_link);
+    }
+
+    async fn add_outgoing_link(&mut self, port: edgeless_api::function_instance::PortId, link_id: &edgeless_api::link::LinkInstanceId) {
+        let link = self.link_manager.get_writer(link_id).await;
+        if let Some(link) = link {
+            self.links.insert(link_id.clone(), std::sync::Arc::new(tokio::sync::Mutex::new(link)));
+        }
+    }
+
+    pub async fn send_alias(&mut self, target: String, msg: String) -> anyhow::Result<()> {
+        if target == "self" {
+            self.send(
+                self.slf.clone(),
+                edgeless_api::function_instance::PortId("INTERNAL".to_string()),
+                msg.to_string(),
+            )
+            .await;
+            Ok(())
+        } else if let Some(target) = self.alias_mapping.get_mapping(&target).await {
+            match target {
+                edgeless_api::common::Output::Single(instance_id, port_id) => {
+                    self.send(instance_id, port_id.clone(), msg.to_string()).await;
+                }
+                edgeless_api::common::Output::Any(ids) => {
+                    let id = ids.choose(&mut rand::thread_rng());
+                    if let Some((instance_id, port_id)) = id {
+                        self.send(instance_id.clone(), port_id.clone(), msg.to_string()).await;
+                    } else {
+                        return Err(anyhow::anyhow!("Unknown Alias"));
+                    }
+                }
+                edgeless_api::common::Output::All(ids) => {
+                    for (instance_id, port_id) in ids {
+                        self.send(instance_id, port_id.clone(), msg.to_string()).await;
+                    }
+                }
+                edgeless_api::common::Output::Link(link_id) => {
+                    self.send_to_link(&link_id, msg.to_string().into_bytes()).await;
+                }
+            }
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("Unknown Alias"))
+        }
+    }
+
+    pub async fn call_alias(&mut self, alias: String, msg: String) -> CallRet {
+        if alias == "self" {
+            return self
+                .call(self.slf.clone(), edgeless_api::function_instance::PortId("INTERNAL".to_string()), msg)
+                .await;
+            // return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
+        } else if let Some(target) = self.alias_mapping.get_mapping(&alias).await {
+            // return self.call_raw(target, msg).await;
+            match target {
+                edgeless_api::common::Output::Single(instance_id, port_id) => {
+                    // self.data_plane.send(id, msg.to_string()).await;
+                    return self.call(instance_id, port_id, msg).await;
+                }
+                edgeless_api::common::Output::Any(ids) => {
+                    let id = ids.choose(&mut rand::thread_rng());
+                    if let Some((instance_id, port_id)) = id {
+                        // self.data_plane.send(id.clone(), msg.to_string()).await;
+                        return self.call(instance_id.clone(), port_id.clone(), msg).await;
+                    } else {
+                        // return Err(GuestAPIError::UnknownAlias);
+                        return CallRet::Err;
+                    }
+                }
+                edgeless_api::common::Output::All(_ids) => {
+                    // TODO(raphaelhetzel) introduce new error for this
+                    // return Err(GuestAPIError::UnknownAlias);
+                    return CallRet::Err;
+                }
+                edgeless_api::common::Output::Link(link_id) => {
+                    return CallRet::Err;
+                }
+            }
+        } else {
+            log::warn!("Unknown alias.");
+            // Err(GuestAPIError::UnknownAlias)
+            return CallRet::Err;
+        }
+    }
+
+    pub async fn send_to_link(&mut self, link_id: &edgeless_api::link::LinkInstanceId, msg: Vec<u8>) {
+        if let Some(link) = self.links.get(link_id) {
+            link.lock().await.handle(msg).await;
         }
     }
 
@@ -182,6 +343,21 @@ struct TemporaryReceivers {
 pub struct DataplaneProvider {
     local_provider: std::sync::Arc<tokio::sync::Mutex<NodeLocalLinkProvider>>,
     remote_provider: std::sync::Arc<tokio::sync::Mutex<RemoteLinkProvider>>,
+    link_manager: std::sync::Arc<tokio::sync::Mutex<LinkManager>>,
+}
+
+struct LinkManager {
+    link_providers: std::collections::HashMap<edgeless_api::link::LinkProviderId, Box<dyn edgeless_api::link::LinkProvider>>,
+    links: std::collections::HashMap<edgeless_api::link::LinkInstanceId, Box<dyn edgeless_api::link::LinkInstance>>,
+}
+
+impl LinkManager {
+    fn new() -> Self {
+        LinkManager {
+            link_providers: std::collections::HashMap::new(),
+            links: std::collections::HashMap::new()
+        }
+    }
 }
 
 impl DataplaneProvider {
@@ -206,9 +382,13 @@ impl DataplaneProvider {
             ));
         }
 
+        let mut lm = LinkManager::new();
+        lm.link_providers.insert(edgeless_api::link::LinkProviderId(uuid::Uuid::new_v4()), Box::new(crate::multicast_link::MulticastProvider::new()));
+
         Self {
             local_provider: std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalLinkProvider::new())),
             remote_provider,
+            link_manager: std::sync::Arc::new(tokio::sync::Mutex::new(lm)),
         }
     }
 
@@ -218,7 +398,7 @@ impl DataplaneProvider {
             self.local_provider.lock().await.new_link(target, sender.clone()).await,
             self.remote_provider.lock().await.new_link(target, sender.clone()).await,
         ];
-        DataplaneHandle::new(target, output_chain, receiver).await
+        DataplaneHandle::new(target, edgeless_api::link::LinkManagerClone::clone_box(self), output_chain, receiver).await
     }
 
     pub async fn add_peer(&mut self, peer: EdgelessDataplanePeerSettings) {
@@ -243,6 +423,47 @@ impl DataplaneProvider {
             }
             _ => Box::new(edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&target.invocation_url).await),
         }
+    }
+}
+
+
+
+#[async_trait::async_trait]
+impl edgeless_api::link::LinkManager for DataplaneProvider {
+
+    async fn register_reader(&mut self, link_id: &edgeless_api::link::LinkInstanceId, reader: Box<dyn edgeless_api::link::LinkWriter>) -> anyhow::Result<()> {
+        if let Some(link) = self.link_manager.lock().await.links.get_mut(link_id) {
+            link.register_reader(reader).await.unwrap();
+            return Ok(());
+        }
+        return Err(anyhow::anyhow!("Link not Found"));
+    }
+
+    async fn get_writer(&mut self, link_id: &edgeless_api::link::LinkInstanceId) -> Option<Box<dyn edgeless_api::link::LinkWriter>> {
+        if let Some(link) = self.link_manager.lock().await.links.get_mut(link_id) {
+            return link.get_writer().await;
+        }
+        None
+    }
+}
+
+#[async_trait::async_trait]
+impl edgeless_api::link::LinkInstanceAPI for DataplaneProvider {
+    async fn create(&mut self, req: edgeless_api::link::CreateLinkRequest) -> anyhow::Result<()> {
+        let mut lm = self.link_manager.lock().await;
+        if let Some(link_provider) = lm.link_providers.get_mut(&req.provider) {
+            let link = link_provider.create(req.clone()).await?;
+            lm.links.insert(req.id, link);
+            return Ok(());
+        }
+        Err(anyhow::anyhow!("Not Possible"))
+    }
+
+    async fn remove(&mut self, id: edgeless_api::link::LinkInstanceId) -> anyhow::Result<()> {
+        let mut lm = self.link_manager.lock().await;
+
+        lm.links.remove(&id);
+        Ok(())
     }
 }
 
