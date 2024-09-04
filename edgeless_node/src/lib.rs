@@ -37,6 +37,8 @@ pub struct EdgelessNodeTelemetrySettings {
     pub metrics_url: String,
     /// Log level to use for telemetry events, if enabled.
     pub log_level: Option<String>,
+    /// True if performance samples are sent to the orchestrator as part of health status responses to keep-alive polls.
+    pub performance_samples: bool,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -166,6 +168,7 @@ impl EdgelessNodeSettings {
             telemetry: EdgelessNodeTelemetrySettings {
                 metrics_url: format!("http://{}:{}", node_address, metrics_port),
                 log_level: None,
+                performance_samples: false,
             },
             wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: None,

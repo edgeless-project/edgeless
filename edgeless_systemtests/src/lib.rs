@@ -95,6 +95,7 @@ mod tests {
                         telemetry: edgeless_node::EdgelessNodeTelemetrySettings {
                             metrics_url: format!("http://{}:{}", address, next_port()),
                             log_level: None,
+                            performance_samples: false,
                         },
                         wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
                         container_runtime: None,
