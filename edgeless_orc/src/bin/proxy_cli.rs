@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 
 use itertools::Itertools;
-use std::str::FromStr;
+use std::{io::Write, str::FromStr};
 
 use clap::Parser;
 use edgeless_orc::proxy::Proxy;
@@ -17,6 +17,11 @@ struct Args {
     proxy_type: String,
     #[arg(short, long, default_value_t = String::from("redis://localhost:6379"))]
     redis_url: String,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum DumpCommands {
+    Performance {},
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -50,6 +55,10 @@ enum Commands {
     Intent {
         #[command(subcommand)]
         intent_command: IntentCommands,
+    },
+    Dump {
+        #[command(subcommand)]
+        dump_command: DumpCommands,
     },
 }
 
@@ -116,6 +125,27 @@ fn main() -> anyhow::Result<()> {
                     Err(err) => anyhow::bail!("invalid instance id {}: {}", node, err),
                 };
                 proxy.add_deploy_intents(vec![edgeless_orc::orchestrator::DeployIntent::Migrate(instance_id, vec![node_id])]);
+            }
+        },
+        Commands::Dump { dump_command } => match dump_command {
+            DumpCommands::Performance {} => {
+                for (metric, inner_map) in proxy.fetch_performance_samples() {
+                    for (id, values) in inner_map {
+                        let filename = format!("{}-{}.dat", metric, id);
+                        println!("saving to {}", filename);
+                        let mut outfile = std::fs::OpenOptions::new()
+                            .write(true)
+                            .append(false)
+                            .create(true)
+                            .truncate(true)
+                            .open(filename.clone())?;
+                        for value in values {
+                            outfile
+                                .write(format!("{},{}\n", value.0, value.1).as_bytes())
+                                .expect(format!("could not write to file '{}'", filename).as_str());
+                        }
+                    }
+                }
             }
         },
     }

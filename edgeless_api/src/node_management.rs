@@ -10,7 +10,7 @@ pub enum UpdatePeersRequest {
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct HealthStatus {
+pub struct NodeHealthStatus {
     pub cpu_usage: i32,
     pub cpu_load: i32,
     pub mem_free: i32,
@@ -20,10 +20,28 @@ pub struct HealthStatus {
     pub proc_cpu_usage: i32,
     pub proc_memory: i32,
     pub proc_vmemory: i32,
-    pub function_execution_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<f32>>,
 }
 
-impl std::fmt::Display for HealthStatus {
+#[derive(Debug, Clone, PartialEq)]
+pub struct NodePerformanceSamples {
+    pub function_execution_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<f64>>,
+}
+
+impl NodePerformanceSamples {
+    pub fn empty() -> Self {
+        Self {
+            function_execution_times: std::collections::HashMap::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct KeepAliveResponse {
+    pub health_status: NodeHealthStatus,
+    pub performance_samples: NodePerformanceSamples,
+}
+
+impl std::fmt::Display for NodeHealthStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -41,7 +59,7 @@ impl std::fmt::Display for HealthStatus {
     }
 }
 
-impl HealthStatus {
+impl NodeHealthStatus {
     pub fn empty() -> Self {
         Self {
             cpu_usage: 0,
@@ -53,7 +71,6 @@ impl HealthStatus {
             proc_cpu_usage: 0,
             proc_memory: 0,
             proc_vmemory: 0,
-            function_execution_times: std::collections::HashMap::new(),
         }
     }
 
@@ -68,7 +85,15 @@ impl HealthStatus {
             proc_cpu_usage: -1,
             proc_memory: -1,
             proc_vmemory: -1,
-            function_execution_times: std::collections::HashMap::new(),
+        }
+    }
+}
+
+impl KeepAliveResponse {
+    pub fn empty() -> Self {
+        Self {
+            health_status: NodeHealthStatus::empty(),
+            performance_samples: NodePerformanceSamples::empty(),
         }
     }
 }
@@ -76,7 +101,7 @@ impl HealthStatus {
 #[async_trait::async_trait]
 pub trait NodeManagementAPI: NodeManagementAPIClone + Sync + Send {
     async fn update_peers(&mut self, request: UpdatePeersRequest) -> anyhow::Result<()>;
-    async fn keep_alive(&mut self) -> anyhow::Result<HealthStatus>;
+    async fn keep_alive(&mut self) -> anyhow::Result<KeepAliveResponse>;
 }
 
 // https://stackoverflow.com/a/30353928
