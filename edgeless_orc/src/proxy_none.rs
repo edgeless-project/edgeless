@@ -32,6 +32,11 @@ impl super::proxy::Proxy for ProxyNone {
     ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::NodeId>> {
         std::collections::HashMap::new()
     }
+    fn fetch_instances_to_physical_ids(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::ComponentId>> {
+        std::collections::HashMap::new()
+    }
     fn fetch_resource_instances_to_nodes(
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::NodeId> {

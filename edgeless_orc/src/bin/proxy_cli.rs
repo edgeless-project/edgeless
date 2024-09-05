@@ -35,6 +35,7 @@ enum NodeCommands {
 enum ShowCommands {
     Functions {},
     Resources {},
+    LogicalToPhysical {},
     Node {
         #[command(subcommand)]
         node_command: NodeCommands,
@@ -88,6 +89,15 @@ fn main() -> anyhow::Result<()> {
             ShowCommands::Resources {} => {
                 for (resource, node) in proxy.fetch_resource_instances_to_nodes().iter().sorted_by_key(|x| x.0.to_string()) {
                     println!("{} -> {}", resource, node);
+                }
+            }
+            ShowCommands::LogicalToPhysical {} => {
+                for (logical, physical) in proxy.fetch_instances_to_physical_ids().iter().sorted_by_key(|x| x.0.to_string()) {
+                    println!(
+                        "{} -> {}",
+                        logical,
+                        physical.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                    );
                 }
             }
             ShowCommands::Node { node_command } => match node_command {
