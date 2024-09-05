@@ -22,7 +22,7 @@ enum AgentRequest {
     Patch(edgeless_api::common::PatchRequest),
     PatchResource(edgeless_api::common::PatchRequest, futures::channel::oneshot::Sender<anyhow::Result<()>>),
     UpdatePeers(edgeless_api::node_management::UpdatePeersRequest),
-    HealthStatus(futures::channel::oneshot::Sender<anyhow::Result<edgeless_api::node_management::HealthStatus>>),
+    KeepAlive(futures::channel::oneshot::Sender<anyhow::Result<edgeless_api::node_management::KeepAliveResponse>>),
 }
 
 pub struct Agent {
@@ -294,7 +294,7 @@ impl Agent {
                         )))
                         .unwrap_or_else(|_| log::warn!("Responder Send Error"));
                 }
-                AgentRequest::HealthStatus(responder) => {
+                AgentRequest::KeepAlive(responder) => {
                     // Refresh system/process information.
                     sys.refresh_cpu();
                     sys.refresh_memory();
@@ -302,7 +302,7 @@ impl Agent {
 
                     let to_kb = |x| (x / 1024) as i32;
                     let proc = sys.process(my_pid).unwrap();
-                    let health_status = edgeless_api::node_management::HealthStatus {
+                    let health_status = edgeless_api::node_management::NodeHealthStatus {
                         cpu_usage: sys.global_cpu_info().cpu_usage() as i32,
                         cpu_load: sys.cpus().iter().map(|x| x.cpu_usage() / 100_f32).sum::<f32>() as i32,
                         mem_free: to_kb(sys.free_memory()),
@@ -312,9 +312,16 @@ impl Agent {
                         proc_cpu_usage: proc.cpu_usage() as i32,
                         proc_memory: to_kb(proc.memory()),
                         proc_vmemory: to_kb(proc.virtual_memory()),
+                    };
+                    let performance_samples = edgeless_api::node_management::NodePerformanceSamples {
                         function_execution_times: telemetry_performance_target.get_metrics().function_execution_times,
                     };
-                    responder.send(Ok(health_status)).unwrap_or_else(|_| log::warn!("Responder Send Error"));
+                    responder
+                        .send(Ok(edgeless_api::node_management::KeepAliveResponse {
+                            health_status,
+                            performance_samples,
+                        }))
+                        .unwrap_or_else(|_| log::warn!("Responder Send Error"));
                 }
             }
         }
@@ -412,11 +419,11 @@ impl edgeless_api::node_management::NodeManagementAPI for NodeManagementClient {
         }
     }
 
-    async fn keep_alive(&mut self) -> anyhow::Result<edgeless_api::node_management::HealthStatus> {
-        let (rsp_sender, rsp_receiver) = futures::channel::oneshot::channel::<anyhow::Result<edgeless_api::node_management::HealthStatus>>();
+    async fn keep_alive(&mut self) -> anyhow::Result<edgeless_api::node_management::KeepAliveResponse> {
+        let (rsp_sender, rsp_receiver) = futures::channel::oneshot::channel::<anyhow::Result<edgeless_api::node_management::KeepAliveResponse>>();
         let _ = self
             .sender
-            .send(AgentRequest::HealthStatus(rsp_sender))
+            .send(AgentRequest::KeepAlive(rsp_sender))
             .await
             .map_err(|err| anyhow::anyhow!("Agent channel error when querying health status: {}", err.to_string()))?;
         rsp_receiver

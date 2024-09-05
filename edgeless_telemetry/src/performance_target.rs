@@ -4,7 +4,7 @@
 use std::str::FromStr;
 
 pub struct Metrics {
-    pub function_execution_times: std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<f32>>,
+    pub function_execution_times: std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<f64>>,
 }
 
 /// Non thread-safe data structure holding performance-related per-node metrics.
@@ -40,7 +40,7 @@ impl crate::telemetry_events::EventProcessor for PerformanceTarget {
                 if let Some(function_id) = event_tags.get("FUNCTION_ID") {
                     if let Ok(function_id) = uuid::Uuid::from_str(function_id) {
                         let res = self.metrics.function_execution_times.entry(function_id).or_insert(vec![]);
-                        res.push(lat.as_secs_f32());
+                        res.push(lat.as_secs_f64());
                     }
                 }
             }

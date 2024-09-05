@@ -23,6 +23,9 @@ pub trait Proxy: Sync + Send {
     /// Update the dependency graph.
     fn update_dependency_graph(&mut self, dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>);
 
+    /// Push keep-alive responses.
+    fn push_keep_alive_responses(&mut self, keep_alive_responses: Vec<(uuid::Uuid, edgeless_api::node_management::KeepAliveResponse)>);
+
     /// Add deployment intents.
     fn add_deploy_intents(&mut self, intents: Vec<orchestrator::DeployIntent>);
 
@@ -37,7 +40,10 @@ pub trait Proxy: Sync + Send {
     /// Fetch the nodes' health status.
     fn fetch_node_health(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_management::HealthStatus>;
+    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_management::NodeHealthStatus>;
+
+    /// Fetch the performance samples.
+    fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, std::collections::HashMap<String, Vec<(f64, f64)>>>;
 
     /// Fetch the mapping between active function instances and nodes.
     fn fetch_function_instances_to_nodes(

@@ -264,7 +264,7 @@ impl MetricsCollectorResourceProvider {
                     RedisCommand::Push(key, value, instant) => {
                         keys.insert(key.to_string());
                         redis_connection
-                            .lpush::<&str, String, usize>(&key, format!("{},{}", *value, RedisCommand::timestamp(instant)))
+                            .rpush::<&str, String, usize>(&key, format!("{},{}", *value, RedisCommand::timestamp(instant)))
                             .err()
                     }
                     RedisCommand::Set(key, value) => {
