@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-use crate::node_management::HealthStatus;
+use crate::node_management::{KeepAliveResponse, NodeHealthStatus, NodePerformanceSamples};
 
 #[async_trait::async_trait]
 impl crate::node_management::NodeManagementAPI for super::CoapClient {
@@ -50,12 +50,15 @@ impl crate::node_management::NodeManagementAPI for super::CoapClient {
         }
     }
 
-    async fn keep_alive(&mut self) -> anyhow::Result<crate::node_management::HealthStatus> {
+    async fn keep_alive(&mut self) -> anyhow::Result<crate::node_management::KeepAliveResponse> {
         match self
             .call_with_reply(|token, addr, buffer| edgeless_api_core::coap_mapping::COAPEncoder::encode_keepalive(addr, token, buffer))
             .await
         {
-            Ok(_) => Ok(HealthStatus::invalid()),
+            Ok(_) => Ok(KeepAliveResponse {
+                health_status: NodeHealthStatus::invalid(),
+                performance_samples: NodePerformanceSamples::empty(),
+            }),
             Err(err) => Err(anyhow::anyhow!(String::from_utf8(err).unwrap())),
         }
     }

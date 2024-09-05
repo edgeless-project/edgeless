@@ -340,7 +340,6 @@ pub struct ClientDesc {
     pub invocation_url: String,
     pub api: Box<dyn edgeless_api::agent::AgentAPI + Send>,
     pub capabilities: edgeless_api::node_registration::NodeCapabilities,
-    pub health_status: edgeless_api::node_management::HealthStatus,
 }
 
 enum IntFid {
@@ -1077,9 +1076,8 @@ impl Orchestrator {
                                     ClientDesc {
                                         agent_url: agent_url.clone(),
                                         invocation_url: invocation_url.clone(),
-                                        api: api,
+                                        api,
                                         capabilities,
-                                        health_status: edgeless_api::node_management::HealthStatus::invalid(),
                                     },
                                 );
 
@@ -1159,12 +1157,19 @@ impl Orchestrator {
                         "nodes to be polled: {}",
                         nodes.keys().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
                     );
+
+                    let mut keep_alive_responses = vec![];
                     for (node_id, client_desc) in &mut nodes {
                         log::debug!("polling node {} begin", node_id);
                         match client_desc.api.node_management_api().keep_alive().await {
-                            Ok(health_status) => {
-                                log::debug!("node uuid {} health status {}", node_id, health_status);
-                                client_desc.health_status = health_status;
+                            Ok(keep_alive_response) => {
+                                log::debug!(
+                                    "node uuid {} health status {} performance [function execution times: {} samples]",
+                                    node_id,
+                                    keep_alive_response.health_status,
+                                    keep_alive_response.performance_samples.function_execution_times.len()
+                                );
+                                keep_alive_responses.push((node_id.clone(), keep_alive_response));
                             }
                             Err(_) => {
                                 to_be_disconnected.insert(*node_id);
@@ -1213,6 +1218,7 @@ impl Orchestrator {
                     // Update the orchestration logic and proxy.
                     orchestration_logic.update_nodes(&nodes, &resource_providers);
                     proxy.update_nodes(&nodes);
+                    proxy.push_keep_alive_responses(keep_alive_responses);
 
                     //
                     // Make sure that all active logical functions are assigned

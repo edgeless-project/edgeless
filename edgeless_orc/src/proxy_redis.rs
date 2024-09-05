@@ -109,10 +109,6 @@ impl super::proxy::Proxy for ProxyRedis {
                     format!("node:capabilities:{}", uuid).as_str(),
                     serde_json::to_string(&client_desc.capabilities).unwrap_or_default().as_str(),
                 )
-                .set::<&str, &str>(
-                    format!("node:health:{}", uuid).as_str(),
-                    serde_json::to_string(&client_desc.health_status).unwrap_or_default().as_str(),
-                )
                 .execute(&mut self.connection);
         }
 
@@ -186,6 +182,29 @@ impl super::proxy::Proxy for ProxyRedis {
         self.dependency_uuids = new_dependency_uuids;
     }
 
+    fn push_keep_alive_responses(&mut self, keep_alive_responses: Vec<(uuid::Uuid, edgeless_api::node_management::KeepAliveResponse)>) {
+        let duration = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap();
+        let timestamp = format!("{}.{}", duration.as_secs(), duration.subsec_millis());
+
+        // serialize the nodes' health status and performance samples to Redis
+        for (uuid, keep_alive_response) in keep_alive_responses {
+            redis::pipe()
+                .set::<&str, &str>(
+                    format!("node:health:{}", uuid).as_str(),
+                    serde_json::to_string(&keep_alive_response.health_status).unwrap_or_default().as_str(),
+                )
+                .execute(&mut self.connection);
+            for (function_id, values) in keep_alive_response.performance_samples.function_execution_times {
+                let key = format!("performance:function_execution_time:{}", function_id);
+                for value in values {
+                    redis::pipe()
+                        .rpush::<&str, &str>(&key, format!("{},{}", value, &timestamp).as_str())
+                        .execute(&mut self.connection);
+                }
+            }
+        }
+    }
+
     fn add_deploy_intents(&mut self, intents: Vec<super::orchestrator::DeployIntent>) {
         for intent in intents {
             match intent {
@@ -194,7 +213,7 @@ impl super::proxy::Proxy for ProxyRedis {
                     let _ = self
                         .connection
                         .set::<&str, &str, usize>(&key, &nodes.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","));
-                    let _ = self.connection.lpush::<&str, &str, String>("intents", &key);
+                    let _ = self.connection.rpush::<&str, &str, String>("intents", &key);
                 }
             }
         }
@@ -250,20 +269,49 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_node_health(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_management::HealthStatus> {
+    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_management::NodeHealthStatus> {
         let mut health = std::collections::HashMap::new();
         for node_key in self.connection.keys::<&str, Vec<String>>("node:health:*").unwrap_or(vec![]) {
             let tokens: Vec<&str> = node_key.split(':').collect();
             assert_eq!(tokens.len(), 3);
+            assert_eq!("node", tokens[0]);
+            assert_eq!("health", tokens[1]);
             if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2]) {
                 if let Ok(val) = self.connection.get::<&str, String>(&node_key) {
-                    if let Ok(val) = serde_json::from_str::<edgeless_api::node_management::HealthStatus>(&val) {
+                    if let Ok(val) = serde_json::from_str::<edgeless_api::node_management::NodeHealthStatus>(&val) {
                         health.insert(node_id, val);
                     }
                 }
             }
         }
         health
+    }
+
+    fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, std::collections::HashMap<String, Vec<(f64, f64)>>> {
+        let mut samples = std::collections::HashMap::new();
+        for perf_key in self.connection.keys::<&str, Vec<String>>("performance:*").unwrap_or(vec![]) {
+            let tokens: Vec<&str> = perf_key.split(':').collect();
+            if tokens.len() != 3 {
+                continue;
+            }
+            assert_eq!(tokens.len(), 3);
+            assert_eq!("performance", tokens[0]);
+
+            let entry = samples.entry(tokens[1].to_string()).or_insert(std::collections::HashMap::new());
+            let sub_entry = entry.entry(tokens[2].to_string()).or_insert(vec![]);
+            if let Ok(values) = self.connection.lrange::<&str, Vec<String>>(&perf_key, 0, -1) {
+                for value in values {
+                    let tokens: Vec<&str> = value.split(",").collect();
+                    if tokens.len() != 2 {
+                        continue;
+                    }
+                    if let (Ok(metric), Ok(timestamp)) = (tokens[0].parse::<f64>(), tokens[1].parse::<f64>()) {
+                        sub_entry.push((metric, timestamp));
+                    }
+                }
+            }
+        }
+        samples
     }
 
     fn fetch_function_instances_to_nodes(
@@ -419,6 +467,48 @@ mod test {
         let entry = nodes.get(&node2_id);
         assert!(entry.is_some());
         assert_eq!(entry.unwrap().len(), 5);
+
+        // Check health status and performance samples.
+        let health_status = edgeless_api::node_management::NodeHealthStatus {
+            cpu_usage: 1,
+            cpu_load: 2,
+            mem_free: 3,
+            mem_used: 4,
+            mem_total: 5,
+            mem_available: 6,
+            proc_cpu_usage: 7,
+            proc_memory: 8,
+            proc_vmemory: 9,
+        };
+        let samples_1: Vec<f64> = vec![100.0, 101.0, 102.0, 103.0];
+        let samples_2: Vec<f64> = vec![200.0, 201.0];
+        let node_id_perf = uuid::Uuid::new_v4();
+        let fid_perf_1 = uuid::Uuid::new_v4();
+        let fid_perf_2 = uuid::Uuid::new_v4();
+        let keep_alive_responses = vec![(
+            node_id_perf.clone(),
+            edgeless_api::node_management::KeepAliveResponse {
+                health_status: health_status.clone(),
+                performance_samples: edgeless_api::node_management::NodePerformanceSamples {
+                    function_execution_times: std::collections::HashMap::from([
+                        (fid_perf_1.clone(), samples_1.clone()),
+                        (fid_perf_2.clone(), samples_2.clone()),
+                    ]),
+                },
+            },
+        )];
+        redis_proxy.push_keep_alive_responses(keep_alive_responses);
+
+        let node_health_res = redis_proxy.fetch_node_health();
+        assert_eq!(std::collections::HashMap::from([(node_id_perf, health_status)]), node_health_res);
+
+        let samples = redis_proxy.fetch_performance_samples();
+        let entry = samples.get("function_execution_time").unwrap();
+        assert_eq!(2, entry.len());
+        let samples_1_res = entry.get(&fid_perf_1.to_string()).unwrap();
+        let samples_2_res = entry.get(&fid_perf_2.to_string()).unwrap();
+        assert_eq!(samples_1, samples_1_res.iter().map(|x| x.0).collect::<Vec<f64>>());
+        assert_eq!(samples_2, samples_2_res.iter().map(|x| x.0).collect::<Vec<f64>>());
     }
 
     #[test]
@@ -445,7 +535,7 @@ mod test {
         let mut connection = redis::Client::open(redis_url).unwrap().get_connection().unwrap();
         for intent in intents {
             assert!(connection.set::<&str, &str, String>(&intent.key(), &intent.value()).is_ok());
-            assert!(connection.lpush::<&str, &str, usize>("intents", &intent.key()).is_ok());
+            assert!(connection.rpush::<&str, &str, usize>("intents", &intent.key()).is_ok());
         }
 
         // retrieve them

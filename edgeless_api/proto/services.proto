@@ -38,7 +38,7 @@ service NodeManagement {
     // Check if the component is still alive.
     // Input: none.
     // Output: health status information.
-    rpc KeepAlive (google.protobuf.Empty) returns (HealthStatus);
+    rpc KeepAlive (google.protobuf.Empty) returns (KeepAliveResponse);
 }
 
 // API that allows nodes to register themselves with the orchestrator

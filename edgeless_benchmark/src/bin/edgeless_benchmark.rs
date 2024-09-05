@@ -374,13 +374,13 @@ async fn setup_metrics_collector(client_interface: &mut ClientInterface, single_
 }
 
 impl ClientInterface {
-    async fn new(controller_url: &str, wf_type: WorkflowType) -> Self {
+    async fn new(controller_url: &str, wf_type: WorkflowType, seed: u64) -> Self {
         Self {
             client: edgeless_api::grpc_impl::controller::ControllerAPIClient::new(controller_url)
                 .await
                 .workflow_instance_api(),
             wf_type,
-            rng: rand::rngs::StdRng::from_entropy(),
+            rng: rand::rngs::StdRng::seed_from_u64(seed),
             wf_id: 0,
         }
     }
@@ -600,6 +600,8 @@ impl ClientInterface {
 
                 let mut inputs: Vec<u32> = vec![];
                 let mut breadths = vec![];
+                let mut fibonacci_values = vec![];
+                let mut allocate_values = vec![];
                 for stage in 0..=stages {
                     let breadth = draw(*min_breadth, *max_breadth);
                     let first = stage == 0;
@@ -632,9 +634,13 @@ impl ClientInterface {
                         )]),
                     });
 
+                    fibonacci_values.push(vec![]);
+                    allocate_values.push(vec![]);
                     for out in &outputs {
                         let fibonacci = draw(*min_fibonacci, *max_fibonacci);
+                        fibonacci_values.last_mut().unwrap().push(fibonacci);
                         let allocate = draw(*min_allocate, *max_allocate);
+                        allocate_values.last_mut().unwrap().push(allocate);
                         functions.push(WorkflowFunction {
                             name: format!("p{}-{}", stage, out),
                             function_class_specification: function_class_specification(
@@ -652,12 +658,22 @@ impl ClientInterface {
                     inputs = outputs;
                 }
                 log::info!(
-                    "wf{}, average interval {} ms, input size {}, num stages {}, breadths [{}]",
+                    "wf{}, average interval {} ms, input size {}, num stages {}, breadths [{}], fibonacci [{}], allocate [{}]",
                     self.wf_id,
                     interval,
                     size,
                     stages,
-                    breadths.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                    breadths.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
+                    fibonacci_values
+                        .iter()
+                        .map(|x| format!("[{}]", x.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")))
+                        .collect::<Vec<String>>()
+                        .join(","),
+                    allocate_values
+                        .iter()
+                        .map(|x| format!("[{}]", x.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")))
+                        .collect::<Vec<String>>()
+                        .join(",")
                 );
             }
         };
@@ -760,7 +776,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // Create an e-ORC client
-    let mut client_interface = ClientInterface::new(&args.controller_url, wf_type).await;
+    let mut client_interface = ClientInterface::new(&args.controller_url, wf_type, args.seed + 1000).await;
 
     // event queue, the first event is always a new workflow arriving at time 0
     let mut events = BinaryHeap::new();

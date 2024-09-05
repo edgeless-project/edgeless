@@ -43,9 +43,9 @@ impl crate::node_management::NodeManagementAPI for NodeManagementClient {
         }
     }
 
-    async fn keep_alive(&mut self) -> anyhow::Result<crate::node_management::HealthStatus> {
+    async fn keep_alive(&mut self) -> anyhow::Result<crate::node_management::KeepAliveResponse> {
         match self.client.keep_alive(tonic::Request::new(())).await {
-            Ok(res) => parse_health_status(&res.into_inner()),
+            Ok(res) => parse_keep_alive_response(&res.into_inner()),
             Err(err) => Err(anyhow::anyhow!("Communication error during keep alive: {}", err.to_string())),
         }
     }
@@ -70,9 +70,9 @@ impl crate::grpc_impl::api::node_management_server::NodeManagement for NodeManag
         }
     }
 
-    async fn keep_alive(&self, _request: tonic::Request<()>) -> Result<tonic::Response<crate::grpc_impl::api::HealthStatus>, tonic::Status> {
+    async fn keep_alive(&self, _request: tonic::Request<()>) -> Result<tonic::Response<crate::grpc_impl::api::KeepAliveResponse>, tonic::Status> {
         match self.node_management_api.lock().await.keep_alive().await {
-            Ok(health_status) => Ok(tonic::Response::new(serialize_health_status(&health_status))),
+            Ok(keep_alive_response) => Ok(tonic::Response::new(serialize_keep_alive_response(&keep_alive_response))),
             Err(err) => Err(tonic::Status::internal(format!("Error during keep alive: {}", err))),
         }
     }
@@ -113,8 +113,8 @@ pub fn parse_update_peers_request(
     }
 }
 
-pub fn parse_health_status(api_instance: &crate::grpc_impl::api::HealthStatus) -> anyhow::Result<crate::node_management::HealthStatus> {
-    Ok(crate::node_management::HealthStatus {
+pub fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealthStatus) -> anyhow::Result<crate::node_management::NodeHealthStatus> {
+    Ok(crate::node_management::NodeHealthStatus {
         cpu_usage: api_instance.cpu_usage,
         cpu_load: api_instance.cpu_load,
         mem_free: api_instance.mem_free,
@@ -124,6 +124,13 @@ pub fn parse_health_status(api_instance: &crate::grpc_impl::api::HealthStatus) -
         proc_cpu_usage: api_instance.proc_cpu_usage,
         proc_memory: api_instance.proc_memory,
         proc_vmemory: api_instance.proc_vmemory,
+    })
+}
+
+pub fn parse_node_performance_samples(
+    api_instance: &crate::grpc_impl::api::NodePerformanceSamples,
+) -> anyhow::Result<crate::node_management::NodePerformanceSamples> {
+    Ok(crate::node_management::NodePerformanceSamples {
         function_execution_times: api_instance
             .function_execution_times
             .iter()
@@ -132,6 +139,29 @@ pub fn parse_health_status(api_instance: &crate::grpc_impl::api::HealthStatus) -
                 _ => None,
             })
             .collect(),
+    })
+}
+
+pub fn parse_keep_alive_response(
+    api_instance: &crate::grpc_impl::api::KeepAliveResponse,
+) -> anyhow::Result<crate::node_management::KeepAliveResponse> {
+    let health_status = match &api_instance.health_status {
+        Some(val) => match parse_node_health_status(val) {
+            Ok(res) => res,
+            Err(_) => crate::node_management::NodeHealthStatus::invalid(),
+        },
+        None => crate::node_management::NodeHealthStatus::invalid(),
+    };
+    let performance_samples = match &api_instance.performance_samples {
+        Some(val) => match parse_node_performance_samples(val) {
+            Ok(res) => res,
+            Err(_) => crate::node_management::NodePerformanceSamples::empty(),
+        },
+        None => crate::node_management::NodePerformanceSamples::empty(),
+    };
+    Ok(crate::node_management::KeepAliveResponse {
+        health_status,
+        performance_samples,
     })
 }
 
@@ -155,8 +185,8 @@ fn serialize_update_peers_request(req: &crate::node_management::UpdatePeersReque
     }
 }
 
-fn serialize_health_status(req: &crate::node_management::HealthStatus) -> crate::grpc_impl::api::HealthStatus {
-    crate::grpc_impl::api::HealthStatus {
+fn serialize_node_health_status(req: &crate::node_management::NodeHealthStatus) -> crate::grpc_impl::api::NodeHealthStatus {
+    crate::grpc_impl::api::NodeHealthStatus {
         cpu_usage: req.cpu_usage,
         cpu_load: req.cpu_load,
         mem_free: req.mem_free,
@@ -166,6 +196,11 @@ fn serialize_health_status(req: &crate::node_management::HealthStatus) -> crate:
         proc_cpu_usage: req.proc_cpu_usage,
         proc_memory: req.proc_memory,
         proc_vmemory: req.proc_vmemory,
+    }
+}
+
+fn serialize_node_performance_samples(req: &crate::node_management::NodePerformanceSamples) -> crate::grpc_impl::api::NodePerformanceSamples {
+    crate::grpc_impl::api::NodePerformanceSamples {
         function_execution_times: req
             .function_execution_times
             .iter()
@@ -177,10 +212,19 @@ fn serialize_health_status(req: &crate::node_management::HealthStatus) -> crate:
     }
 }
 
+fn serialize_keep_alive_response(req: &crate::node_management::KeepAliveResponse) -> crate::grpc_impl::api::KeepAliveResponse {
+    crate::grpc_impl::api::KeepAliveResponse {
+        health_status: Some(serialize_node_health_status(&req.health_status)),
+        performance_samples: Some(serialize_node_performance_samples(&req.performance_samples)),
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::node_management::HealthStatus;
+    use crate::node_management::KeepAliveResponse;
+    use crate::node_management::NodeHealthStatus;
+    use crate::node_management::NodePerformanceSamples;
     use crate::node_management::UpdatePeersRequest;
 
     #[test]
@@ -199,29 +243,36 @@ mod test {
     }
 
     #[test]
-    fn serialize_deserialize_health_status() {
+    fn serialize_deserialize_keep_alive_response() {
         let messages = vec![
-            HealthStatus::empty(),
-            HealthStatus::invalid(),
-            HealthStatus {
-                cpu_usage: 1,
-                cpu_load: 2,
-                mem_free: 3,
-                mem_used: 4,
-                mem_total: 5,
-                mem_available: 6,
-                proc_cpu_usage: 7,
-                proc_memory: 8,
-                proc_vmemory: 9,
-                function_execution_times: std::collections::HashMap::from([
-                    (uuid::Uuid::new_v4(), vec![1.0, 2.5, 3.0]),
-                    (uuid::Uuid::new_v4(), vec![]),
-                    (uuid::Uuid::new_v4(), vec![0.1, 0.2, 999.0]),
-                ]),
+            KeepAliveResponse::empty(),
+            KeepAliveResponse {
+                health_status: NodeHealthStatus::invalid(),
+                performance_samples: NodePerformanceSamples::empty(),
+            },
+            KeepAliveResponse {
+                health_status: NodeHealthStatus {
+                    cpu_usage: 1,
+                    cpu_load: 2,
+                    mem_free: 3,
+                    mem_used: 4,
+                    mem_total: 5,
+                    mem_available: 6,
+                    proc_cpu_usage: 7,
+                    proc_memory: 8,
+                    proc_vmemory: 9,
+                },
+                performance_samples: NodePerformanceSamples {
+                    function_execution_times: std::collections::HashMap::from([
+                        (uuid::Uuid::new_v4(), vec![1.0, 2.5, 3.0]),
+                        (uuid::Uuid::new_v4(), vec![]),
+                        (uuid::Uuid::new_v4(), vec![0.1, 0.2, 999.0]),
+                    ]),
+                },
             },
         ];
         for msg in messages {
-            match parse_health_status(&serialize_health_status(&msg)) {
+            match parse_keep_alive_response(&&serialize_keep_alive_response(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }
