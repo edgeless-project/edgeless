@@ -8,20 +8,15 @@ fn test_sysinfo() {
 
     let my_pid = sysinfo::Pid::from_u32(std::process::id());
     println!("my PID is {}", my_pid);
+    let mut networks = sysinfo::Networks::new_with_refreshed_list();
+
+    let mut disks = sysinfo::Disks::new();
 
     loop {
-        sys.refresh_cpu();
-        sys.refresh_memory();
-        sys.refresh_process(my_pid);
+        sys.refresh_all();
 
-        let global_cpu = sys.global_cpu_info();
-        println!(
-            "global cpu brand {} name {} usage {:.0}% frequency {} Hz",
-            global_cpu.brand(),
-            global_cpu.name(),
-            global_cpu.cpu_usage(),
-            global_cpu.frequency()
-        );
+        let global_cpu = sys.global_cpu_usage();
+        println!("global cpu usage: {}%", global_cpu);
 
         for (i, cpu) in sys.cpus().iter().enumerate() {
             println!(
@@ -49,6 +44,50 @@ fn test_sysinfo() {
             proc.virtual_memory()
         );
         println!("\n");
+
+        let load_avg = sysinfo::System::load_average();
+        println!(
+            "one minute: {}%, five minutes: {}%, fifteen minutes: {}%",
+            load_avg.one, load_avg.five, load_avg.fifteen,
+        );
+
+        networks.refresh();
+
+        for (interface_name, network) in &networks {
+            println!(
+                "{}:\ttotal-received {} B ({} pkts), total-transmitted {} B ({} pkts), total-errors rx {} tx {}",
+                interface_name,
+                network.total_received(),
+                network.total_packets_received(),
+                network.total_transmitted(),
+                network.total_packets_transmitted(),
+                network.total_errors_on_received(),
+                network.total_errors_on_transmitted()
+            );
+        }
+
+        let mut tot_rx_bytes = 0;
+        let mut tot_rx_pkts = 0;
+        let mut tot_rx_errs = 0;
+        let mut tot_tx_bytes = 0;
+        let mut tot_tx_pkts = 0;
+        let mut tot_tx_errs = 0;
+        for (_interface_name, network) in &networks {
+            tot_rx_bytes += network.total_received();
+            tot_rx_pkts += network.total_packets_received();
+            tot_rx_errs += network.total_errors_on_received();
+            tot_tx_bytes += network.total_packets_transmitted();
+            tot_tx_pkts += network.total_transmitted();
+            tot_tx_errs += network.total_errors_on_transmitted();
+        }
+        println!("ALL:\tRX {} bytes {} pkts {} errs", tot_rx_bytes, tot_rx_pkts, tot_rx_errs);
+        println!("ALL:\tTX {} bytes {} pkts {} errs", tot_tx_bytes, tot_tx_pkts, tot_tx_errs);
+
+        disks.refresh_list();
+        disks.refresh();
+
+        println!("available disk space {} B", disks.iter().map(|x| x.available_space()).sum::<u64>());
+        println!("total     disk space {} B", disks.iter().map(|x| x.total_space()).sum::<u64>());
 
         std::thread::sleep(std::cmp::max(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL, std::time::Duration::from_secs(2)));
     }
