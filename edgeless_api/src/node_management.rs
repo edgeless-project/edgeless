@@ -20,6 +20,17 @@ pub struct NodeHealthStatus {
     pub proc_cpu_usage: i32,
     pub proc_memory: i32,
     pub proc_vmemory: i32,
+    pub load_avg_1: i32,
+    pub load_avg_5: i32,
+    pub load_avg_15: i32,
+    pub tot_rx_bytes: i64,
+    pub tot_rx_pkts: i64,
+    pub tot_rx_errs: i64,
+    pub tot_tx_bytes: i64,
+    pub tot_tx_pkts: i64,
+    pub tot_tx_errs: i64,
+    pub disk_tot_space: i64,
+    pub disk_free_space: i64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -45,7 +56,7 @@ impl std::fmt::Display for NodeHealthStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "global cpu usage {:.1}%, load {}, memory free {} kb, used {} kb, total {} kb, available {} kb, process cpu usage {:.1}%, memory {} kb, vmemory {} kb",
+            "global cpu usage {:.1}%, load {}, memory free {} kb, used {} kb, total {} kb, available {} kb, process cpu usage {:.1}%, memory {} kb, vmemory {} kb, load avg 1 minute {}% 5 minutes {}% 15 minutes {}%, network tot rx {} bytes ({} pkts) {} errs, tot tx {} bytes ({} pkts) {} errs, disk tot {} bytes vs. available {} bytes",
             self.cpu_usage,
             self.cpu_load,
             self.mem_free,
@@ -55,6 +66,17 @@ impl std::fmt::Display for NodeHealthStatus {
             self.proc_cpu_usage,
             self.proc_memory,
             self.proc_vmemory,
+            self.load_avg_1,
+            self.load_avg_5,
+            self.load_avg_15,
+            self.tot_rx_bytes,
+            self.tot_rx_pkts,
+            self.tot_rx_errs,
+            self.tot_tx_bytes,
+            self.tot_tx_pkts,
+            self.tot_tx_errs,
+            self.disk_tot_space,
+            self.disk_free_space,
         )
     }
 }
@@ -71,6 +93,17 @@ impl NodeHealthStatus {
             proc_cpu_usage: 0,
             proc_memory: 0,
             proc_vmemory: 0,
+            load_avg_1: 0,
+            load_avg_5: 0,
+            load_avg_15: 0,
+            tot_rx_bytes: 0,
+            tot_rx_pkts: 0,
+            tot_rx_errs: 0,
+            tot_tx_bytes: 0,
+            tot_tx_pkts: 0,
+            tot_tx_errs: 0,
+            disk_tot_space: 0,
+            disk_free_space: 0,
         }
     }
 
@@ -85,6 +118,17 @@ impl NodeHealthStatus {
             proc_cpu_usage: -1,
             proc_memory: -1,
             proc_vmemory: -1,
+            load_avg_1: -1,
+            load_avg_5: -1,
+            load_avg_15: -1,
+            tot_rx_bytes: -1,
+            tot_rx_pkts: -1,
+            tot_rx_errs: -1,
+            tot_tx_bytes: -1,
+            tot_tx_pkts: -1,
+            tot_tx_errs: -1,
+            disk_tot_space: -1,
+            disk_free_space: -1,
         }
     }
 }
