@@ -110,7 +110,7 @@ mod tests {
 
         let mut expected = vec![];
         for i in 0..10 {
-            expected.push(i as f32);
+            expected.push(i as f64);
             target.handle(
                 &crate::telemetry_events::TelemetryEvent::FunctionInit(std::time::Duration::from_secs(999)),
                 &event_tags,
