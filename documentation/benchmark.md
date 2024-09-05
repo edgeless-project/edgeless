@@ -43,17 +43,17 @@ target/debug/edgeless_inabox
 In another run the following benchmark, which lasts 30 seconds:
 
 ```bash
-target/debug/edgeless_benchmark -w "vector-mul-chain;5;5;1000;2000;functions/vector_mul/vector_mul.wasm
+target/debug/edgeless_benchmark -w "vector-mul-chain;5;5;1000;2000;functions/vector_mul/vector_mul.wasm"
 ```
 
 At the end you will find a file `out.csv` that contains the dump of the
-metrics collected during the benchmark.
+application metrics collected during the benchmark.
 
-During the execution you can query the status of the ε-ORC and the metrics
-by looking at the content of Redis.
-A utility script is provided that dumps the content (except individual latency
-samples) by pretty-print JSON values:
+You can dump the performance metrics with:
 
-```bash
-scripts/redis_dump.sh
+```shell
+target/debug/proxy_cli dump performance
 ```
+
+You can find the difference between application vs. performance metrics
+in the [orchestration documentation](./orchestration.md).
