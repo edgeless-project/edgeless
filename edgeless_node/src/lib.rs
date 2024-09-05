@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use edgeless_api::orc::OrchestratorAPI;
-use edgeless_telemetry::performance_target;
+use futures::Future;
 
 pub mod agent;
 pub mod base_runtime;
@@ -455,6 +455,82 @@ async fn fill_resources(
     }
 
     ret
+}
+
+pub async fn create_metrics_collector_node(
+    invocation_url: String,
+    agent_url: String,
+    metrics_collector_type: String,
+    redis_url: Option<String>,
+) -> (
+    uuid::Uuid,
+    std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
+    futures::future::BoxFuture<'static, ()>,
+    Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
+) {
+    // Create the data plane for the node.
+    let node_id = uuid::Uuid::new_v4();
+    let data_plane = edgeless_dataplane::handle::DataplaneProvider::new(node_id.clone(), invocation_url, None).await;
+
+    // Create the metrics collector resource.
+    let mut resource_provider_specifications = vec![];
+    let mut resources: std::collections::HashMap<String, agent::ResourceDesc> = std::collections::HashMap::new();
+
+    match metrics_collector_type.to_lowercase().as_str() {
+        "redis" => match redis_url {
+            Some(redis_url) => {
+                match redis::Client::open(redis_url.clone()) {
+                    Ok(client) => match client.get_connection() {
+                        Ok(redis_connection) => {
+                            let provider_id = "metrics-collector".to_string();
+                            let class_type = "metrics-collector".to_string();
+                            resource_provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                                provider_id: provider_id.clone(),
+                                class_type: class_type.clone(),
+                                outputs: vec![],
+                            });
+                            resources.insert(
+                                provider_id,
+                                agent::ResourceDesc {
+                                    class_type,
+                                    client: Box::new(
+                                        resources::metrics_collector::MetricsCollectorResourceProvider::new(
+                                            data_plane.clone(),
+                                            edgeless_api::function_instance::InstanceId::new(node_id),
+                                            redis_connection,
+                                        )
+                                        .await,
+                                    ),
+                                },
+                            );
+                            log::info!("metrics collector connected to Redis at {}", redis_url);
+                        }
+                        Err(err) => log::error!("error when connecting to Redis at {}: {}", redis_url, err),
+                    },
+                    Err(err) => log::error!("error when creating a Redis client at {}: {}", redis_url, err),
+                };
+            }
+            None => {
+                log::warn!("redis_url not specified for a Redis metrics collector");
+            }
+        },
+        _ => {
+            log::info!("no metrics collector is used");
+        }
+    }
+
+    // Create the agent of the node embedded in the orchestrator.
+    let telemetry_performance_target = edgeless_telemetry::performance_target::PerformanceTargetInner::new();
+    let (mut agent, agent_task) = agent::Agent::new(
+        std::collections::HashMap::new(),
+        resources,
+        node_id,
+        data_plane.clone(),
+        telemetry_performance_target,
+    );
+    let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), agent_url);
+
+    (node_id, agent_task, agent_api_server, resource_provider_specifications)
 }
 
 pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
