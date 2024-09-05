@@ -141,8 +141,8 @@ fn main() -> anyhow::Result<()> {
                             .open(filename.clone())?;
                         for value in values {
                             outfile
-                                .write(format!("{},{}\n", value.0, value.1).as_bytes())
-                                .expect(format!("could not write to file '{}'", filename).as_str());
+                                .write_all(format!("{},{}\n", value.0, value.1).as_bytes())
+                                .unwrap_or_else(|_| panic!("could not write to file '{}'", filename));
                         }
                     }
                 }
