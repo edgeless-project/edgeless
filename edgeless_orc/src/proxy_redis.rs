@@ -333,6 +333,33 @@ impl super::proxy::Proxy for ProxyRedis {
         instances
     }
 
+    fn fetch_instances_to_physical_ids(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::ComponentId>> {
+        let mut instances = std::collections::HashMap::new();
+        for (logical_id, instance) in self.fetch_instances() {
+            match instance {
+                ActiveInstanceClone::Function(_, instance_ids) => {
+                    instances.insert(
+                        logical_id,
+                        instance_ids
+                            .iter()
+                            .filter_map(|x| string_to_instance_id(x).ok())
+                            .map(|x| x.function_id)
+                            .collect(),
+                    );
+                }
+                ActiveInstanceClone::Resource(_, instance_id) => match string_to_instance_id(&instance_id) {
+                    Ok(instance_id) => {
+                        instances.insert(logical_id, vec![instance_id.function_id]);
+                    }
+                    Err(_) => {}
+                },
+            }
+        }
+        instances
+    }
+
     fn fetch_resource_instances_to_nodes(
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::NodeId> {
@@ -400,9 +427,11 @@ mod test {
         let mut active_instances = std::collections::HashMap::new();
         let node1_id = uuid::Uuid::new_v4(); // functions
         let node2_id = uuid::Uuid::new_v4(); // resources
+        let mut logical_physical_ids = vec![];
         for _ in 0..10 {
+            logical_physical_ids.push((uuid::Uuid::new_v4(), uuid::Uuid::new_v4()));
             active_instances.insert(
-                uuid::Uuid::new_v4(),
+                logical_physical_ids.last().unwrap().0.clone(),
                 crate::orchestrator::ActiveInstance::Function(
                     SpawnFunctionRequest {
                         instance_id: None,
@@ -421,14 +450,16 @@ mod test {
                     },
                     vec![edgeless_api::function_instance::InstanceId {
                         node_id: node1_id,
-                        function_id: uuid::Uuid::new_v4(),
+                        function_id: logical_physical_ids.last().unwrap().1.clone(),
                     }],
                 ),
             );
         }
+
         for _ in 0..5 {
+            logical_physical_ids.push((uuid::Uuid::new_v4(), uuid::Uuid::new_v4()));
             active_instances.insert(
-                uuid::Uuid::new_v4(),
+                logical_physical_ids.last().unwrap().0.clone(),
                 crate::orchestrator::ActiveInstance::Resource(
                     edgeless_api::resource_configuration::ResourceInstanceSpecification {
                         class_type: "res".to_string(),
@@ -437,7 +468,7 @@ mod test {
                     },
                     edgeless_api::function_instance::InstanceId {
                         node_id: node2_id,
-                        function_id: uuid::Uuid::new_v4(),
+                        function_id: logical_physical_ids.last().unwrap().1.clone(),
                     },
                 ),
             );
@@ -467,6 +498,18 @@ mod test {
         let entry = nodes.get(&node2_id);
         assert!(entry.is_some());
         assert_eq!(entry.unwrap().len(), 5);
+
+        let logical_to_physical = redis_proxy.fetch_instances_to_physical_ids();
+        assert_eq!(logical_physical_ids.len(), logical_to_physical.len());
+        for mapping in logical_to_physical {
+            let logical = mapping.0;
+            assert_eq!(1, mapping.1.len());
+            let physical = mapping.1.first().unwrap();
+
+            let elem = logical_physical_ids.iter().find(|x| x.0 == logical).unwrap();
+            assert_eq!(logical, elem.0);
+            assert_eq!(*physical, elem.1);
+        }
 
         // Check health status and performance samples.
         let health_status = edgeless_api::node_management::NodeHealthStatus {
