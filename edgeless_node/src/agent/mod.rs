@@ -84,6 +84,11 @@ impl Agent {
 
         // Internal data structures to query system/process information.
         let mut sys = sysinfo::System::new();
+        if !sysinfo::IS_SUPPORTED_SYSTEM {
+            log::warn!("sysinfo does not support (yet) this OS");
+        }
+        let mut networks = sysinfo::Networks::new_with_refreshed_list();
+        let mut disks = sysinfo::Disks::new();
         let my_pid = sysinfo::Pid::from_u32(std::process::id());
 
         log::info!("Starting Edgeless Agent");
@@ -296,14 +301,30 @@ impl Agent {
                 }
                 AgentRequest::KeepAlive(responder) => {
                     // Refresh system/process information.
-                    sys.refresh_cpu();
-                    sys.refresh_memory();
-                    sys.refresh_process(my_pid);
+                    sys.refresh_all();
+                    networks.refresh();
+                    disks.refresh_list();
+                    disks.refresh();
 
                     let to_kb = |x| (x / 1024) as i32;
                     let proc = sys.process(my_pid).unwrap();
+                    let load_avg = sysinfo::System::load_average();
+                    let mut tot_rx_bytes: i64 = 0;
+                    let mut tot_rx_pkts: i64 = 0;
+                    let mut tot_rx_errs: i64 = 0;
+                    let mut tot_tx_bytes: i64 = 0;
+                    let mut tot_tx_pkts: i64 = 0;
+                    let mut tot_tx_errs: i64 = 0;
+                    for (_interface_name, network) in &networks {
+                        tot_rx_bytes += network.total_received() as i64;
+                        tot_rx_pkts += network.total_packets_received() as i64;
+                        tot_rx_errs += network.total_errors_on_received() as i64;
+                        tot_tx_bytes += network.total_packets_transmitted() as i64;
+                        tot_tx_pkts += network.total_transmitted() as i64;
+                        tot_tx_errs += network.total_errors_on_transmitted() as i64;
+                    }
                     let health_status = edgeless_api::node_management::NodeHealthStatus {
-                        cpu_usage: sys.global_cpu_info().cpu_usage() as i32,
+                        cpu_usage: sys.global_cpu_usage() as i32,
                         cpu_load: sys.cpus().iter().map(|x| x.cpu_usage() / 100_f32).sum::<f32>() as i32,
                         mem_free: to_kb(sys.free_memory()),
                         mem_used: to_kb(sys.used_memory()),
@@ -312,6 +333,17 @@ impl Agent {
                         proc_cpu_usage: proc.cpu_usage() as i32,
                         proc_memory: to_kb(proc.memory()),
                         proc_vmemory: to_kb(proc.virtual_memory()),
+                        load_avg_1: load_avg.one as i32,
+                        load_avg_5: load_avg.five as i32,
+                        load_avg_15: load_avg.fifteen as i32,
+                        tot_rx_bytes,
+                        tot_rx_pkts,
+                        tot_rx_errs,
+                        tot_tx_bytes,
+                        tot_tx_pkts,
+                        tot_tx_errs,
+                        disk_tot_space: disks.iter().map(|x| x.available_space() as i64).sum::<i64>(),
+                        disk_free_space: disks.iter().map(|x| x.available_space() as i64).sum::<i64>(),
                     };
                     let performance_samples = edgeless_api::node_management::NodePerformanceSamples {
                         function_execution_times: telemetry_performance_target.get_metrics().function_execution_times,

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 use std::str::FromStr;
 
+use super::api;
+
 #[derive(Clone)]
 pub struct NodeManagementClient {
     client: crate::grpc_impl::api::node_management_client::NodeManagementClient<tonic::transport::Channel>,
@@ -124,6 +126,17 @@ pub fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealth
         proc_cpu_usage: api_instance.proc_cpu_usage,
         proc_memory: api_instance.proc_memory,
         proc_vmemory: api_instance.proc_vmemory,
+        load_avg_1: api_instance.load_avg_1,
+        load_avg_5: api_instance.load_avg_5,
+        load_avg_15: api_instance.load_avg_15,
+        tot_rx_bytes: api_instance.tot_rx_bytes,
+        tot_rx_pkts: api_instance.tot_rx_pkts,
+        tot_rx_errs: api_instance.tot_rx_errs,
+        tot_tx_pkts: api_instance.tot_tx_pkts,
+        tot_tx_bytes: api_instance.tot_tx_bytes,
+        tot_tx_errs: api_instance.tot_tx_errs,
+        disk_tot_space: api_instance.disk_tot_space,
+        disk_free_space: api_instance.disk_free_space,
     })
 }
 
@@ -196,6 +209,17 @@ fn serialize_node_health_status(req: &crate::node_management::NodeHealthStatus) 
         proc_cpu_usage: req.proc_cpu_usage,
         proc_memory: req.proc_memory,
         proc_vmemory: req.proc_vmemory,
+        load_avg_1: req.load_avg_1,
+        load_avg_5: req.load_avg_5,
+        load_avg_15: req.load_avg_15,
+        tot_rx_bytes: req.tot_rx_bytes,
+        tot_rx_pkts: req.tot_rx_pkts,
+        tot_rx_errs: req.tot_rx_errs,
+        tot_tx_pkts: req.tot_tx_pkts,
+        tot_tx_bytes: req.tot_tx_bytes,
+        tot_tx_errs: req.tot_tx_errs,
+        disk_tot_space: req.disk_tot_space,
+        disk_free_space: req.disk_free_space,
     }
 }
 
@@ -261,6 +285,17 @@ mod test {
                     proc_cpu_usage: 7,
                     proc_memory: 8,
                     proc_vmemory: 9,
+                    load_avg_1: 10,
+                    load_avg_5: 11,
+                    load_avg_15: 12,
+                    tot_rx_bytes: 13,
+                    tot_rx_pkts: 14,
+                    tot_rx_errs: 15,
+                    tot_tx_bytes: 16,
+                    tot_tx_pkts: 17,
+                    tot_tx_errs: 18,
+                    disk_tot_space: 19,
+                    disk_free_space: 20,
                 },
                 performance_samples: NodePerformanceSamples {
                     function_execution_times: std::collections::HashMap::from([

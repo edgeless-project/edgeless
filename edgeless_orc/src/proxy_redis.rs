@@ -522,6 +522,17 @@ mod test {
             proc_cpu_usage: 7,
             proc_memory: 8,
             proc_vmemory: 9,
+            load_avg_1: 10,
+            load_avg_5: 11,
+            load_avg_15: 12,
+            tot_rx_bytes: 13,
+            tot_rx_pkts: 14,
+            tot_rx_errs: 15,
+            tot_tx_bytes: 16,
+            tot_tx_pkts: 17,
+            tot_tx_errs: 18,
+            disk_tot_space: 19,
+            disk_free_space: 20,
         };
         let samples_1: Vec<f64> = vec![100.0, 101.0, 102.0, 103.0];
         let samples_2: Vec<f64> = vec![200.0, 201.0];

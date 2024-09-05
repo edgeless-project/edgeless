@@ -162,6 +162,7 @@ message NodeHealthStatus {
     int32 cpu_usage      = 10;
     // Load, as the sum of usage of all the CPUs.
     int32 cpu_load       = 11;
+
     // Free memory, in kbytes.
     int32 mem_free       = 20;
     // Used memory, in kbytes.
@@ -170,12 +171,39 @@ message NodeHealthStatus {
     int32 mem_total      = 22;
     // Available memory, in kbytes
     int32 mem_available  = 23;
+
     // CPU usage of the current process, in percentage.
     int32 proc_cpu_usage = 30;
     // Memory occupied by this process, in kbytes.
     int32 proc_memory    = 31;
     // Virtual memory occupied by this process, in kbytes.
     int32 proc_vmemory   = 32;
+
+    // Load, one minute average, in percentage.
+    int32 load_avg_1     = 40;
+    // Load, five minutes average, in percentage.
+    int32 load_avg_5     = 41;
+    // Load, fifteen minutes average, in percentage.
+    int32 load_avg_15    = 42;
+    
+    // Total received traffic on all the network interfaces, in bytes.
+    int64 tot_rx_bytes   = 50;
+    // Total received traffic on all the network interfaces, in packets.
+    int64 tot_rx_pkts    = 51;
+    // Total rx errors on all the network interfaces.
+    int64 tot_rx_errs    = 52;
+
+    // Total transmitted traffic on all the network interfaces, in bytes.
+    int64 tot_tx_bytes   = 60;
+    // Total transmitted traffic on all the network interfaces, in packets.
+    int64 tot_tx_pkts    = 61;
+    // Total tx errors on all the network interfaces.
+    int64 tot_tx_errs    = 62;
+
+    // Total disk space, in bytes.
+    int64 disk_tot_space  = 70;
+    // Available disk space, in bytes.
+    int64 disk_free_space = 71;
 }
 
 // Node performance samples.
