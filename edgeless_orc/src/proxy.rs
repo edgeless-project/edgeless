@@ -50,6 +50,12 @@ pub trait Proxy: Sync + Send {
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::NodeId>>;
 
+    /// Fetch the mapping between active function/resource instances and their
+    /// physical identifiers.
+    fn fetch_instances_to_physical_ids(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::ComponentId>>;
+
     /// Fetch the mapping between active resources instances and nodes.
     fn fetch_resource_instances_to_nodes(
         &mut self,
