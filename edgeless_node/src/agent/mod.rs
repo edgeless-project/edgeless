@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MIT
 use edgeless_api::node_management::UpdatePeersRequest;
 use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
-use edgeless_telemetry::performance_target;
 use futures::{Future, SinkExt, StreamExt};
 
 #[cfg(test)]

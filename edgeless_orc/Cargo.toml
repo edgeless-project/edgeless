@@ -31,7 +31,6 @@ async-trait = "0.1"
 edgeless_api = {path = "../edgeless_api", features = ["grpc_impl"]}
 edgeless_dataplane = { path = "../edgeless_dataplane" }
 edgeless_node = { path = "../edgeless_node" }
-edgeless_telemetry = { path = "../edgeless_telemetry" }
 serde = "1.0"
 serde_json = "1"
 clap = { version = "4.3", features=["derive"] }

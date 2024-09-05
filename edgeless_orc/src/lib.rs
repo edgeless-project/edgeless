@@ -3,14 +3,12 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-mod metrics_collector;
 mod orchestration_logic;
 pub mod orchestrator;
 pub mod proxy;
 pub mod proxy_none;
 pub mod proxy_redis;
 
-use edgeless_node::agent;
 use futures::join;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -101,67 +99,14 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     log::info!("Starting Edgeless Orchestrator at {}", settings.general.orchestrator_url,);
     log::debug!("Settings: {:?}", settings);
 
-    // Create the data plane for the node embedded in the orchestrator.
-    let node_id = uuid::Uuid::new_v4();
-    let data_plane = edgeless_dataplane::handle::DataplaneProvider::new(node_id.clone(), settings.general.invocation_url.clone(), None).await;
-
-    // Create the metrics collector resource.
-    let mut resource_provider_specifications = vec![];
-    let mut resources: std::collections::HashMap<String, agent::ResourceDesc> = std::collections::HashMap::new();
-
-    match settings.collector.collector_type.to_lowercase().as_str() {
-        "redis" => match settings.collector.redis_url {
-            Some(redis_url) => {
-                match redis::Client::open(redis_url.clone()) {
-                    Ok(client) => match client.get_connection() {
-                        Ok(redis_connection) => {
-                            let provider_id = "metrics-collector".to_string();
-                            let class_type = "metrics-collector".to_string();
-                            resource_provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                                provider_id: provider_id.clone(),
-                                class_type: class_type.clone(),
-                                outputs: vec![],
-                            });
-                            resources.insert(
-                                provider_id,
-                                agent::ResourceDesc {
-                                    class_type,
-                                    client: Box::new(
-                                        metrics_collector::MetricsCollectorResourceProvider::new(
-                                            data_plane.clone(),
-                                            edgeless_api::function_instance::InstanceId::new(node_id),
-                                            redis_connection,
-                                        )
-                                        .await,
-                                    ),
-                                },
-                            );
-                            log::info!("metrics collector connected to Redis at {}", redis_url);
-                        }
-                        Err(err) => log::error!("error when connecting to Redis at {}: {}", redis_url, err),
-                    },
-                    Err(err) => log::error!("error when creating a Redis client at {}: {}", redis_url, err),
-                };
-            }
-            None => {
-                log::warn!("redis_url not specified for a Redis metrics collector");
-            }
-        },
-        _ => {
-            log::info!("no metrics collector is used");
-        }
-    }
-
-    // Create the agent of the node embedded in the orchestrator.
-    let telemetry_performance_target = edgeless_telemetry::performance_target::PerformanceTargetInner::new();
-    let (mut agent, agent_task) = edgeless_node::agent::Agent::new(
-        std::collections::HashMap::new(),
-        resources,
-        node_id,
-        data_plane.clone(),
-        telemetry_performance_target,
-    );
-    let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
+    // Create a node embedded in the orchestrator for metrics collection.
+    let (node_id, agent_task, agent_api_server, resource_provider_specifications) = edgeless_node::create_metrics_collector_node(
+        settings.general.invocation_url.clone(),
+        settings.general.agent_url.clone(),
+        settings.collector.collector_type,
+        settings.collector.redis_url,
+    )
+    .await;
 
     // Create the orchestrator.
     let (mut orchestrator, orchestrator_task) = orchestrator::Orchestrator::new(settings.baseline.clone(), make_proxy(settings.proxy)).await;
