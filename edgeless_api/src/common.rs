@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: MIT
 use edgeless_api_core::instance_id::{ComponentId, InstanceId};
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub struct ResponseError {
     pub summary: String,
     pub detail: Option<String>,
