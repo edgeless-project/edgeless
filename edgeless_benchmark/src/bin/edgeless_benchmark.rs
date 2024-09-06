@@ -6,6 +6,7 @@ use clap::Parser;
 use core::cmp::Ordering;
 use edgeless_api::controller::ControllerAPI;
 use edgeless_api::workflow_instance::{SpawnWorkflowResponse, WorkflowFunction, WorkflowId, WorkflowInstanceAPI};
+use edgeless_benchmark::redis_dumper;
 use rand::prelude::*;
 use rand::SeedableRng;
 use rand_distr::Exp;
@@ -326,11 +327,16 @@ impl std::fmt::Display for WorkflowType {
 }
 
 struct ClientInterface {
+    /// The client interface.
     client: Box<dyn WorkflowInstanceAPI>,
+    /// Type of workflows generated.
     wf_type: WorkflowType,
+    /// Pseudo-random number generator.
     rng: rand::rngs::StdRng,
     /// Identifier of the next workflow to start.
     wf_id: u32,
+    /// Redis client.
+    redis_client: Option<edgeless_benchmark::redis_dumper::RedisDumper>,
 }
 
 async fn setup_metrics_collector(client_interface: &mut ClientInterface, single_trigger_wasm: &str, warmup: f64) -> anyhow::Result<String> {
@@ -374,7 +380,12 @@ async fn setup_metrics_collector(client_interface: &mut ClientInterface, single_
 }
 
 impl ClientInterface {
-    async fn new(controller_url: &str, wf_type: WorkflowType, seed: u64) -> Self {
+    async fn new(
+        controller_url: &str,
+        wf_type: WorkflowType,
+        seed: u64,
+        redis_client: Option<edgeless_benchmark::redis_dumper::RedisDumper>,
+    ) -> Self {
         Self {
             client: edgeless_api::grpc_impl::controller::ControllerAPIClient::new(controller_url)
                 .await
@@ -382,6 +393,15 @@ impl ClientInterface {
             wf_type,
             rng: rand::rngs::StdRng::seed_from_u64(seed),
             wf_id: 0,
+            redis_client,
+        }
+    }
+
+    fn dump(&mut self, output: &str, append: bool) {
+        if let Some(redis_client) = &mut self.redis_client {
+            if let Err(err) = redis_client.dump_csv(output, append) {
+                log::error!("error dumping from Redis to file {}: {}", output, err);
+            }
         }
     }
 
@@ -683,7 +703,10 @@ impl ClientInterface {
                 name: "metrics-collector".to_string(),
                 class_type: "metrics-collector".to_string(),
                 output_mapping: std::collections::HashMap::new(),
-                configurations: std::collections::HashMap::from([("alpha".to_string(), format!("{}", ALPHA)), ("wf_name".to_string(), wf_name)]),
+                configurations: std::collections::HashMap::from([
+                    ("alpha".to_string(), format!("{}", ALPHA)),
+                    ("wf_name".to_string(), wf_name.clone()),
+                ]),
             });
         }
 
@@ -694,19 +717,39 @@ impl ClientInterface {
             return Ok("".to_string());
         }
 
-        let res = self
-            .client
-            .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                workflow_functions: functions,
-                workflow_resources: resources,
-                annotations: std::collections::HashMap::new(),
-            })
-            .await;
+        // Prepare the workflow creation request and save it to the Redis
+        // JSON-serialized in the following key:
+        // workflow:$wf_name:request
+        let req = edgeless_api::workflow_instance::SpawnWorkflowRequest {
+            workflow_functions: functions,
+            workflow_resources: resources,
+            annotations: std::collections::HashMap::new(),
+        };
+        if let Some(redis_client) = &mut self.redis_client {
+            redis_client.set(
+                format!("workflow:{}:request", wf_name).as_str(),
+                serde_json::to_string(&req).unwrap_or_default().as_str(),
+            );
+        }
+
+        // Request the creation of the workflow.
+        let res = self.client.start(req).await;
+
+        // Save the JSON-serialized response to Redis in the following key:
+        // workflow:$wf_name:response
         match res {
-            Ok(response) => match &response {
-                SpawnWorkflowResponse::ResponseError(err) => Err(anyhow!("{}", err)),
-                SpawnWorkflowResponse::WorkflowInstance(val) => Ok(val.workflow_id.workflow_id.to_string()),
-            },
+            Ok(response) => {
+                if let Some(redis_client) = &mut self.redis_client {
+                    redis_client.set(
+                        format!("workflow:{}:response", wf_name).as_str(),
+                        serde_json::to_string(&response).unwrap_or_default().as_str(),
+                    );
+                }
+                match &response {
+                    SpawnWorkflowResponse::ResponseError(err) => Err(anyhow!("{}", err)),
+                    SpawnWorkflowResponse::WorkflowInstance(val) => Ok(val.workflow_id.workflow_id.to_string()),
+                }
+            }
             Err(err) => {
                 panic!("error when stopping a workflow: {}", err);
             }
@@ -771,12 +814,16 @@ async fn main() -> anyhow::Result<()> {
     // Start the Redis dumper
     let mut redis_client =
         edgeless_benchmark::redis_dumper::RedisDumper::new(&args.redis_url, additional_fields.join(","), additional_header.join(","));
-    if redis_client.is_ok() {
-        log::info!("connected to Redis at {}", &args.redis_url);
-    }
+    let mut redis_client = match redis_client {
+        Ok(val) => Some(val),
+        Err(err) => {
+            log::error!("could not connect to Redis at {}: {}", &args.redis_url, err);
+            None
+        }
+    };
 
     // Create an e-ORC client
-    let mut client_interface = ClientInterface::new(&args.controller_url, wf_type, args.seed + 1000).await;
+    let mut client_interface = ClientInterface::new(&args.controller_url, wf_type, args.seed + 1000, redis_client).await;
 
     // event queue, the first event is always a new workflow arriving at time 0
     let mut events = BinaryHeap::new();
@@ -886,11 +933,7 @@ async fn main() -> anyhow::Result<()> {
     let _ = client_interface.stop_workflow(&single_trigger_workflow_id).await;
 
     // dump data collected in Redis
-    if let Ok(client) = &mut redis_client {
-        if let Err(err) = client.dump_csv(&args.output, args.append) {
-            log::error!("error dumping to {}: {}", args.output, err);
-        }
-    }
+    client_interface.dump(&args.output, args.append);
 
     // output metrics
     let blocking_probability = 1.0 - wf_started as f64 / wf_requested as f64;
