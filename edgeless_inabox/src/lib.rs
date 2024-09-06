@@ -16,20 +16,46 @@ pub fn edgeless_inabox_main(
 ) -> anyhow::Result<()> {
     let mut node_confs: Vec<edgeless_node::EdgelessNodeSettings> = Vec::new();
     for node_conf_file in in_a_box_config.node_conf_files {
-        node_confs.push(toml::from_str(&std::fs::read_to_string(node_conf_file)?)?);
+        if std::path::Path::new(&node_conf_file).exists() {
+            node_confs.push(toml::from_str(&std::fs::read_to_string(node_conf_file)?)?);
+        }
     }
-    let orc_conf: edgeless_orc::EdgelessOrcSettings = toml::from_str(&std::fs::read_to_string(in_a_box_config.orc_conf_file)?)?;
-    let bal_conf: edgeless_bal::EdgelessBalSettings = toml::from_str(&std::fs::read_to_string(in_a_box_config.bal_conf_file)?)?;
-    let con_conf: edgeless_con::EdgelessConSettings = toml::from_str(&std::fs::read_to_string(in_a_box_config.con_conf_file)?)?;
+    let orc_conf = if std::path::Path::new(&in_a_box_config.orc_conf_file).exists() {
+        Some(toml::from_str::<edgeless_orc::EdgelessOrcSettings>(&std::fs::read_to_string(
+            in_a_box_config.orc_conf_file,
+        )?)?)
+    } else {
+        None
+    };
+    let bal_conf = if std::path::Path::new(&in_a_box_config.bal_conf_file).exists() {
+        Some(toml::from_str::<edgeless_bal::EdgelessBalSettings>(&std::fs::read_to_string(
+            in_a_box_config.bal_conf_file,
+        )?)?)
+    } else {
+        None
+    };
+    let con_conf = if std::path::Path::new(&in_a_box_config.con_conf_file).exists() {
+        Some(toml::from_str::<edgeless_con::EdgelessConSettings>(&std::fs::read_to_string(
+            in_a_box_config.con_conf_file,
+        )?)?)
+    } else {
+        None
+    };
 
-    log::info!("Starting Edgeless In A Box");
+    log::info!("Starting EDGELESS-in-a-box");
 
     for node_conf in node_confs {
-        async_tasks.push(async_runtime.spawn(edgeless_node::edgeless_node_main(node_conf.clone())));
+        async_tasks.push(async_runtime.spawn(edgeless_node::edgeless_node_main(node_conf)));
     }
-    async_tasks.push(async_runtime.spawn(edgeless_bal::edgeless_bal_main(bal_conf.clone())));
-    async_tasks.push(async_runtime.spawn(edgeless_orc::edgeless_orc_main(orc_conf.clone())));
-    async_tasks.push(async_runtime.spawn(edgeless_con::edgeless_con_main(con_conf.clone())));
+    if let Some(bal_conf) = bal_conf {
+        async_tasks.push(async_runtime.spawn(edgeless_bal::edgeless_bal_main(bal_conf)));
+    }
+    if let Some(orc_conf) = orc_conf {
+        async_tasks.push(async_runtime.spawn(edgeless_orc::edgeless_orc_main(orc_conf)));
+    }
+    if let Some(con_conf) = con_conf {
+        async_tasks.push(async_runtime.spawn(edgeless_con::edgeless_con_main(con_conf)));
+    }
 
     Ok(())
 }
