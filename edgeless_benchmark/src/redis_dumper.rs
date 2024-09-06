@@ -27,6 +27,10 @@ impl RedisDumper {
         }
     }
 
+    pub fn set(&mut self, k: &str, v: &str) {
+        let _ = self.connection.set::<&str, &str, usize>(k, v);
+    }
+
     ///
     /// Dump the content from Redis to a CSV file.
     ///

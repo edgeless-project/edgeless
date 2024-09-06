@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 const WORKFLOW_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
 pub struct WorkflowId {
     pub workflow_id: uuid::Uuid,
 }
@@ -33,20 +33,20 @@ impl WorkflowId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct WorkflowFunctionMapping {
     pub name: String,
     pub function_id: crate::function_instance::ComponentId,
     pub domain_id: String,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct WorkflowInstance {
     pub workflow_id: WorkflowId,
     pub domain_mapping: Vec<WorkflowFunctionMapping>,
 }
 
-#[derive(Clone, Debug, serde::Deserialize, PartialEq)]
+#[derive(Clone, Debug, serde::Serialize, PartialEq)]
 pub struct WorkflowResource {
     pub name: String,
     pub class_type: String,
@@ -54,7 +54,7 @@ pub struct WorkflowResource {
     pub configurations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Clone, Debug, serde::Deserialize, PartialEq)]
+#[derive(Clone, Debug, serde::Serialize, PartialEq)]
 pub struct WorkflowFunction {
     pub name: String,
     pub function_class_specification: crate::function_instance::FunctionClassSpecification,
@@ -62,14 +62,14 @@ pub struct WorkflowFunction {
     pub annotations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub struct SpawnWorkflowRequest {
     pub workflow_functions: Vec<WorkflowFunction>,
     pub workflow_resources: Vec<WorkflowResource>,
     pub annotations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub enum SpawnWorkflowResponse {
     ResponseError(crate::common::ResponseError),
     WorkflowInstance(WorkflowInstance),
