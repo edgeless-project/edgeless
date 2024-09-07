@@ -27,6 +27,7 @@ edgeless_api = {path = "../edgeless_api", features = ["grpc_impl"]}
 edgeless_cli = {path = "../edgeless_cli"}
 edgeless_dataplane = { path = "../edgeless_dataplane" }
 edgeless_node = { path = "../edgeless_node" }
+edgeless_orc = { path = "../edgeless_orc" }
 edgeless_telemetry = { path = "../edgeless_telemetry" }
 clap = { version = "4.3", features=["derive"] }
 redis = "*"
