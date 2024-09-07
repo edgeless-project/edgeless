@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MIT
 use std::str::FromStr;
 
-use super::api;
-
 #[derive(Clone)]
 pub struct NodeManagementClient {
     client: crate::grpc_impl::api::node_management_client::NodeManagementClient<tonic::transport::Channel>,
