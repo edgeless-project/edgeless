@@ -86,10 +86,16 @@ impl Engine {
         }
     }
 
-    pub fn dump(&mut self, output: &str, append: bool) {
+    ///
+    /// Dump the content of the Redis file to a set of output CSV files.
+    ///
+    /// - `dataset_path`: the path where to save the files.
+    /// - `append`: if true append to the output files, if they exist already.
+    ///
+    pub fn dump(&mut self, dataset_path: &str, append: bool) {
         if let Some(redis_client) = &mut self.redis_client {
-            if let Err(err) = redis_client.dump_csv(output, append) {
-                log::error!("error dumping from Redis to file {}: {}", output, err);
+            if let Err(err) = redis_client.dump_csv(dataset_path, append) {
+                log::error!("error dumping from Redis: {}", err);
             }
         }
     }
