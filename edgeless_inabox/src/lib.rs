@@ -44,9 +44,6 @@ pub fn edgeless_inabox_main(
 
     log::info!("Starting EDGELESS-in-a-box");
 
-    for node_conf in node_confs {
-        async_tasks.push(async_runtime.spawn(edgeless_node::edgeless_node_main(node_conf)));
-    }
     if let Some(bal_conf) = bal_conf {
         async_tasks.push(async_runtime.spawn(edgeless_bal::edgeless_bal_main(bal_conf)));
     }
@@ -55,6 +52,10 @@ pub fn edgeless_inabox_main(
     }
     if let Some(con_conf) = con_conf {
         async_tasks.push(async_runtime.spawn(edgeless_con::edgeless_con_main(con_conf)));
+    }
+    std::thread::sleep(std::time::Duration::from_millis(500));
+    for node_conf in node_confs {
+        async_tasks.push(async_runtime.spawn(edgeless_node::edgeless_node_main(node_conf)));
     }
 
     Ok(())

@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 use redis::Commands;
+use std::io::Write;
+use std::mem;
 use std::str::FromStr;
 
 /// An orchestrator proxy that uses a Redis in-memory database to mirror
@@ -24,11 +26,35 @@ pub struct ProxyRedis {
     resource_provider_ids: std::collections::HashSet<String>,
     active_instance_uuids: std::collections::HashSet<uuid::Uuid>,
     dependency_uuids: std::collections::HashSet<uuid::Uuid>,
+
+    // copy of data structures dumped to files
+    mapping_to_instance_id: std::collections::HashMap<uuid::Uuid, Vec<edgeless_api::function_instance::InstanceId>>,
+    node_capabilities: std::collections::HashMap<uuid::Uuid, String>,
+    node_health_status: std::collections::HashMap<uuid::Uuid, String>,
+
+    // dataset dumping stuff
+    additional_fields: String,
+    health_status_file: Option<std::fs::File>,
+    capabilities_file: Option<std::fs::File>,
+    mapping_to_instance_id_file: Option<std::fs::File>,
+    performance_samples_file: Option<std::fs::File>,
 }
 
 impl ProxyRedis {
-    pub fn new(redis_url: &str, flushdb: bool) -> anyhow::Result<Self> {
-        log::info!("creating Redis orchestrator proxy at URL {}", redis_url);
+    ///
+    /// Create a Redis EDGELESS orchestrator proxy.
+    ///
+    /// Parameters:
+    /// - `redis_url`: the URL of the external Redis server.
+    /// - `flushdb`: if true, then the Redis database is flushed upon creation.
+    /// - `dataset_settings`: the settings to save samples to output files.
+    ///
+    pub fn new(redis_url: &str, flushdb: bool, dataset_settings: Option<crate::EdgelessOrcProxyDatasetSettings>) -> anyhow::Result<Self> {
+        log::info!(
+            "creating Redis orchestrator proxy at URL {} ({})",
+            redis_url,
+            if flushdb { "flush DB" } else { "do not flush DB" }
+        );
 
         // create the connection with the Redis server
         let mut connection = redis::Client::open(redis_url)?.get_connection()?;
@@ -38,13 +64,89 @@ impl ProxyRedis {
             let _ = redis::cmd("FLUSHDB").query(&mut connection)?;
         }
 
+        let additional_fields = match &dataset_settings {
+            Some(dataset_settings) => dataset_settings.additional_fields.clone(),
+            None => "".to_string(),
+        };
+
+        let (health_status_file, capabilities_file, mapping_to_instance_id_file, performance_samples_file) =
+            if let Some(dataset_settings) = dataset_settings {
+                if !dataset_settings.dataset_path.is_empty() {
+                    ProxyRedis::open_files(dataset_settings.dataset_path, dataset_settings.append, dataset_settings.additional_header)
+                } else {
+                    (None, None, None, None)
+                }
+            } else {
+                (None, None, None, None)
+            };
+
         Ok(Self {
             connection,
             node_uuids: std::collections::HashSet::new(),
             resource_provider_ids: std::collections::HashSet::new(),
             active_instance_uuids: std::collections::HashSet::new(),
             dependency_uuids: std::collections::HashSet::new(),
+            mapping_to_instance_id: std::collections::HashMap::new(),
+            node_capabilities: std::collections::HashMap::new(),
+            node_health_status: std::collections::HashMap::new(),
+            additional_fields,
+            health_status_file,
+            capabilities_file,
+            mapping_to_instance_id_file,
+            performance_samples_file,
         })
+    }
+
+    fn open_files(
+        dataset_path: String,
+        append: bool,
+        additional_header: String,
+    ) -> (Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>) {
+        let filenames = vec!["performance_samples", "mapping_to_instance_id", "capabilities", "health_status"];
+        let headers = vec![
+            "metric,identifier,value,timestamp".to_string(),
+            "timestamp,logical_id,node_id,physical_id".to_string(),
+            format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeCapabilities::csv_header()),
+            format!("timestamp,node_id,{}", edgeless_api::node_management::NodeHealthStatus::csv_header()),
+        ];
+        let mut outfiles = vec![];
+        for (filename, header) in filenames.iter().zip(headers.iter()) {
+            let filename = format!("{}{}.csv", dataset_path, filename);
+            match ProxyRedis::open_file(filename.as_str(), append, header, &additional_header) {
+                Ok(outfile) => outfiles.push(Some(outfile)),
+                Err(err) => {
+                    log::error!("could not open '{}' for writing: {}", filename, err);
+                    outfiles.push(None);
+                }
+            };
+        }
+        assert_eq!(4, outfiles.len());
+        (
+            outfiles.pop().unwrap(),
+            outfiles.pop().unwrap(),
+            outfiles.pop().unwrap(),
+            outfiles.pop().unwrap(),
+        )
+    }
+
+    fn open_file(filename: &str, append: bool, header: &str, additional_header: &str) -> anyhow::Result<std::fs::File> {
+        let write_header = !append
+            || match std::fs::metadata(filename) {
+                Ok(metadata) => metadata.len() == 0,
+                Err(_) => true,
+            };
+        let mut outfile = std::fs::OpenOptions::new()
+            .write(true)
+            .append(append)
+            .create(true)
+            .truncate(!append)
+            .open(filename)?;
+
+        if write_header {
+            writeln!(&mut outfile, "{},{}", additional_header, header)?;
+        }
+
+        Ok(outfile)
     }
 }
 
@@ -78,6 +180,11 @@ fn string_to_instance_id(val: &str) -> anyhow::Result<edgeless_api::function_ins
 }
 
 impl ProxyRedis {
+    fn timestamp_now() -> String {
+        let duration = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap();
+        format!("{}.{}", duration.as_secs(), duration.subsec_millis())
+    }
+
     fn fetch_instances(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, ActiveInstanceClone> {
         let mut instance_ids = vec![];
         for instance_key in self.connection.keys::<&str, Vec<String>>("instance:*").unwrap_or(vec![]) {
@@ -102,7 +209,10 @@ impl ProxyRedis {
 
 impl super::proxy::Proxy for ProxyRedis {
     fn update_nodes(&mut self, nodes: &std::collections::HashMap<uuid::Uuid, super::orchestrator::ClientDesc>) {
+        let timestamp = ProxyRedis::timestamp_now();
+
         // serialize the nodes' capabilities and health status to Redis
+        let mut new_node_capabilities = std::collections::HashMap::new();
         for (uuid, client_desc) in nodes {
             redis::pipe()
                 .set::<&str, &str>(
@@ -110,7 +220,24 @@ impl super::proxy::Proxy for ProxyRedis {
                     serde_json::to_string(&client_desc.capabilities).unwrap_or_default().as_str(),
                 )
                 .execute(&mut self.connection);
+            let new_caps = client_desc.capabilities.to_csv();
+            if let Some(outfile) = &mut self.capabilities_file {
+                let write: bool = if let Some(old_caps) = self.node_capabilities.get(uuid) {
+                    if *old_caps == new_caps {
+                        false
+                    } else {
+                        true
+                    }
+                } else {
+                    true
+                };
+                if write {
+                    let _ = writeln!(outfile, "{},{},{},{}", self.additional_fields, timestamp, uuid, new_caps);
+                }
+            }
+            new_node_capabilities.insert(uuid.clone(), new_caps);
         }
+        let _ = std::mem::replace(&mut self.node_capabilities, new_node_capabilities);
 
         // remove nodes that are not anymore in the orchestration domain
         let new_active_instance_uuids = nodes.keys().cloned().collect::<std::collections::HashSet<uuid::Uuid>>();
@@ -145,13 +272,44 @@ impl super::proxy::Proxy for ProxyRedis {
     }
 
     fn update_active_instances(&mut self, active_instances: &std::collections::HashMap<uuid::Uuid, super::orchestrator::ActiveInstance>) {
+        let timestamp = ProxyRedis::timestamp_now();
+
         // serialize the active instances
+        let mut new_mapping_to_instance_id = std::collections::HashMap::new();
         for (ext_fid, active_instance) in active_instances {
             let _ = self.connection.set::<&str, &str, usize>(
                 format!("instance:{}", ext_fid).as_str(),
                 serde_json::to_string(&active_instance).unwrap_or_default().as_str(),
             );
+            let new_instance_ids = active_instance.instance_ids();
+            if let Some(outfile) = &mut self.mapping_to_instance_id_file {
+                let write = if let Some(old_instance_ids) = self.mapping_to_instance_id.get(ext_fid) {
+                    if *old_instance_ids == new_instance_ids {
+                        false
+                    } else {
+                        true
+                    }
+                } else {
+                    true
+                };
+                if write {
+                    let _ = writeln!(
+                        outfile,
+                        "{},{},{},{}",
+                        self.additional_fields,
+                        timestamp,
+                        ext_fid,
+                        new_instance_ids
+                            .iter()
+                            .map(|x| format!("{},{}", x.node_id, x.function_id))
+                            .collect::<Vec<String>>()
+                            .join(",")
+                    );
+                }
+            }
+            new_mapping_to_instance_id.insert(ext_fid.clone(), new_instance_ids);
         }
+        let _ = std::mem::replace(&mut self.mapping_to_instance_id, new_mapping_to_instance_id);
 
         // remove instances that are not active anymore
         let new_node_uuids = active_instances.keys().cloned().collect::<std::collections::HashSet<uuid::Uuid>>();
@@ -183,26 +341,55 @@ impl super::proxy::Proxy for ProxyRedis {
     }
 
     fn push_keep_alive_responses(&mut self, keep_alive_responses: Vec<(uuid::Uuid, edgeless_api::node_management::KeepAliveResponse)>) {
-        let duration = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap();
-        let timestamp = format!("{}.{}", duration.as_secs(), duration.subsec_millis());
+        let timestamp = ProxyRedis::timestamp_now();
 
         // serialize the nodes' health status and performance samples to Redis
+        let mut new_node_health_status = std::collections::HashMap::new();
         for (uuid, keep_alive_response) in keep_alive_responses {
+            // Save health status.
             redis::pipe()
                 .set::<&str, &str>(
                     format!("node:health:{}", uuid).as_str(),
                     serde_json::to_string(&keep_alive_response.health_status).unwrap_or_default().as_str(),
                 )
                 .execute(&mut self.connection);
+            let new_health_status = keep_alive_response.health_status.to_csv();
+            if let Some(outfile) = &mut self.health_status_file {
+                let write = if let Some(old_health_status) = self.node_health_status.get(&uuid) {
+                    if *old_health_status == new_health_status {
+                        false
+                    } else {
+                        true
+                    }
+                } else {
+                    true
+                };
+                if write {
+                    let _ = writeln!(outfile, "{},{},{},{}", self.additional_fields, timestamp, &uuid, new_health_status);
+                }
+            }
+            new_node_health_status.insert(uuid.clone(), new_health_status);
+
+            // Save performance samples.
             for (function_id, values) in keep_alive_response.performance_samples.function_execution_times {
                 let key = format!("performance:function_execution_time:{}", function_id);
                 for value in values {
                     redis::pipe()
                         .rpush::<&str, &str>(&key, format!("{},{}", value, &timestamp).as_str())
                         .execute(&mut self.connection);
+
+                    // Save to dataset output.
+                    if let Some(outfile) = &mut self.performance_samples_file {
+                        let _ = writeln!(
+                            outfile,
+                            "{},function_execution_time,{},{},{}",
+                            self.additional_fields, function_id, value, &timestamp
+                        );
+                    }
                 }
             }
         }
+        let _ = std::mem::replace(&mut self.node_health_status, new_node_health_status);
     }
 
     fn add_deploy_intents(&mut self, intents: Vec<super::orchestrator::DeployIntent>) {
@@ -409,7 +596,7 @@ mod test {
     #[test]
     fn test_redis_proxy() {
         // Skip the test if there is no local Redis listening on default port.
-        let mut redis_proxy = match ProxyRedis::new("redis://localhost:6379", true) {
+        let mut redis_proxy = match ProxyRedis::new("redis://localhost:6379", true, None) {
             Ok(redis_proxy) => redis_proxy,
             Err(_) => {
                 println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
@@ -571,7 +758,7 @@ mod test {
         let redis_url = "redis://127.0.0.1:6379";
 
         // create the proxy, also flushing the db
-        let mut proxy = ProxyRedis::new(redis_url, true).unwrap();
+        let mut proxy = ProxyRedis::new(redis_url, true, None).unwrap();
 
         // fill intents
         let component1 = uuid::Uuid::new_v4();

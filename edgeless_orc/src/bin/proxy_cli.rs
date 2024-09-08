@@ -70,7 +70,7 @@ fn main() -> anyhow::Result<()> {
 
     anyhow::ensure!(args.proxy_type.to_lowercase() == "redis", "unknown proxy type: {}", args.proxy_type);
 
-    let mut proxy = match edgeless_orc::proxy_redis::ProxyRedis::new(&args.redis_url, false) {
+    let mut proxy = match edgeless_orc::proxy_redis::ProxyRedis::new(&args.redis_url, false, None) {
         Ok(proxy) => proxy,
         Err(err) => anyhow::bail!("could not connect to a Redis at {}: {}", args.redis_url, err),
     };
