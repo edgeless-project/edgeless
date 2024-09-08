@@ -51,7 +51,7 @@ struct Args {
     /// URL of the Redis server to use for metrics.
     #[arg(short, long, default_value_t = String::from("redis://127.0.0.1:6379/"))]
     redis_url: String,
-    /// Path where to save the output CSV datasets. If empty, do not save the.
+    /// Path where to save the output CSV datasets. If empty, do not save them.
     #[arg(long, default_value_t = String::from(""))]
     dataset_path: String,
     /// Append to the output dataset files.
@@ -118,8 +118,6 @@ fn to_seconds(us: u64) -> f64 {
 fn to_microseconds(s: f64) -> u64 {
     (s * MEGA as f64).round() as u64
 }
-
-async fn save_component_mapping() {}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

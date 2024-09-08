@@ -125,6 +125,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         proxy: edgeless_orc::EdgelessOrcProxySettings {
             proxy_type: "None".to_string(),
             redis_url: None,
+            dataset_settings: None,
         },
         collector: edgeless_orc::EdgelessOrcCollectorSettings {
             collector_type: "None".to_string(),
