@@ -1526,7 +1526,6 @@ dependencies = [
  "edgeless_cli",
  "edgeless_dataplane",
  "edgeless_node",
- "edgeless_orc",
  "edgeless_telemetry",
  "env_logger",
  "futures 0.3.30",
