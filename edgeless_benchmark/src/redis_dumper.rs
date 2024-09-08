@@ -31,55 +31,46 @@ impl RedisDumper {
         let _ = self.connection.set::<&str, &str, usize>(k, v);
     }
 
-    ///
-    /// Dump the content from Redis to a CSV file.
-    ///
-    /// # Example with Pandas
-    ///
-    /// ```ignore
-    /// >>> import pandas as pd
-    /// >>> df = pd.read_csv('out.csv')
-    /// >>> df[df["entity"] == "w"]["value"].mean()
-    /// 142.66666666666666
-    /// >>> df
-    ///      seed entity                                  name  value     timestamp
-    /// 0      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     32  1.718281e+09
-    /// 1      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     47  1.718281e+09
-    /// 2      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     31  1.718281e+09
-    /// 3      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     29  1.718281e+09
-    /// 4      42      f  9f651f74-f46c-46e4-aaa2-7aa25b437b98     31  1.718281e+09
-    /// ..    ...    ...                                   ...    ...           ...
-    /// 115    42      w                                   wf0    142  1.718281e+09
-    /// 116    42      w                                   wf0    142  1.718281e+09
-    /// 117    42      w                                   wf0    141  1.718281e+09
-    /// 118    42      w                                   wf0    134  1.718281e+09
-    /// 119    42      w                                   wf0    145  1.718281e+09
-    ///
-    /// [120 rows x 5 columns]
-    /// ```
-    pub fn dump_csv(&mut self, output: &str, append: bool) -> anyhow::Result<()> {
+    fn open_file(filename: &str, append: bool, additional_header: &str) -> anyhow::Result<std::fs::File> {
         let header = !append
-            || match std::fs::metadata(output) {
+            || match std::fs::metadata(filename) {
                 Ok(metadata) => metadata.len() == 0,
                 Err(_) => true,
             };
-        let mut f = std::fs::OpenOptions::new()
+        let mut outfile = std::fs::OpenOptions::new()
             .write(true)
             .append(append)
             .create(true)
             .truncate(!append)
-            .open(output)?;
+            .open(filename)?;
 
         if header {
-            writeln!(&mut f, "{},entity,name,value,timestamp", self.additional_header)?;
+            writeln!(&mut outfile, "{},entity,name,value,timestamp", additional_header)?;
         }
+
+        Ok(outfile)
+    }
+
+    ///
+    /// Dump the content from Redis to CSV files in `dataset_path`:
+    /// - application-metrics.csv
+    /// - performance_samples.csv
+    /// - capabilities.csv
+    ///
+    pub fn dump_csv(&mut self, dataset_path: &str, append: bool) -> anyhow::Result<()> {
+        // Application mettrics.
+        let mut outfile = RedisDumper::open_file(
+            format!("{}application_metrics.csv", dataset_path).as_str(),
+            append,
+            &self.additional_header,
+        )?;
 
         for key_in in self.connection.keys::<&str, Vec<String>>("*:*:samples")? {
             let tokens: Vec<&str> = key_in.split(':').collect();
             assert!(tokens.len() == 3);
             let key_out = &tokens[0][0..1].to_string();
             let id = tokens[1];
-            self.write_values(&mut f, &key_in, key_out, id)?;
+            self.write_values(&mut outfile, &key_in, key_out, id)?;
         }
 
         Ok(())

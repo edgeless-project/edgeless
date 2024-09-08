@@ -51,10 +51,10 @@ struct Args {
     /// URL of the Redis server to use for metrics.
     #[arg(short, long, default_value_t = String::from("redis://127.0.0.1:6379/"))]
     redis_url: String,
-    /// Name of the CSV output file where to save the application metrics collected, if not empty.
+    /// Path where to save the output CSV datasets. If empty, do not save the.
     #[arg(long, default_value_t = String::from(""))]
-    output: String,
-    /// Append to the output file.
+    dataset_path: String,
+    /// Append to the output dataset files.
     #[arg(long, default_value_t = false)]
     append: bool,
     /// Additional fields recorded in the CSV output file.
@@ -289,8 +289,8 @@ async fn main() -> anyhow::Result<()> {
     let _ = engine.stop_workflow(&single_trigger_workflow_id).await;
 
     // dump data collected in Redis
-    if !args.output.is_empty() {
-        engine.dump(&args.output, args.append);
+    if !args.dataset_path.is_empty() {
+        engine.dump(&args.dataset_path, args.append);
     }
 
     // output metrics
