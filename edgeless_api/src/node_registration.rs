@@ -65,6 +65,25 @@ impl NodeCapabilities {
     pub fn do_not_use(&self) -> bool {
         self.num_cpus * self.num_cores == 0
     }
+
+    pub fn csv_header() -> String {
+        "num_cpus,model_name_cpu,clock_freq_cpu,num_cores,mem_size,labels,is_tee_running,has_tpm,runtimes".to_string()
+    }
+
+    pub fn to_csv(&self) -> String {
+        format!(
+            "{},{},{},{},{},[{}],{},{},[{}]",
+            self.num_cpus,
+            self.model_name_cpu,
+            self.clock_freq_cpu,
+            self.num_cores,
+            self.mem_size,
+            self.labels.join(";"),
+            self.is_tee_running,
+            self.has_tpm,
+            self.runtimes.join(";"),
+        )
+    }
 }
 
 impl std::fmt::Display for NodeCapabilities {

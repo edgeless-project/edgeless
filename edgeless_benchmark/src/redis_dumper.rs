@@ -54,7 +54,6 @@ impl RedisDumper {
     ///
     /// Dump the content from Redis to CSV files in `dataset_path`:
     /// - application-metrics.csv
-    /// - performance_samples.csv
     /// - capabilities.csv
     ///
     pub fn dump_csv(&mut self, dataset_path: &str, append: bool) -> anyhow::Result<()> {

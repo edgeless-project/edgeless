@@ -62,6 +62,20 @@ pub struct EdgelessOrcProxySettings {
     pub proxy_type: String,
     /// If proxy_type is "Redis" then this is the URL of the Redis server.
     pub redis_url: Option<String>,
+    /// Settings on whether/how to save events to output files.
+    pub dataset_settings: Option<EdgelessOrcProxyDatasetSettings>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct EdgelessOrcProxyDatasetSettings {
+    /// Path where to save the output CSV datasets. If empty, do not save them.
+    dataset_path: String,
+    /// Append to the output dataset files.
+    append: bool,
+    /// Additional fields recorded in the CSV output file.
+    additional_fields: String,
+    /// Header of additional fields recorded in the CSV output file.
+    additional_header: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -86,7 +100,7 @@ pub enum OrchestrationStrategy {
 pub fn make_proxy(settings: EdgelessOrcProxySettings) -> Box<dyn proxy::Proxy> {
     match settings.proxy_type.to_lowercase().as_str() {
         "none" => {}
-        "redis" => match proxy_redis::ProxyRedis::new(&settings.redis_url.unwrap_or_default(), true) {
+        "redis" => match proxy_redis::ProxyRedis::new(&settings.redis_url.unwrap_or_default(), true, settings.dataset_settings) {
             Ok(proxy_redis) => return Box::new(proxy_redis),
             Err(err) => log::error!("error when connecting to Redis: {}", err),
         },
@@ -182,6 +196,12 @@ keep_alive_interval_secs = 2
 [proxy]
 proxy_type = "None"
 redis_url = ""
+
+[proxy.dataset_settings]
+dataset_path = ""
+append = true
+additional_fields = ""
+additional_header = ""
 
 [collector]
 collector_type = "None"

@@ -33,6 +33,37 @@ pub struct NodeHealthStatus {
     pub disk_free_space: i64,
 }
 
+impl NodeHealthStatus {
+    pub fn csv_header() -> String {
+        "cpu_usage,cpu_load,mem_free,mem_used,mem_total,mem_available,proc_cpu_usage,proc_memory,proc_vmemory,load_avg_1,load_avg_5,load_avg_15,tot_rx_bytes,tot_rx_pkts,tot_rx_errs,tot_tx_bytes,tot_tx_pkts,tot_tx_errs,disk_tot_space,disk_free_space".to_string()
+    }
+    pub fn to_csv(&self) -> String {
+        format!(
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            self.cpu_usage,
+            self.cpu_load,
+            self.mem_free,
+            self.mem_used,
+            self.mem_total,
+            self.mem_available,
+            self.proc_cpu_usage,
+            self.proc_memory,
+            self.proc_vmemory,
+            self.load_avg_1,
+            self.load_avg_5,
+            self.load_avg_15,
+            self.tot_rx_bytes,
+            self.tot_rx_pkts,
+            self.tot_rx_errs,
+            self.tot_tx_bytes,
+            self.tot_tx_pkts,
+            self.tot_tx_errs,
+            self.disk_tot_space,
+            self.disk_free_space,
+        )
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodePerformanceSamples {
     pub function_execution_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<f64>>,

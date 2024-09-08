@@ -240,6 +240,15 @@ pub enum ActiveInstance {
     ),
 }
 
+impl ActiveInstance {
+    pub fn instance_ids(&self) -> Vec<edgeless_api::function_instance::InstanceId> {
+        match self {
+            ActiveInstance::Function(_, ids) => ids.clone(),
+            ActiveInstance::Resource(_, id) => vec![id.clone()],
+        }
+    }
+}
+
 impl Serialize for ActiveInstance {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
