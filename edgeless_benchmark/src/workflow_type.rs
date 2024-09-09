@@ -5,9 +5,14 @@ use anyhow::anyhow;
 
 pub enum WorkflowType {
     None,
+
+    // A single function.
     // 0: function.json path
     // 1: function.wasm path
     Single(String, String),
+
+    // A chain of functions, each performing the multiplication of two matrices
+    // of 32-bit floating point random numbers at each invocation.
     // 0: min chain length
     // 1: max chain length
     // 2: min matrix size
@@ -18,12 +23,21 @@ pub enum WorkflowType {
     //    transaction
     // 5: matrix_mul.wasm path
     MatrixMulChain(u32, u32, u32, u32, u32, String),
+
+    // A chain of functions, each performing the multiplication of an internal
+    // random matrix of 32-bit floating point numbers by the input vector
+    // received from the caller.
     // 0: min chain length
     // 1: max chain length
     // 2: min input size
     // 3: max input size
     // 4: vector_mul.wasm path
     VectorMulChain(u32, u32, u32, u32, String),
+
+    // A workflow consisting of a random number of stages, where each stage
+    // is composed of a random number of processing blocks. Before going to the
+    // next stage, the output from all the processing blocks in the stage before
+    // must be received.
     // 0:  min interval between consecutive transactions, in ms
     // 1:  max interval between consecutive transactions, in ms
     // 2:  min input vector size
