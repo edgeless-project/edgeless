@@ -323,19 +323,27 @@ impl Agent {
                         tot_tx_pkts += network.total_transmitted() as i64;
                         tot_tx_errs += network.total_errors_on_transmitted() as i64;
                     }
+                    let mut disk_tot_reads = 0;
+                    let mut disk_tot_writes = 0;
+                    for (_, process) in sys.processes() {
+                        let disk_usage = process.disk_usage();
+                        disk_tot_reads += disk_usage.total_read_bytes as i64;
+                        disk_tot_writes += disk_usage.total_written_bytes as i64;
+                    }
+                    let num_cpus = std::cmp::min(1, sys.cpus().len()) as f32;
                     let health_status = edgeless_api::node_management::NodeHealthStatus {
-                        cpu_usage: sys.global_cpu_usage() as i32,
+                        cpu_usage: (sys.global_cpu_usage() / num_cpus) as i32,
                         cpu_load: sys.cpus().iter().map(|x| x.cpu_usage() / 100_f32).sum::<f32>() as i32,
                         mem_free: to_kb(sys.free_memory()),
                         mem_used: to_kb(sys.used_memory()),
                         mem_total: to_kb(sys.total_memory()),
                         mem_available: to_kb(sys.available_memory()),
-                        proc_cpu_usage: proc.cpu_usage() as i32,
+                        proc_cpu_usage: (proc.cpu_usage() / num_cpus) as i32,
                         proc_memory: to_kb(proc.memory()),
                         proc_vmemory: to_kb(proc.virtual_memory()),
-                        load_avg_1: load_avg.one as i32,
-                        load_avg_5: load_avg.five as i32,
-                        load_avg_15: load_avg.fifteen as i32,
+                        load_avg_1: (load_avg.one / num_cpus as f64) as i32,
+                        load_avg_5: (load_avg.five / num_cpus as f64) as i32,
+                        load_avg_15: (load_avg.fifteen / num_cpus as f64) as i32,
                         tot_rx_bytes,
                         tot_rx_pkts,
                         tot_rx_errs,
@@ -344,6 +352,8 @@ impl Agent {
                         tot_tx_errs,
                         disk_tot_space: disks.iter().map(|x| x.available_space() as i64).sum::<i64>(),
                         disk_free_space: disks.iter().map(|x| x.available_space() as i64).sum::<i64>(),
+                        disk_tot_reads,
+                        disk_tot_writes,
                     };
                     let performance_samples = edgeless_api::node_management::NodePerformanceSamples {
                         function_execution_times: telemetry_performance_target.get_metrics().function_execution_times,
