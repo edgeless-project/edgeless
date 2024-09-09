@@ -720,6 +720,8 @@ mod test {
             tot_tx_errs: 18,
             disk_tot_space: 19,
             disk_free_space: 20,
+            disk_tot_reads: 21,
+            disk_tot_writes: 22,
         };
         let samples_1: Vec<f64> = vec![100.0, 101.0, 102.0, 103.0];
         let samples_2: Vec<f64> = vec![200.0, 201.0];

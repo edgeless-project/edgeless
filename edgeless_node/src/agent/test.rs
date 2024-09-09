@@ -89,6 +89,16 @@ fn test_sysinfo() {
         println!("available disk space {} B", disks.iter().map(|x| x.available_space()).sum::<u64>());
         println!("total     disk space {} B", disks.iter().map(|x| x.total_space()).sum::<u64>());
 
+        let mut tot_disk_reads = 0;
+        let mut tot_disk_writes = 0;
+        for (_, process) in sys.processes() {
+            let disk_usage = process.disk_usage();
+            tot_disk_reads += disk_usage.total_read_bytes;
+            tot_disk_writes += disk_usage.total_written_bytes;
+        }
+        println!("total reads from disk {} B", tot_disk_reads);
+        println!("total writes to disk {} B", tot_disk_writes);
+
         std::thread::sleep(std::cmp::max(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL, std::time::Duration::from_secs(2)));
     }
 }

@@ -31,15 +31,17 @@ pub struct NodeHealthStatus {
     pub tot_tx_errs: i64,
     pub disk_tot_space: i64,
     pub disk_free_space: i64,
+    pub disk_tot_reads: i64,
+    pub disk_tot_writes: i64,
 }
 
 impl NodeHealthStatus {
     pub fn csv_header() -> String {
-        "cpu_usage,cpu_load,mem_free,mem_used,mem_total,mem_available,proc_cpu_usage,proc_memory,proc_vmemory,load_avg_1,load_avg_5,load_avg_15,tot_rx_bytes,tot_rx_pkts,tot_rx_errs,tot_tx_bytes,tot_tx_pkts,tot_tx_errs,disk_tot_space,disk_free_space".to_string()
+        "cpu_usage,cpu_load,mem_free,mem_used,mem_total,mem_available,proc_cpu_usage,proc_memory,proc_vmemory,load_avg_1,load_avg_5,load_avg_15,tot_rx_bytes,tot_rx_pkts,tot_rx_errs,tot_tx_bytes,tot_tx_pkts,tot_tx_errs,disk_tot_space,disk_free_space,disk_tot_reads,disk_tot_writes".to_string()
     }
     pub fn to_csv(&self) -> String {
         format!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             self.cpu_usage,
             self.cpu_load,
             self.mem_free,
@@ -60,6 +62,8 @@ impl NodeHealthStatus {
             self.tot_tx_errs,
             self.disk_tot_space,
             self.disk_free_space,
+            self.disk_tot_reads,
+            self.disk_tot_writes
         )
     }
 }
@@ -87,7 +91,7 @@ impl std::fmt::Display for NodeHealthStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "global cpu usage {:.1}%, load {}, memory free {} kb, used {} kb, total {} kb, available {} kb, process cpu usage {:.1}%, memory {} kb, vmemory {} kb, load avg 1 minute {}% 5 minutes {}% 15 minutes {}%, network tot rx {} bytes ({} pkts) {} errs, tot tx {} bytes ({} pkts) {} errs, disk tot {} bytes vs. available {} bytes",
+            "global cpu usage {:.1}%, load {}, memory free {} kb, used {} kb, total {} kb, available {} kb, process cpu usage {:.1}%, memory {} kb, vmemory {} kb, load avg 1 minute {}% 5 minutes {}% 15 minutes {}%, network tot rx {} bytes ({} pkts) {} errs, tot tx {} bytes ({} pkts) {} errs, disk tot {} bytes vs. available {} bytes, tot disk reads {} writes {}",
             self.cpu_usage,
             self.cpu_load,
             self.mem_free,
@@ -108,6 +112,8 @@ impl std::fmt::Display for NodeHealthStatus {
             self.tot_tx_errs,
             self.disk_tot_space,
             self.disk_free_space,
+            self.disk_tot_reads,
+            self.disk_tot_writes
         )
     }
 }
@@ -135,6 +141,8 @@ impl NodeHealthStatus {
             tot_tx_errs: 0,
             disk_tot_space: 0,
             disk_free_space: 0,
+            disk_tot_reads: 0,
+            disk_tot_writes: 0,
         }
     }
 
@@ -160,6 +168,8 @@ impl NodeHealthStatus {
             tot_tx_errs: -1,
             disk_tot_space: -1,
             disk_free_space: -1,
+            disk_tot_reads: -1,
+            disk_tot_writes: -1,
         }
     }
 }
