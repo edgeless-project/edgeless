@@ -350,7 +350,7 @@ impl Agent {
                         tot_tx_bytes,
                         tot_tx_pkts,
                         tot_tx_errs,
-                        disk_tot_space: disks.iter().map(|x| x.available_space() as i64).sum::<i64>(),
+                        disk_tot_space: disks.iter().map(|x| x.total_space() as i64).sum::<i64>(),
                         disk_free_space: disks.iter().map(|x| x.available_space() as i64).sum::<i64>(),
                         disk_tot_reads,
                         disk_tot_writes,
