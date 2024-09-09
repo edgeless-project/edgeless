@@ -204,6 +204,10 @@ message NodeHealthStatus {
     int64 disk_tot_space  = 70;
     // Available disk space, in bytes.
     int64 disk_free_space = 71;
+    // Total disk reads, in bytes.
+    int64 disk_tot_reads  = 72;
+    // Total disk writes, in bytes.
+    int64 disk_tot_writes = 73;
 }
 
 // Node performance samples.

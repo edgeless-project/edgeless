@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT
 use std::str::FromStr;
 
+use super::api;
+
 #[derive(Clone)]
 pub struct NodeManagementClient {
     client: crate::grpc_impl::api::node_management_client::NodeManagementClient<tonic::transport::Channel>,
@@ -135,6 +137,8 @@ pub fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealth
         tot_tx_errs: api_instance.tot_tx_errs,
         disk_tot_space: api_instance.disk_tot_space,
         disk_free_space: api_instance.disk_free_space,
+        disk_tot_reads: api_instance.disk_tot_reads,
+        disk_tot_writes: api_instance.disk_tot_writes,
     })
 }
 
@@ -218,6 +222,8 @@ fn serialize_node_health_status(req: &crate::node_management::NodeHealthStatus) 
         tot_tx_errs: req.tot_tx_errs,
         disk_tot_space: req.disk_tot_space,
         disk_free_space: req.disk_free_space,
+        disk_tot_reads: req.disk_tot_reads,
+        disk_tot_writes: req.disk_tot_writes,
     }
 }
 
@@ -294,6 +300,8 @@ mod test {
                     tot_tx_errs: 18,
                     disk_tot_space: 19,
                     disk_free_space: 20,
+                    disk_tot_reads: 21,
+                    disk_tot_writes: 22,
                 },
                 performance_samples: NodePerformanceSamples {
                     function_execution_times: std::collections::HashMap::from([
