@@ -333,7 +333,7 @@ impl Agent {
                     let num_cpus = std::cmp::min(1, sys.cpus().len()) as f32;
                     let health_status = edgeless_api::node_management::NodeHealthStatus {
                         cpu_usage: (sys.global_cpu_usage() / num_cpus) as i32,
-                        cpu_load: sys.cpus().iter().map(|x| x.cpu_usage() / 100_f32).sum::<f32>() as i32,
+                        cpu_load: sys.cpus().iter().map(|x| x.cpu_usage()).sum::<f32>() as i32,
                         mem_free: to_kb(sys.free_memory()),
                         mem_used: to_kb(sys.used_memory()),
                         mem_total: to_kb(sys.total_memory()),
@@ -341,9 +341,9 @@ impl Agent {
                         proc_cpu_usage: (proc.cpu_usage() / num_cpus) as i32,
                         proc_memory: to_kb(proc.memory()),
                         proc_vmemory: to_kb(proc.virtual_memory()),
-                        load_avg_1: (load_avg.one / num_cpus as f64) as i32,
-                        load_avg_5: (load_avg.five / num_cpus as f64) as i32,
-                        load_avg_15: (load_avg.fifteen / num_cpus as f64) as i32,
+                        load_avg_1: (load_avg.one * 100_f64 / num_cpus as f64) as i32,
+                        load_avg_5: (load_avg.five * 100_f64 / num_cpus as f64) as i32,
+                        load_avg_15: (load_avg.fifteen * 100_f64 / num_cpus as f64) as i32,
                         tot_rx_bytes,
                         tot_rx_pkts,
                         tot_rx_errs,
