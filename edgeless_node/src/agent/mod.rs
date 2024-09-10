@@ -330,7 +330,7 @@ impl Agent {
                         disk_tot_reads += disk_usage.total_read_bytes as i64;
                         disk_tot_writes += disk_usage.total_written_bytes as i64;
                     }
-                    let num_cpus = std::cmp::min(1, sys.cpus().len()) as f32;
+                    let num_cpus = std::cmp::max(1, sys.cpus().len()) as f32;
                     let health_status = edgeless_api::node_management::NodeHealthStatus {
                         cpu_usage: (sys.global_cpu_usage() / num_cpus) as i32,
                         cpu_load: sys.cpus().iter().map(|x| x.cpu_usage()).sum::<f32>() as i32,
