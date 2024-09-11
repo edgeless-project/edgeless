@@ -205,9 +205,10 @@ message HealthStatus {
 // Message to request the update of a function instance.
 message PatchRequest {
     // The function instance identifier.
-    string function_id = 1;
+    InstanceId function_id = 1;
     // Mapping of the outputs to concrete function/resource instances.
     map<string, InstanceOutput> output_mapping = 3;
+    map<string, InstanceOutput> input_mapping = 4;
 }
 
 message Target {

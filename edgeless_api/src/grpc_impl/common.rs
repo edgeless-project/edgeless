@@ -120,7 +120,7 @@ impl CommonConverters {
 
     pub fn parse_patch_request(api_update: &crate::grpc_impl::api::PatchRequest) -> anyhow::Result<crate::common::PatchRequest> {
         Ok(crate::common::PatchRequest {
-            function_id: uuid::Uuid::parse_str(&api_update.function_id)?,
+            function_id: super::common::CommonConverters::parse_instance_id(api_update.function_id.as_ref().unwrap())?,
             output_mapping: api_update
                 .output_mapping
                 .iter()
@@ -129,7 +129,7 @@ impl CommonConverters {
                     Err(_) => None,
                 })
                 .collect(),
-            input_mapping: todo!(),
+            input_mapping: std::collections::HashMap::new(),
         })
     }
 
@@ -170,12 +170,13 @@ impl CommonConverters {
 
     pub fn serialize_patch_request(crate_update: &crate::common::PatchRequest) -> crate::grpc_impl::api::PatchRequest {
         crate::grpc_impl::api::PatchRequest {
-            function_id: crate_update.function_id.to_string(),
+            function_id: Some(super::common::CommonConverters::serialize_instance_id(&crate_update.function_id)),
             output_mapping: crate_update
                 .output_mapping
                 .iter()
                 .map(|(key, value)| (key.clone(), Self::serialize_output(value)))
                 .collect(),
+            input_mapping: std::collections::HashMap::new(),
         }
     }
 

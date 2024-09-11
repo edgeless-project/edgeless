@@ -7,11 +7,11 @@ use futures::FutureExt;
 pub mod agent;
 pub mod function_instance;
 pub mod invocation;
+pub mod link;
 pub mod node_management;
 pub mod node_registration;
 pub mod orchestration;
 pub mod resource_configuration;
-pub mod link;
 
 #[derive(Clone)]
 pub struct CoapClient {

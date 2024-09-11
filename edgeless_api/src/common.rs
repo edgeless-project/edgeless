@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use edgeless_api_core::instance_id::{ComponentId, InstanceId};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResponseError {
@@ -17,9 +16,9 @@ pub enum StartComponentResponse<InstanceIdType> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Output {
-    Single(InstanceId, crate::function_instance::PortId),
-    Any(Vec<(InstanceId, crate::function_instance::PortId)>),
-    All(Vec<(InstanceId, crate::function_instance::PortId)>),
+    Single(edgeless_api_core::instance_id::InstanceId, crate::function_instance::PortId),
+    Any(Vec<(edgeless_api_core::instance_id::InstanceId, crate::function_instance::PortId)>),
+    All(Vec<(edgeless_api_core::instance_id::InstanceId, crate::function_instance::PortId)>),
     Link(crate::link::LinkInstanceId),
 }
 
@@ -30,7 +29,7 @@ pub enum Input {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatchRequest {
-    pub function_id: ComponentId,
+    pub function_id: edgeless_api_core::instance_id::InstanceId,
     pub output_mapping: std::collections::HashMap<String, Output>,
     pub input_mapping: std::collections::HashMap<String, Input>,
 }

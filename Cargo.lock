@@ -1757,6 +1757,7 @@ dependencies = [
  "env_logger",
  "futures 0.3.30",
  "log",
+ "rand",
  "serde",
  "tokio 1.39.1",
  "toml 0.7.8",
@@ -1895,7 +1896,6 @@ dependencies = [
  "edgeless_con",
  "edgeless_dataplane",
  "edgeless_node",
- "edgeless_orc",
  "env_logger",
  "futures 0.3.30",
  "log",
@@ -1945,30 +1945,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "edgeless_orc"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "clap",
- "edgeless_api",
- "edgeless_dataplane",
- "edgeless_node",
- "env_logger",
- "futures 0.3.30",
- "itertools 0.13.0",
- "log",
- "rand",
- "redis",
- "serde",
- "serde_json",
- "serial_test",
- "tokio 1.39.1",
- "toml 0.7.8",
- "uuid",
-]
-
-[[package]]
 name = "edgeless_systemtests"
 version = "0.1.0"
 dependencies = [
@@ -1980,7 +1956,6 @@ dependencies = [
  "edgeless_con",
  "edgeless_dataplane",
  "edgeless_node",
- "edgeless_orc",
  "env_logger",
  "futures 0.3.30",
  "log",
@@ -4139,15 +4114,6 @@ name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
-dependencies = [
- "either",
-]
-
-[[package]]
-name = "itertools"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]

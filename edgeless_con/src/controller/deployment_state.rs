@@ -20,11 +20,11 @@ pub struct ActiveComponent {
     // Name of the function/resource within the workflow.
     pub name: String,
 
-    // Name of the domain that manages the lifecycle of this function/resource.
-    pub domain_id: String,
+    // // Name of the domain that manages the lifecycle of this function/resource.
+    // pub domain_id: String,
 
     // Identifier returned by the e-ORC.
-    pub fid: edgeless_api::function_instance::ComponentId,
+    pub fid: edgeless_api::function_instance::InstanceId,
 }
 
 pub enum LogicalOutput {
@@ -34,7 +34,7 @@ pub enum LogicalOutput {
 }
 
 impl ActiveWorkflow {
-    pub fn mapped_fids(&self, component_name: &str) -> Option<Vec<edgeless_api::function_instance::ComponentId>> {
+    pub fn mapped_fids(&self, component_name: &str) -> Option<Vec<edgeless_api::function_instance::InstanceId>> {
         let comp = self.domain_mapping.get(component_name)?;
         Some(vec![comp.fid])
     }
@@ -114,7 +114,7 @@ impl ActiveWorkflow {
             .iter()
             .map(|(name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
                 name: name.clone(),
-                domain_id: component.domain_id.clone(),
+                domain_id: component.fid.node_id.clone().to_string(),
             })
             .collect()
     }
@@ -360,13 +360,51 @@ impl ActiveWorkflow {
 
         std::collections::HashMap::new()
     }
+
+    pub fn inputs_for(&self, component_name: &str) -> std::collections::HashSet<String> {
+        let mut inputing_functions = std::collections::HashSet::<String>::new();
+
+        'each_fn: for f in &self.desired_state.workflow_functions {
+            for (_, output) in &f.output_mapping {
+                match output {
+                    edgeless_api::workflow_instance::PortMapping::DirectTarget(target, _) => {
+                        if target == component_name {
+                            inputing_functions.insert(f.name.clone());
+                            continue 'each_fn;
+                        }
+                    }
+                    edgeless_api::workflow_instance::PortMapping::AnyOfTargets(targets) => {
+                        for (target_actor, _) in targets {
+                            if target_actor == component_name {
+                                inputing_functions.insert(f.name.clone());
+                                continue 'each_fn;
+                            }
+                        }
+                    }
+                    edgeless_api::workflow_instance::PortMapping::AllOfTargets(targets) => {
+                        for (target_actor, _) in targets {
+                            if target_actor == component_name {
+                                inputing_functions.insert(f.name.clone());
+                                continue 'each_fn;
+                            }
+                        }
+                    }
+                    edgeless_api::workflow_instance::PortMapping::Topic(_) => {
+                        log::info!("Unused Topic!");
+                    }
+                }
+            }
+        }
+
+        inputing_functions
+    }
 }
 
 impl std::fmt::Display for ActiveComponent {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.component_type {
-            super::ComponentType::Function => write!(f, "function name {}, domain {}, fid {}", self.name, self.domain_id, self.fid),
-            super::ComponentType::Resource => write!(f, "resource name {}, domain {}, fid {}", self.name, self.domain_id, self.fid),
+            super::ComponentType::Function => write!(f, "function name {}, fid {}", self.name, self.fid),
+            super::ComponentType::Resource => write!(f, "resource name {}, fid {}", self.name, self.fid),
         }
     }
 }

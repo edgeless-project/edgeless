@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use edgeless_api::function_instance::{ComponentId, InstanceId};
+use edgeless_api::function_instance::InstanceId;
 use http_body_util::BodyExt;
 use std::str::FromStr;
 
@@ -12,7 +12,7 @@ struct ResourceDesc {
 
 struct IngressState {
     interests: Vec<HTTPIngressInterest>,
-    active_resources: std::collections::HashMap<ComponentId, ResourceDesc>,
+    active_resources: std::collections::HashMap<InstanceId, ResourceDesc>,
     dataplane: edgeless_dataplane::handle::DataplaneHandle,
 }
 
@@ -178,7 +178,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             // Assign a new component identifier to the newly-created  resource.
             let resource_id = edgeless_api::function_instance::InstanceId::new(self.own_node_id.clone());
             lck.active_resources.insert(
-                resource_id.function_id.clone(),
+                resource_id.clone(),
                 ResourceDesc {
                     host: host.clone(),
                     allow: methods
@@ -227,10 +227,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
         if let edgeless_api::common::Output::Single(target, port_id) = target {
             lck.interests.push(HTTPIngressInterest {
-                resource_id: InstanceId {
-                    node_id: self.own_node_id.clone(),
-                    function_id: update.function_id.clone(),
-                },
+                resource_id: update.function_id.clone(),
                 host,
                 allow,
                 target,

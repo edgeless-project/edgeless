@@ -25,6 +25,11 @@ pub(crate) enum ControllerRequest {
         // Reply Channel
         tokio::sync::oneshot::Sender<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>,
     ),
+    UPDATENODE(
+        edgeless_api::node_registration::UpdateNodeRequest,
+        // Reply Channel
+        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>,
+    ),
 }
 
 #[derive(Clone)]

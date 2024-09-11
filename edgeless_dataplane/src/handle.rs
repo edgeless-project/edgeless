@@ -355,7 +355,7 @@ impl LinkManager {
     fn new() -> Self {
         LinkManager {
             link_providers: std::collections::HashMap::new(),
-            links: std::collections::HashMap::new()
+            links: std::collections::HashMap::new(),
         }
     }
 }
@@ -383,7 +383,10 @@ impl DataplaneProvider {
         }
 
         let mut lm = LinkManager::new();
-        lm.link_providers.insert(edgeless_api::link::LinkProviderId(uuid::Uuid::new_v4()), Box::new(crate::multicast_link::MulticastProvider::new()));
+        lm.link_providers.insert(
+            edgeless_api::link::LinkProviderId(uuid::Uuid::new_v4()),
+            Box::new(crate::multicast_link::MulticastProvider::new()),
+        );
 
         Self {
             local_provider: std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalLinkProvider::new())),
@@ -426,12 +429,13 @@ impl DataplaneProvider {
     }
 }
 
-
-
 #[async_trait::async_trait]
 impl edgeless_api::link::LinkManager for DataplaneProvider {
-
-    async fn register_reader(&mut self, link_id: &edgeless_api::link::LinkInstanceId, reader: Box<dyn edgeless_api::link::LinkWriter>) -> anyhow::Result<()> {
+    async fn register_reader(
+        &mut self,
+        link_id: &edgeless_api::link::LinkInstanceId,
+        reader: Box<dyn edgeless_api::link::LinkWriter>,
+    ) -> anyhow::Result<()> {
         if let Some(link) = self.link_manager.lock().await.links.get_mut(link_id) {
             link.register_reader(reader).await.unwrap();
             return Ok(());

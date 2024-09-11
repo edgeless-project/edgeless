@@ -27,7 +27,7 @@ edgeless_api = {path = "../edgeless_api" }
 edgeless_dataplane = {path = "../edgeless_dataplane"  }
 edgeless_bal = {path = "../edgeless_bal" }
 edgeless_con = {path = "../edgeless_con" }
-edgeless_orc = {path = "../edgeless_orc" }
+#edgeless_orc = {path = "../edgeless_orc" }
 edgeless_node = {path = "../edgeless_node" }
 redis = "*"
 serial_test = { version = "3" }

@@ -74,12 +74,12 @@ impl Agent {
         let mut resource_providers = resources;
         // key: fid
         // value: provider_id
-        let mut resource_instances = std::collections::HashMap::<edgeless_api::function_instance::ComponentId, String>::new();
+        let mut resource_instances = std::collections::HashMap::<edgeless_api::function_instance::InstanceId, String>::new();
 
         // After spawning a new function, the function´s class is only used to determine which runner to start it on.
         // When stopping, only the stop_function_id is provided which does not allow to know which runner it is
         // currently deployed on. Here, we implement a instance_id -> function_class HashMap
-        let mut component_id_to_class_map = std::collections::HashMap::<edgeless_api::function_instance::ComponentId, String>::new();
+        let mut component_id_to_class_map = std::collections::HashMap::<edgeless_api::function_instance::InstanceId, String>::new();
 
         // Internal data structures to query system/process information.
         let mut sys = sysinfo::System::new();
@@ -97,10 +97,7 @@ impl Agent {
                         log::error!("No instance_id provided for SpawnFunctionRequest!");
                         continue;
                     }
-                    component_id_to_class_map.insert(
-                        spawn_req.instance_id.clone().unwrap().function_id,
-                        spawn_req.code.function_class_type.clone(),
-                    );
+                    component_id_to_class_map.insert(spawn_req.instance_id.clone().unwrap(), spawn_req.code.function_class_type.clone());
 
                     // Get runner for function_class of spawn_req
                     match runners.get_mut(&spawn_req.code.function_class_type) {
@@ -124,7 +121,7 @@ impl Agent {
                     log::debug!("Agent Stop {:?}", stop_function_id);
 
                     // Get function class by looking it up in the instanceId->functionClass map
-                    let function_class: String = match component_id_to_class_map.get(&stop_function_id.function_id) {
+                    let function_class: String = match component_id_to_class_map.get(&stop_function_id) {
                         Some(v) => v.clone(),
                         None => {
                             log::error!("Could not find function_class for instanceId {}", stop_function_id);
@@ -139,7 +136,7 @@ impl Agent {
                             match r.stop(stop_function_id).await {
                                 Ok(_) => {
                                     // Successfully stopped - now delete the component_id -> function_class mapping
-                                    component_id_to_class_map.remove(&stop_function_id.function_id);
+                                    component_id_to_class_map.remove(&stop_function_id);
                                     log::info!("Stopped function {} and cleared memory.", stop_function_id);
                                 }
                                 Err(err) => {
@@ -219,7 +216,7 @@ impl Agent {
                                 id.node_id,
                                 id.function_id
                             );
-                            resource_instances.insert(id.function_id.clone(), provider_id.clone());
+                            resource_instances.insert(id.clone(), provider_id.clone());
                             responder
                                 .send(Ok(edgeless_api::common::StartComponentResponse::InstanceId(id)))
                                 .unwrap_or_else(|_| log::warn!("Responder Send Error"));
@@ -238,7 +235,7 @@ impl Agent {
                     }
                 }
                 AgentRequest::StopResource(resource_id, responder) => {
-                    if let Some(provider_id) = resource_instances.get(&resource_id.function_id) {
+                    if let Some(provider_id) = resource_instances.get(&resource_id) {
                         if let Some(resource_desc) = resource_providers.get_mut(provider_id) {
                             log::info!(
                                 "Stopped resource class_type {}, provider_id {} node_id {}, fid {}",
@@ -313,12 +310,16 @@ impl Agent {
                         proc_vmemory: to_kb(proc.virtual_memory()),
                     };
                     responder.send(Ok(health_status)).unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                },
+                }
                 AgentRequest::CreateLink(req) => {
-                    edgeless_api::link::LinkInstanceAPI::create(&mut data_plane_provider, req).await.unwrap_or_else(|_| log::warn!("Unreported error while creating a link"));
-                },
+                    edgeless_api::link::LinkInstanceAPI::create(&mut data_plane_provider, req)
+                        .await
+                        .unwrap_or_else(|_| log::warn!("Unreported error while creating a link"));
+                }
                 AgentRequest::RemoveLink(id) => {
-                    edgeless_api::link::LinkInstanceAPI::remove(&mut data_plane_provider, id).await.unwrap_or_else(|_| log::warn!("Unreported error while removing a link"));
+                    edgeless_api::link::LinkInstanceAPI::remove(&mut data_plane_provider, id)
+                        .await
+                        .unwrap_or_else(|_| log::warn!("Unreported error while removing a link"));
                 }
             }
         }
@@ -332,7 +333,7 @@ impl Agent {
             }),
             node_management_client: Box::new(NodeManagementClient { sender: self.sender.clone() }),
             resource_configuration_client: Box::new(ResourceConfigurationClient { sender: self.sender.clone() }),
-            link_instance_client: Box::new(LinkInstanceAPIClient{ sender: self.sender.clone() })
+            link_instance_client: Box::new(LinkInstanceAPIClient { sender: self.sender.clone() }),
         })
     }
 }
@@ -354,7 +355,7 @@ pub struct ResourceConfigurationClient {
 }
 #[derive(Clone)]
 pub struct LinkInstanceAPIClient {
-    sender: futures::channel::mpsc::UnboundedSender<AgentRequest> 
+    sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
 }
 
 #[derive(Clone)]
@@ -363,7 +364,7 @@ pub struct AgentClient {
     node_management_client: Box<dyn edgeless_api::node_management::NodeManagementAPI>,
     resource_configuration_client:
         Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
-    link_instance_client: Box<dyn edgeless_api::link::LinkInstanceAPI>
+    link_instance_client: Box<dyn edgeless_api::link::LinkInstanceAPI>,
 }
 
 #[async_trait::async_trait]
@@ -479,11 +480,17 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 #[async_trait::async_trait]
 impl edgeless_api::link::LinkInstanceAPI for LinkInstanceAPIClient {
     async fn create(&mut self, req: edgeless_api::link::CreateLinkRequest) -> anyhow::Result<()> {
-        self.sender.send(AgentRequest::CreateLink(req)).await.map_err(|err| anyhow::anyhow!("Agent channel error when creating a link: {}", err.to_string()))?;
+        self.sender
+            .send(AgentRequest::CreateLink(req))
+            .await
+            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a link: {}", err.to_string()))?;
         Ok(())
     }
     async fn remove(&mut self, id: edgeless_api::link::LinkInstanceId) -> anyhow::Result<()> {
-        self.sender.send(AgentRequest::RemoveLink(id)).await.map_err(|err| anyhow::anyhow!("Agent channel error when  removing a link: {}", err.to_string()))?;
+        self.sender
+            .send(AgentRequest::RemoveLink(id))
+            .await
+            .map_err(|err| anyhow::anyhow!("Agent channel error when  removing a link: {}", err.to_string()))?;
         Ok(())
     }
 }
@@ -505,9 +512,7 @@ impl edgeless_api::agent::AgentAPI for AgentClient {
         self.resource_configuration_client.clone()
     }
 
-    fn link_instance_api(
-        &mut self,
-    ) -> Box<dyn edgeless_api::link::LinkInstanceAPI> {
+    fn link_instance_api(&mut self) -> Box<dyn edgeless_api::link::LinkInstanceAPI> {
         self.link_instance_client.clone()
     }
 }

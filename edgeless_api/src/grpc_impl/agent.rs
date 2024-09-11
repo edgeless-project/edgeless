@@ -22,7 +22,7 @@ impl AgentAPIClient {
                     .unwrap(),
             ),
             resource_management_client: Box::new(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(api_addr, Some(1)).await),
-            link_instance_client: Box::new(crate::grpc_impl::link::LinkInstanceClient::new(api_addr, Some(1)).await)
+            link_instance_client: Box::new(crate::grpc_impl::link::LinkInstanceClient::new(api_addr, Some(1)).await),
         }
     }
 }

@@ -12,14 +12,14 @@ struct ChatCommand {
     model_name: String,
     history_id: String,
     prompt: String,
-    resource_id: edgeless_api::function_instance::ComponentId,
+    resource_id: edgeless_api::function_instance::InstanceId,
     reply_sender: tokio::sync::oneshot::Sender<anyhow::Result<(edgeless_api::function_instance::InstanceId, String)>>,
 }
 
 enum OllamaCommand {
     Chat(ChatCommand),
     // resource_id, target
-    Patch(edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::InstanceId),
+    Patch(edgeless_api::function_instance::InstanceId, edgeless_api::function_instance::InstanceId),
 }
 
 impl std::fmt::Display for OllamaCommand {
@@ -41,7 +41,7 @@ impl std::fmt::Display for OllamaCommand {
 pub struct OllamaResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
-    instances: std::collections::HashMap<edgeless_api::function_instance::ComponentId, OllamaResource>,
+    instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, OllamaResource>,
     sender: futures::channel::mpsc::UnboundedSender<OllamaCommand>,
     _handle: tokio::task::JoinHandle<()>,
 }
@@ -98,7 +98,7 @@ impl OllamaResource {
                         model_name: model_name.clone(),
                         history_id: history_id.clone(),
                         prompt,
-                        resource_id: instance_id.function_id.clone(),
+                        resource_id: instance_id.clone(),
                         reply_sender,
                     }))
                     .await;
@@ -220,7 +220,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
         match OllamaResource::new(dataplane_handle, model.to_string(), new_id, lck.sender.clone()).await {
             Ok(resource) => {
-                lck.instances.insert(new_id.function_id.clone(), resource);
+                lck.instances.insert(new_id.clone(), resource);
                 return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
             }
             Err(err) => {
@@ -235,7 +235,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 
     async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-        self.inner.lock().await.instances.remove(&resource_id.function_id);
+        self.inner.lock().await.instances.remove(&resource_id);
         Ok(())
     }
 

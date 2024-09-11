@@ -27,3 +27,4 @@ edgeless_build = {path = "../edgeless_build"}
 serde = "1.0"
 clap = { version = "4.3", features=["derive"] }
 toml = "0.7"
+rand = { version = "0.8" }

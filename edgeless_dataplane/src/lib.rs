@@ -3,6 +3,6 @@
 pub mod alias_mapping;
 pub mod core;
 pub mod handle;
+pub mod multicast_link;
 pub mod node_local;
 pub mod remote_node;
-pub mod multicast_link;

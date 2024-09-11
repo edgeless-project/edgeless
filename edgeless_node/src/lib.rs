@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::orc::OrchestratorAPI;
+use edgeless_api::controller::ControllerAPI;
 
 pub mod agent;
 pub mod base_runtime;
@@ -50,7 +50,7 @@ pub struct EdgelessNodeGeneralSettings {
     /// The URL of the agent of this node used for creating the local server.
     pub agent_url: String,
     /// The agent URL announced by the node.
-    /// It is the end-point used by the orchestrator to manage the node.
+    /// It is the end-point used by the controller to manage the node.
     /// It can be different from `agent_url`, e.g., for NAT traversal.
     pub agent_url_announced: String,
     /// The URL of the dataplane of this node, used for event dispatching.
@@ -65,8 +65,8 @@ pub struct EdgelessNodeGeneralSettings {
     pub invocation_url_announced_coap: Option<String>,
     /// The URL exposed by this node to publish telemetry metrics collected.
     pub metrics_url: String,
-    /// The URL of the orchestrator to which this node registers.
-    pub orchestrator_url: String,
+    /// The URL of the controller to which this node registers.
+    pub controller_url: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -136,7 +136,7 @@ impl NodeCapabilitiesUser {
 impl EdgelessNodeSettings {
     /// Create settings for a node with WASM run-time and no resources
     /// binding the given ports on the same address.
-    pub fn new_without_resources(orchestrator_url: &str, node_address: &str, agent_port: u16, invocation_port: u16, metrics_port: u16) -> Self {
+    pub fn new_without_resources(controller_url: &str, node_address: &str, agent_port: u16, invocation_port: u16, metrics_port: u16) -> Self {
         let agent_url = format!("http://{}:{}", node_address, agent_port);
         let invocation_url = format!("http://{}:{}", node_address, invocation_port);
         let invocation_url_coap = Some(format!("coap://{}:{}", node_address, invocation_port));
@@ -150,7 +150,7 @@ impl EdgelessNodeSettings {
                 invocation_url_coap: invocation_url_coap.clone(),
                 invocation_url_announced_coap: invocation_url_coap,
                 metrics_url: format!("http://{}:{}", node_address, metrics_port),
-                orchestrator_url: orchestrator_url.to_string(),
+                controller_url: controller_url.to_string(),
             },
             wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: None,
@@ -205,38 +205,35 @@ pub async fn register_node(
     log::info!(
         "Registering this node '{}' on e-ORC {}, capabilities: {}",
         &settings.node_id,
-        &settings.orchestrator_url,
+        &settings.controller_url,
         capabilities
     );
-    match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&settings.orchestrator_url, None).await {
-        Ok(mut orc_client) => match orc_client
-            .node_registration_api()
-            .update_node(edgeless_api::node_registration::UpdateNodeRequest::Registration(
-                settings.node_id.clone(),
-                match settings.agent_url_announced.is_empty() {
-                    true => settings.agent_url.clone(),
-                    false => settings.agent_url_announced.clone(),
-                },
-                match settings.invocation_url_announced.is_empty() {
-                    true => settings.invocation_url.clone(),
-                    false => settings.invocation_url_announced.clone(),
-                },
-                resource_provider_specifications,
-                capabilities,
-            ))
-            .await
-        {
-            Ok(res) => match res {
-                edgeless_api::node_registration::UpdateNodeResponse::ResponseError(err) => {
-                    panic!("could not register to e-ORC {}: {}", &settings.orchestrator_url, err)
-                }
-                edgeless_api::node_registration::UpdateNodeResponse::Accepted => {
-                    log::info!("this node '{}' registered to e-ORC '{}'", &settings.node_id, &settings.orchestrator_url)
-                }
+    match edgeless_api::grpc_impl::controller::ControllerAPIClient::new(&settings.controller_url).await
+        .node_registration_api()
+        .update_node(edgeless_api::node_registration::UpdateNodeRequest::Registration(
+            settings.node_id.clone(),
+            match settings.agent_url_announced.is_empty() {
+                true => settings.agent_url.clone(),
+                false => settings.agent_url_announced.clone(),
             },
-            Err(err) => panic!("channel error when registering to e-ORC {}: {}", &settings.orchestrator_url, err),
+            match settings.invocation_url_announced.is_empty() {
+                true => settings.invocation_url.clone(),
+                false => settings.invocation_url_announced.clone(),
+            },
+            resource_provider_specifications,
+            capabilities,
+        ))
+        .await
+    {
+        Ok(res) => match res {
+            edgeless_api::node_registration::UpdateNodeResponse::ResponseError(err) => {
+                panic!("could not register to e-ORC {}: {}", &settings.controller_url, err)
+            }
+            edgeless_api::node_registration::UpdateNodeResponse::Accepted => {
+                log::info!("this node '{}' registered to e-ORC '{}'", &settings.node_id, &settings.controller_url)
+            }
         },
-        Err(err) => panic!("could not connect to e-ORC {}: {}", &settings.orchestrator_url, err),
+        Err(err) => panic!("channel error when registering to e-ORC {}: {}", &settings.controller_url, err),
     }
 }
 
@@ -567,7 +564,7 @@ invocation_url_announced = ""
 invocation_url_coap = "coap://127.0.0.1:7002"
 invocation_url_announced_coap = ""
 metrics_url = "http://127.0.0.1:7003"
-orchestrator_url = "http://127.0.0.1:7011"
+controller_url = "http://127.0.0.1:7001"
 
 [wasm_runtime]
 enabled = true

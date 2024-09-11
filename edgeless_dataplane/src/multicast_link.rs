@@ -1,32 +1,32 @@
-use std::ops::{DerefMut, Mul};
 use edgeless_api::link::LinkWriter;
 use futures::FutureExt;
+use std::ops::{DerefMut, Mul};
 
 #[derive(Clone)]
 struct MulticastWriter {
-    sender: tokio::sync::mpsc::UnboundedSender<Vec<u8>>
+    sender: tokio::sync::mpsc::UnboundedSender<Vec<u8>>,
 }
 
 #[derive(Clone)]
 pub struct MulticastLink {
     reader: std::sync::Arc<tokio::sync::Mutex<Option<Box<dyn LinkWriter>>>>,
     writer: Box<MulticastWriter>,
-    task: std::sync::Arc<tokio::sync::Mutex<tokio::task::JoinHandle<()>>>
+    task: std::sync::Arc<tokio::sync::Mutex<tokio::task::JoinHandle<()>>>,
 }
 
 #[derive(Clone)]
 pub struct MulticastProvider {
-    links: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkInstanceId, Box<MulticastLink>>>>
+    links: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<edgeless_api::link::LinkInstanceId, Box<MulticastLink>>>>,
 }
 
 struct ActiveMulticastLink {
     addr: std::net::Ipv4Addr,
-    active_nodes: Vec<edgeless_api::function_instance::NodeId>
+    active_nodes: Vec<edgeless_api::function_instance::NodeId>,
 }
 
 pub struct MulticastManager {
     pool_free: Vec<std::net::Ipv4Addr>,
-    active: std::collections::HashMap<edgeless_api::link::LinkInstanceId, ActiveMulticastLink>
+    active: std::collections::HashMap<edgeless_api::link::LinkInstanceId, ActiveMulticastLink>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -37,10 +37,8 @@ pub struct MulticastConfig {
 
 impl MulticastLink {
     pub fn new(addr: std::net::Ipv4Addr, port: u16) -> Self {
-        
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<Vec<u8>>();
         let reader: std::sync::Arc<tokio::sync::Mutex<Option<Box<dyn LinkWriter>>>> = std::sync::Arc::new(tokio::sync::Mutex::new(None));
-
 
         let reader_clone = reader.clone();
         let task = tokio::task::spawn(async move {
@@ -49,7 +47,7 @@ impl MulticastLink {
             let mut receiver = receiver;
 
             assert!(addr.is_multicast());
-            
+
             let sock = tokio::net::UdpSocket::bind(sock_addr.clone()).await.unwrap();
             sock.join_multicast_v4(addr, "0.0.0.0".parse().unwrap()).unwrap();
             let mut buffer = vec![0 as u8; 5000];
@@ -89,7 +87,7 @@ impl MulticastLink {
 impl MulticastProvider {
     pub fn new() -> Self {
         MulticastProvider {
-            links: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()))
+            links: std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new())),
         }
     }
 }
@@ -103,7 +101,7 @@ impl edgeless_api::link::LinkProvider for MulticastProvider {
 
         self.links.lock().await.insert(req.id, link.clone());
 
-        return Ok(link)
+        return Ok(link);
     }
     async fn remove(&mut self, id: edgeless_api::link::LinkInstanceId) -> anyhow::Result<()> {
         self.links.lock().await.remove(&id);
@@ -119,24 +117,29 @@ impl edgeless_api::link::LinkProvider for MulticastProvider {
 
 impl MulticastManager {
     pub fn new() -> MulticastManager {
-
-        let pool_free: Vec<_> = std::ops::Range { start: 153, end: 253 }.into_iter().map(|i| std::net::Ipv4Addr::new(224, 0, 0, i)).collect();
+        let pool_free: Vec<_> = std::ops::Range { start: 153, end: 253 }
+            .into_iter()
+            .map(|i| std::net::Ipv4Addr::new(224, 0, 0, i))
+            .collect();
 
         MulticastManager {
             pool_free: pool_free,
-            active: std::collections::HashMap::new()
+            active: std::collections::HashMap::new(),
         }
     }
 
-    pub fn new_link(
-        &mut self,
-        nodes: Vec<edgeless_api::function_instance::NodeId>
-    ) -> anyhow::Result<edgeless_api::link::LinkInstanceId> {
+    pub fn new_link(&mut self, nodes: Vec<edgeless_api::function_instance::NodeId>) -> anyhow::Result<edgeless_api::link::LinkInstanceId> {
         let id = edgeless_api::link::LinkInstanceId(uuid::Uuid::new_v4());
         let ip = self.pool_free.pop();
 
         if let Some(ip) = ip {
-            self.active.insert(id.clone(), ActiveMulticastLink { addr: ip.clone(), active_nodes: nodes });
+            self.active.insert(
+                id.clone(),
+                ActiveMulticastLink {
+                    addr: ip.clone(),
+                    active_nodes: nodes,
+                },
+            );
             Ok(id)
         } else {
             Err(anyhow::anyhow!("No Capacity"))

@@ -26,7 +26,7 @@ pub struct CreateLinkRequest {
 }
 
 #[async_trait::async_trait]
-pub trait LinkInstanceAPI : LinkInstanceAPIClone + Send + Sync {
+pub trait LinkInstanceAPI: LinkInstanceAPIClone + Send + Sync {
     async fn create(&mut self, req: CreateLinkRequest) -> anyhow::Result<()>;
     async fn remove(&mut self, id: LinkInstanceId) -> anyhow::Result<()>;
 }
@@ -40,9 +40,9 @@ pub trait LinkProvider: LinkProviderClone + Send + Sync {
 }
 
 #[async_trait::async_trait]
-pub trait LinkManager : LinkManagerClone + Send + Sync {
-    async fn register_reader(&mut self, link_id: &LinkInstanceId, reader: Box<dyn LinkWriter>)-> anyhow::Result<()>;
-    async fn get_writer(&mut self, link_id: &LinkInstanceId) -> Option<Box<dyn LinkWriter>>; 
+pub trait LinkManager: LinkManagerClone + Send + Sync {
+    async fn register_reader(&mut self, link_id: &LinkInstanceId, reader: Box<dyn LinkWriter>) -> anyhow::Result<()>;
+    async fn get_writer(&mut self, link_id: &LinkInstanceId) -> Option<Box<dyn LinkWriter>>;
 }
 
 #[async_trait::async_trait]

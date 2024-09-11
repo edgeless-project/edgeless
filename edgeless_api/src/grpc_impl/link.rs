@@ -15,8 +15,6 @@ impl crate::link::LinkInstanceAPI for LinkInstanceClient {
 
 impl LinkInstanceClient {
     pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> Self {
-        Self {
-            client: true
-        }
+        Self { client: true }
     }
 }

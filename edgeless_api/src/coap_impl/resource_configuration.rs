@@ -142,10 +142,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
         }
 
         let encoded_patch_req = edgeless_api_core::resource_configuration::EncodedPatchRequest {
-            instance_id: edgeless_api_core::instance_id::InstanceId {
-                node_id: edgeless_api_core::instance_id::NODE_ID_NONE,
-                function_id: update.function_id,
-            },
+            instance_id: update.function_id,
             output_mapping: outputs,
         };
 

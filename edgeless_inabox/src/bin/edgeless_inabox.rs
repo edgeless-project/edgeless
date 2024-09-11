@@ -32,7 +32,7 @@ fn main() -> anyhow::Result<()> {
     if args.templates && args.num_of_nodes == 1 {
         log::info!("Generating default templates for one node");
         edgeless_api::util::create_template("node.toml", edgeless_node::edgeless_node_default_conf().as_str())?;
-        edgeless_api::util::create_template("orchestrator.toml", edgeless_orc::edgeless_orc_default_conf().as_str())?;
+        // edgeless_api::util::create_template("orchestrator.toml", edgeless_orc::edgeless_orc_default_conf().as_str())?;
         edgeless_api::util::create_template("balancer.toml", edgeless_bal::edgeless_bal_default_conf().as_str())?;
         edgeless_api::util::create_template("controller.toml", edgeless_con::edgeless_con_default_conf().as_str())?;
         return Ok(());
@@ -105,41 +105,38 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
         invocation_url: next_url(),
     };
 
-    // Orchestrator
-    let orc_conf = edgeless_orc::EdgelessOrcSettings {
-        general: edgeless_orc::EdgelessOrcGeneralSettings {
-            domain_id: "domain-1".to_string(),
-            orchestrator_url: next_url(),
-            orchestrator_url_announced: "".to_string(),
-            orchestrator_coap_url: None,
-            orchestrator_coap_url_announced: None,
-            agent_url: next_url(),
-            agent_url_announced: "".to_string(),
-            invocation_url: next_url(),
-            invocation_url_announced: "".to_string(),
-        },
-        baseline: edgeless_orc::EdgelessOrcBaselineSettings {
-            orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
-            keep_alive_interval_secs: 2,
-        },
-        proxy: edgeless_orc::EdgelessOrcProxySettings {
-            proxy_type: "None".to_string(),
-            redis_url: None,
-        },
-        collector: edgeless_orc::EdgelessOrcCollectorSettings {
-            collector_type: "None".to_string(),
-            redis_url: None,
-        },
-    };
+    // // Orchestrator
+    // let orc_conf = edgeless_orc::EdgelessOrcSettings {
+    //     general: edgeless_orc::EdgelessOrcGeneralSettings {
+    //         domain_id: "domain-1".to_string(),
+    //         orchestrator_url: next_url(),
+    //         orchestrator_url_announced: "".to_string(),
+    //         orchestrator_coap_url: None,
+    //         orchestrator_coap_url_announced: None,
+    //         agent_url: next_url(),
+    //         agent_url_announced: "".to_string(),
+    //         invocation_url: next_url(),
+    //         invocation_url_announced: "".to_string(),
+    //     },
+    //     baseline: edgeless_orc::EdgelessOrcBaselineSettings {
+    //         orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
+    //         keep_alive_interval_secs: 2,
+    //     },
+    //     proxy: edgeless_orc::EdgelessOrcProxySettings {
+    //         proxy_type: "None".to_string(),
+    //         redis_url: None,
+    //     },
+    //     collector: edgeless_orc::EdgelessOrcCollectorSettings {
+    //         collector_type: "None".to_string(),
+    //         redis_url: None,
+    //     },
+    // };
 
     // Controller
     let con_conf = edgeless_con::EdgelessConSettings {
         controller_url,
         // for now only one orchestrator
-        orchestrators: vec![EdgelessConOrcConfig {
-            domain_id: orc_conf.general.domain_id.clone(),
-            orchestrator_url: orc_conf.general.orchestrator_url.clone(),
-        }],
+        orchestrators: vec![],
     };
 
     // Nodes
@@ -157,7 +154,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 invocation_url_coap: Some(node_coap_invocation_urls.get(node_id).expect("").clone()), // we are sure that it is there
                 invocation_url_announced_coap: Some("".to_string()),
                 metrics_url: next_url(),
-                orchestrator_url: orc_conf.general.orchestrator_url.clone(),
+                controller_url: con_conf.controller_url.clone(),
             },
             wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: None,
@@ -214,7 +211,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
 
     // now we are sure that there exists a directory which is empty (this is
     // still not completely safe, might panic)
-    std::fs::write(Path::new(&path).join("orchestrator.toml"), toml::to_string(&orc_conf).expect("Wrong")).ok();
+    // std::fs::write(Path::new(&path).join("orchestrator.toml"), toml::to_string(&orc_conf).expect("Wrong")).ok();
     std::fs::write(Path::new(&path).join("controller.toml"), toml::to_string(&con_conf).expect("Wrong")).ok();
     std::fs::write(Path::new(&path).join("balancer.toml"), toml::to_string(&bal_conf).expect("Wrong")).ok();
     let mut node_files = vec![];

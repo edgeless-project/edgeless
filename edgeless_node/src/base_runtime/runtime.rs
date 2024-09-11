@@ -35,7 +35,10 @@ pub struct RuntimeTask<FunctionInstanceType: super::FunctionInstance> {
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
     slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
-    functions: std::collections::HashMap<uuid::Uuid, super::function_instance_runner::FunctionInstanceRunner<FunctionInstanceType>>,
+    functions: std::collections::HashMap<
+        edgeless_api::function_instance::InstanceId,
+        super::function_instance_runner::FunctionInstanceRunner<FunctionInstanceType>,
+    >,
 }
 
 pub enum RuntimeRequest {
@@ -131,12 +134,12 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
             self.guest_api_host_register.clone(),
         )
         .await;
-        self.functions.insert(instance_id.function_id.clone(), instance);
+        self.functions.insert(instance_id.clone(), instance);
     }
 
     async fn stop_function(&mut self, instance_id: edgeless_api::function_instance::InstanceId) {
         log::info!("Stop Function {:?}", instance_id);
-        if let Some(instance) = self.functions.get_mut(&instance_id.function_id) {
+        if let Some(instance) = self.functions.get_mut(&instance_id) {
             instance.stop().await;
         }
     }
@@ -150,7 +153,7 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
 
     async fn function_exit(&mut self, instance_id: edgeless_api::function_instance::InstanceId, status: Result<(), super::FunctionInstanceError>) {
         log::info!("Function Exit Event: {:?} {:?}", instance_id, status);
-        self.functions.remove(&instance_id.function_id);
+        self.functions.remove(&instance_id);
     }
 }
 

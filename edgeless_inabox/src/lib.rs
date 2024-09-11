@@ -18,18 +18,19 @@ pub fn edgeless_inabox_main(
     for node_conf_file in in_a_box_config.node_conf_files {
         node_confs.push(toml::from_str(&std::fs::read_to_string(node_conf_file)?)?);
     }
-    let orc_conf: edgeless_orc::EdgelessOrcSettings = toml::from_str(&std::fs::read_to_string(in_a_box_config.orc_conf_file)?)?;
+    // let orc_conf: edgeless_orc::EdgelessOrcSettings = toml::from_str(&std::fs::read_to_string(in_a_box_config.orc_conf_file)?)?;
     let bal_conf: edgeless_bal::EdgelessBalSettings = toml::from_str(&std::fs::read_to_string(in_a_box_config.bal_conf_file)?)?;
     let con_conf: edgeless_con::EdgelessConSettings = toml::from_str(&std::fs::read_to_string(in_a_box_config.con_conf_file)?)?;
 
     log::info!("Starting Edgeless In A Box");
 
+    async_tasks.push(async_runtime.spawn(edgeless_bal::edgeless_bal_main(bal_conf.clone())));
+    // async_tasks.push(async_runtime.spawn(edgeless_orc::edgeless_orc_main(orc_conf.clone())));
+    async_tasks.push(async_runtime.spawn(edgeless_con::edgeless_con_main(con_conf.clone())));
+
     for node_conf in node_confs {
         async_tasks.push(async_runtime.spawn(edgeless_node::edgeless_node_main(node_conf.clone())));
     }
-    async_tasks.push(async_runtime.spawn(edgeless_bal::edgeless_bal_main(bal_conf.clone())));
-    async_tasks.push(async_runtime.spawn(edgeless_orc::edgeless_orc_main(orc_conf.clone())));
-    async_tasks.push(async_runtime.spawn(edgeless_con::edgeless_con_main(con_conf.clone())));
 
     Ok(())
 }
@@ -57,7 +58,7 @@ mod tests {
         println!("bal  conf: {}", bal_conf);
         println!("con  conf: {}", con_conf);
         edgeless_api::util::create_template(node_conf.as_str(), edgeless_node::edgeless_node_default_conf().as_str())?;
-        edgeless_api::util::create_template(orc_conf.as_str(), edgeless_orc::edgeless_orc_default_conf().as_str())?;
+        // edgeless_api::util::create_template(orc_conf.as_str(), edgeless_orc::edgeless_orc_default_conf().as_str())?;
         edgeless_api::util::create_template(bal_conf.as_str(), edgeless_bal::edgeless_bal_default_conf().as_str())?;
         edgeless_api::util::create_template(con_conf.as_str(), edgeless_con::edgeless_con_default_conf().as_str())?;
 
