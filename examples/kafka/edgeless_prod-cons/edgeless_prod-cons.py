@@ -4,10 +4,6 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 
-def parse_timestamp(timestamp):
-    seconds, nanoseconds = timestamp.split('.')
-    return int(seconds) 
-
 def read_file(file_path):
     with open(file_path, 'r') as file:
         lines = file.readlines()
@@ -16,8 +12,8 @@ def read_file(file_path):
 def calculate_differences(producer_timestamps, consumer_timestamps):
     differences = []
     for prod_ts, cons_ts in zip(producer_timestamps, consumer_timestamps):
-        prod_time = parse_timestamp(prod_ts)
-        cons_time = parse_timestamp(cons_ts)
+        prod_time = float(prod_ts)
+        cons_time = float(cons_ts)
         difference = cons_time - prod_time
         differences.append(difference)
     return differences

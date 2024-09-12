@@ -20,7 +20,14 @@ while (true) ; do
     fi
 
     echo "$COUNTER" | curl -H "Host: kafka" -XPOST http://127.0.0.1:7035/hello -d@-
-    echo "$(date +%s.%N) $COUNTER" >> $OUTFILE
+
+    # Calcola i millisecondi
+    TIMESTAMP=$(date +%s)
+    MILLISECONDS=$(($(gdate +%s%N) / 1000000))
+
+    # Stampa i millisecondi nel formato richiesto
+    echo "$TIMESTAMP.$MILLISECONDS $COUNTER" >> $OUTFILE
+
     COUNTER=$(( COUNTER + 1 ))
 
     sleep $PERIOD
