@@ -1,8 +1,8 @@
-# Fractal Demo Workflow for KPI #x
+# Fractal Demo Workflow for KPI #5.2b
 
-This workflow is intended to become a demo scenario for EDGELESS KPI #x:
+This workflow is intended to become a demo scenario for EDGELESS KPI #5.2b.
 
-"Scenario critical tasks, as defined by Quality of Service (QoS) parameters, will be guaranteed to have less than ≤ 10 ms downtime upon (simulated) failure of any system component, thanks to hot stand-by redundant executors." ``
+`"Scenario critical tasks, as defined by Quality of Service (QoS) parameters, will be guaranteed to have less than ≤ 10 ms downtime upon (simulated) failure of any system component, thanks to hot stand-by redundant executors."`
 
 The workflow is expected to improve our understanding of KPI-related system behavior and visualize KPI-related fault tolerance metrics.
 
