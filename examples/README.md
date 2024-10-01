@@ -9,6 +9,7 @@ features provided by the platform.
 - `file_log`: shows how to use a resource that appends the function arguments to a file local to the node
 - `http_egress`: shows the HTTP egress feature of the e-Balancer by periodically issuing a GET to an external server
 - `http_ingress`: shows the HTTP ingress feature of the e-Balancer by waiting for POST commands, to which the function replies with an OK message with fixed body, see [tutorial](http_ingress/README.md)
+- `kafka_egress`: shows host to use a resource that streams messages to an Apache Kafka server
 - `matrix_mul`: shows how to create a single function or a chain of three functions performing multiplication of two internal matrices to increase the CPU load
 - `noop`: minimal workflow with a single function that does nothing, which can be used as a template to create more interesting stuff, see [tutorial](noop/README.md)
 - `ollama`: workflow that lets you interact via curl (`http-ingress` resource) with an ollama server (`ollama` resource), saving the responses to a file (`file-log` resource)

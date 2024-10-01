@@ -4,5 +4,6 @@ pub mod dda;
 pub mod file_log;
 pub mod http_egress;
 pub mod http_ingress;
+pub mod kafka_egress;
 pub mod ollama;
 pub mod redis;
