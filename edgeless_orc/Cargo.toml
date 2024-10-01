@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 # SPDX-FileCopyrightText: © 2023 Siemens AG
 # SPDX-License-Identifier: MIT
+
 [package]
 name = "edgeless_orc"
 version = "0.1.0"
@@ -14,6 +15,10 @@ path = "src/lib.rs"
 [[bin]]
 name = "edgeless_orc_d"
 path = "src/bin/edgeless_orc_d.rs"
+
+[[bin]]
+name = "proxy_cli"
+path = "src/bin/proxy_cli.rs"
 
 [dependencies]
 log = "0.4"
@@ -33,3 +38,4 @@ toml = "0.7"
 rand = "0.8.5"
 redis = "*"
 serial_test = { version = "3" }
+itertools = "0.13.0"

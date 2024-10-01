@@ -78,12 +78,6 @@ impl OrchestrationLogic {
         assert!(self.nodes.len() == self.resource_providers.len());
         assert!(self.nodes.len() == self.weights.len());
         assert!(self.nodes.len() <= clients.len());
-
-        // Initialize the orchestration variables depending on the strategy
-        match self.orchestration_strategy {
-            crate::OrchestrationStrategy::Random => {}
-            crate::OrchestrationStrategy::RoundRobin => self.round_robin_current_index = 0,
-        };
     }
 
     /// Filter only the nodes on which the given function can be deployed.
@@ -192,8 +186,9 @@ impl OrchestrationLogic {
                 None
             }
             crate::OrchestrationStrategy::RoundRobin => {
+                // Prevent infinite loop: evaluate each node at most once.
                 for _ in 0..self.nodes.len() {
-                    // prevent infinite loop
+                    // Wrap-around if the current index is out of bounds.
                     if self.round_robin_current_index >= self.nodes.len() {
                         self.round_robin_current_index = 0;
                     }

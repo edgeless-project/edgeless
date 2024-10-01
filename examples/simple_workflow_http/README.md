@@ -7,12 +7,7 @@ The example creates the following chain:
 - a function `double` that doubles the received integer number in the payload
 - an HTTP egress that sends the received message to an external sink
 
-```bash
-target/debug/edgeless_cli function build examples/simple_workflow_http/http_read_number/function.json
-target/debug/edgeless_cli function build examples/simple_workflow_http/http_write_number/function.json
-target/debug/edgeless_cli function build examples/simple_workflow_http/double/function.json
-target/debug/edgeless_cli function build examples/simple_workflow_http/incr/function.json
-```
+First, build the `http_read_number`, `http_write_number`, `double`, and `incr` WASM binaries following the [instructions](../../functions/README.md). 
 
 Then, you can request the controller to start the workflow:
 

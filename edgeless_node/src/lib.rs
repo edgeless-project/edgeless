@@ -58,6 +58,11 @@ pub struct EdgelessNodeGeneralSettings {
     /// The invocation URL announced by the node.
     /// It can be different from `agent_url`, e.g., for NAT traversal.
     pub invocation_url_announced: String,
+    /// The COAP URL of the dataplane of this node, used for event dispatching.
+    pub invocation_url_coap: Option<String>,
+    /// The COAP invocation URL announced by the node.
+    /// It can be different from `agent_url`, e.g., for NAT traversal.
+    pub invocation_url_announced_coap: Option<String>,
     /// The URL exposed by this node to publish telemetry metrics collected.
     pub metrics_url: String,
     /// The URL of the orchestrator to which this node registers.
@@ -69,22 +74,40 @@ pub struct EdgelessNodeResourceSettings {
     /// If `http_ingress_provider` is not empty, this is the URL of the
     /// HTTP web server exposed by the http-ingress resource for this node.
     pub http_ingress_url: Option<String>,
-    /// If not empty, a http-ingress resource with the given name is created.
+    /// If not empty, a http-ingress resource provider with that name is created.
     pub http_ingress_provider: Option<String>,
-    /// If not empty, a http-egress resource with the given name is created.
+    /// If not empty, a http-egress resource provider with that name is created.
     pub http_egress_provider: Option<String>,
-    /// If not empty, a file-log resource with the given name is created.
+    /// If not empty, a file-log resource provider with that name is created.
     /// The resource will write on the local filesystem.
     pub file_log_provider: Option<String>,
-    /// If not empty, a redis resource with the given name is created.
+    /// If not empty, a redis resource provider with that name is created.
     /// The resource will connect to a remote Redis server to update the
     /// value of a given given, as specified in the resource configuration
     /// at run-time.
     pub redis_provider: Option<String>,
     /// The URL of DDA used by this node, used for communication via the DDA resources
     pub dda_url: Option<String>,
-    /// If not empty, a DDA resource with the given name is created.
+    /// If not empty, a DDA resource with that name is created.
     pub dda_provider: Option<String>,
+    /// The ollama resource provider settings.
+    pub ollama_provider: Option<OllamaProviderSettings>,
+    /// If not empty, a kafka-egress resource provider with that name is created.
+    /// The resource will connect to a remote Kafka server to stream the
+    /// messages received on a given topic.
+    pub kafka_egress_provider: Option<String>,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct OllamaProviderSettings {
+    /// The address of the ollama server.
+    pub host: String,
+    /// The port of the ollama server.
+    pub port: u16,
+    /// The maximum number of messages in the history of the ollama resource.
+    pub messages_number_limit: u16,
+    /// If not empty, an ollama resource provider with that name is created.
+    pub provider: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -120,6 +143,7 @@ impl EdgelessNodeSettings {
     pub fn new_without_resources(orchestrator_url: &str, node_address: &str, agent_port: u16, invocation_port: u16, metrics_port: u16) -> Self {
         let agent_url = format!("http://{}:{}", node_address, agent_port);
         let invocation_url = format!("http://{}:{}", node_address, invocation_port);
+        let invocation_url_coap = Some(format!("coap://{}:{}", node_address, invocation_port));
         Self {
             general: EdgelessNodeGeneralSettings {
                 node_id: uuid::Uuid::new_v4(),
@@ -127,6 +151,8 @@ impl EdgelessNodeSettings {
                 agent_url_announced: agent_url,
                 invocation_url: invocation_url.clone(),
                 invocation_url_announced: invocation_url,
+                invocation_url_coap: invocation_url_coap.clone(),
+                invocation_url_announced_coap: invocation_url_coap,
                 metrics_url: format!("http://{}:{}", node_address, metrics_port),
                 orchestrator_url: orchestrator_url.to_string(),
             },
@@ -351,6 +377,66 @@ async fn fill_resources(
                 });
             }
         }
+
+        if let Some(settings) = &settings.ollama_provider {
+            if !settings.host.is_empty() && !settings.provider.is_empty() {
+                log::info!(
+                    "Creating resource '{}' towards {}:{} (limit to {} messages per chat)",
+                    settings.provider,
+                    settings.host,
+                    settings.port,
+                    settings.messages_number_limit
+                );
+                let class_type = "ollama".to_string();
+                ret.insert(
+                    settings.provider.clone(),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::ollama::OllamaResourceProvider::new(
+                                data_plane.clone(),
+                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                                &settings.host,
+                                settings.port,
+                                settings.messages_number_limit,
+                            )
+                            .await,
+                        ),
+                    },
+                );
+
+                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id: settings.provider.clone(),
+                    class_type,
+                    outputs: vec!["out".to_string()],
+                });
+            }
+        }
+
+        if let Some(provider_id) = &settings.kafka_egress_provider {
+            if !provider_id.is_empty() {
+                log::info!("Creating resource '{}'", provider_id);
+                let class_type = "kafka-egress".to_string();
+                ret.insert(
+                    provider_id.clone(),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::kafka_egress::KafkaEgressResourceProvider::new(
+                                data_plane.clone(),
+                                edgeless_api::function_instance::InstanceId::new(node_id.clone()),
+                            )
+                            .await,
+                        ),
+                    },
+                );
+                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id: provider_id.clone(),
+                    class_type,
+                    outputs: vec![],
+                });
+            }
+        }
     }
 
     ret
@@ -364,8 +450,12 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let state_manager = Box::new(state_management::StateManager::new().await);
 
     // Create the data plane.
-    let data_plane =
-        edgeless_dataplane::handle::DataplaneProvider::new(settings.general.node_id.clone(), settings.general.invocation_url.clone()).await;
+    let data_plane = edgeless_dataplane::handle::DataplaneProvider::new(
+        settings.general.node_id.clone(),
+        settings.general.invocation_url.clone(),
+        settings.general.invocation_url_coap.clone(),
+    )
+    .await;
 
     // Create the telemetry provider.
     let telemetry_provider = edgeless_telemetry::telemetry_events::TelemetryProcessor::new(settings.general.metrics_url.clone())
@@ -503,6 +593,8 @@ agent_url = "http://127.0.0.1:7021"
 agent_url_announced = ""
 invocation_url = "http://127.0.0.1:7002"
 invocation_url_announced = ""
+invocation_url_coap = "coap://127.0.0.1:7002"
+invocation_url_announced_coap = ""
 metrics_url = "http://127.0.0.1:7003"
 orchestrator_url = "http://127.0.0.1:7011"
 
@@ -521,6 +613,13 @@ file_log_provider = "file-log-1"
 redis_provider = "redis-1"
 dda_url = "http://127.0.0.1:10000"
 dda_provider = "dda-1"
+kafka_egress_provider = "kafka-egress-1"
+
+[resources.ollama_provider]
+host = "localhost"
+port = 11434
+messages_number_limit = 30
+provider = "ollama-1"
 
 [user_node_capabilities]
 "##,

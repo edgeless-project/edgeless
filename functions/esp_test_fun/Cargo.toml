@@ -1,0 +1,29 @@
+# SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+# SPDX-License-Identifier: MIT
+[workspace]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+lto = true
+opt-level = "z"
+panic = "abort"
+codegen-units = 1
+strip = true
+
+[package]
+name = "esp_test_fun"
+version = "0.1.0"
+authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+edition = "2021"
+
+[lib]
+name = "esp_test_fun"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { path = "../../edgeless_function" }
+log = "0.4"
+minicbor =  {version = "0.19", default-features = false, features = ["derive"]}

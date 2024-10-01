@@ -5,10 +5,10 @@
 
 mod metrics_collector;
 mod orchestration_logic;
-mod orchestrator;
-mod proxy;
-mod proxy_none;
-mod proxy_redis;
+pub mod orchestrator;
+pub mod proxy;
+pub mod proxy_none;
+pub mod proxy_redis;
 
 use edgeless_node::agent;
 use futures::join;
@@ -30,6 +30,11 @@ pub struct EdgelessOrcGeneralSettings {
     /// The URL to which the orchestrator can be reached, which may be
     /// different from `orchestrator_url`, e.g., for NAT traversal.
     pub orchestrator_url_announced: String,
+    /// The COAP URL to which the orchestrator is bound.
+    pub orchestrator_coap_url: Option<String>,
+    /// The COAP URL to which the orchestrator can be reached, which may be
+    /// different from `orchestrator_url`, e.g., for NAT traversal.
+    pub orchestrator_coap_url_announced: Option<String>,
     /// The URL of the agent of the node embedded in the orchestrator.
     pub agent_url: String,
     /// The agent URL announced by the node.
@@ -98,7 +103,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
 
     // Create the data plane for the node embedded in the orchestrator.
     let node_id = uuid::Uuid::new_v4();
-    let data_plane = edgeless_dataplane::handle::DataplaneProvider::new(node_id.clone(), settings.general.invocation_url.clone()).await;
+    let data_plane = edgeless_dataplane::handle::DataplaneProvider::new(node_id.clone(), settings.general.invocation_url.clone(), None).await;
 
     // Create the metrics collector resource.
     let mut resource_provider_specifications = vec![];
@@ -157,6 +162,15 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     let orchestrator_server =
         edgeless_api::grpc_impl::orc::OrchestratorAPIServer::run(orchestrator.get_api_client(), settings.general.orchestrator_url.clone());
 
+    let orchestrator_coap_server = if let Some(url) = settings.general.orchestrator_coap_url {
+        edgeless_api::coap_impl::orchestration::CoapOrchestrationServer::run(
+            orchestrator.get_api_client().node_registration_api(),
+            std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), 7050),
+        )
+    } else {
+        Box::pin(async {})
+    };
+
     if settings.baseline.keep_alive_interval_secs == 0 {
         log::info!("node keep-alive disabled");
     } else {
@@ -175,6 +189,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
         agent_api_server,
         orchestrator_task,
         orchestrator_server,
+        orchestrator_coap_server,
         edgeless_node::register_node(
             edgeless_node::EdgelessNodeGeneralSettings {
                 node_id,
@@ -182,6 +197,8 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
                 agent_url_announced: settings.general.agent_url_announced,
                 invocation_url: settings.general.invocation_url,
                 invocation_url_announced: settings.general.invocation_url_announced,
+                invocation_url_coap: None,
+                invocation_url_announced_coap: None,
                 metrics_url: "".to_string(),
                 orchestrator_url: match settings.general.orchestrator_url_announced.is_empty() {
                     true => settings.general.orchestrator_url,
@@ -200,6 +217,8 @@ pub fn edgeless_orc_default_conf() -> String {
 domain_id = "domain-1"
 orchestrator_url = "http://127.0.0.1:7011"
 orchestrator_url_announced = ""
+orchestrator_coap_url = "coap://127.0.0.1:7050"
+orchestrator_coap_url_announced = ""
 agent_url = "http://127.0.0.1:7121"
 agent_url_announced = ""
 invocation_url = "http://127.0.0.1:7102"

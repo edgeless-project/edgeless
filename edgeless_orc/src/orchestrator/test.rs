@@ -563,7 +563,7 @@ async fn test_orc_patch() {
             function_id: ext_function_id.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out-1".to_string(),
-                InstanceId {
+                edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_resource_id.clone(),
                 },
@@ -593,7 +593,7 @@ async fn test_orc_patch() {
             function_id: ext_resource_id.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out-2".to_string(),
-                InstanceId {
+                edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_function_id.clone(),
                 },
@@ -701,7 +701,7 @@ async fn test_orc_node_with_fun_disconnects() {
             function_id: ext_fid_1.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
-                InstanceId {
+                edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_2.clone(),
                 },
@@ -724,7 +724,7 @@ async fn test_orc_node_with_fun_disconnects() {
             function_id: ext_fid_2.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
-                InstanceId {
+                edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_3.clone(),
                 },
@@ -747,7 +747,7 @@ async fn test_orc_node_with_fun_disconnects() {
             function_id: ext_fid_3.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
-                InstanceId {
+                edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_4.clone(),
                 },
@@ -917,7 +917,7 @@ async fn orc_node_with_res_disconnects() {
             function_id: ext_fid_1.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
-                InstanceId {
+                edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_res.clone(),
                 },
@@ -1057,7 +1057,7 @@ async fn test_patch_after_fun_stop() {
         for i in 0..ext_fid_pair.1.len() {
             output_mapping.insert(
                 format!("out{}", i),
-                InstanceId {
+                edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_pair.1[i],
                 },
@@ -1190,7 +1190,7 @@ async fn test_recreate_fun_after_disconnect() {
             function_id: ext_fid_1.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
-                InstanceId {
+                edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_2.clone(),
                 },
@@ -1213,7 +1213,7 @@ async fn test_recreate_fun_after_disconnect() {
             function_id: ext_fid_2.clone(),
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
-                InstanceId {
+                edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
                     function_id: ext_fid_3.clone(),
                 },
@@ -1357,74 +1357,114 @@ fn test_orchestration_logic_is_node_feasible() {
     let mut runtime = "RUST_WASM".to_string();
 
     // Empty requirements
-    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     // Match any node_id
     reqs.node_id_match_any.push(node_id.clone());
-    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     reqs.node_id_match_any.push(uuid::Uuid::new_v4());
-    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     reqs.node_id_match_any.clear();
     reqs.node_id_match_any.push(uuid::Uuid::new_v4());
-    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
     reqs.node_id_match_any.clear();
 
     // Match all labels
     reqs.label_match_all.push("red".to_string());
     caps.labels.push("green".to_string());
-    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     caps.labels.push("red".to_string());
-    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     reqs.label_match_all.push("blue".to_string());
-    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     caps.labels.push("blue".to_string());
-    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     // Match all providers
     reqs.resource_match_all.push("file-1".to_string());
-    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     providers.insert("file-1".to_string());
-    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     providers.insert("file-2".to_string());
     providers.insert("file-3".to_string());
-    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     reqs.resource_match_all.push("file-9".to_string());
-    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     providers.insert("file-9".to_string());
-    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     // Match TEE and TPM
     reqs.tee = AffinityLevel::Required;
-    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
     caps.is_tee_running = true;
-    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     reqs.tpm = AffinityLevel::Required;
-    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
     caps.has_tpm = true;
-    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 
     // Match runtime
     runtime = "CONTAINER".to_string();
-    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
     runtime = "".to_string();
-    assert!(!OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
     runtime = "RUST_WASM".to_string();
-    assert!(OrchestrationLogic::is_node_feasible(&runtime, &reqs, &node_id, &caps, &providers));
+    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+        &runtime, &reqs, &node_id, &caps, &providers
+    ));
 }
 
 #[test]
 fn test_orchestration_feasible_nodes() {
-    let mut logic = OrchestrationLogic::new(crate::OrchestrationStrategy::Random);
+    let mut logic = crate::orchestration_logic::OrchestrationLogic::new(crate::OrchestrationStrategy::Random);
 
     // No nodes
     let mut fun1_req = make_spawn_function_request("fun");

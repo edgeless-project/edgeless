@@ -123,7 +123,7 @@ path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-edgeless_function = { path = "../../../edgeless_function" }
+edgeless_function = { path = "../../edgeless_function" }
 serde = {version="1", features=["derive"] }
 serde_json = "1"
 ```

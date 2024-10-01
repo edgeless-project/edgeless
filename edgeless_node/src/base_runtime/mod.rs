@@ -36,6 +36,6 @@ pub trait FunctionInstance: Send + 'static {
 
 #[derive(Clone, Debug)]
 pub enum FunctionInstanceError {
-    BadCode,
+    BadCode(String),
     InternalError,
 }

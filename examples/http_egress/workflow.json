@@ -6,7 +6,7 @@
                 "id": "http_requestor",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./requestor/http_requestor.wasm",
+                "code": "../../functions/http_requestor/http_requestor.wasm",
                 "outputs": [
                     "http_e"
                 ]
