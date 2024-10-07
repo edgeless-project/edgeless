@@ -1,7 +1,7 @@
 #[derive(Debug, PartialEq, Eq, allocative::Allocative, starlark::any::ProvidesStaticType, Clone, serde::Serialize, serde::Deserialize)]
 pub struct EdgelessActorGen<PortType> {
     pub id: String,
-    #[serde(alias = "functions")]
+    #[serde(rename = "function_type")]
     pub klass: crate::actor_class::EdgelessActorClass,
     pub outputs: std::collections::HashMap<String, PortType>,
     pub inputs: std::collections::HashMap<String, PortType>,
@@ -101,7 +101,7 @@ pub fn edgeless_actor(builder: &mut starlark::environment::GlobalsBuilder) {
                         port_id.clone(),
                         crate::port::Port {
                             component_id: id.clone(),
-                            port_id: id.clone(),
+                            port_id: port_id.clone(),
                             klass: port_spec.clone(),
                             mapping: std::rc::Rc::new(std::cell::RefCell::new(crate::port::Mapping::Unmapped)),
                         },
@@ -116,7 +116,7 @@ pub fn edgeless_actor(builder: &mut starlark::environment::GlobalsBuilder) {
                         port_id.clone(),
                         crate::port::Port {
                             component_id: id.clone(),
-                            port_id: id.clone(),
+                            port_id: port_id.clone(),
                             klass: port_spec.clone(),
                             mapping: std::rc::Rc::new(std::cell::RefCell::new(crate::port::Mapping::Unmapped)),
                         },

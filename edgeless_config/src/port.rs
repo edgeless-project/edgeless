@@ -38,10 +38,30 @@ impl<'v> starlark::values::StarlarkValue<'v> for Port {
         other: starlark::values::Value<'v>,
         heap: &'v starlark::values::Heap,
     ) -> Result<starlark::values::Value<'v>, starlark::Error> {
-        *self.mapping.borrow_mut() = Mapping::Direct(DirectTarget {
-            target_component: "Foo".to_string(),
-            port: "bar".to_string(),
-        });
+        if let Some(port) = starlark::values::ValueLike::downcast_ref::<Port>(other) {
+            *self.mapping.borrow_mut() = Mapping::Direct(DirectTarget {
+                target_component: port.component_id.clone(),
+                port: port.port_id.clone(),
+            });
+
+            return Ok(other);
+        };
+
+        if let Some(ports) = <starlark::values::list::ListOf<Port> as starlark::values::UnpackValue>::unpack_value(other) {
+            *self.mapping.borrow_mut() = Mapping::All(
+                ports
+                    .to_vec()
+                    .into_iter()
+                    .map(|port| DirectTarget {
+                        target_component: port.component_id.clone(),
+                        port: port.port_id.clone(),
+                    })
+                    .collect(),
+            );
+
+            return Ok(other);
+        }
+
         Ok(other)
     }
 }
@@ -55,6 +75,12 @@ impl<'v> starlark::values::AllocValue<'v> for Port {
 impl<V> std::fmt::Display for PortGen<V> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
+    }
+}
+
+impl<'v> starlark::values::UnpackValue<'v> for Port {
+    fn unpack_value(value: starlark::values::Value<'v>) -> Option<Self> {
+        starlark::values::ValueLike::downcast_ref::<Port>(value).cloned()
     }
 }
 

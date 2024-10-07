@@ -1,18 +1,16 @@
 {
   "id": "ping_async",
-  "function_type": "RUST_WASM",
   "version": "0.1",
-  "code": "./ping_async.wasm",
-  "outputs": {
-    "ping": {
-      "method": "CAST",
-      "data_type": "edgeless.example.Ping"
-    }
-  },
   "inputs": {
     "pong": {
       "method": "CAST",
       "data_type": "edgeless.example.Pong"
+    }
+  },
+  "outputs": {
+    "ping": {
+      "method": "CAST",
+      "data_type": "edgeless.example.Ping"
     }
   },
   "inner_structure": [
@@ -23,7 +21,7 @@
       "dests": [
         {
           "type": "PORT",
-          "port_id": "pong"
+          "port_id": "ping"
         }
       ]
     },
@@ -38,5 +36,7 @@
         }
       ]
     }
-  ]
+  ],
+  "path": "/app/functions/ping_async/ping_async.tar.gz",
+  "function_type": "RUST"
 }

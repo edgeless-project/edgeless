@@ -5,6 +5,7 @@ version = 3
 [[package]]
 name = "edgeless_function"
 version = "0.1.0"
+source = "git+https://github.com/edgeless-project/edgeless.git?branch=serverless_ir#1e2da314b0366433f03ca2fe3e475fc74c2ca7b3"
 dependencies = [
  "edgeless_function_macro",
  "log",
@@ -13,6 +14,7 @@ dependencies = [
 [[package]]
 name = "edgeless_function_core"
 version = "0.1.0"
+source = "git+https://github.com/edgeless-project/edgeless.git?branch=serverless_ir#1e2da314b0366433f03ca2fe3e475fc74c2ca7b3"
 dependencies = [
  "log",
  "serde",
@@ -22,6 +24,7 @@ dependencies = [
 [[package]]
 name = "edgeless_function_macro"
 version = "0.1.0"
+source = "git+https://github.com/edgeless-project/edgeless.git?branch=serverless_ir#1e2da314b0366433f03ca2fe3e475fc74c2ca7b3"
 dependencies = [
  "edgeless_function_core",
  "proc-macro2",

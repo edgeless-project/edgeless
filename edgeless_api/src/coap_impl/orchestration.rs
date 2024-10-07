@@ -66,6 +66,7 @@ impl CoapOrchestrationServer {
                 })
                 .collect(),
             crate::node_registration::NodeCapabilities::empty(),
+            Vec::new(),
         );
 
         let ret = match key_entry {

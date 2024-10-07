@@ -84,15 +84,19 @@ impl Default for FunctionClassSpecification {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct SpawnFunctionRequest {
     #[serde(skip)]
-    pub instance_id: Option<InstanceId>,
+    pub instance_id: InstanceId,
     #[serde(skip)]
     pub code: FunctionClassSpecification,
     pub annotations: std::collections::HashMap<String, String>,
     #[serde(skip)]
     pub state_specification: StateSpecification,
+    #[serde(skip)]
+    pub input_mapping: std::collections::HashMap<PortId, crate::common::Input>,
+    #[serde(skip)]
+    pub output_mapping: std::collections::HashMap<PortId, crate::common::Output>,
 }
 
 #[async_trait::async_trait]

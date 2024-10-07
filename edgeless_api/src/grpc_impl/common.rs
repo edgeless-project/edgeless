@@ -70,6 +70,13 @@ impl CommonConverters {
             crate::grpc_impl::api::instance_output::OutputType::All(targets) => {
                 crate::common::Output::All(targets.data.iter().map(|target| Self::parse_target(target).unwrap()).collect())
             }
+            crate::grpc_impl::api::instance_output::OutputType::Link(link_id) => crate::common::Output::Link(Self::parse_link_id(link_id)?),
+        })
+    }
+
+    pub fn parse_input(api_input: &crate::grpc_impl::api::InstanceInput) -> anyhow::Result<crate::common::Input> {
+        Ok(match api_input.input_type.as_ref().unwrap() {
+            crate::grpc_impl::api::instance_input::InputType::Link(link_id) => crate::common::Input::Link(Self::parse_link_id(link_id)?),
         })
     }
 
@@ -87,6 +94,10 @@ impl CommonConverters {
             node_id: uuid::Uuid::parse_str(&api_id.node_id)?,
             function_id: uuid::Uuid::parse_str(&api_id.function_id)?,
         })
+    }
+
+    pub fn parse_link_id(api_id: &crate::grpc_impl::api::LinkInstanceId) -> anyhow::Result<crate::link::LinkInstanceId> {
+        Ok(crate::link::LinkInstanceId(uuid::Uuid::parse_str(&api_id.id)?))
     }
 
     pub fn parse_domain_managed_instance_id(
@@ -125,7 +136,7 @@ impl CommonConverters {
                 .output_mapping
                 .iter()
                 .filter_map(|(key, value)| match CommonConverters::parse_output(value) {
-                    Ok(val) => Some((key.clone(), val)),
+                    Ok(val) => Some((crate::function_instance::PortId(key.clone()), val)),
                     Err(_) => None,
                 })
                 .collect(),
@@ -144,6 +155,12 @@ impl CommonConverters {
         crate::grpc_impl::api::InstanceId {
             node_id: instance_id.node_id.to_string(),
             function_id: instance_id.function_id.to_string(),
+        }
+    }
+
+    pub fn serialize_link_instance_id(instance_id: &crate::link::LinkInstanceId) -> crate::grpc_impl::api::LinkInstanceId {
+        crate::grpc_impl::api::LinkInstanceId {
+            id: instance_id.0.to_string(),
         }
     }
 
@@ -174,7 +191,7 @@ impl CommonConverters {
             output_mapping: crate_update
                 .output_mapping
                 .iter()
-                .map(|(key, value)| (key.clone(), Self::serialize_output(value)))
+                .map(|(key, value)| (key.0.clone(), Self::serialize_output(value)))
                 .collect(),
             input_mapping: std::collections::HashMap::new(),
         }
@@ -204,7 +221,21 @@ impl CommonConverters {
                         .collect(),
                 })),
             },
-            crate::common::Output::Link(link_id) => todo!(),
+            crate::common::Output::Link(link_instance_id) => super::api::InstanceOutput {
+                output_type: Some(super::api::instance_output::OutputType::Link(
+                    CommonConverters::serialize_link_instance_id(link_instance_id),
+                )),
+            },
+        }
+    }
+
+    pub fn serialize_input(crate_input: &crate::common::Input) -> super::api::InstanceInput {
+        match crate_input {
+            crate::common::Input::Link(link_instance_id) => super::api::InstanceInput {
+                input_type: Some(super::api::instance_input::InputType::Link(CommonConverters::serialize_link_instance_id(
+                    link_instance_id,
+                ))),
+            },
         }
     }
 

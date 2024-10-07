@@ -4,7 +4,7 @@
 #[derive(Debug, serde::Deserialize)]
 pub struct WorkflowSpecFunctionClass {
     pub id: String,
-    pub function_type: String,
+    pub code_type: String,
     pub version: String,
     pub code: Option<String>,
     pub build: Option<String>,

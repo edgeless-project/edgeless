@@ -211,7 +211,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         log::info!("{:?}", update.output_mapping);
-        let target = match update.output_mapping.get("new_request") {
+        let target = match update
+            .output_mapping
+            .get(&edgeless_api::function_instance::PortId("new_request".to_string()))
+        {
             Some(val) => val.clone(),
             None => {
                 return Err(anyhow::anyhow!("Missing mapping of channel: new_request"));

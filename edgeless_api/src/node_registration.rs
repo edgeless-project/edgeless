@@ -8,6 +8,12 @@ pub struct ResourceProviderSpecification {
     pub outputs: Vec<String>,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct LinkProviderSpecification {
+    pub provider_id: crate::link::LinkProviderId,
+    pub class: crate::link::LinkType,
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NodeCapabilities {
     // Number of (actual or virtual) CPUs associated with the edge node.
@@ -98,7 +104,14 @@ pub enum UpdateNodeRequest {
     // 2: invocation_url (cannot be empty)
     // 3: resource provider specifications (can be empty)
     // 4: node capabilities
-    Registration(uuid::Uuid, String, String, Vec<ResourceProviderSpecification>, NodeCapabilities),
+    Registration(
+        uuid::Uuid,
+        String,
+        String,
+        Vec<ResourceProviderSpecification>,
+        NodeCapabilities,
+        Vec<LinkProviderSpecification>,
+    ),
 
     // 0: node_id (cannot be empty)
     Deregistration(uuid::Uuid),

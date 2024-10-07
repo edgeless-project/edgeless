@@ -242,7 +242,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         // Find the target component to which we have to send events
         // generated on the "out" output channel.
-        let target = match update.output_mapping.get("out") {
+        let target = match update.output_mapping.get(&edgeless_api::function_instance::PortId("out".to_string())) {
             Some(val) => val.clone(),
             None => {
                 anyhow::bail!("Missing mapping of channel: out");

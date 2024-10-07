@@ -111,15 +111,11 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
     }
 
     async fn start_function(&mut self, spawn_request: edgeless_api::function_instance::SpawnFunctionRequest) {
-        log::info!("Start Function {:?}", spawn_request.instance_id);
-        let instance_id = match spawn_request.instance_id.clone() {
-            Some(id) => id,
-            None => {
-                return;
-            }
-        };
+        log::info!("Start Function {:?} {:?}", spawn_request.instance_id, spawn_request.output_mapping);
+        let instance_id = spawn_request.instance_id.clone();
         let cloned_req = spawn_request.clone();
-        let data_plane = self.data_plane_provider.get_handle_for(instance_id.clone()).await;
+        let mut data_plane = self.data_plane_provider.get_handle_for(instance_id.clone()).await;
+        data_plane.update_mapping(spawn_request.input_mapping, spawn_request.output_mapping).await;
         let instance = super::function_instance_runner::FunctionInstanceRunner::new(
             cloned_req,
             data_plane,

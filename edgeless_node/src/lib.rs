@@ -201,6 +201,7 @@ pub async fn register_node(
     settings: EdgelessNodeGeneralSettings,
     capabilities: edgeless_api::node_registration::NodeCapabilities,
     resource_provider_specifications: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
+    link_provider_specifications: Vec<edgeless_api::node_registration::LinkProviderSpecification>,
 ) {
     log::info!(
         "Registering this node '{}' on e-ORC {}, capabilities: {}",
@@ -208,7 +209,8 @@ pub async fn register_node(
         &settings.controller_url,
         capabilities
     );
-    match edgeless_api::grpc_impl::controller::ControllerAPIClient::new(&settings.controller_url).await
+    match edgeless_api::grpc_impl::controller::ControllerAPIClient::new(&settings.controller_url)
+        .await
         .node_registration_api()
         .update_node(edgeless_api::node_registration::UpdateNodeRequest::Registration(
             settings.node_id.clone(),
@@ -222,6 +224,7 @@ pub async fn register_node(
             },
             resource_provider_specifications,
             capabilities,
+            link_provider_specifications,
         ))
         .await
     {
@@ -545,7 +548,16 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         register_node(
             settings.general,
             get_capabilities(runtimes, settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
-            resource_provider_specifications
+            resource_provider_specifications,
+            data_plane
+                .link_providers()
+                .await
+                .into_iter()
+                .map(|(class, id)| edgeless_api::node_registration::LinkProviderSpecification {
+                    provider_id: id,
+                    class: class
+                })
+                .collect()
         )
     );
 }

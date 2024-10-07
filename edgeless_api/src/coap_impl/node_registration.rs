@@ -37,7 +37,8 @@ impl NodeRegistrationHelper for super::CoapClient {
         &mut self,
         update: crate::node_registration::UpdateNodeRequest,
     ) -> anyhow::Result<crate::node_registration::UpdateNodeResponse> {
-        if let crate::node_registration::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resources, capabilities) = update {
+        if let crate::node_registration::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resources, capabilities, links) = update
+        {
             let mut encoded_resources = heapless::Vec::new();
 
             for resource in &resources {

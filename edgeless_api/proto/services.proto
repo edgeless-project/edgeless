@@ -166,3 +166,8 @@ service GuestAPIHost {
     // Output: none.
     rpc Sync (SyncData) returns (google.protobuf.Empty);
 }
+
+service LinkInstance {
+    rpc Create (CreateLinkInstanceRequest) returns (google.protobuf.Empty);
+    rpc Remove (LinkInstanceId) returns (google.protobuf.Empty);
+}

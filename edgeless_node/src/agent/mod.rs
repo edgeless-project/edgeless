@@ -97,7 +97,7 @@ impl Agent {
                         log::error!("No instance_id provided for SpawnFunctionRequest!");
                         continue;
                     }
-                    component_id_to_class_map.insert(spawn_req.instance_id.clone().unwrap(), spawn_req.code.function_class_type.clone());
+                    component_id_to_class_map.insert(spawn_req.instance_id.clone(), spawn_req.code.function_class_type.clone());
 
                     // Get runner for function_class of spawn_req
                     match runners.get_mut(&spawn_req.code.function_class_type) {
@@ -374,14 +374,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
         let mut request = request;
-        let f_id = match request.instance_id.clone() {
-            Some(id) => id,
-            None => {
-                let new_id = edgeless_api::function_instance::InstanceId::new(self.node_id);
-                request.instance_id = Some(new_id.clone());
-                new_id
-            }
-        };
+        let f_id = request.instance_id.clone();
         match self.sender.send(AgentRequest::Spawn(request)).await {
             Ok(_) => Ok(edgeless_api::common::StartComponentResponse::InstanceId(f_id)),
             Err(err) => Err(anyhow::anyhow!(

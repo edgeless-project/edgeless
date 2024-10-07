@@ -15,10 +15,21 @@ impl ResourceConfigurationConverters {
             output_mapping: api_spec
                 .output_mapping
                 .iter()
-                .flat_map(|(name, output)| {
+                .filter_map(|(name, output)| {
                     let id = CommonConverters::parse_output(output);
                     match id {
-                        Ok(val) => Some((name.to_string(), val)),
+                        Ok(val) => Some((crate::function_instance::PortId(name.to_string()), val)),
+                        Err(_) => None,
+                    }
+                })
+                .collect(),
+            input_mapping: api_spec
+                .input_mapping
+                .iter()
+                .filter_map(|(name, input)| {
+                    let id = CommonConverters::parse_input(input);
+                    match id {
+                        Ok(val) => Some((crate::function_instance::PortId(name.to_string()), val)),
                         Err(_) => None,
                     }
                 })
@@ -35,7 +46,12 @@ impl ResourceConfigurationConverters {
             output_mapping: crate_spec
                 .output_mapping
                 .iter()
-                .map(|(name, output)| (name.to_string(), CommonConverters::serialize_output(output)))
+                .map(|(name, output)| (name.0.to_string(), CommonConverters::serialize_output(output)))
+                .collect(),
+            input_mapping: crate_spec
+                .input_mapping
+                .iter()
+                .map(|(name, input)| (name.0.to_string(), CommonConverters::serialize_input(input)))
                 .collect(),
         }
     }

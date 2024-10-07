@@ -152,7 +152,8 @@ async fn main() -> anyhow::Result<()> {
                                     .actors
                                     .into_iter()
                                     .map(|func_spec| {
-                                        let function_class_code = match func_spec.klass.id.as_str() {
+                                        log::info!("{:?}", func_spec.klass.code.clone());
+                                        let function_class_code = match func_spec.klass.code_type.as_str() {
                                             "RUST_WASM" => std::fs::read(func_spec.klass.code.unwrap().path).unwrap(),
                                             "RUST" => std::fs::read(func_spec.klass.code.unwrap().path).unwrap(),
                                             "CONTAINER" => func_spec.klass.code.unwrap().path.as_bytes().to_vec(),
@@ -351,8 +352,18 @@ async fn main() -> anyhow::Result<()> {
                     let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
                     let cargo_project_path = spec_file_path.parent().unwrap().to_path_buf();
 
-                    let function_spec: edgeless_config::actor_class::EdgelessActorClass =
-                        serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
+                    let function_spec: edgeless_config::actor_class::EdgelessActorClass = if spec_file_path.extension().unwrap() == "json" {
+                        serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap()
+                    } else {
+                        match edgeless_config::load(spec_file_path).unwrap() {
+                            edgeless_config::LoadResult::ActorClass(a) => a,
+                            _ => {
+                                panic!("Can't Spawn Function as Workflow");
+                            }
+                        }
+                    };
+                    // let function_spec: edgeless_config::actor_class::EdgelessActorClass =
+                    //     serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
 
                     let out_file = cargo_project_path
                         .join(format!("{}.wasm", function_spec.id))
@@ -365,11 +376,22 @@ async fn main() -> anyhow::Result<()> {
                 }
 
                 FunctionCommands::Package { spec_file } => {
+                    log::info!("{:?}", spec_file);
                     let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
                     let cargo_project_path = spec_file_path.parent().unwrap().to_path_buf();
 
-                    let function_spec: edgeless_config::actor_class::EdgelessActorClass =
-                        serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
+                    let function_spec: edgeless_config::actor_class::EdgelessActorClass = if spec_file_path.extension().unwrap() == "json" {
+                        serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap()
+                    } else {
+                        match edgeless_config::load(spec_file_path).unwrap() {
+                            edgeless_config::LoadResult::ActorClass(a) => a,
+                            _ => {
+                                panic!("Can't Spawn Function as Workflow");
+                            }
+                        }
+                    };
+
+                    log::info!("{:?}", function_spec);
 
                     let out_file = cargo_project_path
                         .join(format!("{}.tar.gz", function_spec.id))
@@ -566,7 +588,10 @@ async fn main() -> anyhow::Result<()> {
                             let out = serde_json::to_string(&wf).unwrap();
                             std::fs::write(parent.join(std::path::PathBuf::from("workflow.json")), out.as_bytes()).unwrap();
                         }
-                        edgeless_config::LoadResult::ActorClass(a) => {}
+                        edgeless_config::LoadResult::ActorClass(a) => {
+                            let out = serde_json::to_string(&a).unwrap();
+                            std::fs::write(parent.join(std::path::PathBuf::from("function.json")), out.as_bytes()).unwrap()
+                        }
                     }
                 }
             },

@@ -1,20 +1,18 @@
 {
     "id": "pong_async",
-    "function_type": "RUST_WASM",
     "version": "0.1",
-    "code": "./pong_async.wasm",
+    "inputs": {
+        "ping": {
+            "method": "CAST",
+            "data_type": "edgeless.example.Ping"
+        }
+    },
     "outputs": {
         "pong": {
             "method": "CAST",
             "data_type": "edgeless.example.Pong"
         }
     },
-    "inputs": {
-        "ping": {
-            "method": "CAST",
-            "data_type": "edgeless.example.Ping" 
-        }
-    }, 
     "inner_structure": [
         {
             "source": {
@@ -28,5 +26,7 @@
                 }
             ]
         }
-    ]
+    ],
+    "path": "/app/functions/pong_async/pong_async.tar.gz",
+    "function_type": "RUST"
 }

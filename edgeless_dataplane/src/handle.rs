@@ -26,7 +26,7 @@ impl edgeless_api::link::LinkWriter for IncommingLink {
                 },
                 target_port: self.target_port.clone(),
                 channel_id: 0,
-                message: crate::core::Message::Call(String::from_utf8(msg).unwrap()),
+                message: crate::core::Message::Cast(String::from_utf8(msg).unwrap()),
             })
             .await
             .unwrap();
@@ -139,28 +139,31 @@ impl DataplaneHandle {
                         target_port: target_channel,
                     };
                 }
-                log::error!("Unprocesses other message");
+                log::error!("Unprocesses other message {:?}", message);
             }
         }
     }
 
     pub async fn update_mapping(
         &mut self,
-        new_input_mapping: std::collections::HashMap<String, edgeless_api::common::Input>,
-        new_output_mapping: std::collections::HashMap<String, edgeless_api::common::Output>,
+        new_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
+        new_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
     ) {
+        log::info!("{:?}", new_output_mapping);
         let ((removed_inputs, removed_output), (added_inputs, added_outputs)) =
             self.alias_mapping.update(new_input_mapping, new_output_mapping).await;
 
         for (added_i_id, i) in added_inputs {
             if let edgeless_api::common::Input::Link(l) = i {
+                log::info!("I Link");
                 self.add_incomming_link(edgeless_api::function_instance::PortId(added_i_id), &l).await;
             }
         }
 
         for (added_o_id, o) in added_outputs {
             if let edgeless_api::common::Output::Link(l) = o {
-                self.add_incomming_link(edgeless_api::function_instance::PortId(added_o_id), &l).await;
+                log::info!("O Link");
+                self.add_outgoing_link(edgeless_api::function_instance::PortId(added_o_id), &l).await;
             }
         }
     }
@@ -185,6 +188,7 @@ impl DataplaneHandle {
     }
 
     pub async fn send_alias(&mut self, target: String, msg: String) -> anyhow::Result<()> {
+        log::info!("Send alias: {}", msg);
         if target == "self" {
             self.send(
                 self.slf.clone(),
@@ -207,11 +211,13 @@ impl DataplaneHandle {
                     }
                 }
                 edgeless_api::common::Output::All(ids) => {
+                    log::info!("Send all {:?}", ids);
                     for (instance_id, port_id) in ids {
                         self.send(instance_id, port_id.clone(), msg.to_string()).await;
                     }
                 }
                 edgeless_api::common::Output::Link(link_id) => {
+                    log::info!("Send Link");
                     self.send_to_link(&link_id, msg.to_string().into_bytes()).await;
                 }
             }
@@ -263,6 +269,8 @@ impl DataplaneHandle {
     pub async fn send_to_link(&mut self, link_id: &edgeless_api::link::LinkInstanceId, msg: Vec<u8>) {
         if let Some(link) = self.links.get(link_id) {
             link.lock().await.handle(msg).await;
+        } else {
+            log::info!("Link not found");
         }
     }
 
@@ -273,6 +281,7 @@ impl DataplaneHandle {
         target_port: edgeless_api::function_instance::PortId,
         msg: String,
     ) {
+        log::info!("Send Raw");
         self.send_inner(target, Message::Cast(msg), target_port, 0).await;
     }
 
@@ -331,7 +340,7 @@ impl DataplaneHandle {
                 _ => {}
             }
         }
-        log::info!("Unprocessed Message: {:?}->{:?}", self.slf, target);
+        log::info!("Unprocessed Message: {:?} {:?}->{:?}", msg, self.slf, target);
     }
 }
 
@@ -357,6 +366,10 @@ impl LinkManager {
             link_providers: std::collections::HashMap::new(),
             links: std::collections::HashMap::new(),
         }
+    }
+
+    fn providers(&self) -> Vec<(edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId)> {
+        self.link_providers.iter().map(|(p_id, p)| (p.class(), p_id.clone())).collect()
     }
 }
 
@@ -385,7 +398,7 @@ impl DataplaneProvider {
         let mut lm = LinkManager::new();
         lm.link_providers.insert(
             edgeless_api::link::LinkProviderId(uuid::Uuid::new_v4()),
-            Box::new(crate::multicast_link::MulticastProvider::new()),
+            Box::new(edgeless_link_multicast::link::MulticastProvider::new()),
         );
 
         Self {
@@ -427,6 +440,10 @@ impl DataplaneProvider {
             _ => Box::new(edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&target.invocation_url).await),
         }
     }
+
+    pub async fn link_providers(&self) -> Vec<(edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId)> {
+        self.link_manager.lock().await.providers()
+    }
 }
 
 #[async_trait::async_trait]
@@ -454,10 +471,14 @@ impl edgeless_api::link::LinkManager for DataplaneProvider {
 #[async_trait::async_trait]
 impl edgeless_api::link::LinkInstanceAPI for DataplaneProvider {
     async fn create(&mut self, req: edgeless_api::link::CreateLinkRequest) -> anyhow::Result<()> {
+        log::info!("Create Link Called");
+
         let mut lm = self.link_manager.lock().await;
         if let Some(link_provider) = lm.link_providers.get_mut(&req.provider) {
             let link = link_provider.create(req.clone()).await?;
             lm.links.insert(req.id, link);
+            log::info!("Added Link");
+
             return Ok(());
         }
         Err(anyhow::anyhow!("Not Possible"))

@@ -42,7 +42,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
     ) -> Self {
-        let instance_id = spawn_req.instance_id.unwrap();
+        let instance_id = spawn_req.instance_id;
         let mut telemetry_handle = telemetry_handle;
         let mut state_handle = state_handle;
 

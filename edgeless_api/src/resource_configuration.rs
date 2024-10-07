@@ -7,7 +7,9 @@ use crate::common::PatchRequest;
 pub struct ResourceInstanceSpecification {
     pub class_type: String,
     #[serde(skip)]
-    pub output_mapping: std::collections::HashMap<String, crate::common::Output>,
+    pub output_mapping: std::collections::HashMap<super::function_instance::PortId, crate::common::Output>,
+    #[serde(skip)]
+    pub input_mapping: std::collections::HashMap<super::function_instance::PortId, crate::common::Input>,
     pub configuration: std::collections::HashMap<String, String>,
 }
 

@@ -125,6 +125,11 @@ fn parse_update_node_request(api_instance: &crate::grpc_impl::api::UpdateNodeReq
                         Some(val) => parse_node_capabilities(val),
                         None => crate::node_registration::NodeCapabilities::empty(),
                     },
+                    api_instance
+                        .link_providers
+                        .iter()
+                        .map(|p| crate::node_registration::LinkProviderSpecification::try_from(p.clone()).unwrap())
+                        .collect(),
                 ))
             } else {
                 Err(anyhow::anyhow!(
@@ -167,16 +172,22 @@ fn parse_update_node_response(
 
 fn serialize_update_node_request(req: &crate::node_registration::UpdateNodeRequest) -> crate::grpc_impl::api::UpdateNodeRequest {
     match req {
-        crate::node_registration::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resource_providers, capabilities) => {
-            crate::grpc_impl::api::UpdateNodeRequest {
-                request_type: crate::grpc_impl::api::UpdateNodeRequestType::Register as i32,
-                node_id: node_id.to_string(),
-                agent_url: Some(agent_url.to_string()),
-                invocation_url: Some(invocation_url.to_string()),
-                resource_providers: resource_providers.iter().map(serialize_resource_provider_specification).collect(),
-                capabilities: Some(serialize_node_capabilities(capabilities)),
-            }
-        }
+        crate::node_registration::UpdateNodeRequest::Registration(
+            node_id,
+            agent_url,
+            invocation_url,
+            resource_providers,
+            capabilities,
+            link_providers,
+        ) => crate::grpc_impl::api::UpdateNodeRequest {
+            request_type: crate::grpc_impl::api::UpdateNodeRequestType::Register as i32,
+            node_id: node_id.to_string(),
+            agent_url: Some(agent_url.to_string()),
+            invocation_url: Some(invocation_url.to_string()),
+            resource_providers: resource_providers.iter().map(serialize_resource_provider_specification).collect(),
+            capabilities: Some(serialize_node_capabilities(capabilities)),
+            link_providers: link_providers.iter().map(|p| p.clone().into()).collect(),
+        },
         crate::node_registration::UpdateNodeRequest::Deregistration(node_id) => crate::grpc_impl::api::UpdateNodeRequest {
             request_type: crate::grpc_impl::api::UpdateNodeRequestType::Deregister as i32,
             node_id: node_id.to_string(),
@@ -184,6 +195,7 @@ fn serialize_update_node_request(req: &crate::node_registration::UpdateNodeReque
             invocation_url: None,
             resource_providers: vec![],
             capabilities: None,
+            link_providers: Vec::new(),
         },
     }
 }
@@ -215,6 +227,26 @@ fn serialize_resource_provider_specification(
         provider_id: crate_spec.provider_id.clone(),
         class_type: crate_spec.class_type.clone(),
         outputs: crate_spec.outputs.clone(),
+    }
+}
+
+impl Into<crate::grpc_impl::api::LinkProviderSpecification> for crate::node_registration::LinkProviderSpecification {
+    fn into(self) -> crate::grpc_impl::api::LinkProviderSpecification {
+        crate::grpc_impl::api::LinkProviderSpecification {
+            id: Some(self.provider_id.into()),
+            class: Some(self.class.into()),
+        }
+    }
+}
+
+impl TryFrom<crate::grpc_impl::api::LinkProviderSpecification> for crate::node_registration::LinkProviderSpecification {
+    type Error = anyhow::Error;
+
+    fn try_from(value: crate::grpc_impl::api::LinkProviderSpecification) -> Result<Self, Self::Error> {
+        Ok(crate::node_registration::LinkProviderSpecification {
+            provider_id: crate::link::LinkProviderId::try_from(value.id.ok_or(anyhow::anyhow!("Missing Field"))?)?,
+            class: crate::link::LinkType::try_from(value.class.ok_or(anyhow::anyhow!("Missing Field"))?)?,
+        })
     }
 }
 

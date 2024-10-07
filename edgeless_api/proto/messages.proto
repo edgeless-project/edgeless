@@ -88,6 +88,10 @@ message SpawnFunctionRequest {
     map<string, string> annotations = 3;
     // The state specification.
     StateSpecification state_specification = 4;
+
+    map<string, InstanceOutput> output_mapping = 5;
+
+    map<string, InstanceInput> input_mapping = 6;
 }
 
 // Some APIs provide the same inteface for different id types (external vs internal)
@@ -132,6 +136,8 @@ message UpdateNodeRequest {
     repeated ResourceProviderSpecification resource_providers = 5;
     // Node capabilities. May be only present if REGISTER type.
     NodeCapabilities capabilities                             = 6;
+
+    repeated LinkProviderSpecification link_providers = 7;
 }
 
 // Node capabilities exposed to the orchestrator.
@@ -208,7 +214,7 @@ message PatchRequest {
     InstanceId function_id = 1;
     // Mapping of the outputs to concrete function/resource instances.
     map<string, InstanceOutput> output_mapping = 3;
-    map<string, InstanceOutput> input_mapping = 4;
+    map<string, InstanceInput> input_mapping = 4;
 }
 
 message Target {
@@ -220,11 +226,22 @@ message TargetVec {
     repeated Target data = 1;
 }
 
+message LinkInstanceId {
+    string id = 1;
+}
+
 message InstanceOutput {
     oneof OutputType {
         Target single = 1;
         TargetVec any  = 2;
         TargetVec all = 3;
+        LinkInstanceId link = 4;    
+    }
+}
+
+message InstanceInput {
+    oneof InputType {
+        LinkInstanceId link = 1;
     }
 }
 
@@ -378,6 +395,12 @@ message ResourceInstanceSpecification {
     map<string, string> configuration = 2;
     // Mapping of the outputs to concrete function/resource instances.
     map<string, InstanceOutput> output_mapping = 3;
+    map<string, InstanceInput> input_mapping = 4;
+}
+
+message LinkProviderSpecification {
+    LinkProviderId id = 1;
+    LinkType class = 2;
 }
 
 // Message containing information provided as response to failed request.
@@ -513,4 +536,25 @@ message SyncData {
 
     // The function instance state to be serialized (opaque to the platform).
     bytes serialized_state = 2;
+}
+
+message LinkProviderId {
+    string id = 1;
+}
+
+message LinkType {
+    string type = 1;
+}
+
+enum LinkDirection {
+    Read = 0;
+    Write = 1;
+    BiDi = 2;
+}
+
+message CreateLinkInstanceRequest {
+    LinkInstanceId id = 1;
+    LinkProviderId provider_id = 2;
+    LinkDirection direction = 3;
+    bytes config = 4;
 }

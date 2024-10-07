@@ -21,5 +21,6 @@ members = [
     "edgeless_build",
     "edgeless_function_core",
     "edgeless_function_macro",
-    "edgeless_config"
+    "edgeless_config",
+    "edgeless_link_multicast"
 ]

@@ -1,7 +1,7 @@
 {
     "functions": [
         {
-            "name": "ponger",
+            "id": "ponger",
             "class_specification": {
                 "id": "pong_async",
                 "function_type": "RUST",
@@ -47,7 +47,7 @@
             "annotations": {}
         },
         {
-            "name": "pinger",
+            "id": "pinger",
             "class_specification": {
                 "id": "ping_async",
                 "function_type": "RUST",

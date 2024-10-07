@@ -320,7 +320,7 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
 
         for (id, output) in update.output_mapping {
             if let edgeless_api::common::Output::Single(target, port_id) = output {
-                output_targets.insert(id, (target, port_id));
+                output_targets.insert(id.0, (target, port_id));
             } else {
                 return Err(anyhow::anyhow!("Unsupported Output Type"));
             }

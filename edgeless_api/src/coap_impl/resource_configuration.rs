@@ -14,7 +14,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
         for (key, val) in &instance_specification.output_mapping {
             outputs
                 .push((
-                    &key,
+                    &key.0,
                     match val {
                         crate::common::Output::Single(instance_id, port_id) => {
                             edgeless_api_core::common::Output::Single(edgeless_api_core::common::Target {
@@ -100,7 +100,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
 
         for (key, val) in &update.output_mapping {
             outputs.push((
-                key,
+                &key.0,
                 match val {
                     crate::common::Output::Single(instance_id, port_id) => {
                         edgeless_api_core::common::Output::Single(edgeless_api_core::common::Target {

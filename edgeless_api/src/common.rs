@@ -30,8 +30,8 @@ pub enum Input {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatchRequest {
     pub function_id: edgeless_api_core::instance_id::InstanceId,
-    pub output_mapping: std::collections::HashMap<String, Output>,
-    pub input_mapping: std::collections::HashMap<String, Input>,
+    pub output_mapping: std::collections::HashMap<crate::function_instance::PortId, Output>,
+    pub input_mapping: std::collections::HashMap<crate::function_instance::PortId, Input>,
 }
 
 impl std::fmt::Display for ResponseError {

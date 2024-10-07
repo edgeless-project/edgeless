@@ -40,10 +40,7 @@ impl OrchestrationLogic {
         capabilities: &edgeless_api::node_registration::NodeCapabilities,
         resource_providers: &std::collections::HashMap<String, crate::controller::server::ResourceProvider>,
     ) -> bool {
-        if !capabilities.runtimes.iter().any(|x| x == runtime) {
-            return false;
-        }
-        if !reqs.node_id_match_any.is_empty() && !reqs.node_id_match_any.contains(node_id) {
+        if !Self::runtime_supported(runtime, &capabilities.runtimes[..]) {
             return false;
         }
         for label in reqs.label_match_all.iter() {
@@ -82,25 +79,21 @@ impl OrchestrationLogic {
     pub fn next(
         &mut self,
         node_pool: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>,
-        spawn_req: &edgeless_api::workflow_instance::WorkflowFunction,
+        compute_type: &str,
+        annotations: &std::collections::HashMap<String, String>,
     ) -> Option<uuid::Uuid> {
         if node_pool.is_empty() {
+            log::info!("No nodes");
             return None;
         }
-        let reqs = crate::orchestration_utils::DeploymentRequirements::from_annotations(&spawn_req.annotations);
+        let reqs = crate::orchestration_utils::DeploymentRequirements::from_annotations(annotations);
         match self.orchestration_strategy {
             crate::orchestration_utils::OrchestrationStrategy::Random => {
                 // Select only the nodes that are feasible.
                 let mut candidates = vec![];
                 let mut high: f32 = 0.0;
                 for (node_id, node_desc) in node_pool {
-                    if Self::is_node_feasible(
-                        &spawn_req.function_class_specification.function_class_type,
-                        &reqs,
-                        &node_id,
-                        &node_desc.capabilities,
-                        &node_desc.resource_providers,
-                    ) {
+                    if Self::is_node_feasible(compute_type, &reqs, &node_id, &node_desc.capabilities, &node_desc.resource_providers) {
                         candidates.push((node_id.clone(), node_desc.weight));
                         high += &node_desc.weight;
                     }
@@ -116,8 +109,22 @@ impl OrchestrationLogic {
                         }
                     }
                 }
+                log::info!("Random no High");
                 None
             }
         }
+    }
+
+    fn runtime_supported(requested_runtime: &str, available_runtimes: &[String]) -> bool {
+        if available_runtimes.iter().any(|x| x.as_str() == requested_runtime) {
+            return true;
+        }
+        if requested_runtime == "RUST" {
+            if available_runtimes.iter().any(|x| x.as_str() == "RUST_WASM") {
+                return true;
+            }
+        }
+
+        false
     }
 }

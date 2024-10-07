@@ -43,28 +43,26 @@ impl Controller {
         controller_settings: crate::EdgelessConSettings,
     ) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
         // Connect to all orchestrators.
-        let mut orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>::new();
-        for orc in &controller_settings.orchestrators {
-            match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&orc.orchestrator_url, Some(1)).await {
-                Ok(val) => {
-                    orc_clients.insert(orc.domain_id.to_string(), Box::new(val));
-                }
-                Err(err) => {
-                    log::error!("Could not connect to e-ORC {}: {}", &orc.orchestrator_url, err);
-                }
-            }
-        }
+        // let mut orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>::new();
+        // for orc in &controller_settings.orchestrators {
+        //     match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&orc.orchestrator_url, Some(1)).await {
+        //         Ok(val) => {
+        //             orc_clients.insert(orc.domain_id.to_string(), Box::new(val));
+        //         }
+        //         Err(err) => {
+        //             log::error!("Could not connect to e-ORC {}: {}", &orc.orchestrator_url, err);
+        //         }
+        //     }
+        // }
 
-        Self::new(orc_clients)
+        Self::new()
     }
 
-    fn new(
-        orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>,
-    ) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
+    fn new() -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
-            let mut controller_task = server::ControllerTask::new(receiver, orchestrators);
+            let mut controller_task = server::ControllerTask::new(receiver);
             controller_task.run().await;
         });
 

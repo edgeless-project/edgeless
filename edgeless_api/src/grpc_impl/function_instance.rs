@@ -56,10 +56,7 @@ impl FunctonInstanceConverters {
         api_request: &crate::grpc_impl::api::SpawnFunctionRequest,
     ) -> anyhow::Result<crate::function_instance::SpawnFunctionRequest> {
         Ok(crate::function_instance::SpawnFunctionRequest {
-            instance_id: match api_request.instance_id.as_ref() {
-                Some(id) => Some(CommonConverters::parse_instance_id(id)?),
-                None => None,
-            },
+            instance_id: CommonConverters::parse_instance_id(api_request.instance_id.as_ref().unwrap())?,
             code: Self::parse_function_class_specification(match api_request.code.as_ref() {
                 Some(val) => val,
                 None => {
@@ -73,6 +70,28 @@ impl FunctonInstanceConverters {
                     return Err(anyhow::anyhow!("Request does not contain state_spec."));
                 }
             })?,
+            input_mapping: api_request
+                .input_mapping
+                .iter()
+                .filter_map(|(id, spec)| {
+                    if let Ok(input) = CommonConverters::parse_input(spec) {
+                        Some((crate::function_instance::PortId(id.clone()), input))
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+            output_mapping: api_request
+                .output_mapping
+                .iter()
+                .filter_map(|(id, spec)| {
+                    if let Ok(input) = CommonConverters::parse_output(spec) {
+                        Some((crate::function_instance::PortId(id.clone()), input))
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
         })
     }
 
@@ -159,13 +178,20 @@ impl FunctonInstanceConverters {
 
     pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFunctionRequest) -> crate::grpc_impl::api::SpawnFunctionRequest {
         crate::grpc_impl::api::SpawnFunctionRequest {
-            instance_id: req
-                .instance_id
-                .as_ref()
-                .and_then(|instance_id| Some(CommonConverters::serialize_instance_id(instance_id))),
+            instance_id: Some(CommonConverters::serialize_instance_id(&req.instance_id)),
             code: Some(Self::serialize_function_class_specification(&req.code)),
             annotations: req.annotations.clone(),
             state_specification: Some(Self::serialize_state_specification(&req.state_specification)),
+            input_mapping: req
+                .input_mapping
+                .iter()
+                .map(|(id, spec)| (id.0.clone(), CommonConverters::serialize_input(spec)))
+                .collect(),
+            output_mapping: req
+                .output_mapping
+                .iter()
+                .map(|(id, spec)| (id.0.clone(), CommonConverters::serialize_output(spec)))
+                .collect(),
         }
     }
 

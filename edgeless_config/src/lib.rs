@@ -24,6 +24,7 @@ pub fn load(main_file: std::path::PathBuf) -> anyhow::Result<LoadResult> {
 
     if let Ok(main) = m.get("el_main") {
         if let Ok(workflow) = main.clone().downcast::<crate::workflow::EdgelessWorkflow>() {
+            // panic!("{:?}", workflow);
             return Ok(LoadResult::Workflow(workflow.as_ref().clone()));
         }
 

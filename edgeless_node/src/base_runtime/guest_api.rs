@@ -23,6 +23,7 @@ pub enum GuestAPIError {
 
 impl GuestAPIHost {
     pub async fn cast_alias(&mut self, alias: &str, msg: &str) -> Result<(), GuestAPIError> {
+        log::info!("dp send");
         self.data_plane
             .send_alias(alias.to_string(), msg.to_string())
             .await

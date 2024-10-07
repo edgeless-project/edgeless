@@ -12,6 +12,7 @@ use futures::StreamExt;
 pub struct ControllerTask {
     request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
     nodes: std::collections::HashMap<edgeless_api::function_instance::NodeId, WorkerNode>,
+    link_controllers: std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>,
     active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::deployment_state::ActiveWorkflow>,
     orchestration_logic: crate::orchestration_logic::OrchestrationLogic,
 }
@@ -23,6 +24,7 @@ pub struct WorkerNode {
     pub capabilities: edgeless_api::node_registration::NodeCapabilities,
     pub health_status: edgeless_api::node_management::HealthStatus,
     pub weight: f32,
+    pub supported_link_types: std::collections::HashMap<edgeless_api::link::LinkType, edgeless_api::link::LinkProviderId>,
 }
 
 #[derive(serde::Serialize)]
@@ -32,13 +34,14 @@ pub struct ResourceProvider {
 }
 
 impl ControllerTask {
-    pub fn new(
-        request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
-        orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>,
-    ) -> Self {
+    pub fn new(request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>) -> Self {
         Self {
             request_receiver,
             nodes: std::collections::HashMap::new(),
+            link_controllers: std::collections::HashMap::from([(
+                edgeless_api::link::LinkType("MULTICAST".to_string()),
+                Box::new(edgeless_link_multicast::controller::MulticastController::new()) as Box<dyn edgeless_api::link::LinkController>,
+            )]),
             active_workflows: std::collections::HashMap::new(),
             orchestration_logic: crate::orchestration_logic::OrchestrationLogic::new(crate::orchestration_utils::OrchestrationStrategy::Random),
         }
@@ -56,6 +59,7 @@ impl ControllerTask {
                     if let Some(req) = req {
                         match req {
                             super::ControllerRequest::START(spawn_workflow_request, reply_sender) => {
+                                // log::info!("{:?}", spawn_workflow_request);
                                 let reply = self.start_workflow(spawn_workflow_request).await;
                                 match reply_sender.send(reply) {
                                     Ok(_) => {}
@@ -78,7 +82,7 @@ impl ControllerTask {
                             }
                             super::ControllerRequest::UPDATENODE(update, reply_sender) => {
                                 let reply = match update {
-                                    edgeless_api::node_registration::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resource_providers, capabilities) => self.process_node_registration(node_id, agent_url, invocation_url, resource_providers, capabilities).await,
+                                    edgeless_api::node_registration::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resource_providers, capabilities, link_providers) => self.process_node_registration(node_id, agent_url, invocation_url, resource_providers, capabilities, link_providers).await,
                                     edgeless_api::node_registration::UpdateNodeRequest::Deregistration(node_id) => self.process_node_del(node_id).await,
                                 };
                                 match reply_sender.send(reply) {
@@ -103,113 +107,16 @@ impl ControllerTask {
         &mut self,
         spawn_workflow_request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
     ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse> {
-        if !spawn_workflow_request.annotations.is_empty() {
-            log::warn!(
-                "Workflow annotations ({}) are currently ignored",
-                spawn_workflow_request.annotations.len()
-            );
-        }
-
         // Assign a new identifier to the newly-created workflow.
         let wf_id = edgeless_api::workflow_instance::WorkflowId {
             workflow_id: uuid::Uuid::new_v4(),
         };
 
-        let mut wf = super::deployment_state::ActiveWorkflow {
-            desired_state: spawn_workflow_request.clone(),
-            domain_mapping: std::collections::HashMap::new(),
-        };
+        let mut wf2 = super::deployment_state::ActiveWorkflow::new(spawn_workflow_request.clone(), wf_id.clone());
+        let required_changes = wf2.initial_spawn(&mut self.orchestration_logic, &self.nodes, &mut self.link_controllers);
+        self.active_workflows.insert(wf_id.clone(), wf2);
 
-        wf.optimize_logical();
-
-        self.active_workflows.insert(wf_id.clone(), wf);
-
-        let active_workflow = self.active_workflows.get(&wf_id).unwrap().clone();
-
-        // Keep the last error.
-        let mut res: Result<(), String> = Ok(());
-
-        //
-        // First pass: create instances for all the functions and resources.
-        //
-
-        // Start the functions on the orchestration domain.
-        for function in &spawn_workflow_request.workflow_functions {
-            if res.is_err() {
-                break;
-            }
-
-            // let function_domain = self.orchestrators.iter_mut().next().unwrap().0.clone();
-
-            // select node
-            let function_node = self.select_node(function).unwrap();
-
-            res = self
-                .start_workflow_function_on_node(
-                    &wf_id,
-                    function,
-                    &function_node,
-                    active_workflow.active_inputs(&function.name),
-                    active_workflow.active_outputs(&function.name),
-                )
-                .await;
-        }
-
-        // Start the resources on the orchestration domain.
-        for resource in &spawn_workflow_request.workflow_resources {
-            if res.is_err() {
-                break;
-            }
-
-            let resource_node = self.select_node_for_resource(&resource);
-
-            if let Some(resource_node) = resource_node {
-                res = self.start_workflow_resource_on_node(&wf_id, resource, &resource_node).await;
-            }
-        }
-
-        //
-        // Second pass: patch the workflow, if all the functions
-        // have been created successfully.
-        //
-
-        // Loop on all the functions and resources of the workflow.
-        for component_name in &active_workflow.components() {
-            if res.is_err() {
-                break;
-            }
-
-            // Loop on all the identifiers for this function/resource
-            // (once for each orchestration domain to which the
-            // function/resource was allocated).
-            for origin_fid in self.active_workflows.get_mut(&wf_id).unwrap().mapped_fids(&component_name).unwrap() {
-                // let origin_domain = self.orchestrators.iter_mut().next().unwrap().0.clone();
-
-                let output_mapping = self.output_mapping_for(&wf_id, &component_name).await;
-
-                if output_mapping.is_empty() {
-                    continue;
-                }
-
-                let component_type = self.active_workflows.get_mut(&wf_id).unwrap().component_type(&component_name).unwrap();
-                res = self
-                    .patch_outputs(
-                        origin_fid,
-                        component_type,
-                        output_mapping,
-                        std::collections::HashMap::new(),
-                        &component_name,
-                    )
-                    .await;
-            }
-        }
-
-        //
-        // If all went OK, notify the client that the workflow
-        // has been accepted.
-        // On the other hand, if something went wrong, we must stop
-        // all the functions and resources that have been started.
-        //
+        let res = self.materialize(wf_id.clone(), required_changes).await;
 
         if res.is_err() {
             self.stop_workflow(&wf_id).await;
@@ -219,13 +126,13 @@ impl ControllerTask {
             Ok(_) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(
                 edgeless_api::workflow_instance::WorkflowInstance {
                     workflow_id: wf_id.clone(),
-                    domain_mapping: self.active_workflows.get(&wf_id).unwrap().domain_mapping(),
+                    domain_mapping: Vec::new(),
                 },
             )),
             Err(err) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
                 edgeless_api::common::ResponseError {
                     summary: "Workflow creation failed".to_string(),
-                    detail: Some(err),
+                    detail: Some(err.join(";")),
                 },
             )),
         };
@@ -234,7 +141,7 @@ impl ControllerTask {
     }
 
     async fn stop_workflow(&mut self, wf_id: &edgeless_api::workflow_instance::WorkflowId) {
-        let workflow = match self.active_workflows.get(wf_id) {
+        let mut workflow = match self.active_workflows.remove(wf_id) {
             None => {
                 log::error!("trying to tear-down a workflow that does not exist: {}", wf_id.to_string());
                 return;
@@ -242,82 +149,50 @@ impl ControllerTask {
             Some(val) => val,
         };
 
-        // Stop all the functions/resources.
-        for (_, component) in &workflow.domain_mapping {
-            let orc_api = match self.nodes.get_mut(&component.fid.node_id) {
-                None => {
-                    log::warn!(
-                        "node for workflow {} function {} disappeared: {}",
-                        wf_id.to_string(),
-                        &component.name,
-                        &component.fid.node_id
-                    );
-                    continue;
-                }
-                Some(val) => &mut val.api,
-            };
-            let mut fn_client = orc_api.function_instance_api();
-            let mut resource_client = orc_api.resource_configuration_api();
-
-            log::debug!("stopping function/resource of workflow {}: {}", wf_id.to_string(), &component);
-            match component.component_type {
-                super::ComponentType::Function => match fn_client.stop(component.fid).await {
-                    Ok(_) => {}
-                    Err(err) => {
-                        log::error!("Unhandled: {}", err);
-                    }
-                },
-                super::ComponentType::Resource => match resource_client.stop(component.fid).await {
-                    Ok(_) => {}
-                    Err(err) => {
-                        log::error!("Unhandled: {}", err);
-                    }
-                },
-            }
-        }
-
-        // Remove the workflow from the active set.
-        let remove_res = self.active_workflows.remove(wf_id);
-        assert!(remove_res.is_some());
+        let changes = workflow.stop();
+        if let Err(errs) = self.materialize(wf_id.clone(), changes).await {
+            log::info!("Failures while stopping workflow: {}", errs.join(";"));
+        };
     }
 
     async fn list_workflows(
         &mut self,
         workflow_id: &edgeless_api::workflow_instance::WorkflowId,
     ) -> anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>> {
-        let mut ret: Vec<edgeless_api::workflow_instance::WorkflowInstance> = vec![];
-        if let Some(w_id) = workflow_id.is_valid() {
-            if let Some(wf) = self.active_workflows.get(w_id) {
-                ret = vec![edgeless_api::workflow_instance::WorkflowInstance {
-                    workflow_id: w_id.clone(),
-                    domain_mapping: wf
-                        .domain_mapping
-                        .iter()
-                        .map(|(_name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                            name: component.name.to_string(),
-                            domain_id: component.fid.node_id.to_string(),
-                        })
-                        .collect(),
-                }];
-            }
-        } else {
-            ret = self
-                .active_workflows
-                .iter()
-                .map(|(w_id, wf)| edgeless_api::workflow_instance::WorkflowInstance {
-                    workflow_id: w_id.clone(),
-                    domain_mapping: wf
-                        .domain_mapping
-                        .iter()
-                        .map(|(_name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                            name: component.name.to_string(),
-                            domain_id: component.fid.node_id.to_string(),
-                        })
-                        .collect(),
-                })
-                .collect();
-        }
-        Ok(ret)
+        // let mut ret: Vec<edgeless_api::workflow_instance::WorkflowInstance> = vec![];
+        // if let Some(w_id) = workflow_id.is_valid() {
+        //     if let Some(wf) = self.active_workflows.get(w_id) {
+        //         ret = vec![edgeless_api::workflow_instance::WorkflowInstance {
+        //             workflow_id: w_id.clone(),
+        //             domain_mapping: wf
+        //                 .domain_mapping
+        //                 .iter()
+        //                 .map(|(_name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+        //                     name: component.name.to_string(),
+        //                     domain_id: component.fid.node_id.to_string(),
+        //                 })
+        //                 .collect(),
+        //         }];
+        //     }
+        // } else {
+        //     ret = self
+        //         .active_workflows
+        //         .iter()
+        //         .map(|(w_id, wf)| edgeless_api::workflow_instance::WorkflowInstance {
+        //             workflow_id: w_id.clone(),
+        //             domain_mapping: wf
+        //                 .domain_mapping
+        //                 .iter()
+        //                 .map(|(_name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+        //                     name: component.name.to_string(),
+        //                     domain_id: component.fid.node_id.to_string(),
+        //                 })
+        //                 .collect(),
+        //         })
+        //         .collect();
+        // }
+        // Ok(ret)
+        Ok(vec![])
     }
 
     async fn process_node_registration(
@@ -327,16 +202,16 @@ impl ControllerTask {
         invocation_url: String,
         resource_providers: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
         capabilities: edgeless_api::node_registration::NodeCapabilities,
+        link_providers: Vec<edgeless_api::node_registration::LinkProviderSpecification>,
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
-        
         if let Some(node) = self.nodes.get(&node_id) {
             if node.agent_url == agent_url && node.invocation_url == invocation_url {
-                return Ok(edgeless_api::node_registration::UpdateNodeResponse::Accepted)
+                return Ok(edgeless_api::node_registration::UpdateNodeResponse::Accepted);
             } else {
                 return Ok(edgeless_api::node_registration::UpdateNodeResponse::ResponseError(ResponseError {
                     summary: "Duplicate NodeId with different URL(s).".to_string(),
                     detail: None,
-                }))
+                }));
             }
         }
 
@@ -369,6 +244,7 @@ impl ControllerTask {
                 capabilities,
                 health_status: edgeless_api::node_management::HealthStatus::empty(),
                 weight: node_weight,
+                supported_link_types: link_providers.into_iter().map(|p| (p.class, p.provider_id)).collect(),
             },
         );
 
@@ -408,6 +284,8 @@ impl ControllerTask {
         node_id: edgeless_api::function_instance::NodeId,
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
         if let Some(_) = self.nodes.remove(&node_id) {
+            self.handle_node_removal(&std::collections::HashSet::from_iter(vec![node_id.clone()].into_iter()))
+                .await;
             self.send_peer_updates(vec![edgeless_api::node_management::UpdatePeersRequest::Del(node_id)])
                 .await;
             Ok(edgeless_api::node_registration::UpdateNodeResponse::Accepted)
@@ -416,47 +294,134 @@ impl ControllerTask {
         }
     }
 
+    async fn materialize(
+        &mut self,
+        wf_id: edgeless_api::workflow_instance::WorkflowId,
+        required_changes: Vec<super::deployment_state::RequiredChange>,
+    ) -> Result<(), Vec<String>> {
+        let mut results = Vec::<Result<(), String>>::new();
+
+        // This could be parallel
+        for f in required_changes.into_iter() {
+            results.push(match f {
+                super::deployment_state::RequiredChange::StartFunction {
+                    function_id,
+                    image,
+                    input_mapping,
+                    output_mapping,
+                    function_name,
+                    annotations,
+                } => {
+                    self.start_workflow_function_on_node(&wf_id, function_name, function_id, image, input_mapping, output_mapping, annotations)
+                        .await
+                }
+                super::deployment_state::RequiredChange::StartResource {
+                    resource_id,
+                    resource_name,
+                    class_type,
+                    input_mapping,
+                    output_mapping,
+                    configuration,
+                } => {
+                    self.start_workflow_resource_on_node(
+                        &wf_id,
+                        resource_name,
+                        resource_id,
+                        class_type,
+                        output_mapping,
+                        input_mapping,
+                        configuration,
+                    )
+                    .await
+                }
+                super::deployment_state::RequiredChange::PatchFunction {
+                    function_id,
+                    function_name,
+                    input_mapping,
+                    output_mapping,
+                } => {
+                    self.patch_outputs(function_id, super::ComponentType::Function, output_mapping, input_mapping, &function_name)
+                        .await
+                }
+                super::deployment_state::RequiredChange::PatchResource {
+                    resource_id,
+                    resource_name,
+                    input_mapping,
+                    output_mapping,
+                } => {
+                    self.patch_outputs(resource_id, super::ComponentType::Resource, output_mapping, input_mapping, &resource_name)
+                        .await
+                }
+                super::deployment_state::RequiredChange::InstantiateLinkControlPlane { link_id, class } => {
+                    self.create_link_control_plane(link_id, class).await
+                }
+                super::deployment_state::RequiredChange::CreateLinkOnNode {
+                    link_id,
+                    node_id,
+                    config,
+                    provider_id,
+                } => self.create_link_on_node(link_id, node_id, provider_id, config).await,
+                super::deployment_state::RequiredChange::RemoveLinkFromNode { link_id, node_id } => {
+                    self.remove_link_from_node(link_id, node_id).await
+                }
+            });
+        }
+
+        let mut error_msg = Vec::new();
+        for res in results {
+            if let Err(msg) = res {
+                error_msg.push(msg);
+            }
+        }
+
+        if error_msg.len() == 0 {
+            Ok(())
+        } else {
+            Err(error_msg)
+        }
+    }
+
     async fn start_workflow_function_on_node(
         &mut self,
         wf_id: &edgeless_api::workflow_instance::WorkflowId,
-        function: &edgeless_api::workflow_instance::WorkflowFunction,
-        node_id: &edgeless_api::function_instance::NodeId,
-        enabled_inputs: Vec<edgeless_api::function_instance::PortId>,
-        enabled_outputs: Vec<edgeless_api::function_instance::PortId>,
+        f_name: String,
+        function_id: edgeless_api::function_instance::InstanceId,
+        image: super::deployment_state::ActorImage,
+        input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::deployment_state::PhysicalInput>,
+        output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::deployment_state::PhysicalOutput>,
+        annotations: std::collections::HashMap<String, String>,
     ) -> Result<(), String> {
-        let mut function = function.clone();
-
-        let mut enabled_features: Vec<String> = Vec::new();
-        for input in enabled_inputs {
-            enabled_features.push(format!("input_{}", input.0))
-        }
-        for output in enabled_outputs {
-            enabled_features.push(format!("output_{}", output.0))
-        }
-
-        if function.function_class_specification.function_class_type == "RUST" {
-            let rust_dir = edgeless_build::unpack_rust_package(&function.function_class_specification.function_class_code).unwrap();
-            let wasm_file = edgeless_build::rust_to_wasm(rust_dir, enabled_features, true, false).unwrap();
-            let wasm_code = std::fs::read(wasm_file).unwrap();
-            function.function_class_specification.function_class_code = wasm_code;
-            function.function_class_specification.function_class_type = "RUST_WASM".to_string();
-        }
-
         // [TODO] Issue#95
         // The state_specification configuration should be
         // read from the function annotations.
         log::debug!("state specifications currently forced to NodeLocal");
+        log::info!("{:?}", output_mapping);
         let response = self
-            .fn_client(node_id)
-            .ok_or(format!("No function client for node: {}", node_id))?
+            .fn_client(&function_id.node_id)
+            .ok_or(format!("No function client for node: {}", &function_id.node_id))?
             .start(edgeless_api::function_instance::SpawnFunctionRequest {
-                instance_id: None,
-                code: function.function_class_specification.clone(),
-                annotations: function.annotations.clone(),
+                instance_id: function_id.clone(),
+                code: edgeless_api::function_instance::FunctionClassSpecification {
+                    function_class_id: image.class.id.id.clone(),
+                    function_class_type: image.format.clone(),
+                    function_class_version: image.class.id.version.clone(),
+                    function_class_code: image.code.clone(),
+                    function_class_outputs: image.class.outputs.clone(),
+                    function_class_inputs: image.class.inputs.clone(),
+                    function_class_inner_structure: image
+                        .class
+                        .inner_structure
+                        .iter()
+                        .map(|(src, dst)| (src.clone(), dst.clone().into_iter().collect()))
+                        .collect(),
+                },
+                annotations: annotations.clone(),
                 state_specification: edgeless_api::function_instance::StateSpecification {
                     state_id: uuid::Uuid::new_v4(),
                     state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
                 },
+                input_mapping: input_mapping.clone(),
+                output_mapping: output_mapping.clone(),
             })
             .await;
 
@@ -467,17 +432,6 @@ impl ControllerTask {
                     return Err(format!("function instance creation rejected: {} ", error));
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                    log::info!("workflow {} function {} started with fid {}", wf_id.to_string(), function.name, &id);
-                    // id.node_id is unused
-                    self.active_workflows.get_mut(&wf_id).unwrap().domain_mapping.insert(
-                        function.name.clone(),
-                        super::deployment_state::ActiveComponent {
-                            component_type: super::ComponentType::Function,
-                            name: function.name.clone(),
-                            // domain_id: domain.to_string(),
-                            fid: id,
-                        },
-                    );
                     return Ok(());
                 }
             },
@@ -490,16 +444,21 @@ impl ControllerTask {
     async fn start_workflow_resource_on_node(
         &mut self,
         wf_id: &edgeless_api::workflow_instance::WorkflowId,
-        resource: &edgeless_api::workflow_instance::WorkflowResource,
-        node_id: &edgeless_api::function_instance::NodeId,
+        r_name: String,
+        resource_id: edgeless_api::function_instance::InstanceId,
+        class_type: String,
+        output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::deployment_state::PhysicalOutput>,
+        input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, super::deployment_state::PhysicalInput>,
+        configurations: std::collections::HashMap<String, String>,
     ) -> Result<(), String> {
         let response = self
-            .resource_client(node_id)
-            .ok_or(format!("No resource client for node: {}", node_id))?
+            .resource_client(&resource_id.node_id)
+            .ok_or(format!("No resource client for node: {}", &resource_id.node_id))?
             .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
-                class_type: resource.class_type.clone(),
-                configuration: resource.configurations.clone(),
-                output_mapping: std::collections::HashMap::new(),
+                class_type: class_type.clone(),
+                configuration: configurations.clone(),
+                output_mapping: output_mapping.clone(),
+                input_mapping: input_mapping.clone(),
             })
             .await;
 
@@ -510,17 +469,7 @@ impl ControllerTask {
                     return Err(format!("resource start rejected: {} ", error));
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                    log::info!("workflow {} resource {} started with fid {}", wf_id.to_string(), resource.name, &id);
-                    // id.node_id is unused
-                    self.active_workflows.get_mut(&wf_id).unwrap().domain_mapping.insert(
-                        resource.name.clone(),
-                        super::deployment_state::ActiveComponent {
-                            component_type: super::ComponentType::Resource,
-                            name: resource.name.clone(),
-                            // domain_id: domain.to_string(),
-                            fid: id,
-                        },
-                    );
+                    log::info!("workflow {} resource {} started with fid {}", wf_id.to_string(), &r_name, &id);
                     return Ok(());
                 }
             },
@@ -594,168 +543,20 @@ impl ControllerTask {
         removed_nodes: &std::collections::HashSet<edgeless_api::function_instance::NodeId>,
         wf_id: edgeless_api::workflow_instance::WorkflowId,
     ) {
-        let old_state = self.active_workflows.get(&wf_id).unwrap().clone();
-
-        let mut lost_instances = Vec::<(String, crate::controller::ComponentType)>::new();
-        let mut damaged_instances = std::collections::HashSet::<String>::new();
-
-        self.active_workflows.get_mut(&wf_id).unwrap().domain_mapping.retain(|cname, instance| {
-            if removed_nodes.contains(&instance.fid.node_id) {
-                lost_instances.push((cname.clone(), instance.component_type.clone()));
-                false
-            } else {
-                true
-            }
-        });
-
-        for (component_name, component_type) in lost_instances {
-            damaged_instances.extend(old_state.inputs_for(&component_name));
-
-            match component_type {
-                super::ComponentType::Function => {
-                    let function = old_state
-                        .desired_state
-                        .workflow_functions
-                        .iter()
-                        .find(|f| f.name == component_name)
-                        .unwrap()
-                        .clone();
-
-                    let function_node = self.select_node(&function).unwrap();
-
-                    let res = self
-                        .start_workflow_function_on_node(
-                            &wf_id,
-                            &function,
-                            &function_node,
-                            old_state.active_inputs(&function.name),
-                            old_state.active_outputs(&function.name),
-                        )
-                        .await;
-
-                    if let Err(e) = res {
-                        log::error!("Error Spawning Replacement: {}!", e);
-                    }
-                }
-                super::ComponentType::Resource => {
-                    let resource = old_state
-                        .desired_state
-                        .workflow_resources
-                        .iter()
-                        .find(|r| r.name == component_name)
-                        .unwrap()
-                        .clone();
-
-                    let resource_node = self.select_node_for_resource(&resource);
-
-                    if let Some(resource_node) = resource_node {
-                        let res = self.start_workflow_resource_on_node(&wf_id, &resource, &resource_node).await;
-                        if let Err(e) = res {
-                            log::error!("Error Spawning Replacement: {}!", e);
-                        }
-                    }
-                }
+        if let Some(wf) = self.active_workflows.get_mut(&wf_id) {
+            let required_changes = wf.node_removal(removed_nodes, &mut self.orchestration_logic, &self.nodes, &mut self.link_controllers);
+            if let Err(errs) = self.materialize(wf_id, required_changes).await {
+                log::error!("Failures Handling Node Removal: {}", errs.join(";"));
             }
         }
-
-        for component_name in &damaged_instances {
-            let compoent_id = self
-                .active_workflows
-                .get_mut(&wf_id)
-                .unwrap()
-                .domain_mapping
-                .get(component_name)
-                .unwrap()
-                .fid;
-            let component_type = old_state.component_type(component_name).unwrap();
-            let output_mapping = self.output_mapping_for(&wf_id, component_name).await;
-
-            self.patch_outputs(
-                compoent_id,
-                component_type,
-                output_mapping,
-                std::collections::HashMap::new(),
-                &component_name,
-            )
-            .await
-            .unwrap();
-        }
-    }
-
-    async fn output_mapping_for(
-        &mut self,
-        wf_id: &edgeless_api::workflow_instance::WorkflowId,
-        component_name: &str,
-    ) -> std::collections::HashMap<String, edgeless_api::common::Output> {
-        let workflow_mapping: std::collections::HashMap<String, super::deployment_state::LogicalOutput> =
-            self.active_workflows.get(wf_id).unwrap().component_output_mapping(&component_name);
-
-        let mut output_mapping = std::collections::HashMap::new();
-
-        // Loop on all the channels that needed to be
-        // mapped for this function/resource.
-        for (from_channel, logical_output) in workflow_mapping {
-            // Loop on all the identifiers for the
-            // target function/resource (once for each
-            // assigned orchestration domain).
-            match logical_output {
-                super::deployment_state::LogicalOutput::Single((component_name, port_id)) => {
-                    let fids = self.active_workflows.get(&wf_id).unwrap().mapped_fids(&component_name).unwrap();
-
-                    assert!(fids.len() == 1);
-
-                    output_mapping.insert(from_channel.clone(), edgeless_api::common::Output::Single(fids[0], port_id));
-                }
-                super::deployment_state::LogicalOutput::Any(ids) => {
-                    let mut all_fids = Vec::new();
-                    for (component_name, port_id) in ids {
-                        let mut fids = self
-                            .active_workflows
-                            .get(&wf_id)
-                            .unwrap()
-                            .mapped_fids(&component_name)
-                            .unwrap()
-                            .iter()
-                            .map(|x| (x.clone(), port_id.clone()))
-                            .collect();
-                        all_fids.append(&mut fids);
-                    }
-                    output_mapping.insert(
-                        from_channel.clone(),
-                        edgeless_api::common::Output::Any(all_fids.iter().map(|(fid, port)| (fid.clone(), port.clone())).collect()),
-                    );
-                }
-                super::deployment_state::LogicalOutput::All(ids) => {
-                    let mut all_fids = Vec::new();
-                    for (component_name, port_id) in ids {
-                        let mut fids = self
-                            .active_workflows
-                            .get(&wf_id)
-                            .unwrap()
-                            .mapped_fids(&component_name)
-                            .unwrap()
-                            .iter()
-                            .map(|x| (x.clone(), port_id.clone()))
-                            .collect();
-                        all_fids.append(&mut fids);
-                    }
-                    output_mapping.insert(
-                        from_channel.clone(),
-                        edgeless_api::common::Output::All(all_fids.iter().map(|(fid, port)| (fid.clone(), port.clone())).collect()),
-                    );
-                }
-            }
-        }
-
-        output_mapping
     }
 
     async fn patch_outputs(
         &mut self,
         origin_id: edgeless_api::function_instance::InstanceId,
         origin_type: super::ComponentType,
-        output_mapping: std::collections::HashMap<String, edgeless_api::common::Output>,
-        input_mapping: std::collections::HashMap<String, edgeless_api::common::Input>,
+        output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Output>,
+        input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, edgeless_api::common::Input>,
         name_in_workflow: &str,
     ) -> Result<(), String> {
         match origin_type {
@@ -796,6 +597,54 @@ impl ControllerTask {
         }
     }
 
+    async fn create_link_control_plane(
+        &mut self,
+        link_id: edgeless_api::link::LinkInstanceId,
+        class: edgeless_api::link::LinkType,
+    ) -> Result<(), String> {
+        if let Some(lc) = self.link_controllers.get_mut(&class) {
+            lc.instantiate_control_plane(link_id).await;
+        }
+        Ok(())
+    }
+
+    async fn create_link_on_node(
+        &mut self,
+        link_id: edgeless_api::link::LinkInstanceId,
+        node_id: edgeless_api::function_instance::NodeId,
+        link_provider_id: edgeless_api::link::LinkProviderId,
+        config: Vec<u8>,
+    ) -> Result<(), String> {
+        if let Some(node) = self.nodes.get_mut(&node_id) {
+            node.api
+                .link_instance_api()
+                .create(edgeless_api::link::CreateLinkRequest {
+                    id: link_id,
+                    provider: link_provider_id,
+                    config: config,
+                    direction: edgeless_api::link::LinkDirection::BiDi,
+                })
+                .await
+                .map_err(|e| e.to_string())?;
+            Ok(())
+        } else {
+            Err("Node Not Found".to_string())
+        }
+    }
+
+    async fn remove_link_from_node(
+        &mut self,
+        link_id: edgeless_api::link::LinkInstanceId,
+        node_id: edgeless_api::function_instance::NodeId,
+    ) -> Result<(), String> {
+        if let Some(node) = self.nodes.get_mut(&node_id) {
+            node.api.link_instance_api().remove(link_id).await.map_err(|e| e.to_string())?;
+            Ok(())
+        } else {
+            Err("Node Not Found".to_string())
+        }
+    }
+
     fn fn_client(
         &mut self,
         node_id: &edgeless_api::function_instance::NodeId,
@@ -808,31 +657,6 @@ impl ControllerTask {
         node_id: &edgeless_api::function_instance::NodeId,
     ) -> Option<Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>> {
         Some(self.nodes.get_mut(node_id)?.api.resource_configuration_api())
-    }
-
-    fn select_node(
-        &mut self,
-        spawn_req: &edgeless_api::workflow_instance::WorkflowFunction,
-    ) -> anyhow::Result<edgeless_api::function_instance::NodeId> {
-        match self.orchestration_logic.next(&self.nodes, spawn_req) {
-            Some(node_id) => Ok(node_id),
-            None => Err(anyhow::anyhow!("no valid node found")),
-        }
-    }
-
-    fn select_node_for_resource(
-        &self,
-        resource: &edgeless_api::workflow_instance::WorkflowResource,
-    ) -> Option<edgeless_api::function_instance::NodeId> {
-        if let Some((id, _)) = self
-            .nodes
-            .iter()
-            .find(|(_, n)| n.resource_providers.iter().find(|(_, r)| r.class_type == resource.class_type).is_some())
-        {
-            Some(id.clone())
-        } else {
-            None
-        }
     }
 
     async fn send_peer_updates(&mut self, updates: Vec<edgeless_api::node_management::UpdatePeersRequest>) {

@@ -286,7 +286,7 @@ impl WorkflowInstanceConverters {
                     })
                 }
                 crate::workflow_instance::PortMapping::AllOfTargets(targets) => {
-                    super::api::port_mapping::MappingType::AnyTargets(super::api::WorkflowComponentPortVec {
+                    super::api::port_mapping::MappingType::AllTargets(super::api::WorkflowComponentPortVec {
                         data: targets
                             .iter()
                             .map(|(component, port)| super::api::WorkflowComponentPort {
