@@ -176,10 +176,10 @@ impl OrchestrationLogic {
                     let rv = rand::distributions::Uniform::new(0.0, high);
                     let rnd = rv.sample(&mut self.rng);
                     let mut sum = 0.0_f32;
-                    for i in 0..candidates.len() {
-                        sum += candidates[i].1;
+                    for candidate in candidates {
+                        sum += candidate.1;
                         if sum >= rnd {
-                            return Some(self.nodes[candidates[i].0]);
+                            return Some(self.nodes[candidate.0]);
                         }
                     }
                 }

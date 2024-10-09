@@ -48,7 +48,7 @@ impl ControllerTask {
     async fn main_loop(&mut self) {
         while let Some(req) = self.request_receiver.next().await {
             match req {
-                super::ControllerRequest::START(spawn_workflow_request, reply_sender) => {
+                super::ControllerRequest::Start(spawn_workflow_request, reply_sender) => {
                     let reply = self.start_workflow(spawn_workflow_request).await;
                     match reply_sender.send(reply) {
                         Ok(_) => {}
@@ -57,10 +57,10 @@ impl ControllerTask {
                         }
                     }
                 }
-                super::ControllerRequest::STOP(wf_id) => {
+                super::ControllerRequest::Stop(wf_id) => {
                     self.stop_workflow(&wf_id).await;
                 }
-                super::ControllerRequest::LIST(workflow_id, reply_sender) => {
+                super::ControllerRequest::List(workflow_id, reply_sender) => {
                     let reply = self.list_workflows(&workflow_id).await;
                     match reply_sender.send(reply) {
                         Ok(_) => {}
@@ -197,7 +197,7 @@ impl ControllerTask {
         };
 
         // Stop all the functions/resources.
-        for (_, component) in &workflow.domain_mapping {
+        for component in workflow.domain_mapping.values() {
             let orc_api = match self.orchestrators.get_mut(&component.domain_id) {
                 None => {
                     log::warn!(
@@ -245,7 +245,9 @@ impl ControllerTask {
                 ret = vec![edgeless_api::workflow_instance::WorkflowInstance {
                     workflow_id: w_id.clone(),
                     domain_mapping: wf
-                        .domain_mapping.values().map(|component| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                        .domain_mapping
+                        .values()
+                        .map(|component| edgeless_api::workflow_instance::WorkflowFunctionMapping {
                             name: component.name.to_string(),
                             function_id: component.fid,
                             domain_id: component.domain_id.clone(),
@@ -260,7 +262,9 @@ impl ControllerTask {
                 .map(|(w_id, wf)| edgeless_api::workflow_instance::WorkflowInstance {
                     workflow_id: w_id.clone(),
                     domain_mapping: wf
-                        .domain_mapping.values().map(|component| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                        .domain_mapping
+                        .values()
+                        .map(|component| edgeless_api::workflow_instance::WorkflowFunctionMapping {
                             name: component.name.to_string(),
                             function_id: component.fid,
                             domain_id: component.domain_id.clone(),
@@ -317,9 +321,7 @@ impl ControllerTask {
                     Ok(())
                 }
             },
-            Err(err) => {
-                Err(format!("failed interaction when creating a function instance: {}", err))
-            }
+            Err(err) => Err(format!("failed interaction when creating a function instance: {}", err)),
         }
     }
 
@@ -360,9 +362,7 @@ impl ControllerTask {
                     Ok(())
                 }
             },
-            Err(err) => {
-                Err(format!("failed interaction when starting a resource: {}", err))
-            }
+            Err(err) => Err(format!("failed interaction when starting a resource: {}", err)),
         }
     }
 
@@ -423,9 +423,7 @@ impl ControllerTask {
                     .await
                 {
                     Ok(_) => Ok(()),
-                    Err(err) => {
-                        Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err))
-                    }
+                    Err(err) => Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err)),
                 }
             }
             super::ComponentType::Resource => {
@@ -439,9 +437,7 @@ impl ControllerTask {
                     .await
                 {
                     Ok(_) => Ok(()),
-                    Err(err) => {
-                        Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err))
-                    }
+                    Err(err) => Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err)),
                 }
             }
         }

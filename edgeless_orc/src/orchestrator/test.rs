@@ -1,10 +1,11 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
+#![allow(clippy::all)]
+
 use edgeless_api::function_instance::{FunctionClassSpecification, StatePolicy, StateSpecification};
 
 use super::*;
-
 enum MockAgentEvent {
     StartFunction(
         (
@@ -128,6 +129,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn test_create_clients_resources(
     num_nodes: u32,
     num_resources_per_node: u32,
@@ -240,9 +242,9 @@ fn msg_to_string(msg: Result<Option<MockAgentEvent>, futures::channel::mpsc::Try
 
 async fn wait_for_function_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>) -> MockAgentEvent {
     for _ in 0..100 {
-        if let Ok(val) = receiver.try_next() { if let Some(event) = val {
+        if let Ok(Some(event)) = receiver.try_next() {
             return event;
-        } }
+        }
         tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
     }
     panic!("timeout while waiting for an event");
@@ -253,9 +255,9 @@ async fn wait_for_event_multiple(
 ) -> (uuid::Uuid, MockAgentEvent) {
     for _ in 0..100 {
         for (node_id, receiver) in receivers.iter_mut() {
-            if let Ok(val) = receiver.try_next() { if let Some(event) = val {
+            if let Ok(Some(event)) = receiver.try_next() {
                 return (*node_id, event);
-            } }
+            }
         }
         tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
     }
@@ -267,9 +269,9 @@ async fn wait_for_events_if_any(
 ) -> Option<(uuid::Uuid, MockAgentEvent)> {
     for _ in 0..100 {
         for (node_id, receiver) in receivers.iter_mut() {
-            if let Ok(val) = receiver.try_next() { if let Some(event) = val {
+            if let Ok(Some(event)) = receiver.try_next() {
                 return Some((*node_id, event));
-            } }
+            }
         }
         tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
     }
@@ -279,9 +281,9 @@ async fn wait_for_events_if_any(
 async fn no_function_event(receivers: &mut std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>) {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     for (node_id, receiver) in receivers.iter_mut() {
-        if let Ok(val) = receiver.try_next() { if let Some(event) = val {
+        if let Ok(Some(event)) = receiver.try_next() {
             panic!("expecting no event, but received one on node {}: {}", node_id, event_to_string(&event));
-        } }
+        }
     }
 }
 

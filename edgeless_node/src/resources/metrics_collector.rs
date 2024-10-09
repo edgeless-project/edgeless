@@ -86,17 +86,11 @@ impl Event {
     }
 
     fn workflow(&self) -> bool {
-        match self {
-            Event::WorkflowBegin(_) | Event::WorkflowEnd(_) => true,
-            _ => false,
-        }
+        matches!(self, Event::WorkflowBegin(_) | Event::WorkflowEnd(_))
     }
 
     fn begin(&self) -> bool {
-        match self {
-            Event::WorkflowBegin(_) | Event::FunctionBegin(_) => true,
-            _ => false,
-        }
+        matches!(self, Event::WorkflowBegin(_) | Event::FunctionBegin(_))
     }
 }
 
@@ -111,10 +105,7 @@ enum RedisCommand {
 
 impl RedisCommand {
     fn reset(&self) -> bool {
-        match self {
-            RedisCommand::Reset(_) => true,
-            _ => false,
-        }
+        matches!(self, RedisCommand::Reset(_))
     }
 
     fn timestamp(instant: &std::time::SystemTime) -> String {

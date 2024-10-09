@@ -9,6 +9,7 @@ pub struct ControllerClient {
     workflow_instance_client: Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>,
 }
 
+#[allow(clippy::new_ret_no_self)]
 impl ControllerClient {
     pub fn new(sender: futures::channel::mpsc::UnboundedSender<super::ControllerRequest>) -> Box<dyn edgeless_api::controller::ControllerAPI + Send> {
         Box::new(ControllerClient {
@@ -36,7 +37,7 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
     ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse> {
         let (reply_sender, reply_receiver) =
             tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>();
-        match self.sender.send(super::ControllerRequest::START(request.clone(), reply_sender)).await {
+        match self.sender.send(super::ControllerRequest::Start(request.clone(), reply_sender)).await {
             Ok(_) => {}
             Err(_) => return Err(anyhow::anyhow!("Controller Channel Error")),
         }
@@ -47,7 +48,7 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
         }
     }
     async fn stop(&mut self, id: edgeless_api::workflow_instance::WorkflowId) -> anyhow::Result<()> {
-        match self.sender.send(super::ControllerRequest::STOP(id)).await {
+        match self.sender.send(super::ControllerRequest::Stop(id)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Controller Channel Error")),
         }
@@ -58,7 +59,7 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
     ) -> anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>> {
         let (reply_sender, reply_receiver) =
             tokio::sync::oneshot::channel::<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>();
-        match self.sender.send(super::ControllerRequest::LIST(id.clone(), reply_sender)).await {
+        match self.sender.send(super::ControllerRequest::List(id.clone(), reply_sender)).await {
             Ok(_) => {}
             Err(_) => return Err(anyhow::anyhow!("Controller Channel Error")),
         }

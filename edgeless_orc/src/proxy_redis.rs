@@ -102,10 +102,12 @@ impl ProxyRedis {
         additional_header: String,
     ) -> (Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>) {
         let filenames = ["performance_samples", "mapping_to_instance_id", "capabilities", "health_status"];
-        let headers = ["metric,identifier,value,timestamp".to_string(),
+        let headers = [
+            "metric,identifier,value,timestamp".to_string(),
             "timestamp,logical_id,node_id,physical_id".to_string(),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeCapabilities::csv_header()),
-            format!("timestamp,node_id,{}", edgeless_api::node_management::NodeHealthStatus::csv_header())];
+            format!("timestamp,node_id,{}", edgeless_api::node_management::NodeHealthStatus::csv_header()),
+        ];
         let mut outfiles = vec![];
         for (filename, header) in filenames.iter().zip(headers.iter()) {
             let filename = format!("{}{}.csv", dataset_path, filename);
@@ -521,9 +523,11 @@ impl super::proxy::Proxy for ProxyRedis {
                             .collect(),
                     );
                 }
-                ActiveInstanceClone::Resource(_, instance_id) => if let Ok(instance_id) = string_to_instance_id(&instance_id) {
-                    instances.insert(logical_id, vec![instance_id.function_id]);
-                },
+                ActiveInstanceClone::Resource(_, instance_id) => {
+                    if let Ok(instance_id) = string_to_instance_id(&instance_id) {
+                        instances.insert(logical_id, vec![instance_id.function_id]);
+                    }
+                }
             }
         }
         instances
@@ -656,7 +660,7 @@ mod test {
         let resources_instances = redis_proxy.fetch_resource_instances_to_nodes();
         assert_eq!(resources_instances.len(), 5);
         for (_instance, node) in resources_instances {
-            assert!(&node == &node2_id);
+            assert!(node == node2_id);
         }
 
         let nodes = redis_proxy.fetch_nodes_to_instances();
@@ -715,10 +719,7 @@ mod test {
             edgeless_api::node_management::KeepAliveResponse {
                 health_status: health_status.clone(),
                 performance_samples: edgeless_api::node_management::NodePerformanceSamples {
-                    function_execution_times: std::collections::HashMap::from([
-                        (fid_perf_1, samples_1.clone()),
-                        (fid_perf_2, samples_2.clone()),
-                    ]),
+                    function_execution_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
                 },
             },
         )];

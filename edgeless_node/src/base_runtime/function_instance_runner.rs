@@ -103,6 +103,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
 }
 
 impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstanceType> {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
@@ -175,10 +176,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         self.function_instance
             .as_mut()
             .ok_or(super::FunctionInstanceError::InternalError)?
-            .init(
-                self.init_payload.as_deref(),
-                self.serialized_state.as_deref(),
-            )
+            .init(self.init_payload.as_deref(), self.serialized_state.as_deref())
             .await?;
 
         self.telemetry_handle.observe(
@@ -289,10 +287,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
 
     async fn exit(&mut self, exit_status: Result<(), super::FunctionInstanceError>) {
         self.runtime_api
-            .send(super::runtime::RuntimeRequest::FunctionExit(
-                self.instance_id,
-                exit_status.clone(),
-            ))
+            .send(super::runtime::RuntimeRequest::FunctionExit(self.instance_id, exit_status.clone()))
             .await
             .unwrap_or_else(|_| log::error!("FunctionInstance outlived runner."));
 

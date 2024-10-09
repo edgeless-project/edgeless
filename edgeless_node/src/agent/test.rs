@@ -91,7 +91,7 @@ fn test_sysinfo() {
 
         let mut tot_disk_reads = 0;
         let mut tot_disk_writes = 0;
-        for (_, process) in sys.processes() {
+        for process in sys.processes().values() {
             let disk_usage = process.disk_usage();
             tot_disk_reads += disk_usage.total_read_bytes;
             tot_disk_writes += disk_usage.total_written_bytes;
