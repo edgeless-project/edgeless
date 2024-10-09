@@ -93,7 +93,7 @@ impl OrchestrationLogic {
                     &self.capabilities[ndx],
                     &self.resource_providers[ndx],
                 ) {
-                    candidates.push(self.nodes[ndx].clone());
+                    candidates.push(self.nodes[ndx]);
                 }
             }
         }

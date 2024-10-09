@@ -389,13 +389,13 @@ mod tests {
         assert!(wf_list(&mut client).await.is_empty());
 
         // Clean-up closures.
-        let removeme_filename = || format!("removeme.log");
+        let removeme_filename = || "removeme.log".to_string();
         let cleanup = || {
             let _ = std::fs::remove_file(removeme_filename());
         };
 
         // Create one workflow
-        let workflow_id;
+        
         cleanup();
         let res = client
             .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
@@ -432,7 +432,7 @@ mod tests {
             })
             .await;
         let expected_instance_names = std::collections::HashSet::from(["f1", "f2", "f3", "log"]);
-        workflow_id = Some(match res {
+        let workflow_id = Some(match res {
             Ok(response) => match &response {
                 edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => {
                     panic!("workflow rejected: {}", err)
@@ -468,7 +468,7 @@ mod tests {
         for (logical_fid, nodes) in &instances {
             assert!(nodes.len() == 1);
             println!("before function {} -> node {}", logical_fid, nodes.first().unwrap());
-            nodes_with_functions.insert(nodes.first().unwrap().clone());
+            nodes_with_functions.insert(*nodes.first().unwrap());
         }
 
         // Add intents to migrate the function instances.
@@ -484,7 +484,7 @@ mod tests {
         for (logical_fid, nodes) in &instances {
             assert!(nodes.len() == 1);
             intents.push(edgeless_orc::orchestrator::DeployIntent::Migrate(
-                logical_fid.clone(),
+                *logical_fid,
                 vec![other(nodes.first().unwrap())],
             ));
         }

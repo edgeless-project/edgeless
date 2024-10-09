@@ -60,7 +60,7 @@ impl ProxyRedis {
 
         if flushdb {
             // flush the in-memory database upon construction
-            let _ = redis::cmd("FLUSHDB").query(&mut connection)?;
+            redis::cmd("FLUSHDB").query(&mut connection)?;
         }
 
         let additional_fields = match &dataset_settings {
@@ -101,13 +101,11 @@ impl ProxyRedis {
         append: bool,
         additional_header: String,
     ) -> (Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>) {
-        let filenames = vec!["performance_samples", "mapping_to_instance_id", "capabilities", "health_status"];
-        let headers = vec![
-            "metric,identifier,value,timestamp".to_string(),
+        let filenames = ["performance_samples", "mapping_to_instance_id", "capabilities", "health_status"];
+        let headers = ["metric,identifier,value,timestamp".to_string(),
             "timestamp,logical_id,node_id,physical_id".to_string(),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeCapabilities::csv_header()),
-            format!("timestamp,node_id,{}", edgeless_api::node_management::NodeHealthStatus::csv_header()),
-        ];
+            format!("timestamp,node_id,{}", edgeless_api::node_management::NodeHealthStatus::csv_header())];
         let mut outfiles = vec![];
         for (filename, header) in filenames.iter().zip(headers.iter()) {
             let filename = format!("{}{}.csv", dataset_path, filename);
@@ -196,7 +194,7 @@ impl ProxyRedis {
         }
         let mut instances = std::collections::HashMap::new();
         for instance_id in instance_ids {
-            if let Ok(val) = self.connection.get::<String, String>(format!("instance:{}", instance_id.to_string())) {
+            if let Ok(val) = self.connection.get::<String, String>(format!("instance:{}", instance_id)) {
                 if let Ok(val) = serde_json::from_str::<ActiveInstanceClone>(&val) {
                     instances.insert(instance_id, val);
                 }
@@ -222,11 +220,7 @@ impl super::proxy::Proxy for ProxyRedis {
             let new_caps = client_desc.capabilities.to_csv();
             if let Some(outfile) = &mut self.capabilities_file {
                 let write: bool = if let Some(old_caps) = self.node_capabilities.get(uuid) {
-                    if *old_caps == new_caps {
-                        false
-                    } else {
-                        true
-                    }
+                    *old_caps != new_caps
                 } else {
                     true
                 };
@@ -234,7 +228,7 @@ impl super::proxy::Proxy for ProxyRedis {
                     let _ = writeln!(outfile, "{},{},{},{}", self.additional_fields, timestamp, uuid, new_caps);
                 }
             }
-            new_node_capabilities.insert(uuid.clone(), new_caps);
+            new_node_capabilities.insert(*uuid, new_caps);
         }
         let _ = std::mem::replace(&mut self.node_capabilities, new_node_capabilities);
 
@@ -283,11 +277,7 @@ impl super::proxy::Proxy for ProxyRedis {
             let new_instance_ids = active_instance.instance_ids();
             if let Some(outfile) = &mut self.mapping_to_instance_id_file {
                 let write = if let Some(old_instance_ids) = self.mapping_to_instance_id.get(ext_fid) {
-                    if *old_instance_ids == new_instance_ids {
-                        false
-                    } else {
-                        true
-                    }
+                    *old_instance_ids != new_instance_ids
                 } else {
                     true
                 };
@@ -306,7 +296,7 @@ impl super::proxy::Proxy for ProxyRedis {
                     );
                 }
             }
-            new_mapping_to_instance_id.insert(ext_fid.clone(), new_instance_ids);
+            new_mapping_to_instance_id.insert(*ext_fid, new_instance_ids);
         }
         let _ = std::mem::replace(&mut self.mapping_to_instance_id, new_mapping_to_instance_id);
 
@@ -355,11 +345,7 @@ impl super::proxy::Proxy for ProxyRedis {
             let new_health_status = keep_alive_response.health_status.to_csv();
             if let Some(outfile) = &mut self.health_status_file {
                 let write = if let Some(old_health_status) = self.node_health_status.get(&uuid) {
-                    if *old_health_status == new_health_status {
-                        false
-                    } else {
-                        true
-                    }
+                    *old_health_status != new_health_status
                 } else {
                     true
                 };
@@ -367,7 +353,7 @@ impl super::proxy::Proxy for ProxyRedis {
                     let _ = writeln!(outfile, "{},{},{},{}", self.additional_fields, timestamp, &uuid, new_health_status);
                 }
             }
-            new_node_health_status.insert(uuid.clone(), new_health_status);
+            new_node_health_status.insert(uuid, new_health_status);
 
             // Save performance samples.
             for (function_id, values) in keep_alive_response.performance_samples.function_execution_times {
@@ -535,11 +521,8 @@ impl super::proxy::Proxy for ProxyRedis {
                             .collect(),
                     );
                 }
-                ActiveInstanceClone::Resource(_, instance_id) => match string_to_instance_id(&instance_id) {
-                    Ok(instance_id) => {
-                        instances.insert(logical_id, vec![instance_id.function_id]);
-                    }
-                    Err(_) => {}
+                ActiveInstanceClone::Resource(_, instance_id) => if let Ok(instance_id) = string_to_instance_id(&instance_id) {
+                    instances.insert(logical_id, vec![instance_id.function_id]);
                 },
             }
         }
@@ -617,7 +600,7 @@ mod test {
         for _ in 0..10 {
             logical_physical_ids.push((uuid::Uuid::new_v4(), uuid::Uuid::new_v4()));
             active_instances.insert(
-                logical_physical_ids.last().unwrap().0.clone(),
+                logical_physical_ids.last().unwrap().0,
                 crate::orchestrator::ActiveInstance::Function(
                     SpawnFunctionRequest {
                         instance_id: None,
@@ -636,7 +619,7 @@ mod test {
                     },
                     vec![edgeless_api::function_instance::InstanceId {
                         node_id: node1_id,
-                        function_id: logical_physical_ids.last().unwrap().1.clone(),
+                        function_id: logical_physical_ids.last().unwrap().1,
                     }],
                 ),
             );
@@ -645,7 +628,7 @@ mod test {
         for _ in 0..5 {
             logical_physical_ids.push((uuid::Uuid::new_v4(), uuid::Uuid::new_v4()));
             active_instances.insert(
-                logical_physical_ids.last().unwrap().0.clone(),
+                logical_physical_ids.last().unwrap().0,
                 crate::orchestrator::ActiveInstance::Resource(
                     edgeless_api::resource_configuration::ResourceInstanceSpecification {
                         class_type: "res".to_string(),
@@ -654,7 +637,7 @@ mod test {
                     },
                     edgeless_api::function_instance::InstanceId {
                         node_id: node2_id,
-                        function_id: logical_physical_ids.last().unwrap().1.clone(),
+                        function_id: logical_physical_ids.last().unwrap().1,
                     },
                 ),
             );
@@ -728,13 +711,13 @@ mod test {
         let fid_perf_1 = uuid::Uuid::new_v4();
         let fid_perf_2 = uuid::Uuid::new_v4();
         let keep_alive_responses = vec![(
-            node_id_perf.clone(),
+            node_id_perf,
             edgeless_api::node_management::KeepAliveResponse {
                 health_status: health_status.clone(),
                 performance_samples: edgeless_api::node_management::NodePerformanceSamples {
                     function_execution_times: std::collections::HashMap::from([
-                        (fid_perf_1.clone(), samples_1.clone()),
-                        (fid_perf_2.clone(), samples_2.clone()),
+                        (fid_perf_1, samples_1.clone()),
+                        (fid_perf_2, samples_2.clone()),
                     ]),
                 },
             },

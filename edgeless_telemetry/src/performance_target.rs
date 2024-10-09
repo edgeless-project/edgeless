@@ -12,6 +12,12 @@ pub struct PerformanceTarget {
     metrics: Metrics,
 }
 
+impl Default for PerformanceTarget {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PerformanceTarget {
     pub fn new() -> Self {
         Self {
@@ -39,7 +45,7 @@ impl crate::telemetry_events::EventProcessor for PerformanceTarget {
             crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(lat) => {
                 if let Some(function_id) = event_tags.get("FUNCTION_ID") {
                     if let Ok(function_id) = uuid::Uuid::from_str(function_id) {
-                        let res = self.metrics.function_execution_times.entry(function_id).or_insert(vec![]);
+                        let res = self.metrics.function_execution_times.entry(function_id).or_default();
                         res.push(lat.as_secs_f64());
                     }
                 }
@@ -56,6 +62,12 @@ impl crate::telemetry_events::EventProcessor for PerformanceTarget {
 #[derive(Clone)]
 pub struct PerformanceTargetInner {
     target: std::sync::Arc<std::sync::Mutex<PerformanceTarget>>,
+}
+
+impl Default for PerformanceTargetInner {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl PerformanceTargetInner {
@@ -116,7 +128,7 @@ mod tests {
                 &event_tags,
             );
             target.handle(
-                &&crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(std::time::Duration::from_secs(i)),
+                (&crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(std::time::Duration::from_secs(i))),
                 &event_tags,
             );
         }

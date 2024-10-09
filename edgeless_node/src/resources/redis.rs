@@ -98,11 +98,11 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         ) {
             let mut lck = self.inner.lock().await;
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
-            let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
+            let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
 
             match RedisResource::new(dataplane_handle, url, key).await {
                 Ok(resource) => {
-                    lck.instances.insert(new_id.clone(), resource);
+                    lck.instances.insert(new_id, resource);
                     return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
                 }
                 Err(err) => {

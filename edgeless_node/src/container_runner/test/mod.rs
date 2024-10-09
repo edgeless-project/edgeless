@@ -92,7 +92,7 @@ fn test_docker_basic() {
         .iter()
         .find(|x| {
             if let Some(name_found) = x.Names.first() {
-                if *name_found == format!("/{}", name.to_string()) {
+                if *name_found == format!("/{}", name) {
                     return true;
                 }
             }

@@ -94,7 +94,7 @@ impl std::fmt::Display for DeployIntent {
             DeployIntent::Migrate(component, target) => write!(
                 f,
                 "migrate component {} to [{}]",
-                component.to_string(),
+                component,
                 target.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
             ),
         }
@@ -244,7 +244,7 @@ impl ActiveInstance {
     pub fn instance_ids(&self) -> Vec<edgeless_api::function_instance::InstanceId> {
         match self {
             ActiveInstance::Function(_, ids) => ids.clone(),
-            ActiveInstance::Resource(_, id) => vec![id.clone()],
+            ActiveInstance::Resource(_, id) => vec![*id],
         }
     }
 }
@@ -456,7 +456,7 @@ impl Orchestrator {
                     }
 
                     // Filter out the unfeasible targets.
-                    let targets = orchestration_logic.feasible_nodes(&spawn_req, targets);
+                    let targets = orchestration_logic.feasible_nodes(spawn_req, targets);
 
                     let target = targets.first();
                     if let Some(target) = target {
@@ -466,7 +466,7 @@ impl Orchestrator {
                                 target
                             );
                         }
-                        to_be_started.push((spawn_req.clone(), target.clone()));
+                        to_be_started.push((spawn_req.clone(), *target));
                     } else {
                         log::warn!("No (valid) target found for the migration of function ext_fid {}", component);
                     }
@@ -508,10 +508,10 @@ impl Orchestrator {
 
             // Transform the external function identifiers into
             // internal ones.
-            for source in Self::ext_to_int(&active_instances, origin_ext_fid) {
+            for source in Self::ext_to_int(active_instances, origin_ext_fid) {
                 let mut int_output_mapping = std::collections::HashMap::new();
                 for (channel, target_ext_fid) in ext_output_mapping {
-                    for target in Self::ext_to_int(&active_instances, target_ext_fid) {
+                    for target in Self::ext_to_int(active_instances, target_ext_fid) {
                         // [TODO] Issue#96 The output_mapping structure
                         // should be changed so that multiple
                         // values are possible (with weights), and
@@ -529,7 +529,7 @@ impl Orchestrator {
                             .api
                             .function_instance_api()
                             .patch(edgeless_api::common::PatchRequest {
-                                function_id: instance_id.function_id.clone(),
+                                function_id: instance_id.function_id,
                                 output_mapping: int_output_mapping,
                             })
                             .await
@@ -555,7 +555,7 @@ impl Orchestrator {
                             .api
                             .resource_configuration_api()
                             .patch(edgeless_api::common::PatchRequest {
-                                function_id: instance_id.function_id.clone(),
+                                function_id: instance_id.function_id,
                                 output_mapping: int_output_mapping,
                             })
                             .await
@@ -615,12 +615,12 @@ impl Orchestrator {
                             edgeless_api::common::StartComponentResponse::InstanceId(instance_id) => {
                                 assert!(resource_provider.node_id == instance_id.node_id);
                                 active_instances.insert(
-                                    ext_fid.clone(),
+                                    ext_fid,
                                     ActiveInstance::Resource(
                                         start_req,
                                         edgeless_api::function_instance::InstanceId {
-                                            node_id: resource_provider.node_id.clone(),
-                                            function_id: instance_id.function_id.clone(),
+                                            node_id: resource_provider.node_id,
+                                            function_id: instance_id.function_id,
                                         },
                                     ),
                                 );
@@ -694,7 +694,7 @@ impl Orchestrator {
         ext_fid: &uuid::Uuid,
         node_id: &edgeless_api::function_instance::NodeId,
     ) -> Result<edgeless_api::common::StartComponentResponse<uuid::Uuid>, anyhow::Error> {
-        let mut fn_client = match clients.get_mut(&node_id) {
+        let mut fn_client = match clients.get_mut(node_id) {
             Some(c) => c,
             None => panic!(
                 "Invalid node_id {} selected by the orchestration logic when starting function instance ext_fid {}",
@@ -722,18 +722,18 @@ impl Orchestrator {
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                     assert!(*node_id == id.node_id);
                     active_instances.insert(
-                        ext_fid.clone(),
+                        *ext_fid,
                         ActiveInstance::Function(
                             spawn_req.clone(),
                             vec![edgeless_api::function_instance::InstanceId {
-                                node_id: node_id.clone(),
+                                node_id: *node_id,
                                 function_id: id.function_id,
                             }],
                         ),
                     );
                     log::info!("Spawned at node_id {}, ext_fid {}, int_fid {}", node_id, &ext_fid, id.function_id);
 
-                    Ok(edgeless_api::common::StartComponentResponse::InstanceId(ext_fid.clone()))
+                    Ok(edgeless_api::common::StartComponentResponse::InstanceId(*ext_fid))
                 }
             },
             Err(err) => {
@@ -808,7 +808,7 @@ impl Orchestrator {
         for (origin_ext_fid, output_mapping) in dependency_graph.iter() {
             for (_output, target_ext_fid) in output_mapping.iter() {
                 if target_ext_fid == ext_fid {
-                    dependencies.push(origin_ext_fid.clone());
+                    dependencies.push(*origin_ext_fid);
                     break;
                 }
             }
@@ -994,11 +994,11 @@ impl Orchestrator {
 
                     // Extract the ext_fid identifiers for the origin and
                     // target logical functions.
-                    let origin_ext_fid = update.function_id.clone();
+                    let origin_ext_fid = update.function_id;
                     let output_mapping = update
                         .output_mapping
                         .iter()
-                        .map(|x| (x.0.clone(), x.1.function_id.clone()))
+                        .map(|x| (x.0.clone(), x.1.function_id))
                         .collect::<std::collections::HashMap<String, edgeless_api::function_instance::ComponentId>>();
 
                     // Save the patch request into an internal data structure,
@@ -1035,7 +1035,7 @@ impl Orchestrator {
                                 // invocation_url already exists.
                                 None
                             } else {
-                                this_node_id = Some(node_id.clone());
+                                this_node_id = Some(node_id);
 
                                 // Create the resource configuration APIs.
                                 for resource in &resources {
@@ -1053,7 +1053,7 @@ impl Orchestrator {
                                             resource.provider_id.clone(),
                                             ResourceProvider {
                                                 class_type: resource.class_type.clone(),
-                                                node_id: this_node_id.unwrap().clone(),
+                                                node_id: this_node_id.unwrap(),
                                                 outputs: resource.outputs.clone(),
                                             },
                                         );
@@ -1094,7 +1094,7 @@ impl Orchestrator {
                             }
                         }
                         edgeless_api::node_registration::UpdateNodeRequest::Deregistration(node_id) => {
-                            if let None = nodes.get(&node_id) {
+                            if nodes.get(&node_id).is_none() {
                                 // There is no client with that node_id
                                 None
                             } else {
@@ -1178,7 +1178,7 @@ impl Orchestrator {
                                     keep_alive_response.health_status,
                                     keep_alive_response.performance_samples.function_execution_times.len()
                                 );
-                                keep_alive_responses.push((node_id.clone(), keep_alive_response));
+                                keep_alive_responses.push((*node_id, keep_alive_response));
                             }
                             Err(_) => {
                                 to_be_disconnected.insert(*node_id);
@@ -1190,7 +1190,7 @@ impl Orchestrator {
                     // Second, remove all those nodes from the map of clients.
                     for node_id in to_be_disconnected.iter() {
                         log::info!("disconnected node not replying to keep-alive: {}", &node_id);
-                        let val = nodes.remove(&node_id);
+                        let val = nodes.remove(node_id);
                         assert!(val.is_some());
                     }
 
@@ -1269,13 +1269,13 @@ impl Orchestrator {
                                 let num_disconnected = instances.iter().filter(|x| to_be_disconnected.contains(&x.node_id)).count();
                                 assert!(num_disconnected <= instances.len());
                                 if instances.is_empty() || num_disconnected > 0 {
-                                    to_be_repatched.push(origin_ext_fid.clone());
+                                    to_be_repatched.push(*origin_ext_fid);
                                     if instances.is_empty() || num_disconnected == instances.len() {
                                         // If all the function instances
                                         // disappared, then we must enforce the
                                         // creation of (at least) a new
                                         // function instance.
-                                        fun_to_be_created.insert(origin_ext_fid.clone(), start_req.clone());
+                                        fun_to_be_created.insert(*origin_ext_fid, start_req.clone());
                                     } else {
                                         // Otherwise, we just remove the
                                         // disappeared function instances and
@@ -1287,8 +1287,8 @@ impl Orchestrator {
                             }
                             ActiveInstance::Resource(start_req, instance) => {
                                 if instance.is_none() || to_be_disconnected.contains(&instance.node_id) {
-                                    to_be_repatched.push(origin_ext_fid.clone());
-                                    res_to_be_created.insert(origin_ext_fid.clone(), start_req.clone());
+                                    to_be_repatched.push(*origin_ext_fid);
+                                    res_to_be_created.insert(*origin_ext_fid, start_req.clone());
                                 }
                             }
                         }
@@ -1302,7 +1302,7 @@ impl Orchestrator {
                                 || fun_to_be_created.contains_key(target_ext_fid)
                                 || res_to_be_created.contains_key(target_ext_fid)
                             {
-                                to_be_repatched.push(origin_ext_fid.clone());
+                                to_be_repatched.push(*origin_ext_fid);
                             }
                         }
                     }

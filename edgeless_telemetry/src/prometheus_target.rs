@@ -57,7 +57,7 @@ impl PrometheusEventTarget {
         registry.lock().await.register("execution_times", "", execution_times.clone());
 
         let reg_clone = registry.clone();
-        let socket_addr: std::net::SocketAddr = endpoint.parse().expect(&format!("invalid endpoint: {}", &endpoint));
+        let socket_addr: std::net::SocketAddr = endpoint.parse().unwrap_or_else(|_| panic!("invalid endpoint: {}", &endpoint));
         tokio::spawn(async move {
             let metric_handler = warp::path("metrics").then(move || {
                 let cloned = reg_clone.clone();
