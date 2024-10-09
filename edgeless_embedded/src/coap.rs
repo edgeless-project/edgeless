@@ -36,7 +36,7 @@ pub async fn coap_task(
         sock,
         out_reader,
         agent,
-        app_buf_tx: [0_u8; 5000],
+        app_buf_tx: [0 as u8; 5000],
         last_tokens: heapless::LinearMap::new(),
         peers: heapless::LinearMap::new(),
         token: 0,
@@ -48,7 +48,7 @@ pub async fn coap_task(
 
 impl CoapMultiplexer {
     async fn task(&mut self) {
-        let mut app_buf = [0_u8; 5000];
+        let mut app_buf = [0 as u8; 5000];
         loop {
             let res = embassy_futures::select::select(self.sock.recv_from(&mut app_buf), self.out_reader.receive()).await;
 
@@ -122,7 +122,7 @@ impl CoapMultiplexer {
         match key_entry {
             None => {
                 self.agent.handle(invocation).await.unwrap();
-                if self.last_tokens.insert(sender, (token, None)).is_err() {
+                if let Err(_) = self.last_tokens.insert(sender.clone(), (token, None)) {
                     log::info!("Could not store token, duplicate delivery is possible!");
                 }
             }
@@ -147,7 +147,7 @@ impl CoapMultiplexer {
         let ret = match key_entry {
             None => {
                 let response = self.agent.start(start_spec.clone()).await;
-                if self.last_tokens.insert(sender, (token, Some(response.clone()))).is_err() {
+                if let Err(_) = self.last_tokens.insert(sender.clone(), (token, Some(response.clone()))) {
                     log::info!("Could not store token, duplicate delivery is possible!");
                 }
                 Some(response)
@@ -159,10 +159,12 @@ impl CoapMultiplexer {
                     *stored_response = Some(id.clone());
 
                     Some(id)
-                } else if *stored_token == token {
-                    stored_response.clone()
                 } else {
-                    None
+                    if *stored_token == token {
+                        stored_response.clone()
+                    } else {
+                        None
+                    }
                 }
             }
         };
@@ -193,7 +195,7 @@ impl CoapMultiplexer {
         let ret = match key_entry {
             None => {
                 let res = self.agent.stop(stop_instance_id).await;
-                if self.last_tokens.insert(sender, (token, None)).is_err() {
+                if let Err(_) = self.last_tokens.insert(sender.clone(), (token, None)) {
                     log::info!("Could not store token, duplicate delivery is possible!");
                 }
                 Some(res)
@@ -213,7 +215,7 @@ impl CoapMultiplexer {
                 Ok(_) => edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &[], token, &mut self.app_buf_tx[..], true),
                 Err(err) => {
                     let (data, tail) = edgeless_api_core::coap_mapping::COAPEncoder::encode_error_response(err, &mut self.app_buf_tx[..]);
-                    edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, data, token, &mut tail[..], false)
+                    edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &data, token, &mut tail[..], false)
                 }
             };
             if let Err(err) = self.sock.send_to(data, sender).await {
@@ -233,7 +235,7 @@ impl CoapMultiplexer {
         let ret = match key_entry {
             None => {
                 let response = self.agent.patch(patch_req.clone()).await;
-                if self.last_tokens.insert(sender, (token, None)).is_err() {
+                if let Err(_) = self.last_tokens.insert(sender.clone(), (token, None)) {
                     log::info!("Could not store token, duplicate delivery is possible!");
                 }
                 Some(response)
@@ -253,7 +255,7 @@ impl CoapMultiplexer {
                 Ok(_) => edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &[], token, &mut self.app_buf_tx[..], true),
                 Err(err) => {
                     let (data, tail) = edgeless_api_core::coap_mapping::COAPEncoder::encode_error_response(err, &mut self.app_buf_tx[..]);
-                    edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, data, token, &mut tail[..], false)
+                    edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &data, token, &mut tail[..], false)
                 }
             };
             if let Err(err) = self.sock.send_to(data, sender).await {
@@ -269,8 +271,8 @@ impl CoapMultiplexer {
             .insert(
                 edgeless_api_core::node_registration::NodeId(node_id),
                 smoltcp::wire::IpEndpoint {
-                    addr: smoltcp::wire::IpAddress::from(smoltcp::wire::Ipv4Address::from_bytes(addr)),
-                    port,
+                    addr: smoltcp::wire::IpAddress::from(smoltcp::wire::Ipv4Address::from_bytes(&addr)),
+                    port: port,
                 },
             )
             .is_err()
@@ -325,7 +327,7 @@ impl CoapMultiplexer {
                 u8::MAX => 0,
                 _ => self.token + 1,
             };
-            if let Err(err) = self.sock.send_to(data, *endpoint).await {
+            if let Err(err) = self.sock.send_to(&data, endpoint.clone()).await {
                 log::error!("UDP/COAP Send Error: {:?}", err);
             }
             // we don't wait for a reply here.
@@ -345,7 +347,7 @@ impl CoapMultiplexer {
             u8::MAX => 0,
             _ => self.token + 1,
         };
-        if let Err(err) = self.sock.send_to(data, endpoint).await {
+        if let Err(err) = self.sock.send_to(&data, endpoint).await {
             log::error!("UDP/COAP Send Error: {:?}", err);
         } else {
             self.waiting_for_reply = Some((used_token, reply_channel))
