@@ -69,10 +69,7 @@ impl FunctonInstanceConverters {
 
     pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFunctionRequest) -> crate::grpc_impl::api::SpawnFunctionRequest {
         crate::grpc_impl::api::SpawnFunctionRequest {
-            instance_id: req
-                .instance_id
-                .as_ref()
-                .and_then(|instance_id| Some(CommonConverters::serialize_instance_id(instance_id))),
+            instance_id: req.instance_id.as_ref().map(CommonConverters::serialize_instance_id),
             code: Some(Self::serialize_function_class_specification(&req.code)),
             annotations: req.annotations.clone(),
             state_specification: Some(Self::serialize_state_specification(&req.state_specification)),

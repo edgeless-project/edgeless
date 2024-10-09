@@ -48,7 +48,7 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
 
         for item in d.array_iter::<(&str, &str)>().unwrap() {
             if let Ok(item) = item {
-                configuration.push(item);
+                let _ = configuration.push(item);
             }
         }
 

@@ -155,7 +155,7 @@ pub fn parse_boot_data(api_instance: &crate::grpc_impl::api::BootData) -> anyhow
     Ok(crate::guest_api_function::BootData {
         guest_api_host_endpoint: api_instance.guest_api_host_endpoint.clone(),
         instance_id: match &api_instance.instance_id {
-            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
                 Ok(originator) => originator,
                 Err(err) => return Err(anyhow::anyhow!("invalid instance_id field: {}", err)),
             },
@@ -175,7 +175,7 @@ pub fn parse_function_instance_init(
 
 pub fn parse_input_event_data(api_instance: &crate::grpc_impl::api::InputEventData) -> anyhow::Result<crate::guest_api_function::InputEventData> {
     match &api_instance.src {
-        Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+        Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
             Ok(src) => Ok(crate::guest_api_function::InputEventData {
                 src,
                 msg: api_instance.msg.clone(),
@@ -313,7 +313,7 @@ mod test {
             CallReturn::Err,
         ];
         for msg in messages {
-            match parse_call_return(&&serialize_call_return(&msg)) {
+            match parse_call_return(&serialize_call_return(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }

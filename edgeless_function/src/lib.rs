@@ -146,7 +146,7 @@ mod test {
         let arguments = std::collections::HashMap::from([
             ("vec1", "1:2:3:4:5"),
             ("vec2", "1@2@3@4@5"),
-            ("vec3", "3.14:6.28"),
+            ("vec3", "3.4:6.8"),
             ("vec4", "1:-2:3:-4:5"),
             ("vec5", "1:two:3:four:5"),
         ]);
@@ -156,7 +156,7 @@ mod test {
         assert_eq!(vec![1, 2, 3, 4, 5], arg_to_vec::<u32>("vec1", ":", &arguments));
         assert_eq!(vec![1, 2, 3, 4, 5], arg_to_vec::<i32>("vec1", ":", &arguments));
         assert_eq!(vec![1, 2, 3, 4, 5], arg_to_vec::<usize>("vec2", "@", &arguments));
-        assert_eq!(vec![3.14, 6.28], arg_to_vec::<f32>("vec3", ":", &arguments));
+        assert_eq!(vec![3.4, 6.8], arg_to_vec::<f32>("vec3", ":", &arguments));
         assert_eq!(vec![1, 3, 5], arg_to_vec::<usize>("vec4", ":", &arguments));
         assert_eq!(vec![1, -2, 3, -4, 5], arg_to_vec::<i32>("vec4", ":", &arguments));
         assert_eq!(vec![1, 3, 5], arg_to_vec::<usize>("vec5", ":", &arguments));

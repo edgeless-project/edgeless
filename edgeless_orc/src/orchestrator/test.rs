@@ -39,13 +39,13 @@ impl edgeless_api::agent::AgentAPI for MockNode {
         &mut self,
     ) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::InstanceId>> {
         Box::new(MockAgentAPI {
-            node_id: self.node_id.clone(),
+            node_id: self.node_id,
             sender: self.sender.clone(),
         })
     }
     fn node_management_api(&mut self) -> Box<dyn edgeless_api::node_management::NodeManagementAPI> {
         Box::new(MockAgentAPI {
-            node_id: self.node_id.clone(),
+            node_id: self.node_id,
             sender: self.sender.clone(),
         })
     }
@@ -53,7 +53,7 @@ impl edgeless_api::agent::AgentAPI for MockNode {
         &mut self,
     ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>> {
         Box::new(MockAgentAPI {
-            node_id: self.node_id.clone(),
+            node_id: self.node_id,
             sender: self.sender.clone(),
         })
     }
