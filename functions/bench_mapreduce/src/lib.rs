@@ -20,16 +20,12 @@ impl Message {
         } else {
             message
         };
-        let mut iter = encoded_message.chunks_exact(4);
+        let iter = encoded_message.chunks_exact(4);
         let mut data = vec![];
-        loop {
-            if let Some(buf) = iter.next() {
-                let mut copy = [0 as u8; 4];
-                copy.copy_from_slice(buf);
-                data.push(f32::from_be_bytes(copy));
-            } else {
-                break;
-            }
+        for buf in iter {
+            let mut copy = [0; 4];
+            copy.copy_from_slice(buf);
+            data.push(f32::from_be_bytes(copy));
         }
         Self {
             transaction_id: 0,
@@ -49,7 +45,7 @@ impl Message {
         let mut iter = encoded_message.chunks_exact(4);
         let transaction_id = match iter.next() {
             Some(buf) => {
-                let mut copy = [0 as u8; 4];
+                let mut copy = [0; 4];
                 copy.copy_from_slice(buf);
                 u32::from_be_bytes(copy)
             }
@@ -59,7 +55,7 @@ impl Message {
         };
         let source_id = match iter.next() {
             Some(buf) => {
-                let mut copy = [0 as u8; 4];
+                let mut copy = [0; 4];
                 copy.copy_from_slice(buf);
                 u32::from_be_bytes(copy)
             }
@@ -68,14 +64,10 @@ impl Message {
             }
         };
         let mut data = vec![];
-        loop {
-            if let Some(buf) = iter.next() {
-                let mut copy = [0 as u8; 4];
-                copy.copy_from_slice(buf);
-                data.push(f32::from_be_bytes(copy));
-            } else {
-                break;
-            }
+        for buf in iter {
+            let mut copy = [0; 4];
+            copy.copy_from_slice(buf);
+            data.push(f32::from_be_bytes(copy));
         }
         Some(Self {
             transaction_id,
@@ -88,7 +80,7 @@ impl Message {
         let mut ret = vec![];
         ret.append(&mut self.transaction_id.to_be_bytes().to_vec());
         ret.append(&mut self.source_id.to_be_bytes().to_vec());
-        ret.append(&mut self.data.iter().map(|x| x.to_be_bytes()).flatten().collect::<Vec<u8>>());
+        ret.append(&mut self.data.iter().flat_map(|x| x.to_be_bytes()).collect::<Vec<u8>>());
         if use_base64 {
             base64::engine::general_purpose::STANDARD.encode(ret).as_bytes().to_vec()
         } else {
@@ -148,16 +140,14 @@ impl EdgeFunction for BenchMapReduce {
         // - otherwise: a structured Message is expected.
         let mut message = if conf.is_first {
             Message::new(encoded_message, conf.use_base64)
+        } else if let Some(message) = Message::from(encoded_message, conf.use_base64) {
+            message
         } else {
-            if let Some(message) = Message::from(encoded_message, conf.use_base64) {
-                message
-            } else {
-                cast(
-                    "err",
-                    format!("error: discarded invalid message casted (size {})", encoded_message.len()).as_bytes(),
-                );
-                return;
-            }
+            cast(
+                "err",
+                format!("error: discarded invalid message casted (size {})", encoded_message.len()).as_bytes(),
+            );
+            return;
         };
 
         if conf.is_first {
@@ -170,7 +160,7 @@ impl EdgeFunction for BenchMapReduce {
             }
         } else {
             // Discard the message if coming from an expected source.
-            if conf.inputs.iter().find(|x| **x == message.source_id).is_none() {
+            if !conf.inputs.iter().any(|x| *x == message.source_id) {
                 cast(
                     "err",
                     format!(
@@ -187,7 +177,7 @@ impl EdgeFunction for BenchMapReduce {
             state.pending.insert(message.source_id, message);
 
             // Remove all messages from old transactions.
-            let mut transaction_ids = state.pending.iter().map(|(_, m)| m.transaction_id).collect::<Vec<u32>>();
+            let mut transaction_ids = state.pending.values().map(|m| m.transaction_id).collect::<Vec<u32>>();
             transaction_ids.sort_unstable();
             let last_transaction_id = *transaction_ids.last().unwrap();
             state.pending.retain(|_, m| m.transaction_id == last_transaction_id);
@@ -202,14 +192,10 @@ impl EdgeFunction for BenchMapReduce {
                     // Reduce.
                     let mut iter = state.pending.iter_mut();
                     let first = iter.next().unwrap().1;
-                    loop {
-                        if let Some(next) = iter.next() {
-                            let cur = next.1;
-                            for i in 0..std::cmp::min(first.data.len(), cur.data.len()) {
-                                first.data[i] += cur.data[i];
-                            }
-                        } else {
-                            break;
+                    for next in iter {
+                        let cur = next.1;
+                        for i in 0..std::cmp::min(first.data.len(), cur.data.len()) {
+                            first.data[i] += cur.data[i];
                         }
                     }
 
@@ -227,7 +213,7 @@ impl EdgeFunction for BenchMapReduce {
     }
 
     fn handle_call(_src: InstanceId, _encoded_message: &[u8]) -> CallRet {
-        cast("err", format!("error: call handler invoked").as_bytes());
+        cast("err", "error: call handler invoked".as_bytes());
         CallRet::NoReply
     }
 
@@ -244,19 +230,19 @@ impl EdgeFunction for BenchMapReduce {
 
         // check configuration errors
         if is_first && !inputs.is_empty() {
-            cast("err", format!("init error: first element with non-empty inputs").as_bytes());
+            cast("err", "init error: first element with non-empty inputs".as_bytes());
         }
         if !is_first && inputs.is_empty() {
-            cast("err", format!("init error: non-first element with empty inputs").as_bytes());
+            cast("err", "init error: non-first element with empty inputs".as_bytes());
         }
         if is_last && !outputs.is_empty() {
-            cast("err", format!("init error: last element with non-empty outputs").as_bytes());
+            cast("err", "init error: last element with non-empty outputs".as_bytes());
         }
         if !is_last && outputs.is_empty() {
-            cast("err", format!("init error: non-last element with empty outputs").as_bytes());
+            cast("err", "init error: non-last element with empty outputs".as_bytes());
         }
         if is_first && is_last {
-            cast("err", format!("init error: element indicated as first and last").as_bytes());
+            cast("err", "init error: element indicated as first and last".as_bytes());
         }
 
         // save configuration
@@ -291,7 +277,7 @@ mod tests {
             data: vec![1.0, 2.0, 3.0],
         };
 
-        for use_base64 in vec![true, false] {
+        for use_base64 in [true, false] {
             let encoded = message.encode(use_base64);
 
             println!("{:?}", encoded);

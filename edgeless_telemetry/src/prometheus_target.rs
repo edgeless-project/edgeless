@@ -18,6 +18,7 @@ struct RuntimeLabels {
 }
 
 // TODO: add additional labels like class_spec, function_name
+#[allow(dead_code)]
 #[derive(Clone, Debug, Hash, PartialEq, Eq, prometheus_client::encoding::EncodeLabelSet)]
 struct FunctionLabels {
     node_id: String,

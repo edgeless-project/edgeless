@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
- // for parse
+// for parse
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -196,7 +196,7 @@ async fn main() -> anyhow::Result<()> {
                     WorkflowCommands::List {} => match con_wf_client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
                         Ok(instances) => {
                             for instance in instances.iter() {
-                                println!("workflow: {}", instance.workflow_id.to_string());
+                                println!("workflow: {}", instance.workflow_id);
                                 for function in instance.domain_mapping.iter() {
                                     println!("\t{:?}", function);
                                 }

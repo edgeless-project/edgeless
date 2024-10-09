@@ -14,13 +14,13 @@ pub struct Controller {
 }
 
 pub(crate) enum ControllerRequest {
-    START(
+    Start(
         edgeless_api::workflow_instance::SpawnWorkflowRequest,
         // Reply Channel
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>,
     ),
-    STOP(edgeless_api::workflow_instance::WorkflowId),
-    LIST(
+    Stop(edgeless_api::workflow_instance::WorkflowId),
+    List(
         edgeless_api::workflow_instance::WorkflowId,
         // Reply Channel
         tokio::sync::oneshot::Sender<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>,

@@ -151,11 +151,11 @@ impl TelemetryProcessor {
     ///
     /// Parameters:
     /// - `prometheus_url`: HTTP end-point to which to bind a web server
-    /// providing an interface suitable to be scraped by Prometheus
-    /// (https://prometheus.io/); if empty then the server is not started
+    ///   providing an interface suitable to be scraped by Prometheus
+    ///   (https://prometheus.io/); if empty then the server is not started
     /// - `log_level`: level used for log directives at each new event
     /// - `performance_target`: optional target that collects samples about
-    /// performance-related events
+    ///   performance-related events
     ///
     pub async fn new(
         prometheus_url: String,
@@ -197,7 +197,9 @@ impl TelemetryProcessor {
         }
 
         // Created and the log target, if required.
-        if let Some(log_level) = log_level { processing_chain.push(Box::new(EventLogger::new(log_level))) };
+        if let Some(log_level) = log_level {
+            processing_chain.push(Box::new(EventLogger::new(log_level)))
+        };
 
         // Create a channel to receive telemetry events and the processor that
         // will handle them, spawned in a dedicated task.

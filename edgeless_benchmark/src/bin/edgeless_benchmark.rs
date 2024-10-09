@@ -66,6 +66,7 @@ struct Args {
 }
 
 #[derive(PartialEq, Eq)]
+#[allow(clippy::enum_variant_names)]
 enum Event {
     /// 0: Event time.
     WfNew(u64),
@@ -88,13 +89,13 @@ impl Event {
 
 impl PartialOrd for Event {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        other.time().partial_cmp(&self.time())
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for Event {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
+        self.time().cmp(&other.time())
     }
 }
 

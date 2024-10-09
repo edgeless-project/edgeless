@@ -151,10 +151,7 @@ impl WorkflowType {
     }
 
     pub fn metrics_collector(&self) -> bool {
-        match self {
-            WorkflowType::None | WorkflowType::Single(_, _) => false,
-            _ => true,
-        }
+        !matches!(self, WorkflowType::None | WorkflowType::Single(_, _))
     }
 
     pub fn examples() -> Vec<Self> {
