@@ -694,9 +694,9 @@ pub fn edgeless_node_default_conf() -> String {
     let caps = get_capabilities(vec!["RUST_WASM".to_string()], NodeCapabilitiesUser::empty());
 
     format!(
-        "{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}",
-        r##"[general]
-node_id = "fda6ce79-46df-4f96-a0d2-456f720f606c"
+        "[general]\nnode_id = \"{}\"\n{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}",
+        uuid::Uuid::new_v4(),
+        r##"
 agent_url = "http://127.0.0.1:7021"
 agent_url_announced = ""
 invocation_url = "http://127.0.0.1:7002"

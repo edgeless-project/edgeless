@@ -157,7 +157,8 @@ In another shell, create the default configuration of the node:
 ./edgeless_node_d -t node.toml
 ```
 
-The configuration file is the following:
+The configuration file is the following (`node_id` is random and will
+_almost certainly_ be different for you)):
 
 ```toml
 [general]
