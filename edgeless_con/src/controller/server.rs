@@ -142,18 +142,18 @@ impl ControllerTask {
             // Loop on all the identifiers for this function/resource
             // (once for each orchestration domain to which the
             // function/resource was allocated).
-            for origin_fid in self.active_workflows.get_mut(&wf_id).unwrap().mapped_fids(&component_name).unwrap() {
+            for origin_fid in self.active_workflows.get_mut(&wf_id).unwrap().mapped_fids(component_name).unwrap() {
                 let origin_domain = self.orchestrators.iter_mut().next().unwrap().0.clone();
 
-                let output_mapping = self.output_mapping_for(&wf_id, &component_name).await;
+                let output_mapping = self.output_mapping_for(&wf_id, component_name).await;
 
                 if output_mapping.is_empty() {
                     continue;
                 }
 
-                let component_type = self.active_workflows.get_mut(&wf_id).unwrap().component_type(&component_name).unwrap();
+                let component_type = self.active_workflows.get_mut(&wf_id).unwrap().component_type(component_name).unwrap();
                 res = self
-                    .patch_outputs(&origin_domain, origin_fid, component_type, output_mapping, &component_name)
+                    .patch_outputs(&origin_domain, origin_fid, component_type, output_mapping, component_name)
                     .await;
             }
         }
@@ -245,11 +245,9 @@ impl ControllerTask {
                 ret = vec![edgeless_api::workflow_instance::WorkflowInstance {
                     workflow_id: w_id.clone(),
                     domain_mapping: wf
-                        .domain_mapping
-                        .iter()
-                        .map(|(_name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                        .domain_mapping.values().map(|component| edgeless_api::workflow_instance::WorkflowFunctionMapping {
                             name: component.name.to_string(),
-                            function_id: component.fid.clone(),
+                            function_id: component.fid,
                             domain_id: component.domain_id.clone(),
                         })
                         .collect(),
@@ -262,11 +260,9 @@ impl ControllerTask {
                 .map(|(w_id, wf)| edgeless_api::workflow_instance::WorkflowInstance {
                     workflow_id: w_id.clone(),
                     domain_mapping: wf
-                        .domain_mapping
-                        .iter()
-                        .map(|(_name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                        .domain_mapping.values().map(|component| edgeless_api::workflow_instance::WorkflowFunctionMapping {
                             name: component.name.to_string(),
-                            function_id: component.fid.clone(),
+                            function_id: component.fid,
                             domain_id: component.domain_id.clone(),
                         })
                         .collect(),
@@ -304,12 +300,12 @@ impl ControllerTask {
             Ok(response) => match response {
                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
                     log::warn!("function instance creation rejected: {}", error);
-                    return Err(format!("function instance creation rejected: {} ", error));
+                    Err(format!("function instance creation rejected: {} ", error))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                     log::info!("workflow {} function {} started with fid {}", wf_id.to_string(), function.name, &id);
                     // id.node_id is unused
-                    self.active_workflows.get_mut(&wf_id).unwrap().domain_mapping.insert(
+                    self.active_workflows.get_mut(wf_id).unwrap().domain_mapping.insert(
                         function.name.clone(),
                         super::deployment_state::ActiveComponent {
                             component_type: super::ComponentType::Function,
@@ -318,11 +314,11 @@ impl ControllerTask {
                             fid: id,
                         },
                     );
-                    return Ok(());
+                    Ok(())
                 }
             },
             Err(err) => {
-                return Err(format!("failed interaction when creating a function instance: {}", err));
+                Err(format!("failed interaction when creating a function instance: {}", err))
             }
         }
     }
@@ -347,12 +343,12 @@ impl ControllerTask {
             Ok(response) => match response {
                 edgeless_api::common::StartComponentResponse::ResponseError(error) => {
                     log::warn!("resource start rejected: {}", error);
-                    return Err(format!("resource start rejected: {} ", error));
+                    Err(format!("resource start rejected: {} ", error))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                     log::info!("workflow {} resource {} started with fid {}", wf_id.to_string(), resource.name, &id);
                     // id.node_id is unused
-                    self.active_workflows.get_mut(&wf_id).unwrap().domain_mapping.insert(
+                    self.active_workflows.get_mut(wf_id).unwrap().domain_mapping.insert(
                         resource.name.clone(),
                         super::deployment_state::ActiveComponent {
                             component_type: super::ComponentType::Resource,
@@ -361,11 +357,11 @@ impl ControllerTask {
                             fid: id,
                         },
                     );
-                    return Ok(());
+                    Ok(())
                 }
             },
             Err(err) => {
-                return Err(format!("failed interaction when starting a resource: {}", err));
+                Err(format!("failed interaction when starting a resource: {}", err))
             }
         }
     }
@@ -376,7 +372,7 @@ impl ControllerTask {
         component_name: &str,
     ) -> std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> {
         let workflow_mapping: std::collections::HashMap<String, String> =
-            self.active_workflows.get(wf_id).unwrap().component_output_mapping(&component_name);
+            self.active_workflows.get(wf_id).unwrap().component_output_mapping(component_name);
 
         let mut output_mapping = std::collections::HashMap::new();
 
@@ -386,7 +382,7 @@ impl ControllerTask {
             // Loop on all the identifiers for the
             // target function/resource (once for each
             // assigned orchestration domain).
-            for target_fid in self.active_workflows.get(&wf_id).unwrap().mapped_fids(&to_name).unwrap() {
+            for target_fid in self.active_workflows.get(wf_id).unwrap().mapped_fids(&to_name).unwrap() {
                 // [TODO] Issue#96 The output_mapping
                 // structure should be changed so that
                 // multiple values are possible (with
@@ -426,9 +422,9 @@ impl ControllerTask {
                     })
                     .await
                 {
-                    Ok(_) => return Ok(()),
+                    Ok(_) => Ok(()),
                     Err(err) => {
-                        return Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err));
+                        Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err))
                     }
                 }
             }
@@ -442,9 +438,9 @@ impl ControllerTask {
                     })
                     .await
                 {
-                    Ok(_) => return Ok(()),
+                    Ok(_) => Ok(()),
                     Err(err) => {
-                        return Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err));
+                        Err(format!("failed interaction when patching component {}: {}", name_in_workflow, err))
                     }
                 }
             }
