@@ -408,11 +408,13 @@ mod test {
     #[test]
     fn serialize_deserialize_telemetry_log_event() {
         let mut messages = vec![];
-        for log_level in [TelemetryLogLevel::Error,
+        for log_level in [
+            TelemetryLogLevel::Error,
             TelemetryLogLevel::Warn,
             TelemetryLogLevel::Info,
             TelemetryLogLevel::Debug,
-            TelemetryLogLevel::Trace] {
+            TelemetryLogLevel::Trace,
+        ] {
             messages.push(TelemetryLogEvent {
                 originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 log_level: log_level.clone(),

@@ -75,7 +75,7 @@ pub async fn scd30_reader_task(
     sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, Measurement, 2>,
 ) {
     sensor.init(10);
-    embassy_time::Timer::after(embassy_time::Duration::from_secs(10_u64)).await;
+    embassy_time::Timer::after(embassy_time::Duration::from_secs(10 as u64)).await;
     loop {
         let data = {
             match sensor.read() {
@@ -93,28 +93,28 @@ pub async fn scd30_reader_task(
             }
         };
         sender.send(data).await;
-        embassy_time::Timer::after(embassy_time::Duration::from_secs(10_u64)).await;
+        embassy_time::Timer::after(embassy_time::Duration::from_secs(10 as u64)).await;
     }
 }
 
 impl crate::resource::Resource for SCD30Sensor {
     fn provider_id(&self) -> &'static str {
-        "scd30-sensor-bridge-1"
+        return "scd30-sensor-bridge-1";
     }
 
     fn resource_class(&self) -> &'static str {
-        "scd30-sensor"
+        return "scd30-sensor";
     }
 
     fn outputs(&self) -> &'static [&'static str] {
-        &["data_out"]
+        return &["data_out"];
     }
 
     async fn has_instance(&self, instance_id: &edgeless_api_core::instance_id::InstanceId) -> bool {
         let tmp = self.inner.borrow_mut();
         let lck = tmp.lock().await;
 
-        lck.instance_id == Some(*instance_id)
+        return lck.instance_id == Some(instance_id.clone());
     }
 
     async fn launch(&mut self, spawner: embassy_executor::Spawner, dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {
@@ -175,16 +175,16 @@ impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;
 
-        if lck.instance_id.is_some() {
+        if let Some(_) = lck.instance_id {
             return Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Resource Busy",
                 detail: None,
             });
         }
 
-        let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID);
+        let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone());
 
-        lck.instance_id = Some(instance_id);
+        lck.instance_id = Some(instance_id.clone());
         lck.data_out_id = instance_specification.data_out_id;
         log::info!("Start Sensor");
         Ok(instance_id)
