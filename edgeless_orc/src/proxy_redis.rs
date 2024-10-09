@@ -3,7 +3,6 @@
 
 use redis::Commands;
 use std::io::Write;
-use std::mem;
 use std::str::FromStr;
 
 /// An orchestrator proxy that uses a Redis in-memory database to mirror

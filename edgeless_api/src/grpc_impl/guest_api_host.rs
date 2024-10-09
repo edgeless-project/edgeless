@@ -218,7 +218,7 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
 pub fn parse_output_event_data(api_instance: &crate::grpc_impl::api::OutputEventData) -> anyhow::Result<crate::guest_api_host::OutputEventData> {
     Ok(crate::guest_api_host::OutputEventData {
         originator: match &api_instance.originator {
-            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
                 Ok(originator) => originator,
                 Err(err) => return Err(anyhow::anyhow!("invalid originator field: {}", err)),
             },
