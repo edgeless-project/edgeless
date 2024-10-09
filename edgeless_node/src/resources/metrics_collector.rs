@@ -40,7 +40,7 @@ impl Event {
         };
         if tokens[0] == "workflow" {
             if tokens[1] == "begin" {
-                return Ok(Event::WorkflowBegin(transaction));
+                Ok(Event::WorkflowBegin(transaction))
             } else if tokens[1] == "end" {
                 return Ok(Event::WorkflowEnd(transaction));
             } else {
@@ -200,23 +200,21 @@ impl MetricsCollectorResource {
                             let avg_key = format!("{}:{}", event.initial(), id);
                             if event.begin() {
                                 timestamps.insert(key, std::time::Instant::now());
-                            } else {
-                                if let Some(ts) = timestamps.remove(&key) {
-                                    let current = ts.elapsed().as_millis() as i64;
-                                    let _ = sender
-                                        .send(RedisCommand::Push(
-                                            format!("{}:{}:samples", event.full(), id),
-                                            current,
-                                            std::time::SystemTime::now(),
-                                        ))
-                                        .await;
-                                    let average = match averages.get(&avg_key) {
-                                        Some(prev_value) => current as f64 * alpha + (1.0_f64 - alpha) * prev_value,
-                                        None => current as f64,
-                                    };
-                                    averages.insert(avg_key, average);
-                                    let _ = sender.send(RedisCommand::Set(format!("{}:{}:average", event.full(), id), average)).await;
-                                }
+                            } else if let Some(ts) = timestamps.remove(&key) {
+                                let current = ts.elapsed().as_millis() as i64;
+                                let _ = sender
+                                    .send(RedisCommand::Push(
+                                        format!("{}:{}:samples", event.full(), id),
+                                        current,
+                                        std::time::SystemTime::now(),
+                                    ))
+                                    .await;
+                                let average = match averages.get(&avg_key) {
+                                    Some(prev_value) => current as f64 * alpha + (1.0_f64 - alpha) * prev_value,
+                                    None => current as f64,
+                                };
+                                averages.insert(avg_key, average);
+                                let _ = sender.send(RedisCommand::Set(format!("{}:{}:average", event.full(), id), average)).await;
                             }
                         }
                     }
@@ -264,12 +262,12 @@ impl MetricsCollectorResourceProvider {
                     RedisCommand::Push(key, value, instant) => {
                         keys.insert(key.to_string());
                         redis_connection
-                            .rpush::<&str, String, usize>(&key, format!("{},{}", *value, RedisCommand::timestamp(instant)))
+                            .rpush::<&str, String, usize>(key, format!("{},{}", *value, RedisCommand::timestamp(instant)))
                             .err()
                     }
                     RedisCommand::Set(key, value) => {
                         keys.insert(key.to_string());
-                        redis_connection.set::<&str, f64, String>(&key, *value).err()
+                        redis_connection.set::<&str, f64, String>(key, *value).err()
                     }
                     RedisCommand::Reset(new_warmup) => {
                         log::info!("resetting the metrics, a new epoch starts with warm-up period {} ms", new_warmup);
@@ -312,7 +310,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
         let mut lck = self.inner.lock().await;
         let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
-        let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
+        let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
 
         // Read configuration
         let alpha = instance_specification
@@ -326,7 +324,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
         match MetricsCollectorResource::new(dataplane_handle, alpha, wf_name, lck.sender.clone()).await {
             Ok(resource) => {
-                lck.instances.insert(new_id.clone(), resource);
+                lck.instances.insert(new_id, resource);
                 return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
             }
             Err(err) => {

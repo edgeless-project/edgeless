@@ -11,9 +11,9 @@ pub trait GuestAPIHostRegister {
         &mut self,
         instance_id: &edgeless_api::function_instance::InstanceId,
         guest_api_host: crate::base_runtime::guest_api::GuestAPIHost,
-    ) -> ();
+    );
 
-    fn deregister_guest_api_host(&mut self, instance_id: &edgeless_api::function_instance::InstanceId) -> ();
+    fn deregister_guest_api_host(&mut self, instance_id: &edgeless_api::function_instance::InstanceId);
 
     fn guest_api_host(
         &mut self,
@@ -109,14 +109,14 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
 
     async fn start_function(&mut self, spawn_request: edgeless_api::function_instance::SpawnFunctionRequest) {
         log::info!("Start Function {:?}", spawn_request.instance_id);
-        let instance_id = match spawn_request.instance_id.clone() {
+        let instance_id = match spawn_request.instance_id {
             Some(id) => id,
             None => {
                 return;
             }
         };
         let cloned_req = spawn_request.clone();
-        let data_plane = self.data_plane_provider.get_handle_for(instance_id.clone()).await;
+        let data_plane = self.data_plane_provider.get_handle_for(instance_id).await;
         let instance = super::function_instance_runner::FunctionInstanceRunner::new(
             cloned_req,
             data_plane,
@@ -131,7 +131,7 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
             self.guest_api_host_register.clone(),
         )
         .await;
-        self.functions.insert(instance_id.function_id.clone(), instance);
+        self.functions.insert(instance_id.function_id, instance);
     }
 
     async fn stop_function(&mut self, instance_id: edgeless_api::function_instance::InstanceId) {

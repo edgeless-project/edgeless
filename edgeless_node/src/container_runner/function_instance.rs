@@ -77,7 +77,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
                                 match function_client_api
                                     .boot(edgeless_api::guest_api_function::BootData {
                                         guest_api_host_endpoint: url.clone(),
-                                        instance_id: instance_id.clone(),
+                                        instance_id: *instance_id,
                                     })
                                     .await
                                 {
@@ -127,8 +127,8 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
         );
         self.function_client_api
             .init(edgeless_api::guest_api_function::FunctionInstanceInit {
-                init_payload: init_payload.unwrap_or(&"").to_string(),
-                serialized_state: serialized_state.unwrap_or(&"").as_bytes().to_vec(),
+                init_payload: init_payload.unwrap_or("").to_string(),
+                serialized_state: serialized_state.unwrap_or("").as_bytes().to_vec(),
             })
             .await
             .or(Err(crate::base_runtime::FunctionInstanceError::InternalError))
@@ -138,7 +138,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
         log::debug!("container run-time: cast, src {}, msg {} bytes", src, msg.len());
         self.function_client_api
             .cast(edgeless_api::guest_api_function::InputEventData {
-                src: src.clone(),
+                src: *src,
                 msg: msg.into(),
             })
             .await
@@ -154,7 +154,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
         match self
             .function_client_api
             .call(edgeless_api::guest_api_function::InputEventData {
-                src: src.clone(),
+                src: *src,
                 msg: msg.into(),
             })
             .await

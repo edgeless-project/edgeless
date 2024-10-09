@@ -72,7 +72,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
         spawn_request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
         let new_id = edgeless_api::function_instance::InstanceId {
-            node_id: self.node_id.clone(),
+            node_id: self.node_id,
             function_id: uuid::Uuid::new_v4(),
         };
         self.sender.send(MockAgentEvent::StartFunction((new_id, spawn_request))).await.unwrap();
@@ -112,7 +112,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         start_request: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
         let new_id = edgeless_api::function_instance::InstanceId {
-            node_id: self.node_id.clone(),
+            node_id: self.node_id,
             function_id: uuid::Uuid::new_v4(),
         };
         self.sender.send(MockAgentEvent::StartResource((new_id, start_request))).await.unwrap();
@@ -148,19 +148,19 @@ fn test_create_clients_resources(
         let node_id = uuid::Uuid::new_v4();
         let mut capabilities = edgeless_api::node_registration::NodeCapabilities::minimum();
         if node_i == 0 {
-            stable_node_id = node_id.clone();
+            stable_node_id = node_id;
             capabilities.labels.push("stable".to_string());
         } else {
             capabilities.labels.push("unstable".to_string());
         }
-        nodes.insert(node_id.clone(), mock_node_receiver);
+        nodes.insert(node_id, mock_node_receiver);
         clients.insert(
-            node_id.clone(),
+            node_id,
             ClientDesc {
                 agent_url: "".to_string(),
                 invocation_url: "".to_string(),
                 api: Box::new(MockNode {
-                    node_id: node_id.clone(),
+                    node_id,
                     sender: mock_node_sender,
                 }) as Box<dyn edgeless_api::agent::AgentAPI + Send>,
                 capabilities,
@@ -171,7 +171,7 @@ fn test_create_clients_resources(
                 format!("node-{}-resource-{}-provider", node_i, provider_i),
                 ResourceProvider {
                     class_type: "rc-1".to_string(),
-                    node_id: node_id.clone(),
+                    node_id,
                     outputs: vec![],
                 },
             );
@@ -196,7 +196,7 @@ async fn test_setup(
     let (mut orchestrator, orchestrator_task) = Orchestrator::new_with_clients(
         crate::EdgelessOrcBaselineSettings {
             orchestration_strategy: crate::OrchestrationStrategy::Random,
-            keep_alive_interval_secs: 0 as u64, // unused
+            keep_alive_interval_secs: 0_u64, // unused
         },
         clients,
         resource_providers,
@@ -240,15 +240,9 @@ fn msg_to_string(msg: Result<Option<MockAgentEvent>, futures::channel::mpsc::Try
 
 async fn wait_for_function_event(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>) -> MockAgentEvent {
     for _ in 0..100 {
-        match receiver.try_next() {
-            Ok(val) => match val {
-                Some(event) => {
-                    return event;
-                }
-                None => {}
-            },
-            Err(_) => {}
-        }
+        if let Ok(val) = receiver.try_next() { if let Some(event) = val {
+            return event;
+        } }
         tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
     }
     panic!("timeout while waiting for an event");
@@ -259,15 +253,9 @@ async fn wait_for_event_multiple(
 ) -> (uuid::Uuid, MockAgentEvent) {
     for _ in 0..100 {
         for (node_id, receiver) in receivers.iter_mut() {
-            match receiver.try_next() {
-                Ok(val) => match val {
-                    Some(event) => {
-                        return (node_id.clone(), event);
-                    }
-                    None => {}
-                },
-                Err(_) => {}
-            }
+            if let Ok(val) = receiver.try_next() { if let Some(event) = val {
+                return (*node_id, event);
+            } }
         }
         tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
     }
@@ -279,15 +267,9 @@ async fn wait_for_events_if_any(
 ) -> Option<(uuid::Uuid, MockAgentEvent)> {
     for _ in 0..100 {
         for (node_id, receiver) in receivers.iter_mut() {
-            match receiver.try_next() {
-                Ok(val) => match val {
-                    Some(event) => {
-                        return Some((node_id.clone(), event));
-                    }
-                    None => {}
-                },
-                Err(_) => {}
-            }
+            if let Ok(val) = receiver.try_next() { if let Some(event) = val {
+                return Some((*node_id, event));
+            } }
         }
         tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
     }
@@ -297,15 +279,9 @@ async fn wait_for_events_if_any(
 async fn no_function_event(receivers: &mut std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>) {
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     for (node_id, receiver) in receivers.iter_mut() {
-        match receiver.try_next() {
-            Ok(val) => match val {
-                Some(event) => {
-                    panic!("expecting no event, but received one on node {}: {}", node_id, event_to_string(&event));
-                }
-                None => {}
-            },
-            Err(_) => {}
-        }
+        if let Ok(val) = receiver.try_next() { if let Some(event) = val {
+            panic!("expecting no event, but received one on node {}: {}", node_id, event_to_string(&event));
+        } }
     }
 }
 
@@ -463,7 +439,7 @@ async fn test_orc_multiple_resources_start_stop() {
         if let (node_id, MockAgentEvent::StartResource((int_instance_id, resource_instance_spec))) = wait_for_event_multiple(&mut nodes).await {
             assert_eq!(node_id, int_instance_id.node_id);
             node_ids.push(node_id);
-            int_instance_ids.push(int_instance_id.function_id.clone());
+            int_instance_ids.push(int_instance_id.function_id);
             assert!(resource_instance_spec.configuration.is_empty());
         } else {
             panic!("wrong event received");
@@ -515,7 +491,7 @@ async fn test_orc_multiple_resources_start_stop() {
 async fn test_orc_patch() {
     let (mut fun_client, mut res_client, mut _mgt_client, mut nodes, _) = test_setup(1, 1).await;
     assert_eq!(1, nodes.len());
-    let client_node_id = nodes.keys().next().unwrap().clone();
+    let client_node_id = *nodes.keys().next().unwrap();
 
     // Spawn a function instance.
 
@@ -559,12 +535,12 @@ async fn test_orc_patch() {
 
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_function_id.clone(),
+            function_id: ext_function_id,
             output_mapping: std::collections::HashMap::from([(
                 "out-1".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_resource_id.clone(),
+                    function_id: ext_resource_id,
                 },
             )]),
         })
@@ -589,12 +565,12 @@ async fn test_orc_patch() {
 
     match res_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_resource_id.clone(),
+            function_id: ext_resource_id,
             output_mapping: std::collections::HashMap::from([(
                 "out-2".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_function_id.clone(),
+                    function_id: ext_function_id,
                 },
             )]),
         })
@@ -661,7 +637,7 @@ async fn test_orc_node_with_fun_disconnects() {
     let mut int_fid_2 = uuid::Uuid::nil();
     if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
         assert_ne!(node_id, stable_node_id);
-        unstable_node_id = node_id.clone();
+        unstable_node_id = node_id;
         int_fid_2 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
@@ -697,12 +673,12 @@ async fn test_orc_node_with_fun_disconnects() {
     // Patch f1->f2
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_fid_1.clone(),
+            function_id: ext_fid_1,
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_2.clone(),
+                    function_id: ext_fid_2,
                 },
             )]),
         })
@@ -720,12 +696,12 @@ async fn test_orc_node_with_fun_disconnects() {
     // Patch f2->f3
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_fid_2.clone(),
+            function_id: ext_fid_2,
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_3.clone(),
+                    function_id: ext_fid_3,
                 },
             )]),
         })
@@ -743,12 +719,12 @@ async fn test_orc_node_with_fun_disconnects() {
     // Patch f3->f4
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_fid_3.clone(),
+            function_id: ext_fid_3,
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_4.clone(),
+                    function_id: ext_fid_4,
                 },
             )]),
         })
@@ -773,7 +749,7 @@ async fn test_orc_node_with_fun_disconnects() {
 
         let mut failing_nodes = FAILING_NODES.get().unwrap().lock().unwrap();
         failing_nodes.clear();
-        failing_nodes.insert(unstable_node_id.clone());
+        failing_nodes.insert(unstable_node_id);
     }
     let _ = mgt_client.keep_alive().await;
 
@@ -885,8 +861,8 @@ async fn orc_node_with_res_disconnects() {
 
         if let (node_id, MockAgentEvent::StartResource((int_instance_id, resource_instance_spec))) = wait_for_event_multiple(&mut nodes).await {
             assert_eq!(node_id, int_instance_id.node_id);
-            unstable_node_id = int_instance_id.node_id.clone();
-            int_fid_res = int_instance_id.function_id.clone();
+            unstable_node_id = int_instance_id.node_id;
+            int_fid_res = int_instance_id.function_id;
             assert!(resource_instance_spec.configuration.is_empty());
             if int_instance_id.node_id != stable_node_id {
                 break;
@@ -913,12 +889,12 @@ async fn orc_node_with_res_disconnects() {
     // Patch f1->res
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_fid_1.clone(),
+            function_id: ext_fid_1,
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_res.clone(),
+                    function_id: ext_fid_res,
                 },
             )]),
         })
@@ -944,7 +920,7 @@ async fn orc_node_with_res_disconnects() {
 
         let mut failing_nodes = FAILING_NODES.get().unwrap().lock().unwrap();
         failing_nodes.clear();
-        failing_nodes.insert(unstable_node_id.clone());
+        failing_nodes.insert(unstable_node_id);
     }
     let _ = mgt_client.keep_alive().await;
 
@@ -1036,18 +1012,18 @@ async fn test_patch_after_fun_stop() {
 
     // Patch functions
     let patch_instructions = [
-        (ext_fids[0].clone(), vec![ext_fids[2].clone()]),
-        (ext_fids[1].clone(), vec![ext_fids[2].clone()]),
-        (ext_fids[2].clone(), vec![ext_fids[3].clone(), ext_fids[4].clone()]),
-        (ext_fids[3].clone(), vec![ext_fids[5].clone()]),
-        (ext_fids[4].clone(), vec![ext_fids[5].clone()]),
+        (ext_fids[0], vec![ext_fids[2]]),
+        (ext_fids[1], vec![ext_fids[2]]),
+        (ext_fids[2], vec![ext_fids[3], ext_fids[4]]),
+        (ext_fids[3], vec![ext_fids[5]]),
+        (ext_fids[4], vec![ext_fids[5]]),
     ];
     let patch_instructions_int = [
-        (int_fids[0].clone(), vec![int_fids[2].clone()]),
-        (int_fids[1].clone(), vec![int_fids[2].clone()]),
-        (int_fids[2].clone(), vec![int_fids[3].clone(), int_fids[4].clone()]),
-        (int_fids[3].clone(), vec![int_fids[5].clone()]),
-        (int_fids[4].clone(), vec![int_fids[5].clone()]),
+        (int_fids[0], vec![int_fids[2]]),
+        (int_fids[1], vec![int_fids[2]]),
+        (int_fids[2], vec![int_fids[3], int_fids[4]]),
+        (int_fids[3], vec![int_fids[5]]),
+        (int_fids[4], vec![int_fids[5]]),
     ];
 
     for j in 0..patch_instructions.len() {
@@ -1167,7 +1143,7 @@ async fn test_recreate_fun_after_disconnect() {
     let mut unstable_node_id = uuid::Uuid::nil();
     if let (node_id, MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
         assert_ne!(node_id, stable_node_id);
-        unstable_node_id = node_id.clone();
+        unstable_node_id = node_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
@@ -1186,12 +1162,12 @@ async fn test_recreate_fun_after_disconnect() {
     // Patch f1->f2
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_fid_1.clone(),
+            function_id: ext_fid_1,
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_2.clone(),
+                    function_id: ext_fid_2,
                 },
             )]),
         })
@@ -1209,12 +1185,12 @@ async fn test_recreate_fun_after_disconnect() {
     // Patch f2->f3
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_fid_2.clone(),
+            function_id: ext_fid_2,
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_3.clone(),
+                    function_id: ext_fid_3,
                 },
             )]),
         })
@@ -1238,7 +1214,7 @@ async fn test_recreate_fun_after_disconnect() {
 
         let mut failing_nodes = FAILING_NODES.get().unwrap().lock().unwrap();
         failing_nodes.clear();
-        failing_nodes.insert(unstable_node_id.clone());
+        failing_nodes.insert(unstable_node_id);
     }
     let _ = mgt_client.keep_alive().await;
 
@@ -1332,7 +1308,7 @@ fn test_deployment_requirements() {
     let uuid2 = uuid::Uuid::new_v4();
     let valid_annotations = std::collections::HashMap::from([
         ("max_instances".to_string(), "42".to_string()),
-        ("node_id_match_any".to_string(), format!("{},{}", uuid1.to_string(), uuid2.to_string())),
+        ("node_id_match_any".to_string(), format!("{},{}", uuid1, uuid2)),
         ("label_match_all".to_string(), "red,blue".to_string()),
         ("resource_match_all".to_string(), "file,redis".to_string()),
         ("tee".to_string(), "REQuired".to_string()),
@@ -1361,7 +1337,7 @@ fn test_orchestration_logic_is_node_feasible() {
     ));
 
     // Match any node_id
-    reqs.node_id_match_any.push(node_id.clone());
+    reqs.node_id_match_any.push(node_id);
     assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
         &runtime, &reqs, &node_id, &caps, &providers
     ));

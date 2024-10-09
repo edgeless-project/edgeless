@@ -40,7 +40,7 @@ impl crate::base_runtime::runtime::GuestAPIHostRegister for ContainerRuntime {
     }
 
     fn deregister_guest_api_host(&mut self, instance_id: &edgeless_api::function_instance::InstanceId) {
-        if let None = self.guest_api_hosts.remove(&instance_id) {
+        if let None = self.guest_api_hosts.remove(instance_id) {
             log::warn!("ContainerRunTime: trying to deregister non-existing container function {}", instance_id);
         }
     }
@@ -49,7 +49,7 @@ impl crate::base_runtime::runtime::GuestAPIHostRegister for ContainerRuntime {
         &mut self,
         instance_id: &edgeless_api::function_instance::InstanceId,
     ) -> Option<&mut crate::base_runtime::guest_api::GuestAPIHost> {
-        self.guest_api_hosts.get_mut(&instance_id)
+        self.guest_api_hosts.get_mut(instance_id)
     }
 
     fn configuration(&mut self) -> std::collections::HashMap<String, String> {

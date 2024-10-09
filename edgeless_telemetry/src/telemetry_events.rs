@@ -197,10 +197,7 @@ impl TelemetryProcessor {
         }
 
         // Created and the log target, if required.
-        match log_level {
-            Some(log_level) => processing_chain.push(Box::new(EventLogger::new(log_level))),
-            None => {}
-        };
+        if let Some(log_level) = log_level { processing_chain.push(Box::new(EventLogger::new(log_level))) };
 
         // Create a channel to receive telemetry events and the processor that
         // will handle them, spawned in a dedicated task.

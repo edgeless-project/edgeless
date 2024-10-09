@@ -224,23 +224,20 @@ async fn main() -> anyhow::Result<()> {
                     }
 
                     wf_requested += 1;
-                    match engine.start_workflow().await {
-                        Ok(uuid) => {
-                            wf_started += 1;
-                            let end_time = match arrival_model {
-                                ArrivalModel::Poisson => now + to_microseconds(lifetime_rv.sample(&mut rng)),
-                                _ => to_microseconds(args.duration) - 1,
-                            };
-                            assert!(end_time >= now);
-                            log::info!(
-                                "{} new wf created '{}', will last {} s",
-                                to_seconds(now),
-                                &uuid,
-                                to_seconds(end_time - now)
-                            );
-                            events.push(Event::WfEnd(end_time, uuid));
-                        }
-                        Err(_) => {}
+                    if let Ok(uuid) = engine.start_workflow().await {
+                        wf_started += 1;
+                        let end_time = match arrival_model {
+                            ArrivalModel::Poisson => now + to_microseconds(lifetime_rv.sample(&mut rng)),
+                            _ => to_microseconds(args.duration) - 1,
+                        };
+                        assert!(end_time >= now);
+                        log::info!(
+                            "{} new wf created '{}', will last {} s",
+                            to_seconds(now),
+                            &uuid,
+                            to_seconds(end_time - now)
+                        );
+                        events.push(Event::WfEnd(end_time, uuid));
                     }
                     let new_arrival_time = now
                         + to_microseconds(match arrival_model {

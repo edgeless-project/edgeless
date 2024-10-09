@@ -46,7 +46,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
 
             if let Some((host, target)) = lck.interests.iter().find_map(|intr| {
                 if host == intr.host && intr.allow.contains(&method) {
-                    Some((intr.host.clone(), intr.target.clone()))
+                    Some((intr.host.clone(), intr.target))
                 } else {
                     None
                 }
@@ -70,28 +70,25 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                         .collect(),
                 };
                 let serialized_msg = serde_json::to_string(&msg)?;
-                let res = lck.dataplane.call(target.clone(), serialized_msg).await;
-                match res {
-                    edgeless_dataplane::core::CallRet::Reply(data) => {
-                        let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_str(&data)?;
-                        let mut response_builder = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from(
-                            processor_response.body.unwrap_or(vec![]),
-                        )));
-                        *response_builder.status_mut() = hyper::StatusCode::from_u16(processor_response.status)?;
-                        {
-                            let headers = response_builder.headers_mut();
-                            for (header_key, header_val) in processor_response.headers {
-                                if let (Ok(key), Ok(value)) = (
-                                    hyper::header::HeaderName::from_bytes(header_key.as_bytes()),
-                                    hyper::header::HeaderValue::from_str(&header_val),
-                                ) {
-                                    headers.append(key, value);
-                                }
+                let res = lck.dataplane.call(target, serialized_msg).await;
+                if let edgeless_dataplane::core::CallRet::Reply(data) = res {
+                    let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_str(&data)?;
+                    let mut response_builder = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from(
+                        processor_response.body.unwrap_or_default(),
+                    )));
+                    *response_builder.status_mut() = hyper::StatusCode::from_u16(processor_response.status)?;
+                    {
+                        let headers = response_builder.headers_mut();
+                        for (header_key, header_val) in processor_response.headers {
+                            if let (Ok(key), Ok(value)) = (
+                                hyper::header::HeaderName::from_bytes(header_key.as_bytes()),
+                                hyper::header::HeaderValue::from_str(&header_val),
+                            ) {
+                                headers.append(key, value);
                             }
                         }
-                        return Ok(response_builder);
                     }
-                    _ => {}
+                    return Ok(response_builder);
                 }
             }
 
@@ -111,7 +108,7 @@ pub async fn ingress_task(
     let (_, host, port) = edgeless_api::util::parse_http_host(&ingress_url).unwrap();
     let addr = std::net::SocketAddr::from((std::net::IpAddr::from_str(&host).unwrap(), port));
 
-    let dataplane = provider.get_handle_for(ingress_id.clone()).await;
+    let dataplane = provider.get_handle_for(ingress_id).await;
 
     let ingress_state = std::sync::Arc::new(tokio::sync::Mutex::new(IngressState {
         interests: Vec::<HTTPIngressInterest>::new(),
@@ -134,7 +131,7 @@ pub async fn ingress_task(
             let io = hyper_util::rt::TokioIo::new(stream);
             let cloned_interests = cloned_interests.clone();
             let cloned_host = host.clone();
-            let cloned_port = port.clone();
+            let cloned_port = port;
             tokio::task::spawn(async move {
                 if let Err(err) = hyper::server::conn::http1::Builder::new()
                     .serve_connection(
@@ -153,7 +150,7 @@ pub async fn ingress_task(
     });
 
     Box::new(IngressResource {
-        own_node_id: ingress_id.node_id.clone(),
+        own_node_id: ingress_id.node_id,
         configuration_state: ingress_state,
     })
 }
@@ -176,9 +173,9 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             instance_specification.configuration.get("methods"),
         ) {
             // Assign a new component identifier to the newly-created  resource.
-            let resource_id = edgeless_api::function_instance::InstanceId::new(self.own_node_id.clone());
+            let resource_id = edgeless_api::function_instance::InstanceId::new(self.own_node_id);
             lck.active_resources.insert(
-                resource_id.function_id.clone(),
+                resource_id.function_id,
                 ResourceDesc {
                     host: host.clone(),
                     allow: methods
@@ -211,7 +208,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         let target = match update.output_mapping.get("new_request") {
-            Some(val) => val.clone(),
+            Some(val) => *val,
             None => {
                 return Err(anyhow::anyhow!("Missing mapping of channel: new_request"));
             }
@@ -225,8 +222,8 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         };
         lck.interests.push(HTTPIngressInterest {
             resource_id: InstanceId {
-                node_id: self.own_node_id.clone(),
-                function_id: update.function_id.clone(),
+                node_id: self.own_node_id,
+                function_id: update.function_id,
             },
             host,
             allow,

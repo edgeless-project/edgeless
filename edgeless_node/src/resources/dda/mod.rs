@@ -142,7 +142,7 @@ impl DDAResource {
                                         //TODO: In future, this should be iterated upon since multiple outputs might be mapped
                                         if let Some(target_id) = inner.output_mapping.get(&dda_sub.cast_mapping.to_string()) {
                                             log::info!("target id for data {} from subscription is {}", str, target_id);
-                                            dataplane_handle.send(target_id.clone(), str.to_string()).await;
+                                            dataplane_handle.send(*target_id, str.to_string()).await;
                                         } else {
                                             log::info!("target id unknwon for data {} from subscription", str);
                                         }
@@ -261,7 +261,7 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
                     // log::info!("dda_com_subscription_mapping is provided {}", dda_com_subscription_mapping);
                     let mut lck = self.inner.lock().await;
                     let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
-                    let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
+                    let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
 
                     // wrap the grpc client into a nice DDAResource object
                     let dda_res = DDAResource::new(
