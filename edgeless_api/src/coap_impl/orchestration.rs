@@ -18,12 +18,12 @@ impl CoapOrchestrationServer {
 
             let mut slf = CoapOrchestrationServer {
                 sock: sck,
-                registration_api: registration_api,
-                tx_buffer: vec![0 as u8; 5000],
+                registration_api,
+                tx_buffer: vec![0_u8; 5000],
                 received_tokens: std::collections::HashMap::new(),
             };
 
-            let mut buffer = vec![0 as u8; 5000];
+            let mut buffer = vec![0_u8; 5000];
 
             loop {
                 let (size, sender) = slf.sock.recv_from(&mut buffer[..]).await.unwrap();
@@ -102,7 +102,7 @@ impl CoapOrchestrationServer {
                         },
                         &mut self.tx_buffer[..],
                     );
-                    edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &data, token, &mut tail[..], false)
+                    edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, data, token, &mut tail[..], false)
                 }
             };
             if let Err(err) = self.sock.send_to(data, sender).await {
@@ -154,7 +154,7 @@ impl CoapOrchestrationServer {
                         },
                         &mut self.tx_buffer[..],
                     );
-                    edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &data, token, &mut tail[..], false)
+                    edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, data, token, &mut tail[..], false)
                 }
             };
             if let Err(err) = self.sock.send_to(data, sender).await {

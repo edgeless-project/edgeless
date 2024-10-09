@@ -311,7 +311,7 @@ mod test {
             },
         ];
         for msg in messages {
-            match parse_keep_alive_response(&&serialize_keep_alive_response(&msg)) {
+            match parse_keep_alive_response(&serialize_keep_alive_response(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }
