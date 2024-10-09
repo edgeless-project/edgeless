@@ -33,7 +33,7 @@ impl<C> minicbor::CborLen<C> for InstanceId {
 }
 
 impl<C> minicbor::Decode<'_, C> for InstanceId {
-    fn decode(d: &mut minicbor::Decoder<'_>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+    fn decode<'b>(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         // let data: [[u8; 16];2]  = d.decode::<[[u8;16]; 2]>().unwrap();
         let n_id: [u8; 16] = (*d.bytes()?).try_into().unwrap();
         let f_id: [u8; 16] = (*d.bytes()?).try_into().unwrap();
@@ -66,7 +66,11 @@ impl InstanceId {
     }
 
     pub fn is_none(&self) -> bool {
-        self.node_id == NODE_ID_NONE && self.function_id == FUNCTION_ID_NONE
+        if self.node_id == NODE_ID_NONE && self.function_id == FUNCTION_ID_NONE {
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -74,7 +78,7 @@ impl InstanceId {
 mod test {
     #[test]
     fn size_matches() {
-        let mut buffer = [0_u8; 1000];
+        let mut buffer = [0 as u8; 1000];
 
         let id = super::InstanceId::new(uuid::Uuid::new_v4());
 

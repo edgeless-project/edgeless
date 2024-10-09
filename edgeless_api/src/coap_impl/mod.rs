@@ -30,7 +30,7 @@ impl CoapClient {
         let sock = tokio::net::UdpSocket::bind("0.0.0.0:0").await.unwrap();
 
         let inner = std::sync::Arc::new(tokio::sync::Mutex::new(CoapClientInner {
-            endpoint: peer,
+            endpoint: peer.clone(),
             next_token: 0,
             active_requests: std::collections::HashMap::new(),
         }));
@@ -54,7 +54,7 @@ impl CoapClient {
         mut outgoing_receiver: tokio::sync::mpsc::UnboundedReceiver<Vec<u8>>,
     ) {
         loop {
-            let mut buffer = vec![0_u8; 5000];
+            let mut buffer = vec![0 as u8; 5000];
 
             futures::select! {
                 msg = sock.recv_from(&mut buffer).fuse() => {
@@ -116,7 +116,7 @@ impl CoapClient {
         };
 
         for i in 0..3 {
-            let mut buffer = vec![0_u8; 5000];
+            let mut buffer = vec![0 as u8; 5000];
             let ((packet, _addr), _tail) = encode_request(token, endpoint, &mut buffer);
             if self.outgoing_sender.send(Vec::from(packet)).is_err() {
                 log::warn!("Sender could not send on iteration {}", i);

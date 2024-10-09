@@ -78,9 +78,9 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedNodeRegistration<'b> {
 
         Ok(EncodedNodeRegistration {
             node_id: id,
-            agent_url: heapless::String::from_str(agent_url).unwrap(),
-            invocation_url: heapless::String::from_str(invocation_url).unwrap(),
-            resources,
+            agent_url: heapless::String::from_str(&agent_url).unwrap(),
+            invocation_url: heapless::String::from_str(&invocation_url).unwrap(),
+            resources: resources,
         })
     }
 }
@@ -129,9 +129,9 @@ impl<'b, C> minicbor::Decode<'b, C> for ResourceProviderSpecification<'b> {
         }
 
         Ok(ResourceProviderSpecification {
-            provider_id,
-            class_type,
-            outputs,
+            provider_id: &provider_id,
+            class_type: &class_type,
+            outputs: outputs,
         })
     }
 }
