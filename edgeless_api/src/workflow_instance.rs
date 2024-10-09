@@ -16,9 +16,6 @@ impl WorkflowId {
             workflow_id: uuid::Uuid::from_str(s).unwrap(),
         }
     }
-    pub fn to_string(&self) -> String {
-        self.workflow_id.to_string()
-    }
     pub fn none() -> Self {
         Self {
             workflow_id: WORKFLOW_ID_NONE,
@@ -30,6 +27,12 @@ impl WorkflowId {
         } else {
             Some(self)
         }
+    }
+}
+
+impl std::fmt::Display for WorkflowId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.workflow_id)
     }
 }
 

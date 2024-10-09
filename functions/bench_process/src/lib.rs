@@ -100,8 +100,8 @@ mod tests {
             num_bigint::BigUint::from(2584_u64),
             num_bigint::BigUint::from(4181_u64),
         ];
-        for n in 0..expected.len() {
-            assert_eq!(expected[n], fibonacci_n_th_element(n as u64));
+        for (n, val) in expected.iter().enumerate() {
+            assert_eq!(*val, fibonacci_n_th_element(n as u64));
         }
     }
 

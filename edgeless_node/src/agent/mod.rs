@@ -103,10 +103,7 @@ impl Agent {
                         log::error!("No instance_id provided for SpawnFunctionRequest!");
                         continue;
                     }
-                    component_id_to_class_map.insert(
-                        spawn_req.instance_id.unwrap().function_id,
-                        spawn_req.code.function_class_type.clone(),
-                    );
+                    component_id_to_class_map.insert(spawn_req.instance_id.unwrap().function_id, spawn_req.code.function_class_type.clone());
 
                     // Get runner for function_class of spawn_req
                     match runners.get_mut(&spawn_req.code.function_class_type) {
@@ -325,7 +322,7 @@ impl Agent {
                     }
                     let mut disk_tot_reads = 0;
                     let mut disk_tot_writes = 0;
-                    for (_, process) in sys.processes() {
+                    for process in sys.processes().values() {
                         let disk_usage = process.disk_usage();
                         disk_tot_reads += disk_usage.total_read_bytes as i64;
                         disk_tot_writes += disk_usage.total_written_bytes as i64;

@@ -9,14 +9,14 @@ pub struct ContainerFunction {
 }
 
 enum ContainerFunctionRequest {
-    BOOT(edgeless_api::guest_api_function::BootData),
-    INIT(edgeless_api::guest_api_function::FunctionInstanceInit),
-    CAST(edgeless_api::guest_api_function::InputEventData),
-    CALL(
+    Boot(edgeless_api::guest_api_function::BootData),
+    Init(edgeless_api::guest_api_function::FunctionInstanceInit),
+    Cast(edgeless_api::guest_api_function::InputEventData),
+    Call(
         edgeless_api::guest_api_function::InputEventData,
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::guest_api_function::CallReturn>>,
     ),
-    STOP(),
+    Stop(),
 }
 
 enum FiniteStateMachine {
@@ -55,7 +55,7 @@ impl ContainerFunction {
         // Main loop that reacts to messages on the receiver channel
         while let Some(req) = receiver.next().await {
             match req {
-                ContainerFunctionRequest::BOOT(boot_data) => {
+                ContainerFunctionRequest::Boot(boot_data) => {
                     log::info!(
                         "boot, remote node URL {}, instance_id {}",
                         boot_data.guest_api_host_endpoint,
@@ -83,7 +83,7 @@ impl ContainerFunction {
                         }
                     }
                 }
-                ContainerFunctionRequest::INIT(init_data) => {
+                ContainerFunctionRequest::Init(init_data) => {
                     log::info!(
                         "init, init_data {}, serialized_state {} bytes",
                         init_data.init_payload,
@@ -96,7 +96,7 @@ impl ContainerFunction {
                         fsm = FiniteStateMachine::Initialized;
                     }
                 }
-                ContainerFunctionRequest::CAST(event) => {
+                ContainerFunctionRequest::Cast(event) => {
                     log::info!("cast, src {}, msg {} bytes", event.src, event.msg.len());
                     if std::mem::discriminant(&fsm) != std::mem::discriminant(&FiniteStateMachine::Initialized) {
                         log::error!("received cast command while not in an initialized state: ignored");
@@ -123,7 +123,7 @@ impl ContainerFunction {
                         }
                     }
                 }
-                ContainerFunctionRequest::CALL(event, reply_sender) => {
+                ContainerFunctionRequest::Call(event, reply_sender) => {
                     log::info!("call, src {}, msg {} bytes", event.src, event.msg.len());
                     let res = match std::mem::discriminant(&fsm) == std::mem::discriminant(&FiniteStateMachine::Initialized) {
                         false => {
@@ -143,7 +143,7 @@ impl ContainerFunction {
                         }
                     }
                 }
-                ContainerFunctionRequest::STOP() => {
+                ContainerFunctionRequest::Stop() => {
                     log::info!("stop");
                     if std::mem::discriminant(&fsm) != std::mem::discriminant(&FiniteStateMachine::Initialized) {
                         log::error!("received stop command while not in an initialized state: ignored");
@@ -181,21 +181,21 @@ pub struct GuestAPIFunctionClient {
 #[async_trait::async_trait]
 impl edgeless_api::guest_api_function::GuestAPIFunction for GuestAPIFunctionClient {
     async fn boot(&mut self, boot_data: edgeless_api::guest_api_function::BootData) -> anyhow::Result<()> {
-        match self.sender.send(ContainerFunctionRequest::BOOT(boot_data.clone())).await {
+        match self.sender.send(ContainerFunctionRequest::Boot(boot_data.clone())).await {
             Ok(_) => Ok(()),
             Err(err) => return Err(anyhow::anyhow!("GuestAPIFunction::boot channel error: {}", err)),
         }
     }
 
     async fn init(&mut self, init_data: edgeless_api::guest_api_function::FunctionInstanceInit) -> anyhow::Result<()> {
-        match self.sender.send(ContainerFunctionRequest::INIT(init_data.clone())).await {
+        match self.sender.send(ContainerFunctionRequest::Init(init_data.clone())).await {
             Ok(_) => Ok(()),
             Err(err) => return Err(anyhow::anyhow!("GuestAPIFunction::init channel error: {}", err)),
         }
     }
 
     async fn cast(&mut self, event: edgeless_api::guest_api_function::InputEventData) -> anyhow::Result<()> {
-        match self.sender.send(ContainerFunctionRequest::CAST(event.clone())).await {
+        match self.sender.send(ContainerFunctionRequest::Cast(event.clone())).await {
             Ok(_) => Ok(()),
             Err(err) => return Err(anyhow::anyhow!("GuestAPIFunction::cast channel error: {}", err)),
         }
@@ -206,7 +206,7 @@ impl edgeless_api::guest_api_function::GuestAPIFunction for GuestAPIFunctionClie
         event: edgeless_api::guest_api_function::InputEventData,
     ) -> anyhow::Result<edgeless_api::guest_api_function::CallReturn> {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::guest_api_function::CallReturn>>();
-        match self.sender.send(ContainerFunctionRequest::CALL(event.clone(), reply_sender)).await {
+        match self.sender.send(ContainerFunctionRequest::Call(event.clone(), reply_sender)).await {
             Ok(_) => match reply_receiver.await {
                 Ok(ret) => ret,
                 Err(err) => Err(anyhow::anyhow!("GuestAPIFunction::call error: {}", err)),
@@ -216,7 +216,7 @@ impl edgeless_api::guest_api_function::GuestAPIFunction for GuestAPIFunctionClie
     }
 
     async fn stop(&mut self) -> anyhow::Result<()> {
-        match self.sender.send(ContainerFunctionRequest::STOP()).await {
+        match self.sender.send(ContainerFunctionRequest::Stop()).await {
             Ok(_) => Ok(()),
             Err(err) => return Err(anyhow::anyhow!("GuestAPIFunction::stop channel error: {}", err)),
         }

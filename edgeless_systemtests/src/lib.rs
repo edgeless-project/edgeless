@@ -395,7 +395,7 @@ mod tests {
         };
 
         // Create one workflow
-        
+
         cleanup();
         let res = client
             .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
@@ -432,7 +432,7 @@ mod tests {
             })
             .await;
         let expected_instance_names = std::collections::HashSet::from(["f1", "f2", "f3", "log"]);
-        let workflow_id = Some(match res {
+        let workflow_id = match res {
             Ok(response) => match &response {
                 edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => {
                     panic!("workflow rejected: {}", err)
@@ -447,7 +447,7 @@ mod tests {
                 }
             },
             Err(err) => panic!("could not start the workflow: {}", err),
-        });
+        };
 
         // Check that the client now shows one workflow.
         assert_eq!(1, wf_list(&mut client).await.len());
@@ -526,7 +526,7 @@ mod tests {
         assert!(redis_proxy.retrieve_deploy_intents().is_empty());
 
         // Stop the workflows
-        match client.stop(workflow_id.unwrap()).await {
+        match client.stop(workflow_id).await {
             Ok(_) => {}
             Err(err) => panic!("could not stop the workflow: {}", err),
         }

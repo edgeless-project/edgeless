@@ -250,7 +250,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
         // Check that the resource to be patched is active.
         let mut lck = self.inner.lock().await;
-        if lck.instances.get(&update.function_id).is_none() {
+        if !lck.instances.contains_key(&update.function_id) {
             anyhow::bail!("Patching a non-existing resource: {}", update.function_id);
         }
 

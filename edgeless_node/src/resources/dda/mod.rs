@@ -113,8 +113,10 @@ impl DDAResource {
 
         // subscribe to configured dda topics
         for dda_sub in dda_sub_array {
-            let mut dda_subscription_filter = dda_com::SubscriptionFilter::default();
-            dda_subscription_filter.r#type = dda_sub.ddatopic.clone();
+            let dda_subscription_filter = dda_com::SubscriptionFilter {
+                r#type: dda_sub.ddatopic.clone(),
+                ..Default::default()
+            };
             if dda_sub.ddapattern == "event" {
                 let mut dda_temp_subcription_stream = match dda_client.subscribe_event(dda_subscription_filter).await {
                     Ok(dda_resp) => {

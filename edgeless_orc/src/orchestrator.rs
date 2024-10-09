@@ -198,22 +198,22 @@ pub struct Orchestrator {
 }
 
 enum OrchestratorRequest {
-    STARTFUNCTION(
+    StartFunction(
         edgeless_api::function_instance::SpawnFunctionRequest,
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>>,
     ),
-    STOPFUNCTION(edgeless_api::orc::DomainManagedInstanceId),
-    STARTRESOURCE(
+    StopFunction(edgeless_api::orc::DomainManagedInstanceId),
+    StartResource(
         edgeless_api::resource_configuration::ResourceInstanceSpecification,
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>>,
     ),
-    STOPRESOURCE(edgeless_api::orc::DomainManagedInstanceId),
-    PATCH(edgeless_api::common::PatchRequest),
-    UPDATENODE(
+    StopResource(edgeless_api::orc::DomainManagedInstanceId),
+    Patch(edgeless_api::common::PatchRequest),
+    UpdateNode(
         edgeless_api::node_registration::UpdateNodeRequest,
         tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>,
     ),
-    KEEPALIVE(),
+    KeepAlive(),
 }
 
 #[derive(serde::Serialize)]
@@ -402,7 +402,7 @@ impl Orchestrator {
     }
 
     pub async fn keep_alive(&mut self) {
-        let _ = self.sender.send(OrchestratorRequest::KEEPALIVE()).await;
+        let _ = self.sender.send(OrchestratorRequest::KeepAlive()).await;
     }
 
     fn ext_to_int(
@@ -872,7 +872,7 @@ impl Orchestrator {
         // main orchestration loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
             match req {
-                OrchestratorRequest::STARTFUNCTION(spawn_req, reply_channel) => {
+                OrchestratorRequest::StartFunction(spawn_req, reply_channel) => {
                     // Create a new ext_fid for this resource.
                     let ext_fid = uuid::Uuid::new_v4();
 
@@ -892,7 +892,7 @@ impl Orchestrator {
                         Err(err) => log::warn!("Could not start function ext_fid {}: {}", ext_fid, err),
                     }
                 }
-                OrchestratorRequest::STOPFUNCTION(ext_fid) => {
+                OrchestratorRequest::StopFunction(ext_fid) => {
                     log::debug!("Orchestrator StopFunction {:?}", ext_fid);
 
                     match active_instances.remove(&ext_fid) {
@@ -912,7 +912,7 @@ impl Orchestrator {
                                 }
                             };
                             Self::apply_patches(
-                                &mut active_instances,
+                                &active_instances,
                                 &dependency_graph,
                                 &mut nodes,
                                 Self::dependencies(&dependency_graph, &ext_fid),
@@ -928,7 +928,7 @@ impl Orchestrator {
 
                     active_instances_changed = true;
                 }
-                OrchestratorRequest::STARTRESOURCE(start_req, reply_channel) => {
+                OrchestratorRequest::StartResource(start_req, reply_channel) => {
                     log::debug!("Orchestrator StartResource {:?}", &start_req);
 
                     // Create a new ext_fid for this resource.
@@ -955,7 +955,7 @@ impl Orchestrator {
 
                     active_instances_changed = true;
                 }
-                OrchestratorRequest::STOPRESOURCE(ext_fid) => {
+                OrchestratorRequest::StopResource(ext_fid) => {
                     log::debug!("Orchestrator StopResource {:?}", ext_fid);
 
                     match active_instances.remove(&ext_fid) {
@@ -973,7 +973,7 @@ impl Orchestrator {
                                 }
                             }
                             Self::apply_patches(
-                                &mut active_instances,
+                                &active_instances,
                                 &dependency_graph,
                                 &mut nodes,
                                 Self::dependencies(&dependency_graph, &ext_fid),
@@ -989,7 +989,7 @@ impl Orchestrator {
 
                     active_instances_changed = true;
                 }
-                OrchestratorRequest::PATCH(update) => {
+                OrchestratorRequest::Patch(update) => {
                     log::debug!("Orchestrator Patch {:?}", update);
 
                     // Extract the ext_fid identifiers for the origin and
@@ -1010,7 +1010,7 @@ impl Orchestrator {
                     // Apply the patch.
                     Self::apply_patches(&active_instances, &dependency_graph, &mut nodes, vec![origin_ext_fid]).await;
                 }
-                OrchestratorRequest::UPDATENODE(request, reply_channel) => {
+                OrchestratorRequest::UpdateNode(request, reply_channel) => {
                     // Update the map of clients and, at the same time, prepare
                     // the edgeless_api::node_management::UpdatePeersRequest message to be sent to all the
                     // clients to notify that a new node exists (Register) or
@@ -1094,7 +1094,7 @@ impl Orchestrator {
                             }
                         }
                         edgeless_api::node_registration::UpdateNodeRequest::Deregistration(node_id) => {
-                            if nodes.get(&node_id).is_none() {
+                            if !nodes.contains_key(&node_id) {
                                 // There is no client with that node_id
                                 None
                             } else {
@@ -1118,7 +1118,7 @@ impl Orchestrator {
                         // was a deregister operation).
                         let mut num_failures: u32 = 0;
                         for (_node_id, client) in nodes.iter_mut() {
-                            if let Err(_) = client.api.node_management_api().update_peers(msg.clone()).await {
+                            if client.api.node_management_api().update_peers(msg.clone()).await.is_err() {
                                 num_failures += 1;
                             }
                         }
@@ -1133,12 +1133,13 @@ impl Orchestrator {
                                 if other_node_id.eq(&this_node_id) {
                                     continue;
                                 }
-                                if let Err(_) = new_node_client
+                                if new_node_client
                                     .update_peers(edgeless_api::node_management::UpdatePeersRequest::Add(
                                         *other_node_id,
                                         client_desc.invocation_url.clone(),
                                     ))
                                     .await
+                                    .is_err()
                                 {
                                     num_failures += 1;
                                 }
@@ -1158,7 +1159,7 @@ impl Orchestrator {
                         log::error!("Orchestrator channel error in UPDATENODE: {:?}", err);
                     }
                 }
-                OrchestratorRequest::KEEPALIVE() => {
+                OrchestratorRequest::KeepAlive() => {
                     // First check if there are nodes that must be disconnected
                     // because they failed to reply to a keep-alive.
                     let mut to_be_disconnected = std::collections::HashSet::new();
@@ -1384,7 +1385,7 @@ impl Orchestrator {
                     }
 
                     // Repatch everything that needs to be repatched.
-                    Self::apply_patches(&mut active_instances, &dependency_graph, &mut nodes, to_be_repatched).await;
+                    Self::apply_patches(&active_instances, &dependency_graph, &mut nodes, to_be_repatched).await;
 
                     // Update the proxy, if necessary.
                     if resource_providers_changed {
@@ -1423,7 +1424,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::Dom
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
             anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>,
         >();
-        if let Err(err) = self.sender.send(OrchestratorRequest::STARTFUNCTION(request, reply_sender)).await {
+        if let Err(err) = self.sender.send(OrchestratorRequest::StartFunction(request, reply_sender)).await {
             return Err(anyhow::anyhow!(
                 "Orchestrator channel error when creating a function instance: {}",
                 err.to_string()
@@ -1440,7 +1441,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::Dom
 
     async fn stop(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
         log::debug!("FunctionInstance::stop() {:?}", id);
-        match self.sender.send(OrchestratorRequest::STOPFUNCTION(id)).await {
+        match self.sender.send(OrchestratorRequest::StopFunction(id)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Orchestrator channel error when stopping a function instance: {}",
@@ -1451,7 +1452,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::Dom
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         log::debug!("FunctionInstance::patch() {:?}", update);
-        match self.sender.send(OrchestratorRequest::PATCH(update)).await {
+        match self.sender.send(OrchestratorRequest::Patch(update)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Orchestrator channel error when updating the links of a function instance: {}",
@@ -1469,7 +1470,7 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for NodeRegistrationCl
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
         log::debug!("NodeRegistrationAPI::update_node() {:?}", request);
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>();
-        if let Err(err) = self.sender.send(OrchestratorRequest::UPDATENODE(request, reply_sender)).await {
+        if let Err(err) = self.sender.send(OrchestratorRequest::UpdateNode(request, reply_sender)).await {
             return Err(anyhow::anyhow!("Orchestrator channel error when updating a node: {}", err.to_string()));
         }
         match reply_receiver.await {
@@ -1479,7 +1480,7 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for NodeRegistrationCl
     }
     async fn keep_alive(&mut self) {
         log::debug!("NodeRegistrationAPI::keep_alive()");
-        let _ = self.sender.send(OrchestratorRequest::KEEPALIVE()).await;
+        let _ = self.sender.send(OrchestratorRequest::KeepAlive()).await;
     }
 }
 
@@ -1493,7 +1494,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
             anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>,
         >();
-        if let Err(err) = self.sender.send(OrchestratorRequest::STARTRESOURCE(request, reply_sender)).await {
+        if let Err(err) = self.sender.send(OrchestratorRequest::StartResource(request, reply_sender)).await {
             return Err(anyhow::anyhow!(
                 "Orchestrator channel error when starting a resource: {}",
                 err.to_string()
@@ -1510,7 +1511,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
     async fn stop(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
         log::debug!("ResourceConfigurationAPI::stop() {:?}", id);
-        match self.sender.send(OrchestratorRequest::STOPRESOURCE(id)).await {
+        match self.sender.send(OrchestratorRequest::StopResource(id)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Orchestrator channel error when stopping a resource: {}",
@@ -1521,7 +1522,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         log::debug!("ResourceConfigurationAPI::patch() {:?}", update);
-        match self.sender.send(OrchestratorRequest::PATCH(update)).await {
+        match self.sender.send(OrchestratorRequest::Patch(update)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Orchestrator channel error when updating the links of a function instance: {}",
