@@ -128,7 +128,7 @@ mod tests {
                 &event_tags,
             );
             target.handle(
-                (&crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(std::time::Duration::from_secs(i))),
+                &crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(std::time::Duration::from_secs(i)),
                 &event_tags,
             );
         }
