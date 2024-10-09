@@ -14,10 +14,10 @@ impl MockDisplay {
         if data.class_type == "epaper-display" {
             Ok(MockDisplayInstanceConfiguration {})
         } else {
-            return Err(edgeless_api_core::common::ErrorResponse {
+            Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Wrong Resource class type.",
                 detail: None,
-            });
+            })
         }
     }
 
@@ -32,15 +32,15 @@ impl MockDisplay {
 
 impl crate::resource::Resource for MockDisplay {
     fn provider_id(&self) -> &'static str {
-        return "mock-display-1";
+        "mock-display-1"
     }
 
     fn resource_class(&self) -> &'static str {
-        return "epaper-display";
+        "epaper-display"
     }
 
     fn outputs(&self) -> &'static [&'static str] {
-        return &[];
+        &[]
     }
 
     async fn has_instance(&self, id: &edgeless_api_core::instance_id::InstanceId) -> bool {
@@ -98,7 +98,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
             });
         }
 
-        let id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone());
+        let id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID);
 
         self.instance_id = Some(id);
 

@@ -457,7 +457,7 @@ impl Engine {
 
     pub async fn stop_workflow(&mut self, uuid: &str) -> anyhow::Result<()> {
         if let Some(redis_client) = &mut self.redis_client {
-            if let Some(wf_name) = self.uuid_to_names.get(&uuid::Uuid::from_str(&uuid).unwrap()) {
+            if let Some(wf_name) = self.uuid_to_names.get(&uuid::Uuid::from_str(uuid).unwrap()) {
                 redis_client.set(format!("workflow:{}:end", wf_name).as_str(), &timestamp_now());
             }
         }

@@ -35,11 +35,7 @@ impl ActiveWorkflow {
 
     pub fn component_type(&self, component_name: &str) -> Option<super::ComponentType> {
         let item = self.domain_mapping.get(component_name);
-        if let Some(item) = item {
-            return Some(item.component_type.clone());
-        } else {
-            return None;
-        }
+        item.map(|item| item.component_type.clone())
     }
 
     pub fn domain_mapping(&self) -> Vec<edgeless_api::workflow_instance::WorkflowFunctionMapping> {
@@ -47,7 +43,7 @@ impl ActiveWorkflow {
             .iter()
             .map(|(name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
                 name: name.clone(),
-                function_id: component.fid.clone(),
+                function_id: component.fid,
                 domain_id: component.domain_id.clone(),
             })
             .collect()

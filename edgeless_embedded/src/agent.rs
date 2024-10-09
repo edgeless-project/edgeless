@@ -35,7 +35,7 @@ impl EmbeddedAgent {
         static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>> =
             static_cell::StaticCell::new();
         let channel =
-            CHANNEL_RAW.init_with(|| embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>::new());
+            CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>::new);
 
         let sender = channel.sender();
         let receiver = channel.receiver();
@@ -56,12 +56,12 @@ impl EmbeddedAgent {
 
         static SLF_RAW: static_cell::StaticCell<EmbeddedAgent> = static_cell::StaticCell::new();
         let slf = SLF_RAW.init_with(|| EmbeddedAgent {
-            own_node_id: node_id.clone(),
+            own_node_id: node_id,
             upstream_sender: sender,
             upstream_receiver: Some(receiver),
             inner: slf_inner,
             registration_signal: REPLY_CHANNEL
-                .init_with(|| embassy_sync::signal::Signal::<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>::new()),
+                .init_with(embassy_sync::signal::Signal::<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>::new),
         });
 
         {
@@ -106,7 +106,7 @@ impl EmbeddedAgent {
                 .push(edgeless_api_core::node_registration::ResourceProviderSpecification {
                     provider_id: i.provider_id(),
                     class_type: i.resource_class(),
-                    outputs: outputs,
+                    outputs,
                 })
                 .is_err()
             {
@@ -118,7 +118,7 @@ impl EmbeddedAgent {
             node_id: edgeless_api_core::node_registration::NodeId(self.own_node_id),
             agent_url: url.clone(),
             invocation_url: url,
-            resources: resources,
+            resources,
         };
 
         loop {
@@ -126,11 +126,8 @@ impl EmbeddedAgent {
             self.upstream_sender
                 .send(AgentEvent::Registration((reg.clone(), self.registration_signal)))
                 .await;
-            match self.registration_signal.wait().await {
-                RegistrationReply::Sucess => {
-                    return;
-                }
-                _ => {}
+            if let RegistrationReply::Sucess = self.registration_signal.wait().await {
+                return;
             }
         }
     }

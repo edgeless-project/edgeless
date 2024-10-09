@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::io::Cursor;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use toml; // for parse
+ // for parse
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -175,7 +175,7 @@ async fn main() -> anyhow::Result<()> {
                                         println!("{:?}", err);
                                     }
                                     SpawnWorkflowResponse::WorkflowInstance(val) => {
-                                        println!("{}", val.workflow_id.workflow_id.to_string());
+                                        println!("{}", val.workflow_id.workflow_id);
                                     }
                                 }
                                 log::info!("{:?}", response)
@@ -232,13 +232,13 @@ async fn main() -> anyhow::Result<()> {
                         config,
                         None,
                         false,
-                        &vec!["wasm32-unknown-unknown".to_string()],
+                        &["wasm32-unknown-unknown".to_string()],
                         cargo::core::compiler::CompileMode::Build,
                     )?;
                     build_config.requested_profile = cargo::util::interning::InternedString::new("release");
 
                     let compile_options = cargo::ops::CompileOptions {
-                        build_config: build_config,
+                        build_config,
                         cli_features: cargo::core::resolver::CliFeatures::new_all(false),
                         spec: cargo::ops::Packages::Packages(Vec::new()),
                         filter: cargo::ops::CompileFilter::Default {
