@@ -7,6 +7,12 @@ pub struct AliasMapping {
     mapping: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<String, edgeless_api::function_instance::InstanceId>>>,
 }
 
+impl Default for AliasMapping {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AliasMapping {
     pub fn new() -> Self {
         AliasMapping {

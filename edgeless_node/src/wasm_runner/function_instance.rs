@@ -178,8 +178,8 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("handle_stop_asm not available: {}", e)))?,
             memory: instance
                 .get_memory(&mut store, "memory")
-                .ok_or_else(|| (crate::base_runtime::FunctionInstanceError::BadCode(format!("memory not available"))))?,
-            store: store,
+                .ok_or_else(|| (crate::base_runtime::FunctionInstanceError::BadCode("memory not available".to_string())))?,
+            store,
         }))
     }
 

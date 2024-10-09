@@ -129,8 +129,8 @@ impl<'b, C> minicbor::Decode<'b, C> for ResourceProviderSpecification<'b> {
         }
 
         Ok(ResourceProviderSpecification {
-            provider_id: provider_id,
-            class_type: class_type,
+            provider_id,
+            class_type,
             outputs,
         })
     }

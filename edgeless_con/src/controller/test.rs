@@ -73,7 +73,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::Dom
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
         let new_id = uuid::Uuid::new_v4();
         self.sender
-            .send(MockFunctionInstanceEvent::StartFunction((new_id.clone(), spawn_request)))
+            .send(MockFunctionInstanceEvent::StartFunction((new_id, spawn_request)))
             .await
             .unwrap();
         Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
@@ -96,7 +96,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
         let new_id = uuid::Uuid::new_v4();
         self.sender
-            .send(MockFunctionInstanceEvent::StartResource((new_id.clone(), instance_specification)))
+            .send(MockFunctionInstanceEvent::StartResource((new_id, instance_specification)))
             .await
             .unwrap();
         Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
@@ -131,7 +131,7 @@ async fn test_setup() -> (
     let (mock_orc_sender, mock_orc_receiver) = futures::channel::mpsc::unbounded::<MockFunctionInstanceEvent>();
     let node_id = uuid::Uuid::new_v4();
     let mock_orc = MockOrchestrator {
-        _node_id: node_id.clone(),
+        _node_id: node_id,
         sender: mock_orc_sender,
     };
 
@@ -186,7 +186,7 @@ async fn single_function_start_stop() {
     let mut new_func_id = uuid::Uuid::nil();
     assert!(new_func_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        new_func_id = id.clone();
+        new_func_id = id;
         assert!(spawn_req.instance_id.is_none());
         assert_eq!(function_class_specification, spawn_req.code);
         assert!(spawn_req.annotations.is_empty());
@@ -261,7 +261,7 @@ async fn resource_to_function_start_stop() {
     let mut new_func_id = uuid::Uuid::nil();
     assert!(new_func_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, _spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        new_func_id = id.clone();
+        new_func_id = id;
     } else {
         panic!();
     }
@@ -269,7 +269,7 @@ async fn resource_to_function_start_stop() {
     let mut new_res_id = uuid::Uuid::nil();
     assert!(new_res_id.is_nil());
     if let MockFunctionInstanceEvent::StartResource((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        new_res_id = id.clone();
+        new_res_id = id;
         assert_eq!("test-res".to_string(), spawn_req.class_type);
         assert!(spawn_req.configuration.is_empty());
     } else {
@@ -295,12 +295,12 @@ async fn resource_to_function_start_stop() {
         match mock_orc_receiver.try_next().unwrap().unwrap() {
             MockFunctionInstanceEvent::StopFunction(id) => {
                 assert_eq!(new_func_id, id);
-                assert!(got_function_stop == false);
+                assert!(!got_function_stop);
                 got_function_stop = true;
             }
             MockFunctionInstanceEvent::StopResource(id) => {
                 assert_eq!(new_res_id, id);
-                assert!(got_resource_stop == false);
+                assert!(!got_resource_stop);
                 got_resource_stop = true;
             }
             _ => {
@@ -366,7 +366,7 @@ async fn function_link_loop_start_stop() {
     let mut new_func1_id = uuid::Uuid::nil();
     assert!(new_func1_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        new_func1_id = id.clone();
+        new_func1_id = id;
         assert!(spawn_req.instance_id.is_none());
         assert!(spawn_req.annotations.is_empty());
         // TODO check state specifications
@@ -377,7 +377,7 @@ async fn function_link_loop_start_stop() {
     let mut new_func2_id = uuid::Uuid::nil();
     assert!(new_func2_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        new_func2_id = id.clone();
+        new_func2_id = id;
         assert!(spawn_req.instance_id.is_none());
         assert!(spawn_req.annotations.is_empty());
         // TODO check state specifications
@@ -417,7 +417,7 @@ async fn function_link_loop_start_stop() {
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    let mut fids = std::collections::HashSet::from([new_func1_id.clone(), new_func2_id.clone()]);
+    let mut fids = std::collections::HashSet::from([new_func1_id, new_func2_id]);
     let stop_res = mock_orc_receiver.try_next().unwrap().unwrap();
     if let MockFunctionInstanceEvent::StopFunction(id) = stop_res {
         assert!(fids.remove(&id));

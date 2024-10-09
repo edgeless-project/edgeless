@@ -111,7 +111,7 @@ impl EgressResource {
 
         Ok(edgeless_http::EdgelessHTTPResponse {
             status: ret.status().as_u16(),
-            headers: headers,
+            headers,
             body: match ret.bytes().await {
                 Ok(btes) => Some(btes.to_vec()),
                 _ => None,
@@ -144,9 +144,9 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         let mut lck = self.inner.lock().await;
 
         let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
-        let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
+        let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
 
-        lck.egress_instances.insert(new_id.clone(), EgressResource::new(dataplane_handle).await);
+        lck.egress_instances.insert(new_id, EgressResource::new(dataplane_handle).await);
 
         Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
     }

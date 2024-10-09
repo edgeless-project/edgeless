@@ -64,7 +64,7 @@ impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
             };
             match sender
                 .send(DataplaneEvent {
-                    source_id: event.source.clone(),
+                    source_id: event.source,
                     channel_id: event.stream_id,
                     message: msg,
                 })
@@ -84,6 +84,12 @@ impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
 
 pub struct NodeLocalLinkProvider {
     router: std::sync::Arc<tokio::sync::Mutex<NodeLocalRouter>>,
+}
+
+impl Default for NodeLocalLinkProvider {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl NodeLocalLinkProvider {
@@ -115,17 +121,17 @@ mod test {
     #[tokio::test]
     async fn basic_forwarding() {
         let node_id = uuid::Uuid::new_v4();
-        let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
-        let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
-        let fid_3 = edgeless_api::function_instance::InstanceId::new(node_id.clone());
+        let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id);
+        let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id);
+        let fid_3 = edgeless_api::function_instance::InstanceId::new(node_id);
 
         let provider = NodeLocalLinkProvider::new();
 
         let (sender_1, mut receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
-        let mut handle_1 = provider.new_link(fid_1.clone(), sender_1).await;
+        let mut handle_1 = provider.new_link(fid_1, sender_1).await;
 
         let (sender_2, mut receiver_2) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
-        let _handle_2 = provider.new_link(fid_2.clone(), sender_2).await;
+        let _handle_2 = provider.new_link(fid_2, sender_2).await;
 
         assert!(receiver_1.try_next().is_err());
         assert!(receiver_2.try_next().is_err());
