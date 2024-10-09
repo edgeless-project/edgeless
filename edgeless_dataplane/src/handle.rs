@@ -293,7 +293,7 @@ mod test {
             let mut dataplane = DataplaneProvider::new(node_id_2, "http://127.0.0.1:7098".to_string(), None).await;
             dataplane
                 .add_peer(EdgelessDataplanePeerSettings {
-                    node_id: node_id,
+                    node_id,
                     invocation_url: "http://127.0.0.1:7099".to_string(),
                 })
                 .await;
