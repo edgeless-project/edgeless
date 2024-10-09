@@ -212,6 +212,8 @@ target/debug/edgeless_inabox -t
 target/debug/edgeless_cli -t cli.toml
 ```
 
+Modify the `node.toml` file so that `node_id` is `fda6ce79-46df-4f96-a0d2-456f720f606c`.
+
 Modify the `orchestrator.toml` file so that the `[proxy]` and `[collection]` sections are:
 
 ```ini
