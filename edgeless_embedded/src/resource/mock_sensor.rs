@@ -80,22 +80,22 @@ impl MockSensor {
 
 impl crate::resource::Resource for MockSensor {
     fn provider_id(&self) -> &'static str {
-        "mock-scd30-sensor-1"
+        return "mock-scd30-sensor-1";
     }
 
     fn resource_class(&self) -> &'static str {
-        "scd30-sensor"
+        return "scd30-sensor";
     }
 
     fn outputs(&self) -> &'static [&'static str] {
-        &["data_out"]
+        return &["data_out"];
     }
 
     async fn has_instance(&self, instance_id: &edgeless_api_core::instance_id::InstanceId) -> bool {
         let tmp = self.inner.borrow_mut();
         let lck = tmp.lock().await;
 
-        lck.instance_id == Some(*instance_id)
+        return lck.instance_id == Some(instance_id.clone());
     }
 
     async fn launch(&mut self, spawner: embassy_executor::Spawner, dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {
@@ -147,16 +147,16 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
         let mut lck = tmp.lock().await;
         log::info!("got Lock Start");
 
-        if lck.instance_id.is_some() {
+        if let Some(_) = lck.instance_id {
             return Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Resource Busy",
                 detail: None,
             });
         }
 
-        let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID);
+        let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone());
 
-        lck.instance_id = Some(instance_id);
+        lck.instance_id = Some(instance_id.clone());
         lck.data_out_id = instance_specification.data_out_id;
         lck.delay = instance_specification.delay_s;
         log::info!("End Start");

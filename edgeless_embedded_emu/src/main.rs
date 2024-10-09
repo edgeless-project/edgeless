@@ -10,7 +10,7 @@ fn main() -> ! {
     env_logger::init();
 
     static EXECUTOR_RAW: static_cell::StaticCell<embassy_executor::Executor> = static_cell::StaticCell::new();
-    let executor = EXECUTOR_RAW.init_with(embassy_executor::Executor::new);
+    let executor = EXECUTOR_RAW.init_with(|| embassy_executor::Executor::new());
 
     executor.run(|spawner| {
         spawner.spawn(edgeless(spawner)).unwrap();
@@ -39,11 +39,11 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
     log::info!("Edgeless Embedded Async Main");
 
     static RX_BUF_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
-    let rx_buf = RX_BUF_RAW.init_with(|| [0_u8; 5000]);
+    let rx_buf = RX_BUF_RAW.init_with(|| [0 as u8; 5000]);
     static RX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
     let rx_meta = RX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
     static TX_BUF_RAW: static_cell::StaticCell<[u8; 5000]> = static_cell::StaticCell::new();
-    let tx_buf = TX_BUF_RAW.init_with(|| [0_u8; 5000]);
+    let tx_buf = TX_BUF_RAW.init_with(|| [0 as u8; 5000]);
     static TX_META_RAW: static_cell::StaticCell<[embassy_net::udp::PacketMetadata; 10]> = static_cell::StaticCell::new();
     let tx_meta = TX_META_RAW.init_with(|| [embassy_net::udp::PacketMetadata::EMPTY; 10]);
 
@@ -60,7 +60,7 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
         embassy_net::Stack::new(
             device,
             config,
-            STACK_RESOURCES_RAW.init_with(embassy_net::StackResources::<3>::new),
+            STACK_RESOURCES_RAW.init_with(|| embassy_net::StackResources::<3>::new()),
             1234,
         )
     });
@@ -76,7 +76,7 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
     static RESOURCES_RAW: static_cell::StaticCell<[&'static mut dyn edgeless_embedded::resource::ResourceDyn; 2]> = static_cell::StaticCell::new();
     let resources = RESOURCES_RAW.init_with(|| [display, sensor_scd30]);
 
-    let resource_registry = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID, resources).await;
+    let resource_registry = edgeless_embedded::agent::EmbeddedAgent::new(spawner, NODE_ID.clone(), resources).await;
 
     spawner
         .spawn(edgeless_embedded::coap::coap_task(

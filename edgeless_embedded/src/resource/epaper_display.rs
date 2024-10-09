@@ -29,7 +29,7 @@ impl EPaperDisplay {
                     let mut i: usize = 0;
                     for b in val.bytes() {
                         header_data[i] = b;
-                        i += 1;
+                        i = i + 1;
                         if i == 128 {
                             break;
                         }
@@ -40,25 +40,25 @@ impl EPaperDisplay {
 
             Ok(EPaperDisplayInstanceConfiguration { header_text: config })
         } else {
-            Err(edgeless_api_core::common::ErrorResponse {
+            return Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Wrong Resource ProviderId",
                 detail: None,
-            })
+            });
         }
     }
 }
 
 impl crate::resource::Resource for EPaperDisplay {
     fn provider_id(&self) -> &'static str {
-        "epaper-display-1"
+        return "epaper-display-1";
     }
 
     fn resource_class(&self) -> &'static str {
-        "epaper-display"
+        return "epaper-display";
     }
 
     fn outputs(&self) -> &'static [&'static str] {
-        &[]
+        return &[];
     }
 
     async fn has_instance(&self, id: &edgeless_api_core::instance_id::InstanceId) -> bool {
@@ -143,7 +143,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
             });
         }
 
-        self.instance_id = Some(edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID));
+        self.instance_id = Some(edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone()));
 
         self.header = instance_specification.header_text;
 
