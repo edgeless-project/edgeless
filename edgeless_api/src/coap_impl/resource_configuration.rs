@@ -10,12 +10,12 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
         let mut outputs = heapless::Vec::<(&str, edgeless_api_core::instance_id::InstanceId), 16>::new();
         let mut configuration = heapless::Vec::<(&str, &str), 16>::new();
         for (key, val) in &instance_specification.output_mapping {
-            outputs.push((key, *val)).map_err(|_| anyhow::anyhow!("Too many outputs"))?;
+            outputs.push((&key, val.clone())).map_err(|_| anyhow::anyhow!("Too many outputs"))?;
         }
 
         for (key, val) in &instance_specification.configuration {
             configuration
-                .push((key, val))
+                .push((&key, &val))
                 .map_err(|_| anyhow::anyhow!("Too many configuration options"))?;
         }
 
@@ -59,8 +59,8 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
         let mut outputs_i: usize = 0;
 
         for (key, val) in &update.output_mapping {
-            outputs[outputs_i] = Some((key, *val));
-            outputs_i += 1;
+            outputs[outputs_i] = Some((key, val.clone()));
+            outputs_i = outputs_i + 1;
         }
 
         let encoded_patch_req = edgeless_api_core::resource_configuration::EncodedPatchRequest {

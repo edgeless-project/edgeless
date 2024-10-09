@@ -51,7 +51,7 @@ impl NodeRegistrationHelper for super::CoapClient {
                     .push(edgeless_api_core::node_registration::ResourceProviderSpecification {
                         provider_id: &resource.provider_id,
                         class_type: &resource.class_type,
-                        outputs,
+                        outputs: outputs,
                     })
                     .map_err(|_| anyhow::anyhow!("Too many outputs"))?;
             }
