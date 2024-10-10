@@ -196,6 +196,7 @@ impl COAPEncoder {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum CoapMessage<'a> {
     Invocation(crate::invocation::Event<&'a [u8]>),
     ResourceStart(crate::resource_configuration::EncodedResourceInstanceSpecification<'a>),
@@ -211,17 +212,26 @@ pub enum CoapMessage<'a> {
 
 pub struct CoapDecoder {}
 
+#[derive(Debug)]
+pub struct CoapDecoderError;
+
+impl core::fmt::Display for CoapDecoderError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "CoAP decoder error")
+    }
+}
+
 impl CoapDecoder {
-    pub fn decode(data: &[u8]) -> Result<(CoapMessage<'_>, u8), ()> {
+    pub fn decode(data: &[u8]) -> Result<(CoapMessage<'_>, u8), CoapDecoderError> {
         let packet = coap_lite::Packet::from_bytes(data).unwrap();
         match packet.header.code {
             MessageClass::Request(_) => Self::decode_request(data),
             MessageClass::Response(_) => Self::decode_response(data),
-            _ => Err(()),
+            _ => Err(CoapDecoderError {}),
         }
     }
 
-    pub fn decode_request(data: &[u8]) -> Result<(CoapMessage<'_>, u8), ()> {
+    pub fn decode_request(data: &[u8]) -> Result<(CoapMessage<'_>, u8), CoapDecoderError> {
         let packet = coap_lite::Packet::from_bytes(data).unwrap();
 
         let path = match packet.get_option(coap_lite::CoapOption::UriPath) {
@@ -285,40 +295,37 @@ impl CoapDecoder {
                 let resource_id: crate::node_registration::NodeId = minicbor::decode(body_ref).unwrap();
                 Ok((CoapMessage::NodeDeregistration(resource_id), packet.get_token()[0]))
             }
-            _ => Err(()),
+            _ => Err(CoapDecoderError {}),
         }
     }
 
-    pub fn decode_response(data: &[u8]) -> Result<(CoapMessage<'_>, u8), ()> {
+    pub fn decode_response(data: &[u8]) -> Result<(CoapMessage<'_>, u8), CoapDecoderError> {
         let packet = coap_lite::Packet::from_bytes(data).unwrap();
         let response = coap_lite::CoapResponse { message: packet };
         let body_len = response.message.payload.len();
         let body_ref = &data[(data.len() - body_len)..];
 
         let return_status_ok = match response.message.header.code {
-            MessageClass::Response(response_type) => match response_type {
-                ResponseType::Content => true,
-                _ => false,
-            },
+            MessageClass::Response(response_type) => matches!(response_type, ResponseType::Content),
             _ => true,
         };
 
         Ok((CoapMessage::Response(body_ref, return_status_ok), response.message.get_token()[0]))
     }
 
-    pub fn decode_instance_id(data: &[u8]) -> Result<crate::instance_id::InstanceId, ()> {
+    pub fn decode_instance_id(data: &[u8]) -> Result<crate::instance_id::InstanceId, CoapDecoderError> {
         let parsed = minicbor::decode::<crate::instance_id::InstanceId>(data);
         match parsed {
             Ok(id) => Ok(id),
-            Err(_) => Err(()),
+            Err(_) => Err(CoapDecoderError {}),
         }
     }
 
-    pub fn decode_error_response(data: &[u8]) -> Result<crate::instance_id::InstanceId, ()> {
+    pub fn decode_error_response(data: &[u8]) -> Result<crate::instance_id::InstanceId, CoapDecoderError> {
         let parsed = minicbor::decode::<crate::instance_id::InstanceId>(data);
         match parsed {
             Ok(id) => Ok(id),
-            Err(_) => Err(()),
+            Err(_) => Err(CoapDecoderError {}),
         }
     }
 }

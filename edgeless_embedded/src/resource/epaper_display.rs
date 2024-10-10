@@ -18,6 +18,7 @@ pub struct EPaperDisplay {
 }
 
 impl EPaperDisplay {
+    #[allow(clippy::needless_lifetimes)] // not needless
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<EPaperDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
@@ -84,6 +85,7 @@ pub async fn display_writer(
 }
 
 impl EPaperDisplay {
+    #[allow(clippy::new_ret_no_self)]
     pub async fn new(
         sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>,
     ) -> &'static mut dyn crate::resource::ResourceDyn {
@@ -162,7 +164,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
 
     async fn patch(
         &mut self,
-        resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
+        _resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         Ok(())
     }

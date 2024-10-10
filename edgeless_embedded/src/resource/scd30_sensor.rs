@@ -15,9 +15,18 @@ pub struct SCD30SensorInner {
     // pub delay: u8,
 }
 
+#[derive(Debug)]
+pub struct SensorError;
+
+impl core::fmt::Display for SensorError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "Sensor error")
+    }
+}
+
 pub trait Sensor {
     fn init(&mut self, delay_s: u8);
-    fn read(&mut self) -> Result<Measurement, ()>;
+    fn read(&mut self) -> Result<Measurement, SensorError>;
 }
 
 pub struct SCD30SensorConfiguration {
@@ -29,6 +38,7 @@ pub struct SCD30Sensor {
 }
 
 impl SCD30Sensor {
+    #[allow(clippy::needless_lifetimes)] // not needless
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<SCD30SensorConfiguration, edgeless_api_core::common::ErrorResponse> {
@@ -51,6 +61,7 @@ impl SCD30Sensor {
         Ok(SCD30SensorConfiguration { data_out_id: out_id })
     }
 
+    #[allow(clippy::new_ret_no_self)]
     pub async fn new(
         data_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, Measurement, 2>,
     ) -> &'static mut dyn crate::resource::ResourceDyn {
@@ -110,6 +121,7 @@ impl crate::resource::Resource for SCD30Sensor {
         &["data_out"]
     }
 
+    #[allow(clippy::await_holding_refcell_ref)]
     async fn has_instance(&self, instance_id: &edgeless_api_core::instance_id::InstanceId) -> bool {
         let tmp = self.inner.borrow_mut();
         let lck = tmp.lock().await;
@@ -123,6 +135,7 @@ impl crate::resource::Resource for SCD30Sensor {
 }
 
 #[embassy_executor::task]
+#[allow(clippy::await_holding_refcell_ref)]
 pub async fn scd30_sensor_task(
     state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, SCD30SensorInner>>,
     dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
@@ -165,6 +178,7 @@ impl crate::invocation::InvocationAPI for SCD30Sensor {
     }
 }
 
+#[allow(clippy::await_holding_refcell_ref)]
 impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
     async fn start<'a>(
         &mut self,
@@ -216,12 +230,10 @@ impl crate::resource_configuration::ResourceConfigurationAPI for SCD30Sensor {
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;
 
-        for output_callback in patch_req.output_mapping {
-            if let Some((key, val)) = output_callback {
-                if key == "data_out" {
-                    lck.data_out_id = Some(val);
-                    break;
-                }
+        for (key, val) in patch_req.output_mapping.into_iter().flatten() {
+            if key == "data_out" {
+                lck.data_out_id = Some(val);
+                break;
             }
         }
 

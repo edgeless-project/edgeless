@@ -56,11 +56,9 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
 
     async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()> {
         let mut outputs: [Option<(&str, edgeless_api_core::instance_id::InstanceId)>; 16] = [None; 16];
-        let mut outputs_i: usize = 0;
 
-        for (key, val) in &update.output_mapping {
+        for (outputs_i, (key, val)) in update.output_mapping.iter().enumerate() {
             outputs[outputs_i] = Some((key, *val));
-            outputs_i += 1;
         }
 
         let encoded_patch_req = edgeless_api_core::resource_configuration::EncodedPatchRequest {

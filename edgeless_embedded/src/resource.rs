@@ -5,6 +5,7 @@ pub mod mock_display;
 pub mod mock_sensor;
 pub mod scd30_sensor;
 
+#[allow(async_fn_in_trait)]
 pub trait Resource: crate::invocation::InvocationAPI + crate::resource_configuration::ResourceConfigurationAPI {
     fn provider_id(&self) -> &'static str;
     fn resource_class(&self) -> &'static str;

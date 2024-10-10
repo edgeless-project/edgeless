@@ -97,7 +97,7 @@ impl crate::invocation::InvocationAPI for super::CoapClient {
         let token = lck.next_token;
         lck.next_token = if lck.next_token == u8::MAX { 0 } else { lck.next_token + 1 };
 
-        let ((packet, addr), _tail) =
+        let ((packet, _addr), _tail) =
             edgeless_api_core::coap_mapping::COAPEncoder::encode_invocation_event(lck.endpoint, encoded_event, token, &mut buffer[..]);
         self.outgoing_sender.send(Vec::from(packet)).unwrap();
         Ok(crate::invocation::LinkProcessingResult::FINAL)

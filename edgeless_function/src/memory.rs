@@ -20,7 +20,9 @@ pub unsafe extern "C" fn edgeless_mem_alloc(payload_len: usize) -> *mut u8 {
 
 #[cfg(feature = "std")]
 #[no_mangle]
-// https://radu-matei.com/blog/practical-guide-to-wasm-memory/
+/// # Safety
+///
+/// https://radu-matei.com/blog/practical-guide-to-wasm-memory/
 pub unsafe extern "C" fn edgeless_mem_alloc(payload_len: usize) -> *mut u8 {
     let align = std::mem::align_of::<usize>();
     let layout = std::alloc::Layout::from_size_align_unchecked(payload_len, align);
@@ -35,16 +37,21 @@ pub unsafe extern "C" fn edgeless_mem_clear() {
 
 #[cfg(feature = "std")]
 #[no_mangle]
-pub unsafe extern "C" fn edgeless_mem_clear() {
-    // We always free and clear, so this does not leak memory.
-}
+/// # Safety
+///
+/// We always free and clear, so this does not leak memory.
+pub unsafe extern "C" fn edgeless_mem_clear() {}
 
 #[cfg(not(feature = "std"))]
 #[no_mangle]
-pub unsafe extern "C" fn edgeless_mem_free(ptr: *mut u8, size: usize) {
-    // We always free and clear, so this does not leak memory.
-}
+/// # Safety
+///
+/// We always free and clear, so this does not leak memory.
+pub unsafe extern "C" fn edgeless_mem_free(ptr: *mut u8, size: usize) {}
 
+/// # Safety
+///
+/// We always free and clear, so this does not leak memory.
 #[cfg(feature = "std")]
 #[no_mangle]
 pub unsafe extern "C" fn edgeless_mem_free(ptr: *mut u8, size: usize) {
