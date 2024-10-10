@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
+
 // Temporary duplicate until https://blog.rust-lang.org/inside-rust/2023/05/03/stabilizing-async-fn-in-trait.html is done.
+
+#[allow(async_fn_in_trait)]
 pub trait ResourceConfigurationAPI {
     async fn start(
         &mut self,

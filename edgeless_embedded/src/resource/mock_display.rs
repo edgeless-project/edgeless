@@ -8,6 +8,7 @@ pub struct MockDisplay {
 }
 
 impl MockDisplay {
+    #[allow(clippy::needless_lifetimes)] // not needless
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<MockDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
@@ -21,6 +22,7 @@ impl MockDisplay {
         }
     }
 
+    #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
         static SLF_RAW: static_cell::StaticCell<MockDisplay> = static_cell::StaticCell::new();
         SLF_RAW.init_with(|| MockDisplay {
@@ -107,7 +109,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
 
     async fn patch(
         &mut self,
-        resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
+        _resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         Ok(())
     }
