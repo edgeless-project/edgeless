@@ -22,6 +22,7 @@ pub struct CoapClient {
 struct CoapClientInner {
     endpoint: std::net::SocketAddrV4,
     next_token: u8,
+    #[allow(clippy::type_complexity)]
     active_requests: std::collections::HashMap<u8, tokio::sync::oneshot::Sender<Result<Vec<u8>, Vec<u8>>>>,
 }
 

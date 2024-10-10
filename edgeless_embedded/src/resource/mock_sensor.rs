@@ -17,6 +17,7 @@ pub struct MockSensor {
 }
 
 impl MockSensor {
+    #[allow(clippy::needless_lifetimes)] // not needless
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<MockSensorConfiguration, edgeless_api_core::common::ErrorResponse> {
@@ -62,6 +63,7 @@ impl MockSensor {
         })
     }
 
+    #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
         static SENSOR_STATE_RAW: static_cell::StaticCell<
             core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
@@ -91,6 +93,7 @@ impl crate::resource::Resource for MockSensor {
         &["data_out"]
     }
 
+    #[allow(clippy::await_holding_refcell_ref)]
     async fn has_instance(&self, instance_id: &edgeless_api_core::instance_id::InstanceId) -> bool {
         let tmp = self.inner.borrow_mut();
         let lck = tmp.lock().await;
@@ -104,6 +107,7 @@ impl crate::resource::Resource for MockSensor {
 }
 
 #[embassy_executor::task]
+#[allow(clippy::await_holding_refcell_ref)]
 pub async fn mock_sensor_task(
     state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
     dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
@@ -134,6 +138,7 @@ impl crate::invocation::InvocationAPI for MockSensor {
     }
 }
 
+#[allow(clippy::await_holding_refcell_ref)]
 impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
     async fn start<'a>(
         &mut self,
@@ -190,12 +195,10 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;
 
-        for output_callback in patch_req.output_mapping {
-            if let Some((key, val)) = output_callback {
-                if key == "data_out" {
-                    lck.data_out_id = Some(val);
-                    break;
-                }
+        for (key, val) in patch_req.output_mapping.into_iter().flatten() {
+            if key == "data_out" {
+                lck.data_out_id = Some(val);
+                break;
             }
         }
 

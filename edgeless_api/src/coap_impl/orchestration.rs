@@ -93,7 +93,7 @@ impl CoapOrchestrationServer {
         if let Some(ret) = ret {
             let ((data, sender), _tail) = match ret {
                 Ok(_) => edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &[], token, &mut self.tx_buffer[..], true),
-                Err(err) => {
+                Err(_) => {
                     let (data, tail) = edgeless_api_core::coap_mapping::COAPEncoder::encode_error_response(
                         edgeless_api_core::common::ErrorResponse {
                             // Passing the error message would be desired. This requires ErrorResponse to be generic over str and strings (or lifetime annotations).
@@ -146,7 +146,7 @@ impl CoapOrchestrationServer {
         if let Some(ret) = ret {
             let ((data, sender), _tail) = match ret {
                 Ok(_) => edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &[], token, &mut self.tx_buffer[..], true),
-                Err(err) => {
+                Err(_) => {
                     let (data, tail) = edgeless_api_core::coap_mapping::COAPEncoder::encode_error_response(
                         edgeless_api_core::common::ErrorResponse {
                             summary: "Server Error",

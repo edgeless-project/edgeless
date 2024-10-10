@@ -16,7 +16,7 @@ fn main() -> ! {
         spawner.spawn(edgeless(spawner)).unwrap();
     });
 
-    #[allow(unreachable_code)]
+    #[allow(unreachable_code, clippy::empty_loop)]
     loop {}
 }
 
@@ -56,14 +56,8 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
 
     static STACK_RESOURCES_RAW: static_cell::StaticCell<embassy_net::StackResources<3>> = static_cell::StaticCell::new();
     static STACK_RAW: static_cell::StaticCell<embassy_net::Stack<embassy_net_tuntap::TunTapDevice>> = static_cell::StaticCell::new();
-    let stack = STACK_RAW.init_with(|| {
-        embassy_net::Stack::new(
-            device,
-            config,
-            STACK_RESOURCES_RAW.init_with(embassy_net::StackResources::<3>::new),
-            1234,
-        )
-    });
+    let stack =
+        STACK_RAW.init_with(|| embassy_net::Stack::new(device, config, STACK_RESOURCES_RAW.init_with(embassy_net::StackResources::<3>::new), 1234));
 
     spawner.spawn(net_task(stack)).unwrap();
 
@@ -86,5 +80,5 @@ async fn edgeless(spawner: embassy_executor::Spawner) {
         ))
         .unwrap();
 
-    spawner.spawn(registration(resource_registry.clone()));
+    let _ = spawner.spawn(registration(resource_registry.clone()));
 }

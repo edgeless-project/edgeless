@@ -40,16 +40,12 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
         let mut outputs = heapless::Vec::<(&'b str, crate::instance_id::InstanceId), 16>::new();
         let mut configuration = heapless::Vec::<(&'b str, &'b str), 16>::new();
 
-        for item in d.array_iter::<(&str, crate::instance_id::InstanceId)>().unwrap() {
-            if let Ok(item) = item {
-                outputs.push(item);
-            }
+        for item in d.array_iter::<(&str, crate::instance_id::InstanceId)>().unwrap().flatten() {
+            let _ = outputs.push(item);
         }
 
-        for item in d.array_iter::<(&str, &str)>().unwrap() {
-            if let Ok(item) = item {
-                configuration.push(item);
-            }
+        for item in d.array_iter::<(&str, &str)>().unwrap().flatten() {
+            let _ = configuration.push(item);
         }
 
         Ok(EncodedResourceInstanceSpecification {
@@ -83,10 +79,8 @@ impl<C> minicbor::Encode<C> for EncodedPatchRequest<'_> {
                 }
             }
             e = e.array(true_callbacks_size)?;
-            for data in self.output_mapping {
-                if let Some((key, val)) = data {
-                    e = e.encode((key, val))?;
-                }
+            for (key, val) in self.output_mapping.into_iter().flatten() {
+                e = e.encode((key, val))?;
             }
         }
         Ok(())
@@ -98,13 +92,9 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedPatchRequest<'b> {
         let id = d.decode::<crate::instance_id::InstanceId>()?;
 
         let mut outputs: [Option<(&'b str, crate::instance_id::InstanceId)>; 16] = [None; 16];
-        let mut outputs_i: usize = 0;
 
-        for item in d.array_iter::<(&str, crate::instance_id::InstanceId)>().unwrap() {
-            if let Ok(item) = item {
-                outputs[outputs_i] = Some(item);
-                outputs_i += 1;
-            }
+        for (outputs_i, item) in d.array_iter::<(&str, crate::instance_id::InstanceId)>().unwrap().flatten().enumerate() {
+            outputs[outputs_i] = Some(item);
         }
 
         Ok(EncodedPatchRequest {
@@ -119,16 +109,14 @@ impl<C> minicbor::CborLen<C> for EncodedPatchRequest<'_> {
         let mut len: usize = self.instance_id.cbor_len(ctx);
 
         let mut outputs: [(&str, crate::instance_id::InstanceId); 16] = [("" as &str, crate::instance_id::InstanceId::new(uuid::Uuid::new_v4())); 16];
-        let mut outputs_i: usize = 0;
 
-        for item in self.output_mapping {
-            if let Some((key, val)) = item {
-                outputs[outputs_i] = (key, val);
-                outputs_i += 1;
-            }
+        let mut num_valid_entries = 0;
+        for (outputs_i, (key, val)) in self.output_mapping.into_iter().flatten().enumerate() {
+            outputs[outputs_i] = (key, val);
+            num_valid_entries += 1;
         }
 
-        len += outputs[..outputs_i].cbor_len(ctx);
+        len += outputs[..num_valid_entries].cbor_len(ctx);
 
         len
     }
