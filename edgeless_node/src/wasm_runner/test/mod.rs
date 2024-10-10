@@ -606,10 +606,7 @@ async fn state_management() {
 
     // now we try starting with state
 
-    output_mocks
-        .lock()
-        .await
-        .insert(instance_id.function_id, "existing_state".to_string());
+    output_mocks.lock().await.insert(instance_id.function_id, "existing_state".to_string());
 
     // TODO(raphaelhetzel) InstanceId reuse leads to problems that need to be fixed.
     spawn_req.instance_id = Some(fid2);

@@ -376,11 +376,8 @@ async fn fill_resources(
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
                         client: Box::new(
-                            resources::dda::DDAResourceProvider::new(
-                                data_plane.clone(),
-                                edgeless_api::function_instance::InstanceId::new(node_id),
-                            )
-                            .await,
+                            resources::dda::DDAResourceProvider::new(data_plane.clone(), edgeless_api::function_instance::InstanceId::new(node_id))
+                                .await,
                         ),
                     },
                 );

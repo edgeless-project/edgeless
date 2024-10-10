@@ -137,10 +137,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
     async fn cast(&mut self, src: &edgeless_api::function_instance::InstanceId, msg: &str) -> Result<(), crate::base_runtime::FunctionInstanceError> {
         log::debug!("container run-time: cast, src {}, msg {} bytes", src, msg.len());
         self.function_client_api
-            .cast(edgeless_api::guest_api_function::InputEventData {
-                src: *src,
-                msg: msg.into(),
-            })
+            .cast(edgeless_api::guest_api_function::InputEventData { src: *src, msg: msg.into() })
             .await
             .or(Err(crate::base_runtime::FunctionInstanceError::InternalError))
     }
@@ -153,10 +150,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
         log::debug!("container run-time: call, src {}, msg {} bytes", src, msg.len());
         match self
             .function_client_api
-            .call(edgeless_api::guest_api_function::InputEventData {
-                src: *src,
-                msg: msg.into(),
-            })
+            .call(edgeless_api::guest_api_function::InputEventData { src: *src, msg: msg.into() })
             .await
         {
             Ok(ret) => match ret {
