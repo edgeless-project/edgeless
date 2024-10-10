@@ -29,9 +29,7 @@ pub fn parse_http_host(raw: &str) -> anyhow::Result<(Proto, String, u16)> {
             };
             Ok((proto, val[2].to_string(), port))
         }
-        None => {
-            Err(anyhow::anyhow!("Host Parse Error"))
-        }
+        None => Err(anyhow::anyhow!("Host Parse Error")),
     }
 }
 
