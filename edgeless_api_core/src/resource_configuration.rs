@@ -138,7 +138,7 @@ impl<C> minicbor::CborLen<C> for EncodedPatchRequest<'_> {
 mod test {
     #[test]
     fn no_config() {
-        let mut buffer = [0 as u8; 1000];
+        let mut buffer = [0_u8; 1000];
 
         let mut outputs = heapless::Vec::<(&str, crate::instance_id::InstanceId), 16>::new();
         let configuration = heapless::Vec::<(&str, &str), 16>::new();
@@ -148,7 +148,7 @@ mod test {
         let id = super::EncodedResourceInstanceSpecification {
             class_type: "class-1",
             output_mapping: outputs,
-            configuration: configuration,
+            configuration,
         };
 
         minicbor::encode(id.clone(), &mut buffer[..]).unwrap();
