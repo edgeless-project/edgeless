@@ -11,11 +11,8 @@ pub enum UpdatePeersRequest {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NodeHealthStatus {
-    pub cpu_usage: i32,
-    pub cpu_load: i32,
     pub mem_free: i32,
     pub mem_used: i32,
-    pub mem_total: i32,
     pub mem_available: i32,
     pub proc_cpu_usage: i32,
     pub proc_memory: i32,
@@ -29,7 +26,6 @@ pub struct NodeHealthStatus {
     pub tot_tx_bytes: i64,
     pub tot_tx_pkts: i64,
     pub tot_tx_errs: i64,
-    pub disk_tot_space: i64,
     pub disk_free_space: i64,
     pub disk_tot_reads: i64,
     pub disk_tot_writes: i64,
@@ -43,12 +39,9 @@ impl NodeHealthStatus {
     }
     pub fn to_csv(&self) -> String {
         format!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
-            self.cpu_usage,
-            self.cpu_load,
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             self.mem_free,
             self.mem_used,
-            self.mem_total,
             self.mem_available,
             self.proc_cpu_usage,
             self.proc_memory,
@@ -62,7 +55,6 @@ impl NodeHealthStatus {
             self.tot_tx_bytes,
             self.tot_tx_pkts,
             self.tot_tx_errs,
-            self.disk_tot_space,
             self.disk_free_space,
             self.disk_tot_reads,
             self.disk_tot_writes,
@@ -95,12 +87,9 @@ impl std::fmt::Display for NodeHealthStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "global cpu usage {:.1}%, load {}, memory free {} kb, used {} kb, total {} kb, available {} kb, process cpu usage {:.1}%, memory {} kb, vmemory {} kb, load avg 1 minute {}% 5 minutes {}% 15 minutes {}%, network tot rx {} bytes ({} pkts) {} errs, tot tx {} bytes ({} pkts) {} errs, disk tot {} bytes vs. available {} bytes, tot disk reads {} writes {}, gpu_load_perc {}%, gpu_temp_cels {:.2}°C",
-            self.cpu_usage,
-            self.cpu_load,
+            "memory free {} kb, used {} kb, available {} kb, process cpu usage {:.1}%, memory {} kb, vmemory {} kb, load avg 1 minute {}% 5 minutes {}% 15 minutes {}%, network tot rx {} bytes ({} pkts) {} errs, tot tx {} bytes ({} pkts) {} errs, disk available {} bytes, tot disk reads {} writes {}, gpu_load_perc {}%, gpu_temp_cels {:.2}°",
             self.mem_free,
             self.mem_used,
-            self.mem_total,
             self.mem_available,
             self.proc_cpu_usage,
             self.proc_memory,
@@ -114,7 +103,6 @@ impl std::fmt::Display for NodeHealthStatus {
             self.tot_tx_bytes,
             self.tot_tx_pkts,
             self.tot_tx_errs,
-            self.disk_tot_space,
             self.disk_free_space,
             self.disk_tot_reads,
             self.disk_tot_writes,
@@ -127,11 +115,8 @@ impl std::fmt::Display for NodeHealthStatus {
 impl NodeHealthStatus {
     pub fn empty() -> Self {
         Self {
-            cpu_usage: 0,
-            cpu_load: 0,
             mem_free: 0,
             mem_used: 0,
-            mem_total: 0,
             mem_available: 0,
             proc_cpu_usage: 0,
             proc_memory: 0,
@@ -145,7 +130,6 @@ impl NodeHealthStatus {
             tot_tx_bytes: 0,
             tot_tx_pkts: 0,
             tot_tx_errs: 0,
-            disk_tot_space: 0,
             disk_free_space: 0,
             disk_tot_reads: 0,
             disk_tot_writes: 0,
@@ -156,11 +140,8 @@ impl NodeHealthStatus {
 
     pub fn invalid() -> Self {
         Self {
-            cpu_usage: -1,
-            cpu_load: -1,
             mem_free: -1,
             mem_used: -1,
-            mem_total: -1,
             mem_available: -1,
             proc_cpu_usage: -1,
             proc_memory: -1,
@@ -174,7 +155,6 @@ impl NodeHealthStatus {
             tot_tx_bytes: -1,
             tot_tx_pkts: -1,
             tot_tx_errs: -1,
-            disk_tot_space: -1,
             disk_free_space: -1,
             disk_tot_reads: -1,
             disk_tot_writes: -1,

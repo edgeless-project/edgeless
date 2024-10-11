@@ -28,6 +28,14 @@ pub struct NodeCapabilities {
     pub has_tpm: bool,
     // List of run-times supported by the node.
     pub runtimes: Vec<String>,
+    // Total disk space, in MiB.
+    pub disk_tot_space: u32,
+    // Number of (actual or virtual) GPUs associated with the edge node.
+    pub num_gpus: u32,
+    // Name of the GPU model.
+    pub model_name_gpu: String,
+    // GPU memory available, in MiB.
+    pub mem_size_gpu: u32,
 }
 
 impl NodeCapabilities {
@@ -43,6 +51,10 @@ impl NodeCapabilities {
             is_tee_running: false,
             has_tpm: false,
             runtimes: vec![],
+            disk_tot_space: 0,
+            num_gpus: 0,
+            model_name_gpu: "".to_string(),
+            mem_size_gpu: 0,
         }
     }
 
@@ -58,6 +70,10 @@ impl NodeCapabilities {
             is_tee_running: false,
             has_tpm: false,
             runtimes: vec!["RUST_WASM".to_string()],
+            disk_tot_space: 0,
+            num_gpus: 0,
+            model_name_gpu: "".to_string(),
+            mem_size_gpu: 0,
         }
     }
 
@@ -67,12 +83,12 @@ impl NodeCapabilities {
     }
 
     pub fn csv_header() -> String {
-        "num_cpus,model_name_cpu,clock_freq_cpu,num_cores,mem_size,labels,is_tee_running,has_tpm,runtimes".to_string()
+        "num_cpus,model_name_cpu,clock_freq_cpu,num_cores,mem_size,labels,is_tee_running,has_tpm,runtimes,disk_tot_space,num_gpus,model_name_gpu,mem_size_gpu".to_string()
     }
 
     pub fn to_csv(&self) -> String {
         format!(
-            "{},{},{},{},{},[{}],{},{},[{}]",
+            "{},{},{},{},{},[{}],{},{},[{}],{},{},{},{}",
             self.num_cpus,
             self.model_name_cpu,
             self.clock_freq_cpu,
@@ -82,6 +98,10 @@ impl NodeCapabilities {
             self.is_tee_running,
             self.has_tpm,
             self.runtimes.join(";"),
+            self.disk_tot_space,
+            self.num_gpus,
+            self.model_name_gpu,
+            self.mem_size_gpu,
         )
     }
 }
@@ -90,7 +110,7 @@ impl std::fmt::Display for NodeCapabilities {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{} {} CPU(s) at {} BogoMIPS, {} core(s), {} MiB memory, labels [{}]{}{}, runtimes [{}]",
+            "{} {} CPU(s) at {} BogoMIPS, {} core(s), {} MiB memory, labels [{}]{}{}, runtimes [{}], disk space {} MiB, {} {} GPU(s) {} MiB",
             self.num_cpus,
             self.model_name_cpu,
             self.clock_freq_cpu,
@@ -105,7 +125,11 @@ impl std::fmt::Display for NodeCapabilities {
                 true => ", TPM",
                 false => "",
             },
-            self.runtimes.join(",")
+            self.runtimes.join(","),
+            self.disk_tot_space,
+            self.num_gpus,
+            self.model_name_gpu,
+            self.mem_size_gpu,
         )
     }
 }
