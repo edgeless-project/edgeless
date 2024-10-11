@@ -29,10 +29,11 @@ fn test_sysinfo() {
             );
         }
         println!(
-            "mem free {} bytes, used {} bytes, total {} bytes, available {} bytes",
+            "mem free {} bytes, used {} bytes, total {} bytes ({} MB), available {} bytes",
             sys.free_memory(),
             sys.used_memory(),
             sys.total_memory(),
+            sys.total_memory() / (1024 * 1024),
             sys.available_memory()
         );
 
