@@ -686,11 +686,8 @@ mod test {
 
         // Check health status and performance samples.
         let health_status = edgeless_api::node_management::NodeHealthStatus {
-            cpu_usage: 1,
-            cpu_load: 2,
             mem_free: 3,
             mem_used: 4,
-            mem_total: 5,
             mem_available: 6,
             proc_cpu_usage: 7,
             proc_memory: 8,
@@ -704,7 +701,6 @@ mod test {
             tot_tx_bytes: 16,
             tot_tx_pkts: 17,
             tot_tx_errs: 18,
-            disk_tot_space: 19,
             disk_free_space: 20,
             disk_tot_reads: 21,
             disk_tot_writes: 22,

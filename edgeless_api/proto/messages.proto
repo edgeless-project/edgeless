@@ -124,6 +124,14 @@ message NodeCapabilities {
     bool has_tpm             = 40;
     // List of run-times supported by the node.
     repeated string runtimes = 50;
+    // Total disk space, in MiB.
+    uint32 disk_tot_space    = 70;
+    // Number of (actual or virtual) GPUs associated with the edge node.
+    uint32 num_gpus          = 80;
+    // Name of the GPU model.
+    string model_name_gpu    = 81;
+    // GPU memory available, in MiB.
+    uint32 mem_size_gpu      = 82;
 }
 
 // Response message of FunctionInstance::UpdateNode().
@@ -159,16 +167,19 @@ message Samples {
 // Node health status.
 message NodeHealthStatus {
     // Global CPU usage, in percentage.
-    int32 cpu_usage      = 10;
+    // Removed: metric is too variable to be used.
+    // int32 cpu_usage      = 10;
     // Load, as the sum of usage of all the CPUs.
-    int32 cpu_load       = 11;
+    // Removed: metric is too variable to be used.
+    // int32 cpu_load       = 11;
 
     // Free memory, in kbytes.
     int32 mem_free       = 20;
     // Used memory, in kbytes.
     int32 mem_used       = 21;
     // Total memory, in kbytes.
-    int32 mem_total      = 22;
+    // Removed: can be inferred from the node's capabilities.
+    // int32 mem_total      = 22;
     // Available memory, in kbytes
     int32 mem_available  = 23;
 
@@ -201,7 +212,8 @@ message NodeHealthStatus {
     int64 tot_tx_errs    = 62;
 
     // Total disk space, in bytes.
-    int64 disk_tot_space  = 70;
+    // int64 disk_tot_space  = 70;
+    // Removed: can be inferred from the node's capabilities.
     // Available disk space, in bytes.
     int64 disk_free_space = 71;
     // Total disk reads, in bytes.

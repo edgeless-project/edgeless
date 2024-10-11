@@ -327,28 +327,27 @@ impl Agent {
                         disk_tot_reads += disk_usage.total_read_bytes as i64;
                         disk_tot_writes += disk_usage.total_written_bytes as i64;
                     }
-                    let num_cpus = std::cmp::max(1, sys.cpus().len()) as f32;
+                    let unique_available_space = disks
+                        .iter()
+                        .map(|x| (x.name().to_str().unwrap_or_default(), x.total_space()))
+                        .collect::<std::collections::BTreeMap<&str, u64>>();
                     let health_status = edgeless_api::node_management::NodeHealthStatus {
-                        cpu_usage: (sys.global_cpu_usage() / num_cpus) as i32,
-                        cpu_load: sys.cpus().iter().map(|x| x.cpu_usage()).sum::<f32>() as i32,
                         mem_free: to_kb(sys.free_memory()),
                         mem_used: to_kb(sys.used_memory()),
-                        mem_total: to_kb(sys.total_memory()),
                         mem_available: to_kb(sys.available_memory()),
-                        proc_cpu_usage: (proc.cpu_usage() / num_cpus) as i32,
+                        proc_cpu_usage: proc.cpu_usage() as i32,
                         proc_memory: to_kb(proc.memory()),
                         proc_vmemory: to_kb(proc.virtual_memory()),
-                        load_avg_1: (load_avg.one * 100_f64 / num_cpus as f64) as i32,
-                        load_avg_5: (load_avg.five * 100_f64 / num_cpus as f64) as i32,
-                        load_avg_15: (load_avg.fifteen * 100_f64 / num_cpus as f64) as i32,
+                        load_avg_1: (load_avg.one * 100_f64).round() as i32,
+                        load_avg_5: (load_avg.five * 100_f64).round() as i32,
+                        load_avg_15: (load_avg.fifteen * 100_f64).round() as i32,
                         tot_rx_bytes,
                         tot_rx_pkts,
                         tot_rx_errs,
                         tot_tx_bytes,
                         tot_tx_pkts,
                         tot_tx_errs,
-                        disk_tot_space: disks.iter().map(|x| x.total_space() as i64).sum::<i64>(),
-                        disk_free_space: disks.iter().map(|x| x.available_space() as i64).sum::<i64>(),
+                        disk_free_space: unique_available_space.values().sum::<u64>() as i64,
                         disk_tot_reads,
                         disk_tot_writes,
                         gpu_load_perc: crate::gpu_info::get_gpu_load(),

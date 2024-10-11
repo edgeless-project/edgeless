@@ -130,6 +130,10 @@ pub struct NodeCapabilitiesUser {
     pub labels: Option<Vec<String>>,
     pub is_tee_running: Option<bool>,
     pub has_tpm: Option<bool>,
+    pub disk_tot_space: Option<u32>,
+    pub num_gpus: Option<u32>,
+    pub model_name_gpu: Option<String>,
+    pub mem_size_gpu: Option<u32>,
 }
 
 impl NodeCapabilitiesUser {
@@ -143,6 +147,10 @@ impl NodeCapabilitiesUser {
             labels: None,
             is_tee_running: None,
             has_tpm: None,
+            disk_tot_space: None,
+            num_gpus: None,
+            model_name_gpu: None,
+            mem_size_gpu: None,
         }
     }
 }
@@ -179,8 +187,21 @@ impl EdgelessNodeSettings {
 }
 
 fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilitiesUser) -> edgeless_api::node_registration::NodeCapabilities {
+    if !sysinfo::IS_SUPPORTED_SYSTEM {
+        log::warn!("sysinfo does not support (yet) this OS");
+    }
+
     let mut sys = sysinfo::System::new();
     sys.refresh_all();
+
+    let mut disks = sysinfo::Disks::new();
+    disks.refresh_list();
+    disks.refresh();
+    let unique_total_space = disks
+        .iter()
+        .map(|x| (x.name().to_str().unwrap_or_default(), x.total_space()))
+        .collect::<std::collections::BTreeMap<&str, u64>>();
+
     let mut model_name_set = std::collections::HashSet::new();
     let mut clock_freq_cpu_set = std::collections::HashSet::new();
     for processor in sys.cpus() {
@@ -202,6 +223,7 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         log::debug!("CPUs have different frequencies, using: {}", clock_freq_cpu);
     }
 
+    // GPU information is not (yet) inferred automatically
     edgeless_api::node_registration::NodeCapabilities {
         num_cpus: user_node_capabilities.num_cpus.unwrap_or(sys.cpus().len() as u32),
         model_name_cpu: user_node_capabilities.model_name_cpu.unwrap_or(model_name_cpu),
@@ -212,6 +234,12 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         is_tee_running: user_node_capabilities.is_tee_running.unwrap_or(false),
         has_tpm: user_node_capabilities.has_tpm.unwrap_or(false),
         runtimes,
+        disk_tot_space: user_node_capabilities
+            .disk_tot_space
+            .unwrap_or((unique_total_space.values().sum::<u64>() / (1024 * 1024)) as u32),
+        num_gpus: user_node_capabilities.num_gpus.unwrap_or_default(),
+        model_name_gpu: user_node_capabilities.model_name_gpu.unwrap_or_default(),
+        mem_size_gpu: user_node_capabilities.mem_size_gpu.unwrap_or_default(),
     }
 }
 
@@ -690,7 +718,7 @@ pub fn edgeless_node_default_conf() -> String {
     let caps = get_capabilities(vec!["RUST_WASM".to_string()], NodeCapabilitiesUser::empty());
 
     format!(
-        "[general]\nnode_id = \"{}\"\n{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}",
+        "[general]\nnode_id = \"{}\"\n{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}disk_tot_space = {}{}",
         uuid::Uuid::new_v4(),
         r##"
 agent_url = "http://127.0.0.1:7021"
@@ -738,6 +766,12 @@ provider = "ollama-1"
         r##"labels = []
 is_tee_running = false
 has_tpm = false
+"##,
+        caps.disk_tot_space,
+        r##"
+num_gpus = 0
+model_name_gpu = ""
+mem_size_gpu = 0
 "##
     )
 }
