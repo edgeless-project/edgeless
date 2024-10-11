@@ -86,9 +86,24 @@ fn test_sysinfo() {
 
         disks.refresh_list();
         disks.refresh();
+        for disk in disks.iter() {
+            println!(
+                "disk name {:?}, kind {}, removable {}, filesystem {:?}, mount-point {:?}",
+                disk.name(),
+                disk.kind(),
+                disk.is_removable(),
+                disk.file_system(),
+                disk.mount_point()
+            );
+        }
 
-        println!("available disk space {} B", disks.iter().map(|x| x.available_space()).sum::<u64>());
-        println!("total     disk space {} B", disks.iter().map(|x| x.total_space()).sum::<u64>());
+        let unique_total_space = disks
+            .iter()
+            .map(|x| (x.name().to_str().unwrap_or_default(), x.total_space()))
+            .collect::<std::collections::BTreeMap<&str, u64>>();
+        println!("available  disk space {} B", disks.iter().map(|x| x.available_space()).sum::<u64>());
+        println!("total      disk space {} B", disks.iter().map(|x| x.total_space()).sum::<u64>());
+        println!("total uniq disk space {} B", unique_total_space.values().sum::<u64>());
 
         let mut tot_disk_reads = 0;
         let mut tot_disk_writes = 0;

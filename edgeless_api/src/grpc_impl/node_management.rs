@@ -115,11 +115,8 @@ pub fn parse_update_peers_request(
 
 pub fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealthStatus) -> anyhow::Result<crate::node_management::NodeHealthStatus> {
     Ok(crate::node_management::NodeHealthStatus {
-        cpu_usage: api_instance.cpu_usage,
-        cpu_load: api_instance.cpu_load,
         mem_free: api_instance.mem_free,
         mem_used: api_instance.mem_used,
-        mem_total: api_instance.mem_total,
         mem_available: api_instance.mem_available,
         proc_cpu_usage: api_instance.proc_cpu_usage,
         proc_memory: api_instance.proc_memory,
@@ -133,7 +130,6 @@ pub fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealth
         tot_tx_pkts: api_instance.tot_tx_pkts,
         tot_tx_bytes: api_instance.tot_tx_bytes,
         tot_tx_errs: api_instance.tot_tx_errs,
-        disk_tot_space: api_instance.disk_tot_space,
         disk_free_space: api_instance.disk_free_space,
         disk_tot_reads: api_instance.disk_tot_reads,
         disk_tot_writes: api_instance.disk_tot_writes,
@@ -202,11 +198,8 @@ fn serialize_update_peers_request(req: &crate::node_management::UpdatePeersReque
 
 fn serialize_node_health_status(req: &crate::node_management::NodeHealthStatus) -> crate::grpc_impl::api::NodeHealthStatus {
     crate::grpc_impl::api::NodeHealthStatus {
-        cpu_usage: req.cpu_usage,
-        cpu_load: req.cpu_load,
         mem_free: req.mem_free,
         mem_used: req.mem_used,
-        mem_total: req.mem_total,
         mem_available: req.mem_available,
         proc_cpu_usage: req.proc_cpu_usage,
         proc_memory: req.proc_memory,
@@ -220,7 +213,6 @@ fn serialize_node_health_status(req: &crate::node_management::NodeHealthStatus) 
         tot_tx_pkts: req.tot_tx_pkts,
         tot_tx_bytes: req.tot_tx_bytes,
         tot_tx_errs: req.tot_tx_errs,
-        disk_tot_space: req.disk_tot_space,
         disk_free_space: req.disk_free_space,
         disk_tot_reads: req.disk_tot_reads,
         disk_tot_writes: req.disk_tot_writes,
@@ -282,11 +274,8 @@ mod test {
             },
             KeepAliveResponse {
                 health_status: NodeHealthStatus {
-                    cpu_usage: 1,
-                    cpu_load: 2,
                     mem_free: 3,
                     mem_used: 4,
-                    mem_total: 5,
                     mem_available: 6,
                     proc_cpu_usage: 7,
                     proc_memory: 8,
@@ -300,7 +289,6 @@ mod test {
                     tot_tx_bytes: 16,
                     tot_tx_pkts: 17,
                     tot_tx_errs: 18,
-                    disk_tot_space: 19,
                     disk_free_space: 20,
                     disk_tot_reads: 21,
                     disk_tot_writes: 22,

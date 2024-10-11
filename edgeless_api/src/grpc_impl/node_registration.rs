@@ -82,6 +82,10 @@ fn parse_node_capabilities(api_instance: &crate::grpc_impl::api::NodeCapabilitie
         is_tee_running: api_instance.is_tee_running,
         has_tpm: api_instance.has_tpm,
         runtimes: api_instance.runtimes.clone(),
+        disk_tot_space: api_instance.disk_tot_space,
+        num_gpus: api_instance.num_gpus,
+        model_name_gpu: api_instance.model_name_gpu.clone(),
+        mem_size_gpu: api_instance.mem_size_gpu,
     }
 }
 
@@ -96,6 +100,10 @@ fn serialize_node_capabilities(req: &crate::node_registration::NodeCapabilities)
         is_tee_running: req.is_tee_running,
         has_tpm: req.has_tpm,
         runtimes: req.runtimes.clone(),
+        disk_tot_space: req.disk_tot_space,
+        num_gpus: req.num_gpus,
+        model_name_gpu: req.model_name_gpu.clone(),
+        mem_size_gpu: req.mem_size_gpu,
     }
 }
 
@@ -248,6 +256,10 @@ mod test {
                     is_tee_running: true,
                     has_tpm: true,
                     runtimes: vec!["RUST_WASM".to_string()],
+                    disk_tot_space: 999,
+                    num_gpus: 3,
+                    model_name_gpu: "NVIDIA A100".to_string(),
+                    mem_size_gpu: 80 * 1024,
                 },
             ),
             UpdateNodeRequest::Registration(
