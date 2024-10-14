@@ -56,7 +56,7 @@ base64 = "0.22.1"
 rs-docker = "0.0.58"
 chrono = "0.4.38"
 ollama-rs = { version = "0.2.0", features = ["chat-history"] }
-rdkafka = "0.36.2"
+rdkafka = { version = "0.36.2", optional = true }
 dda = { path = "../dda" }
 
 [build-dependencies]
