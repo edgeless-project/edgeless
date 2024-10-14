@@ -14,4 +14,4 @@ secrets/
 .venv
 .DS_Store
 *.swp
-.vscode/symbols.json
+symbols.json

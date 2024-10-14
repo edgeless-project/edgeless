@@ -14,6 +14,9 @@ struct Args {
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
+
+    // NOTE: to debug the edgeless_node using the tokio-console, exchange the
+    // env_logger::init() with the next line. These two options are exclusive.
     // console_subscriber::init();
 
     let args = Args::parse();
