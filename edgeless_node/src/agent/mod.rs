@@ -351,6 +351,8 @@ impl Agent {
                         disk_free_space: disks.iter().map(|x| x.available_space() as i64).sum::<i64>(),
                         disk_tot_reads,
                         disk_tot_writes,
+                        gpu_load_perc: crate::gpu_info::get_gpu_load() as i32,
+                        gpu_temp_celc: (crate::gpu_info::get_gpu_temp() * 1000.0) as i32,
                     };
                     let performance_samples = edgeless_api::node_management::NodePerformanceSamples {
                         function_execution_times: telemetry_performance_target.get_metrics().function_execution_times,

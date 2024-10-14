@@ -208,6 +208,11 @@ message NodeHealthStatus {
     int64 disk_tot_reads  = 72;
     // Total disk writes, in bytes.
     int64 disk_tot_writes = 73;
+
+    // Instantaneous GPU load percentage (0-100%)
+    int32 gpu_load_perc = 80;
+    // GPU instantaneous temp in Celsius multiplied by 1000
+    int32 gpu_temp_celc = 81;
 }
 
 // Node performance samples.

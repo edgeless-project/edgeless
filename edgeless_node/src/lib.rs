@@ -9,6 +9,7 @@ use futures::Future;
 pub mod agent;
 pub mod base_runtime;
 pub mod container_runner;
+pub mod gpu_info;
 pub mod resources;
 pub mod state_management;
 #[cfg(feature = "wasmtime")]
