@@ -69,7 +69,7 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
             // creates a new id for the new DDA Instance with the node_id of the
             // resource provider as its component
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
-            let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
+            let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
 
             // insert the initial output_mapping before the Instance is created
             // to avoid data race
@@ -292,9 +292,11 @@ impl DDAResource {
 
         for dda_sub in dda_sub_array {
             let sender = sender.clone();
-            let mut dda_subscription_filter = dda_com::SubscriptionFilter::default();
             // topic is used as the type for filtering
-            dda_subscription_filter.r#type = dda_sub.topic.clone();
+            let dda_subscription_filter = dda_com::SubscriptionFilter {
+                r#type: dda_sub.topic.clone(),
+                ..Default::default()
+            };
             // start a subscription based on the pattern
             let sub_task = match dda_sub.pattern.as_str() {
                 "event" => {
@@ -440,7 +442,7 @@ impl DDAResource {
         // Spawn asynchrounous task to handle edgeless dataplane events -
         // these are incoming events from e.g. edgeless functions that need to
         // be sent out etc.
-        let mut id: u128 = 0;
+        let id: u128 = 0;
         let mut dataplane_handle = dataplane_handle.clone();
         let _dda_task = tokio::spawn(async move {
             loop {
@@ -484,12 +486,13 @@ impl DDAResource {
                             respond(edgeless_dataplane::core::CallRet::Err).await;
                             continue;
                         }
-                        let mut event = dda_com::Event::default();
-                        event.source = self_id.clone().to_string();
-                        event.id = id.to_string();
-                        event.r#type = p.topic.to_string();
-                        event.data = data;
-                        id += 1;
+                        let event = dda_com::Event {
+                            source: self_id.clone().to_string(),
+                            id: id.to_string(),
+                            r#type: p.topic.to_string(),
+                            data,
+                            ..Default::default()
+                        };
                         let _ = dda_com_client.publish_event(event).await;
                         respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await;
                     }
@@ -508,12 +511,13 @@ impl DDAResource {
                             continue;
                         }
                         // construct the Action
-                        let mut action = dda_com::Action::default();
-                        action.source = self_id.clone().to_string();
-                        action.id = id.to_string();
-                        action.r#type = p.topic.to_string();
-                        action.params = data;
-                        id += 1;
+                        let action = dda_com::Action {
+                            source: self_id.clone().to_string(),
+                            id: id.to_string(),
+                            r#type: p.topic.to_string(),
+                            params: data,
+                            ..Default::default()
+                        };
 
                         // wait for an action response (currently 1)
                         match dda_com_client.publish_action(action).await {
@@ -554,13 +558,13 @@ impl DDAResource {
                             continue;
                         }
                         // construct the Query
-                        let mut query = dda_com::Query::default();
-
-                        query.source = self_id.clone().to_string();
-                        query.id = id.to_string();
-                        query.r#type = p.topic.to_string();
-                        query.data = data;
-                        id += 1;
+                        let query = dda_com::Query {
+                            source: self_id.clone().to_string(),
+                            id: id.to_string(),
+                            r#type: p.topic.to_string(),
+                            data,
+                            ..Default::default()
+                        };
 
                         // wait for an action response as specified in the
                         // parameters - currently waiting for one response
@@ -587,9 +591,11 @@ impl DDAResource {
                         };
                     }
                     dda::DDA::ComPublishActionResult(correlation_id, data) => {
-                        let mut action_result = dda_com::ActionResult::default();
-                        action_result.data = data;
-                        action_result.sequence_number = 0; // one action result will be published
+                        let action_result = dda_com::ActionResult {
+                            data,
+                            sequence_number: 0,
+                            ..Default::default()
+                        };
                         let action_result_correlated = dda_com::ActionResultCorrelated {
                             result: Some(action_result),
                             correlation_id,
@@ -603,9 +609,11 @@ impl DDAResource {
                         }
                     }
                     dda::DDA::ComPublishQueryResult(correlation_id, data) => {
-                        let mut query_result = dda_com::QueryResult::default();
-                        query_result.data = data;
-                        query_result.sequence_number = 0; // one query result will be published
+                        let query_result = dda_com::QueryResult {
+                            data,
+                            sequence_number: 0,
+                            ..Default::default()
+                        };
                         let query_result_correlated = dda_com::QueryResultCorrelated {
                             result: Some(query_result),
                             correlation_id,
@@ -798,6 +806,6 @@ impl DDAResource {
         sub_tasks.push(_dda_task);
         log::info!("DDA resource created, connected to the DDA sidecar at url={}", dda_url);
         dda_resource.sub_tasks = sub_tasks;
-        return Ok(dda_resource);
+        Ok(dda_resource)
     }
 }
