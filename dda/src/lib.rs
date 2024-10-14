@@ -69,8 +69,8 @@ pub enum DDA {
 }
 
 pub fn parse(encoded_msg: &[u8]) -> DDA {
-    let dda = serde_json::from_slice::<DDA>(encoded_msg).expect("this must never happen");
-    return dda;
+    
+    serde_json::from_slice::<DDA>(encoded_msg).expect("this must never happen")
 }
 
 fn decode(msg: OwnedByteBuff) -> DDA {
@@ -84,14 +84,14 @@ fn decode(msg: OwnedByteBuff) -> DDA {
 }
 
 fn encode(msg: DDA) -> Vec<u8> {
-    let serialized = match serde_json::to_vec(&msg) {
+    
+    match serde_json::to_vec(&msg) {
         Ok(x) => x,
         Err(e) => {
             log::error!("could not encode the DDA struct: {:?}", e);
-            vec![].to_vec()
+            [].to_vec()
         }
-    };
-    return serialized;
+    }
 }
 
 // NOTE: this is WIP
