@@ -137,10 +137,7 @@ mod tests {
     }
 
     async fn wf_list(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> Vec<edgeless_api::workflow_instance::WorkflowInstance> {
-        match client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
-            Ok(instances) => instances,
-            Err(_) => vec![],
-        }
+        (client.list(edgeless_api::workflow_instance::WorkflowId::none()).await).unwrap_or_default()
     }
 
     fn fixture_spec() -> edgeless_api::function_instance::FunctionClassSpecification {
