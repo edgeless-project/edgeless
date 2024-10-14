@@ -454,26 +454,31 @@ async fn fill_resources(
 
         if let Some(provider_id) = &settings.kafka_egress_provider {
             if !provider_id.is_empty() {
-                log::info!("Creating resource '{}'", provider_id);
-                let class_type = "kafka-egress".to_string();
-                ret.insert(
-                    provider_id.clone(),
-                    agent::ResourceDesc {
-                        class_type: class_type.clone(),
-                        client: Box::new(
-                            resources::kafka_egress::KafkaEgressResourceProvider::new(
-                                data_plane.clone(),
-                                edgeless_api::function_instance::InstanceId::new(node_id),
-                            )
-                            .await,
-                        ),
-                    },
-                );
-                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                    provider_id: provider_id.clone(),
-                    class_type,
-                    outputs: vec![],
-                });
+                #[cfg(feature = "rdkafka")]
+                {
+                    log::info!("Creating resource '{}'", provider_id);
+                    let class_type = "kafka-egress".to_string();
+                    ret.insert(
+                        provider_id.clone(),
+                        agent::ResourceDesc {
+                            class_type: class_type.clone(),
+                            client: Box::new(
+                                resources::kafka_egress::KafkaEgressResourceProvider::new(
+                                    data_plane.clone(),
+                                    edgeless_api::function_instance::InstanceId::new(node_id),
+                                )
+                                .await,
+                            ),
+                        },
+                    );
+                    provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                        provider_id: provider_id.clone(),
+                        class_type,
+                        outputs: vec![],
+                    });
+                }
+                #[cfg(not(feature = "rdkafka"))]
+                log::error!("Could not create resource '{}' because rdkafka was disabled at compile time", provider_id);
             }
         }
     }
