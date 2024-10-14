@@ -69,7 +69,6 @@ pub enum DDA {
 }
 
 pub fn parse(encoded_msg: &[u8]) -> DDA {
-    
     serde_json::from_slice::<DDA>(encoded_msg).expect("this must never happen")
 }
 
@@ -84,7 +83,6 @@ fn decode(msg: OwnedByteBuff) -> DDA {
 }
 
 fn encode(msg: DDA) -> Vec<u8> {
-    
     match serde_json::to_vec(&msg) {
         Ok(x) => x,
         Err(e) => {
