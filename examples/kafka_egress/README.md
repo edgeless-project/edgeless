@@ -1,5 +1,16 @@
 ### Kafka-egress example
 
+#### Requirements
+
+Deploying a node with a `kafka_egress` resource provider requires
+the `rdkafka` feature at compile time, e.g.:
+
+```shell
+cargo build --features rdkafka
+```
+
+#### Example
+
 The example creates a function that periodically updates a counter on the
 topic `test` of an [Apache Kafka server](https://kafka.apache.org/).
 
