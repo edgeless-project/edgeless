@@ -137,6 +137,8 @@ pub fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealth
         disk_free_space: api_instance.disk_free_space,
         disk_tot_reads: api_instance.disk_tot_reads,
         disk_tot_writes: api_instance.disk_tot_writes,
+        gpu_load_perc: api_instance.gpu_load_perc,
+        gpu_temp_celc: api_instance.gpu_temp_celc,
     })
 }
 
@@ -222,6 +224,8 @@ fn serialize_node_health_status(req: &crate::node_management::NodeHealthStatus) 
         disk_free_space: req.disk_free_space,
         disk_tot_reads: req.disk_tot_reads,
         disk_tot_writes: req.disk_tot_writes,
+        gpu_load_perc: req.gpu_load_perc,
+        gpu_temp_celc: req.gpu_temp_celc,
     }
 }
 
@@ -300,6 +304,8 @@ mod test {
                     disk_free_space: 20,
                     disk_tot_reads: 21,
                     disk_tot_writes: 22,
+                    gpu_load_perc: 23,
+                    gpu_temp_celc: 24,
                 },
                 performance_samples: NodePerformanceSamples {
                     function_execution_times: std::collections::HashMap::from([
