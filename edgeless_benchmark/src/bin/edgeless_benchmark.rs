@@ -37,6 +37,9 @@ struct Args {
     /// Average inter-arrival between consecutive workflows, in s
     #[arg(short, long, default_value_t = 5.0)]
     interarrival: f64,
+    /// Workload trace of comma-separated arrival,end times of workflows
+    #[arg(long, default_value_t = String::from(""))]
+    workload_trace: String,
     /// Seed to initialize the pseudo-random number generators
     #[arg(short, long, default_value_t = 42)]
     seed: u64,
@@ -111,6 +114,7 @@ async fn main() -> anyhow::Result<()> {
         args.seed,
         args.interarrival,
         args.lifetime,
+        &args.workload_trace,
     )?;
 
     // Parse the worflow type from command line option.
