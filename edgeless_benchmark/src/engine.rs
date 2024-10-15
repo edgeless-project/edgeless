@@ -145,8 +145,8 @@ impl Engine {
                     annotations: std::collections::HashMap::new(),
                 });
             }
-            WorkflowType::MatrixMulChain(min_chain_size, max_chain_size, min_matrix_size, max_matrix_size, inter_arrival, path_wasm) => {
-                let chain_size: u32 = draw(*min_chain_size, *max_chain_size);
+            WorkflowType::MatrixMulChain(data) => {
+                let chain_size: u32 = draw(data.min_chain_length, data.max_chain_length);
 
                 let mut matrix_sizes = vec![];
 
@@ -158,11 +158,11 @@ impl Engine {
                     let mut output_mapping = std::collections::HashMap::from([("metric".to_string(), "metrics-collector".to_string())]);
                     if i != (chain_size - 1) {
                         output_mapping.insert("out-0".to_string(), format!("f{}", (i + 1)));
-                    } else if *inter_arrival == 0 {
+                    } else if data.transaction_interval == 0 {
                         assert!(i == (chain_size - 1));
                         output_mapping.insert("out-0".to_string(), "f0".to_string());
                     }
-                    let matrix_size = draw(*min_matrix_size, *max_matrix_size);
+                    let matrix_size = draw(data.min_matrix_size, data.max_matrix_size);
                     matrix_sizes.push(matrix_size);
 
                     let name = format!("f{}", i);
@@ -171,7 +171,7 @@ impl Engine {
                         format!(
                             "seed={},inter_arrival={},is_first={},is_last={},matrix_size={},outputs={}",
                             i,
-                            inter_arrival,
+                            data.transaction_interval,
                             match i {
                                 0 => "true",
                                 _ => "false",
@@ -195,7 +195,7 @@ impl Engine {
                             function_class_id: "matrix_mul".to_string(),
                             function_class_type: "RUST_WASM".to_string(),
                             function_class_version: "0.1".to_string(),
-                            function_class_code: std::fs::read(path_wasm).unwrap(),
+                            function_class_code: std::fs::read(&data.function_wasm_path).unwrap(),
                             function_class_outputs: outputs,
                         },
                         output_mapping,
@@ -210,9 +210,9 @@ impl Engine {
                     matrix_sizes.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
                 );
             }
-            WorkflowType::VectorMulChain(min_chain_size, max_chain_size, min_input_size, max_input_size, path_wasm) => {
-                let chain_size = draw(*min_chain_size, *max_chain_size);
-                let input_size = draw(*min_input_size, *max_input_size);
+            WorkflowType::VectorMulChain(data) => {
+                let chain_size = draw(data.max_chain_length, data.max_chain_length);
+                let input_size = draw(data.min_input_size, data.max_input_size);
 
                 for i in 0..chain_size {
                     let name = match i {
@@ -249,7 +249,7 @@ impl Engine {
                             function_class_id: "vector_mul".to_string(),
                             function_class_type: "RUST_WASM".to_string(),
                             function_class_version: "0.1".to_string(),
-                            function_class_code: std::fs::read(path_wasm).unwrap(),
+                            function_class_code: std::fs::read(&data.function_wasm_path).unwrap(),
                             function_class_outputs: vec!["metric".to_string(), "out".to_string()],
                         },
                         output_mapping,
@@ -259,21 +259,7 @@ impl Engine {
 
                 log::info!("wf{}, chain size {}, input size {}", self.wf_id, chain_size, input_size);
             }
-            WorkflowType::MapReduce(
-                min_interval,
-                max_interval,
-                min_size,
-                max_size,
-                min_stages,
-                max_stages,
-                min_breadth,
-                max_breadth,
-                min_fibonacci,
-                max_fibonacci,
-                min_allocate,
-                max_allocate,
-                library_path,
-            ) => {
+            WorkflowType::MapReduce(data) => {
                 //
                 //
                 //
@@ -294,11 +280,11 @@ impl Engine {
                 //                         └──────────►│  p0-2   ├──────────┘  └──────────►│  p1-2   ├──────────┘
                 //                                     │         │                         │         │
                 //                                     └─────────┘                         └─────────┘
-                let interval = draw(*min_interval, *max_interval);
-                let size = draw(*min_size, *max_size);
-                let stages = draw(*min_stages, *max_stages);
+                let interval = draw(data.min_transaction_interval_ms, data.max_transaction_interval_ms);
+                let size = draw(data.min_input_size, data.max_input_size);
+                let stages = draw(data.min_num_stages, data.max_num_stages);
 
-                let path = std::path::Path::new(library_path);
+                let path = std::path::Path::new(&data.functions_path);
 
                 functions.push(WorkflowFunction {
                     name: "trigger".to_string(),
@@ -318,7 +304,7 @@ impl Engine {
                 let mut fibonacci_values = vec![];
                 let mut allocate_values = vec![];
                 for stage in 0..=stages {
-                    let breadth = draw(*min_breadth, *max_breadth);
+                    let breadth = draw(data.min_fan_out, data.max_fan_out);
                     let first = stage == 0;
                     let last = stage == stages;
                     let outputs: Vec<u32> = if last { vec![] } else { (0..breadth).collect() };
@@ -352,9 +338,9 @@ impl Engine {
                     fibonacci_values.push(vec![]);
                     allocate_values.push(vec![]);
                     for out in &outputs {
-                        let fibonacci = draw(*min_fibonacci, *max_fibonacci);
+                        let fibonacci = draw(data.min_fibonacci, data.max_fibonacci);
                         fibonacci_values.last_mut().unwrap().push(fibonacci);
-                        let allocate = draw(*min_allocate, *max_allocate);
+                        let allocate = draw(data.min_memory_bytes, data.max_memory_bytes);
                         allocate_values.last_mut().unwrap().push(allocate);
                         functions.push(WorkflowFunction {
                             name: format!("p{}-{}", stage, out),

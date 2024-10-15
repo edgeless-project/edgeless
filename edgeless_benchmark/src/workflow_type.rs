@@ -3,6 +3,93 @@
 
 use anyhow::anyhow;
 
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+
+pub struct MatrixMulChainData {
+    pub min_chain_length: u32,
+    pub max_chain_length: u32,
+    pub min_matrix_size: u32,
+    pub max_matrix_size: u32,
+    // interval between consecutive transactions, in ms
+    // if 0 then make the workflow circular, i.e., the last
+    // function calls the first one to trigger a new
+    // transaction
+    pub transaction_interval: u32,
+    pub function_wasm_path: String,
+}
+
+impl Default for MatrixMulChainData {
+    fn default() -> Self {
+        Self {
+            min_chain_length: 1,
+            max_chain_length: 3,
+            min_matrix_size: 100,
+            max_matrix_size: 500,
+            transaction_interval: 0,
+            function_wasm_path: "functions/matrix_mul/matrix_mul.wasm".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct VectorMulChainData {
+    pub min_chain_length: u32,
+    pub max_chain_length: u32,
+    pub min_input_size: u32,
+    pub max_input_size: u32,
+    pub function_wasm_path: String,
+}
+
+impl Default for VectorMulChainData {
+    fn default() -> Self {
+        Self {
+            min_chain_length: 1,
+            max_chain_length: 3,
+            min_input_size: 100,
+            max_input_size: 500,
+            function_wasm_path: "functions/vector_mul/vector_mul.wasm".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+
+pub struct MapReduceData {
+    pub min_transaction_interval_ms: u32,
+    pub max_transaction_interval_ms: u32,
+    pub min_input_size: u32,
+    pub max_input_size: u32,
+    pub min_num_stages: u32,
+    pub max_num_stages: u32,
+    pub min_fan_out: u32,
+    pub max_fan_out: u32,
+    pub min_fibonacci: u32,
+    pub max_fibonacci: u32,
+    pub min_memory_bytes: u32,
+    pub max_memory_bytes: u32,
+    pub functions_path: String,
+}
+
+impl Default for MapReduceData {
+    fn default() -> Self {
+        Self {
+            min_transaction_interval_ms: 500,
+            max_transaction_interval_ms: 1500,
+            min_input_size: 100,
+            max_input_size: 1000,
+            min_num_stages: 1,
+            max_num_stages: 3,
+            min_fan_out: 1,
+            max_fan_out: 3,
+            min_fibonacci: 1000,
+            max_fibonacci: 5000,
+            min_memory_bytes: 0,
+            max_memory_bytes: 0,
+            functions_path: "functions/".to_string(),
+        }
+    }
+}
+
 pub enum WorkflowType {
     None,
 
@@ -13,45 +100,18 @@ pub enum WorkflowType {
 
     // A chain of functions, each performing the multiplication of two matrices
     // of 32-bit floating point random numbers at each invocation.
-    // 0: min chain length
-    // 1: max chain length
-    // 2: min matrix size
-    // 3: max matrix size
-    // 4: interval between consecutive transactions, in ms
-    //    if 0 then make the workflow circular, i.e., the last
-    //    function calls the first one to trigger a new
-    //    transaction
-    // 5: matrix_mul.wasm path
-    MatrixMulChain(u32, u32, u32, u32, u32, String),
+    MatrixMulChain(MatrixMulChainData),
 
     // A chain of functions, each performing the multiplication of an internal
     // random matrix of 32-bit floating point numbers by the input vector
     // received from the caller.
-    // 0: min chain length
-    // 1: max chain length
-    // 2: min input size
-    // 3: max input size
-    // 4: vector_mul.wasm path
-    VectorMulChain(u32, u32, u32, u32, String),
+    VectorMulChain(VectorMulChainData),
 
     // A workflow consisting of a random number of stages, where each stage
     // is composed of a random number of processing blocks. Before going to the
     // next stage, the output from all the processing blocks in the stage before
     // must be received.
-    // 0:  min interval between consecutive transactions, in ms
-    // 1:  max interval between consecutive transactions, in ms
-    // 2:  min input vector size
-    // 3:  min input vector size
-    // 4:  min number of stages
-    // 5:  max number of stages
-    // 6:  min fan-out per stage
-    // 7:  max fan-out per stage
-    // 8:  min element of the Fibonacci sequence to compute
-    // 9:  max element of the Fibonacci sequence to compute
-    // 10: min memory allocation, in bytes
-    // 11: max memory allocation, in bytes
-    // 12: base path of the functions library
-    MapReduce(u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, u32, String),
+    MapReduce(MapReduceData),
 }
 
 impl WorkflowType {
@@ -61,42 +121,33 @@ impl WorkflowType {
             return WorkflowType::None.check();
         } else if !tokens.is_empty() && tokens[0] == "single" && tokens.len() == 3 {
             return WorkflowType::Single(tokens[1].to_string(), tokens[2].to_string()).check();
-        } else if !tokens.is_empty() && tokens[0] == "matrix-mul-chain" && tokens.len() == 7 {
-            return WorkflowType::MatrixMulChain(
-                tokens[1].parse::<u32>().unwrap_or_default(),
-                tokens[2].parse::<u32>().unwrap_or_default(),
-                tokens[3].parse::<u32>().unwrap_or_default(),
-                tokens[4].parse::<u32>().unwrap_or_default(),
-                tokens[5].parse::<u32>().unwrap_or_default(),
-                tokens[6].to_string(),
-            )
-            .check();
-        } else if !tokens.is_empty() && tokens[0] == "vector-mul-chain" && tokens.len() == 6 {
-            return WorkflowType::VectorMulChain(
-                tokens[1].parse::<u32>().unwrap_or_default(),
-                tokens[2].parse::<u32>().unwrap_or_default(),
-                tokens[3].parse::<u32>().unwrap_or_default(),
-                tokens[4].parse::<u32>().unwrap_or_default(),
-                tokens[5].to_string(),
-            )
-            .check();
-        } else if !tokens.is_empty() && tokens[0] == "map-reduce" && tokens.len() == 14 {
-            return WorkflowType::MapReduce(
-                tokens[1].parse::<u32>().unwrap_or_default(),
-                tokens[2].parse::<u32>().unwrap_or_default(),
-                tokens[3].parse::<u32>().unwrap_or_default(),
-                tokens[4].parse::<u32>().unwrap_or_default(),
-                tokens[5].parse::<u32>().unwrap_or_default(),
-                tokens[6].parse::<u32>().unwrap_or_default(),
-                tokens[7].parse::<u32>().unwrap_or_default(),
-                tokens[8].parse::<u32>().unwrap_or_default(),
-                tokens[9].parse::<u32>().unwrap_or_default(),
-                tokens[10].parse::<u32>().unwrap_or_default(),
-                tokens[11].parse::<u32>().unwrap_or_default(),
-                tokens[12].parse::<u32>().unwrap_or_default(),
-                tokens[13].to_string(),
-            )
-            .check();
+        } else if !tokens.is_empty() && tokens[0] == "matrix-mul-chain" && tokens.len() == 2 {
+            if tokens[1] == "template" {
+                println!("{}\n", serde_json::to_string_pretty(&MatrixMulChainData::default()).unwrap());
+                anyhow::bail!("enjoy your template file, which you can save by redirecting stdout to file");
+            }
+            let file = std::fs::File::open(tokens[1])?;
+            let reader = std::io::BufReader::new(file);
+            let data: MatrixMulChainData = serde_json::from_reader(reader)?;
+            return WorkflowType::MatrixMulChain(data).check();
+        } else if !tokens.is_empty() && tokens[0] == "vector-mul-chain" && tokens.len() == 2 {
+            if tokens[1] == "template" {
+                println!("{}\n", serde_json::to_string_pretty(&VectorMulChainData::default()).unwrap());
+                anyhow::bail!("enjoy your template file, which you can save by redirecting stdout to file");
+            }
+            let file = std::fs::File::open(tokens[1])?;
+            let reader = std::io::BufReader::new(file);
+            let data: VectorMulChainData = serde_json::from_reader(reader)?;
+            return WorkflowType::VectorMulChain(data).check();
+        } else if !tokens.is_empty() && tokens[0] == "map-reduce" && tokens.len() == 2 {
+            if tokens[1] == "template" {
+                println!("{}\n", serde_json::to_string_pretty(&MapReduceData::default()).unwrap());
+                anyhow::bail!("enjoy your template file, which you can save by redirecting stdout to file");
+            }
+            let file = std::fs::File::open(tokens[1])?;
+            let reader = std::io::BufReader::new(file);
+            let data: MapReduceData = serde_json::from_reader(reader)?;
+            return WorkflowType::MapReduce(data).check();
         }
         Err(anyhow!("unknown workflow type: {}", wf_type))
     }
@@ -108,111 +159,48 @@ impl WorkflowType {
                 anyhow::ensure!(!json.is_empty(), "empty JSON file path");
                 anyhow::ensure!(!wasm.is_empty(), "empty WASM file path");
             }
-            WorkflowType::VectorMulChain(min_chain, max_chain, min_size, max_size, wasm) => {
-                anyhow::ensure!(*min_chain > 0, "vanishing min chain");
-                anyhow::ensure!(max_chain >= min_chain, "chain: min > max");
-                anyhow::ensure!(max_size >= min_size, "size: min > max");
-                anyhow::ensure!(!wasm.is_empty(), "empty WASM file path");
+            WorkflowType::VectorMulChain(data) => {
+                anyhow::ensure!(data.min_chain_length > 0, "vanishing min chain");
+                anyhow::ensure!(data.max_chain_length >= data.min_chain_length, "chain: min > max");
+                anyhow::ensure!(data.max_input_size >= data.min_input_size, "size: min > max");
+                anyhow::ensure!(!data.function_wasm_path.is_empty(), "empty WASM file path");
             }
-            WorkflowType::MatrixMulChain(min_chain, max_chain, min_size, max_size, _interval, wasm) => {
-                anyhow::ensure!(*min_chain > 0, "vanishing min chain");
-                anyhow::ensure!(max_chain >= min_chain, "chain: min > max");
-                anyhow::ensure!(max_size >= min_size, "size: min > max");
-                anyhow::ensure!(!wasm.is_empty(), "empty WASM file path");
+            WorkflowType::MatrixMulChain(data) => {
+                anyhow::ensure!(data.min_chain_length > 0, "vanishing min chain");
+                anyhow::ensure!(data.max_chain_length >= data.min_chain_length, "chain: min > max");
+                anyhow::ensure!(data.max_matrix_size >= data.min_matrix_size, "size: min > max");
+                anyhow::ensure!(!data.function_wasm_path.is_empty(), "empty WASM file path");
             }
-            WorkflowType::MapReduce(
-                min_interval,
-                max_interval,
-                min_size,
-                max_size,
-                min_stages,
-                max_stages,
-                min_breadth,
-                max_breadth,
-                min_fibonacci,
-                max_fibonacci,
-                min_allocate,
-                max_allocate,
-                library_path,
-            ) => {
-                anyhow::ensure!(*min_interval > 0, "vanishing min interval");
-                anyhow::ensure!(max_interval >= min_interval, "interval: min > max");
-                anyhow::ensure!(max_size >= min_size, "rate: min > max");
-                anyhow::ensure!(*min_stages > 0, "vanishing min stages");
-                anyhow::ensure!(max_stages >= min_stages, "rate: min > max");
-                anyhow::ensure!(*min_breadth > 0, "vanishing min rate");
-                anyhow::ensure!(max_breadth >= min_breadth, "breadth: min > max");
-                anyhow::ensure!(max_fibonacci >= min_fibonacci, "fibonacci: min > max");
-                anyhow::ensure!(max_allocate >= min_allocate, "allocation: min > max");
-                anyhow::ensure!(!library_path.is_empty(), "empty library path");
+            WorkflowType::MapReduce(data) => {
+                anyhow::ensure!(data.min_transaction_interval_ms > 0, "vanishing min interval");
+                anyhow::ensure!(
+                    data.max_transaction_interval_ms >= data.min_transaction_interval_ms,
+                    "interval: min > max"
+                );
+                anyhow::ensure!(data.max_input_size >= data.min_input_size, "rate: min > max");
+                anyhow::ensure!(data.min_num_stages > 0, "vanishing min stages");
+                anyhow::ensure!(data.max_num_stages >= data.min_num_stages, "rate: min > max");
+                anyhow::ensure!(data.min_fan_out > 0, "vanishing fan-out");
+                anyhow::ensure!(data.max_fan_out >= data.min_fan_out, "fan-out: min > max");
+                anyhow::ensure!(data.max_fibonacci >= data.min_fibonacci, "fibonacci: min > max");
+                anyhow::ensure!(data.max_memory_bytes >= data.min_memory_bytes, "allocation: min > max");
+                anyhow::ensure!(!data.functions_path.is_empty(), "empty library path");
             }
         }
         Ok(self)
     }
 
-    pub fn metrics_collector(&self) -> bool {
-        !matches!(self, WorkflowType::None | WorkflowType::Single(_, _))
-    }
-
-    pub fn examples() -> Vec<Self> {
-        vec![
-            WorkflowType::None,
-            WorkflowType::Single("functions/noop/function.json".to_string(), "functions/noop/noop.wasm".to_string()),
-            WorkflowType::VectorMulChain(3, 5, 1000, 1000, "functions/vector_mul/vector_mul.wasm".to_string()),
-            WorkflowType::MatrixMulChain(3, 5, 100, 200, 1000, "functions/matrix_mul/matrix_mul.wasm".to_string()),
-            WorkflowType::MapReduce(1000, 1000, 500, 500, 3, 3, 2, 2, 10000, 10000, 0, 0, "functions/".to_string()),
+    pub fn all() -> [String; 5] {
+        [
+            "none".to_string(),
+            "single".to_string(),
+            "matrix-mul-chain (*)".to_string(),
+            "vector-mul-chain (*)".to_string(),
+            "map-reduce (*)".to_string(),
         ]
     }
-}
 
-impl std::fmt::Display for WorkflowType {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            WorkflowType::None => write!(f, "none"),
-            WorkflowType::Single(json, wasm) => write!(f, "single;{};{}", json, wasm),
-            WorkflowType::VectorMulChain(min_chain, max_chain, min_size, max_size, wasm) => {
-                write!(f, "vector-mul-chain;{};{};{};{};{}", min_chain, max_chain, min_size, max_size, wasm)
-            }
-            WorkflowType::MatrixMulChain(min_chain, max_chain, min_size, max_size, interval, wasm) => {
-                write!(
-                    f,
-                    "matrix-mul-chain;{};{};{};{};{};{}",
-                    min_chain, max_chain, min_size, max_size, interval, wasm
-                )
-            }
-            WorkflowType::MapReduce(
-                min_interval,
-                max_interval,
-                min_size,
-                max_size,
-                min_stages,
-                max_stages,
-                min_breadth,
-                max_breadth,
-                min_fibonacci,
-                max_fibonacci,
-                min_allocate,
-                max_allocate,
-                library_path,
-            ) => {
-                write!(
-                    f,
-                    "map-reduce;{};{};{};{};{};{};{};{};{};{};{};{};{}",
-                    min_interval,
-                    max_interval,
-                    min_size,
-                    max_size,
-                    min_stages,
-                    max_stages,
-                    min_breadth,
-                    max_breadth,
-                    min_fibonacci,
-                    max_fibonacci,
-                    min_allocate,
-                    max_allocate,
-                    library_path,
-                )
-            }
-        }
+    pub fn metrics_collector(&self) -> bool {
+        !matches!(self, WorkflowType::None | WorkflowType::Single(_, _))
     }
 }
