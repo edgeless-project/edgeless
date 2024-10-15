@@ -3,12 +3,10 @@
 
 use clap::Parser;
 use core::cmp::Ordering;
+use edgeless_benchmark::arrival_model;
 use edgeless_benchmark::engine::Engine;
+use edgeless_benchmark::utils;
 use edgeless_benchmark::workflow_type::WorkflowType;
-use rand::prelude::*;
-use rand::SeedableRng;
-use rand_distr::Exp;
-use rand_pcg::Pcg64;
 use std::collections::BinaryHeap;
 use std::time;
 
@@ -65,11 +63,12 @@ struct Args {
     additional_header: String,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Debug)]
 #[allow(clippy::enum_variant_names)]
 enum Event {
     /// 0: Event time.
-    WfNew(u64),
+    /// 1: Time when the workflow ends.
+    WfNew(u64, u64),
     /// 0: Event time.
     /// 1: UUID of the workflow.
     WfEnd(u64, String),
@@ -80,7 +79,7 @@ enum Event {
 impl Event {
     fn time(&self) -> u64 {
         match self {
-            Self::WfNew(t) => *t,
+            Self::WfNew(t, _) => *t,
             Self::WfEnd(t, _) => *t,
             Self::WfExperimentEnd(t) => *t,
         }
@@ -95,29 +94,8 @@ impl PartialOrd for Event {
 
 impl Ord for Event {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.time().cmp(&other.time())
+        other.time().cmp(&self.time())
     }
-}
-
-enum ArrivalModel {
-    /// Inter-arrival between consecutive workflows and durations are exponentially distributed.
-    Poisson,
-    /// One new workflow arrive every new inter-arrival time.
-    Incremental,
-    /// Add workflows incrementally until the warm up period finishes, then keep until the end of the experiment.
-    IncrAndKeep,
-    /// Add a single workflow.
-    Single,
-}
-
-static MEGA: u64 = 1000000;
-
-fn to_seconds(us: u64) -> f64 {
-    us as f64 / MEGA as f64
-}
-
-fn to_microseconds(s: f64) -> u64 {
-    (s * MEGA as f64).round() as u64
 }
 
 #[tokio::main]
@@ -125,9 +103,15 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let args = Args::parse();
-    let mut rng = Pcg64::seed_from_u64(args.seed);
-    let lifetime_rv = Exp::new(1.0 / args.lifetime).unwrap();
-    let interarrival_rv = Exp::new(1.0 / args.interarrival).unwrap();
+
+    let mut arrival_model = arrival_model::ArrivalModel::new(
+        args.arrival_model.as_str(),
+        args.warmup,
+        args.duration,
+        args.seed,
+        args.interarrival,
+        args.lifetime,
+    )?;
 
     // Parse the worflow type from command line option.
     if args.wf_type.to_lowercase() == "help" {
@@ -141,15 +125,6 @@ async fn main() -> anyhow::Result<()> {
         Err(err) => {
             return Err(anyhow::anyhow!("invalid workflow type: {}", err));
         }
-    };
-
-    // Parse the arrival model.
-    let arrival_model = match args.arrival_model.as_str() {
-        "poisson" => ArrivalModel::Poisson,
-        "incremental" => ArrivalModel::Incremental,
-        "incr-and-keep" => ArrivalModel::IncrAndKeep,
-        "single" => ArrivalModel::Single,
-        _ => panic!("unknown arrival model {}: ", args.arrival_model),
     };
 
     // Check that the additional fields, if present, have a consistent header.
@@ -179,12 +154,16 @@ async fn main() -> anyhow::Result<()> {
     // Create the engine for the creation/termination of workflows.
     let mut engine = Engine::new(&args.controller_url, wf_type, args.seed + 1000, redis_client).await;
 
-    // event queue, the first event is always a new workflow arriving at time 0
+    // event queue
     let mut events = BinaryHeap::new();
-    events.push(Event::WfNew(0_u64)); // in us
+
+    // schedule the first event
+    if let Some((arrival_time, end_time)) = arrival_model.next(0_u64) {
+        events.push(Event::WfNew(arrival_time, end_time));
+    }
 
     // add the end-of-experiment event
-    events.push(Event::WfExperimentEnd(to_microseconds(args.duration)));
+    events.push(Event::WfExperimentEnd(utils::to_microseconds(args.duration)));
 
     // set up warm-up period configuration
     if args.warmup >= args.duration {
@@ -207,7 +186,7 @@ async fn main() -> anyhow::Result<()> {
     'outer: loop {
         if let Some(event) = events.pop() {
             // wait until the event
-            assert!(event.time() >= now);
+            assert!(event.time() >= now, "{} should be >= {}", event.time(), now);
             if event.time() > now {
                 std::thread::sleep(time::Duration::from_micros(event.time() - now));
             }
@@ -215,44 +194,26 @@ async fn main() -> anyhow::Result<()> {
             // handle the event
             now = event.time();
             match event {
-                Event::WfNew(_) => {
-                    // do not schedule any more workflows after the warm-up period is finished
-                    // for IncrAndKeep arrival model
-                    if let ArrivalModel::IncrAndKeep = arrival_model {
-                        if now >= to_microseconds(args.warmup) {
-                            continue;
-                        }
-                    }
-
+                Event::WfNew(_, workflow_end_time) => {
                     wf_requested += 1;
                     if let Ok(uuid) = engine.start_workflow().await {
                         wf_started += 1;
-                        let end_time = match arrival_model {
-                            ArrivalModel::Poisson => now + to_microseconds(lifetime_rv.sample(&mut rng)),
-                            _ => to_microseconds(args.duration) - 1,
-                        };
-                        assert!(end_time >= now);
                         log::info!(
-                            "{} new wf created '{}', will last {} s",
-                            to_seconds(now),
+                            "{} new wf created '{}', will end at {} s",
+                            utils::to_seconds(now),
                             &uuid,
-                            to_seconds(end_time - now)
+                            utils::to_seconds(workflow_end_time)
                         );
-                        events.push(Event::WfEnd(end_time, uuid));
+                        events.push(Event::WfEnd(workflow_end_time, uuid));
                     }
-                    let new_arrival_time = now
-                        + to_microseconds(match arrival_model {
-                            ArrivalModel::Poisson => interarrival_rv.sample(&mut rng),
-                            ArrivalModel::Incremental | ArrivalModel::IncrAndKeep => args.interarrival,
-                            ArrivalModel::Single => args.duration + 1.0,
-                        });
-                    if new_arrival_time < to_microseconds(args.duration) {
-                        // only add the event if it is before the end of the experiment
-                        events.push(Event::WfNew(new_arrival_time));
+                    if let Some((arrival_time, end_time)) = arrival_model.next(now) {
+                        if arrival_time < utils::to_microseconds(args.duration) {
+                            events.push(Event::WfNew(arrival_time, end_time));
+                        }
                     }
                 }
                 Event::WfEnd(_, uuid) => {
-                    log::info!("{} wf terminated  '{}'", to_seconds(now), &uuid);
+                    log::info!("{} wf terminated  '{}'", utils::to_seconds(now), &uuid);
                     if !uuid.is_empty() {
                         match engine.stop_workflow(&uuid).await {
                             Ok(_) => {}
@@ -273,6 +234,7 @@ async fn main() -> anyhow::Result<()> {
     for event_type in events.iter() {
         if let Event::WfEnd(_, uuid) = event_type {
             if !uuid.is_empty() {
+                log::info!("{} wf terminated  '{}'", utils::to_seconds(now), &uuid);
                 match engine.stop_workflow(uuid).await {
                     Ok(_) => {}
                     Err(err) => {
