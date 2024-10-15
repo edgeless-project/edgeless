@@ -709,7 +709,7 @@ mod test {
             disk_tot_reads: 21,
             disk_tot_writes: 22,
             gpu_load_perc: 23,
-            gpu_temp_celc: 24,
+            gpu_temp_cels: 24,
         };
         let samples_1: Vec<f64> = vec![100.0, 101.0, 102.0, 103.0];
         let samples_2: Vec<f64> = vec![200.0, 201.0];
