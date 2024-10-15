@@ -74,14 +74,12 @@ pub fn jetson_get_gpu_temp() -> f32 {
         Ok(temp_str) => {
             // Parse the temperature value and return it divided by 1000
             if let Ok(temp) = temp_str.trim().parse::<f32>() {
-                return temp / 1000.0; // Return temperature in Celsius
+                temp / 1000.0 // Return temperature in Celsius
             } else {
-                return -20.0;
+                -20.0
             }
         }
-        _ => {
-            return -10.0;
-        }
+        _ => -10.0,
     }
 }
 
@@ -108,14 +106,12 @@ pub fn jetson_get_gpu_load() -> i32 {
         Ok(load_str) => {
             // Parse the load value and return it divided by 10
             if let Ok(load) = load_str.trim().parse::<u32>() {
-                return (load / 10) as i32; // Return load
+                (load / 10) as i32 // Return load
             } else {
-                return -20;
+                -20
             }
         }
-        _ => {
-            return -10;
-        }
+        _ => -10,
     }
 }
 
