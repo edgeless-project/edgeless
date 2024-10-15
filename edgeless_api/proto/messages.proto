@@ -212,7 +212,7 @@ message NodeHealthStatus {
     // Instantaneous GPU load percentage (0-100%)
     int32 gpu_load_perc = 80;
     // GPU instantaneous temp in Celsius multiplied by 1000
-    int32 gpu_temp_celc = 81;
+    int32 gpu_temp_cels = 81;
 }
 
 // Node performance samples.
