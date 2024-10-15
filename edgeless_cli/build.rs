@@ -1,5 +1,4 @@
 use schemars::schema_for;
-use serde_json;
 use std::fs::File;
 use std::io::Write;
 
@@ -17,7 +16,7 @@ macro_rules! p {
 }
 
 fn main() {
-    if let Err(_) = std::fs::metadata("../schemas") {
+    if std::fs::metadata("../schemas").is_err() {
         p!("schemas/ directory not available - skipping JSON schema generation - they will not be available in your IDE");
         return;
     }
