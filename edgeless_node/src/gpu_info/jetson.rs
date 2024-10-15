@@ -102,7 +102,7 @@ pub fn jetson_get_gpu_load() -> i32 {
     // to choose only one of them
 
     let load_path = format!("/sys/devices/gpu.{}/load", gpu_load);
-    match fs::read_to_string(&load_path) {
+    match fs::read_to_string(load_path) {
         Ok(load_str) => {
             // Parse the load value and return it divided by 10
             if let Ok(load) = load_str.trim().parse::<u32>() {
