@@ -3,6 +3,26 @@
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
 
+pub struct HttpEgressResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for HttpEgressResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("http-egress")
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::new()
+    }
+
+    fn version(&self) -> String {
+        String::from("1.0")
+    }
+}
+
 #[derive(Clone)]
 pub struct EgressResourceProvider {
     inner: std::sync::Arc<tokio::sync::Mutex<EgressResourceProviderInner>>,

@@ -11,6 +11,36 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+pub struct DdaResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for DdaResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("dda")
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec![String::from("out")]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([
+            (String::from("dda_url"), String::from("URL of the DDA")),
+            (
+                String::from("dda_com_subscription_mapping"),
+                String::from("JSON encoding the DDA subscription mapping"),
+            ),
+            (
+                String::from("dda_com_publication_mapping"),
+                String::from("JSON encoding the DDA publication mapping"),
+            ),
+        ])
+    }
+
+    fn version(&self) -> String {
+        String::from("1.0")
+    }
+}
+
 // imports the generated proto file for dda
 pub mod dda_com {
     tonic::include_proto!("dda.com.v1");

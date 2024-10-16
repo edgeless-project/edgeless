@@ -5,6 +5,32 @@ use edgeless_api::function_instance::{ComponentId, InstanceId};
 use http_body_util::BodyExt;
 use std::str::FromStr;
 
+pub struct HttpIngressResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for HttpIngressResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("http-ingress")
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec!["new_request".to_string()]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([
+            (
+                String::from("host"),
+                String::from("Hostname that is used to match incoming HTTP commands"),
+            ),
+            (String::from("method"), String::from("Comma-separated list of HTTP methods allowed")),
+        ])
+    }
+
+    fn version(&self) -> String {
+        String::from("1.0")
+    }
+}
+
 struct ResourceDesc {
     host: String,
     allow: std::collections::HashSet<edgeless_http::EdgelessHTTPMethod>,
