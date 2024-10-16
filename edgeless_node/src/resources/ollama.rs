@@ -3,6 +3,26 @@
 
 use futures::{SinkExt, StreamExt};
 
+pub struct OllamasResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for OllamasResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("ollama")
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec![String::from("new_request")]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([(String::from("model"), String::from("Model to be used for chatting"))])
+    }
+
+    fn version(&self) -> String {
+        String::from("1.0")
+    }
+}
+
 #[derive(Clone)]
 pub struct OllamaResourceProvider {
     inner: std::sync::Arc<tokio::sync::Mutex<OllamaResourceProviderInner>>,
