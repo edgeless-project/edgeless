@@ -5,6 +5,7 @@
 
 use edgeless_api::orc::OrchestratorAPI;
 use futures::Future;
+use resources::resource_provider_specs::ResourceProviderSpecs;
 
 pub mod agent;
 pub mod base_runtime;
@@ -297,7 +298,7 @@ async fn fill_resources(
     if let Some(settings) = settings {
         if let (Some(http_ingress_url), Some(provider_id)) = (&settings.http_ingress_url, &settings.http_ingress_provider) {
             if !http_ingress_url.is_empty() && !provider_id.is_empty() {
-                let class_type = "http-ingress".to_string();
+                let class_type = resources::http_ingress::HttpIngressResourceSpec {}.class_type();
                 log::info!("Creating resource '{}' at {}", provider_id, http_ingress_url);
                 ret.insert(
                     provider_id.clone(),
@@ -314,7 +315,7 @@ async fn fill_resources(
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id: provider_id.clone(),
                     class_type,
-                    outputs: vec!["new_request".to_string()],
+                    outputs: resources::http_ingress::HttpIngressResourceSpec {}.outputs(),
                 });
             }
         }
@@ -322,7 +323,7 @@ async fn fill_resources(
         if let Some(provider_id) = &settings.http_egress_provider {
             if !provider_id.is_empty() {
                 log::info!("Creating resource '{}'", provider_id);
-                let class_type = "http-egress".to_string();
+                let class_type = resources::http_egress::HttpEgressResourceSpec {}.class_type();
                 ret.insert(
                     provider_id.clone(),
                     agent::ResourceDesc {
@@ -339,7 +340,7 @@ async fn fill_resources(
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id: provider_id.clone(),
                     class_type,
-                    outputs: vec![],
+                    outputs: resources::http_egress::HttpEgressResourceSpec {}.outputs(),
                 });
             }
         }
@@ -347,7 +348,7 @@ async fn fill_resources(
         if let Some(provider_id) = &settings.file_log_provider {
             if !provider_id.is_empty() {
                 log::info!("Creating resource '{}'", provider_id);
-                let class_type = "file-log".to_string();
+                let class_type = resources::file_log::FileLogResourceSpec {}.class_type();
                 ret.insert(
                     provider_id.clone(),
                     agent::ResourceDesc {
@@ -364,7 +365,7 @@ async fn fill_resources(
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id: provider_id.clone(),
                     class_type,
-                    outputs: vec![],
+                    outputs: resources::file_log::FileLogResourceSpec {}.outputs(),
                 });
             }
         }
@@ -372,7 +373,7 @@ async fn fill_resources(
         if let Some(provider_id) = &settings.redis_provider {
             if !provider_id.is_empty() {
                 log::info!("Creating resource '{}'", provider_id);
-                let class_type = "redis".to_string();
+                let class_type = resources::redis::RedisResourceSpec {}.class_type();
                 ret.insert(
                     provider_id.clone(),
                     agent::ResourceDesc {
@@ -389,7 +390,7 @@ async fn fill_resources(
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id: provider_id.clone(),
                     class_type,
-                    outputs: vec![],
+                    outputs: resources::redis::RedisResourceSpec {}.outputs(),
                 });
             }
         }
@@ -397,7 +398,7 @@ async fn fill_resources(
         if let Some(provider_id) = &settings.dda_provider {
             if !provider_id.is_empty() {
                 log::info!("Creating dda resource provider '{}'", provider_id);
-                let class_type = "dda".to_string();
+                let class_type = resources::dda::DdaResourceSpec {}.class_type();
                 ret.insert(
                     provider_id.clone(),
                     agent::ResourceDesc {
@@ -412,7 +413,7 @@ async fn fill_resources(
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id: provider_id.clone(),
                     class_type,
-                    outputs: vec!["new_request".to_string()],
+                    outputs: resources::dda::DdaResourceSpec {}.outputs(),
                 });
             }
         }
@@ -426,7 +427,7 @@ async fn fill_resources(
                     settings.port,
                     settings.messages_number_limit
                 );
-                let class_type = "ollama".to_string();
+                let class_type = resources::ollama::OllamasResourceSpec {}.class_type();
                 ret.insert(
                     settings.provider.clone(),
                     agent::ResourceDesc {
@@ -447,7 +448,7 @@ async fn fill_resources(
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id: settings.provider.clone(),
                     class_type,
-                    outputs: vec!["out".to_string()],
+                    outputs: resources::ollama::OllamasResourceSpec {}.outputs(),
                 });
             }
         }
@@ -457,7 +458,7 @@ async fn fill_resources(
                 #[cfg(feature = "rdkafka")]
                 {
                     log::info!("Creating resource '{}'", provider_id);
-                    let class_type = "kafka-egress".to_string();
+                    let class_type = resources::kafka_egress::KafkaEgressResourceSpec {}.class_type();
                     ret.insert(
                         provider_id.clone(),
                         agent::ResourceDesc {
@@ -474,7 +475,7 @@ async fn fill_resources(
                     provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                         provider_id: provider_id.clone(),
                         class_type,
-                        outputs: vec![],
+                        outputs: resources::kafka_egress::KafkaEgressResourceSpec {}.outputs(),
                     });
                 }
                 #[cfg(not(feature = "rdkafka"))]

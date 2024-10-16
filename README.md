@@ -76,6 +76,10 @@ below.
 | `ollama`       | Interact via an LLM ChatBot deployed on an external [ollama](https://ollama.com/) server | host, port, messages_number_limit, provider (separate section) | model                                                              | [click](examples/ollama/README.md)       |
 | `redis`        | Update a value on an external [Redis](https://redis.io/) server                          | redis_provider                                                 | url, key                                                           | [click](examples/redis/README.md)        |
 
+With `edgeless_node_d --available-resources` you can find the list of resource
+providers that a node supports, along with the version, output channels, and
+configuration parameters for each resource provider.
+
 ### Functions
 
 Functions are _stateful_: a given function instance is assigned to exactly one

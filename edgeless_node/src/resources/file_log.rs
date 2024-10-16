@@ -4,6 +4,32 @@
 use edgeless_dataplane::core::Message;
 use std::io::prelude::*;
 
+pub struct FileLogResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for FileLogResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("file-log")
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([
+            (
+                String::from("add-source-id"),
+                String::from("If specified adds the InstanceId of the source component"),
+            ),
+            (String::from("add-timestamp"), String::from("If specified adds a timestamp")),
+        ])
+    }
+
+    fn version(&self) -> String {
+        String::from("1.0")
+    }
+}
+
 #[derive(Clone)]
 pub struct FileLogResourceProvider {
     inner: std::sync::Arc<tokio::sync::Mutex<FileLogResourceProviderInner>>,
