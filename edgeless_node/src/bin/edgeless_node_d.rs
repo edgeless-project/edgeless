@@ -10,6 +10,7 @@ use edgeless_node::resources::http_ingress::HttpIngressResourceSpec;
 use edgeless_node::resources::kafka_egress::KafkaEgressResourceSpec;
 use edgeless_node::resources::ollama::OllamasResourceSpec;
 use edgeless_node::resources::redis::RedisResourceSpec;
+use edgeless_node::resources::resource_provider_specs::ResourceProviderSpecOutput;
 use edgeless_node::resources::resource_provider_specs::ResourceProviderSpecs;
 
 #[derive(Debug, clap::Parser)]
@@ -47,27 +48,11 @@ fn main() -> anyhow::Result<()> {
         specs.push(Box::new(KafkaEgressResourceSpec {}));
 
         if args.output_json {
-            let mut json_output = String::from("[");
-            for (i, spec) in specs.iter().enumerate() {
-                let resource_json = format!(
-                    r#"{{"class_type": "{}", "version": "{}", "outputs": [{}], "configurations": [{}]}}"#,
-                    spec.class_type(),
-                    spec.version(),
-                    spec.outputs().iter().map(|o| format!(r#""{}""#, o)).collect::<Vec<String>>().join(", "),
-                    spec.configurations()
-                        .iter()
-                        .map(|(field, desc)| format!(r#"{{"field": "{}", "desc": "{}"}}"#, field, desc))
-                        .collect::<Vec<String>>()
-                        .join(", ")
-                );
-
-                json_output.push_str(&resource_json);
-                if i < specs.len() - 1 {
-                    json_output.push_str(", ");
-                }
-            }
-            json_output.push_str("]");
-            println!("{}", json_output);
+            println!(
+                "{}",
+                serde_json::to_string(&specs.iter().map(|x| x.to_output()).collect::<Vec<ResourceProviderSpecOutput>>())
+                    .expect("could not serialize available resources to JSON")
+            );
         } else {
             for spec in specs {
                 println!("class_type: {}", spec.class_type());
