@@ -21,6 +21,8 @@ struct Args {
     template: String,
     #[arg(long, default_value_t = false)]
     available_resources: bool,
+    #[arg(long, default_value_t = false)]
+    output_json: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -43,22 +45,47 @@ fn main() -> anyhow::Result<()> {
         ];
         #[cfg(feature = "rdkafka")]
         specs.push(Box::new(KafkaEgressResourceSpec {}));
-        for spec in specs {
-            println!("class_type: {}", spec.class_type());
-            println!("version: {}", spec.version());
-            println!("outputs: [{}]", spec.outputs().join(","));
-            if !spec.configurations().is_empty() {
-                println!("configurations:");
-                println!(
-                    "{}",
+
+        if args.output_json {
+            let mut json_output = String::from("[");
+            for (i, spec) in specs.iter().enumerate() {
+                let resource_json = format!(
+                    r#"{{"class_type": "{}", "version": "{}", "outputs": [{}], "configurations": [{}]}}"#,
+                    spec.class_type(),
+                    spec.version(),
+                    spec.outputs().iter().map(|o| format!(r#""{}""#, o)).collect::<Vec<String>>().join(", "),
                     spec.configurations()
                         .iter()
-                        .map(|(field, desc)| format!("- {}: {}", field, desc))
+                        .map(|(field, desc)| format!(r#"{{"field": "{}", "desc": "{}"}}"#, field, desc))
                         .collect::<Vec<String>>()
-                        .join("\n")
-                )
+                        .join(", ")
+                );
+
+                json_output.push_str(&resource_json);
+                if i < specs.len() - 1 {
+                    json_output.push_str(", ");
+                }
             }
-            println!();
+            json_output.push_str("]");
+            println!("{}", json_output);
+        } else {
+            for spec in specs {
+                println!("class_type: {}", spec.class_type());
+                println!("version: {}", spec.version());
+                println!("outputs: [{}]", spec.outputs().join(","));
+                if !spec.configurations().is_empty() {
+                    println!("configurations:");
+                    println!(
+                        "{}",
+                        spec.configurations()
+                            .iter()
+                            .map(|(field, desc)| format!("  - {}: {}", field, desc))
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    )
+                }
+                println!();
+            }
         }
         return Ok(());
     }
