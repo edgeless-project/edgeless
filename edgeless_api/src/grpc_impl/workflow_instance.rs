@@ -79,6 +79,8 @@ impl WorkflowInstanceConverters {
                 })
                 .collect(),
             annotations: api_request.annotations.clone(),
+            workflow_egress_proxies: Vec::new(),
+            workflow_ingress_proxies: Vec::new(),
         })
     }
 
@@ -352,6 +354,21 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             Err(err) => Err(anyhow::anyhow!("Communication error while stopping a workflow: {}", err.to_string())),
         }
     }
+
+    async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()> {
+        match self
+            .client
+            .patch(tonic::Request::new(CommonConverters::serialize_patch_request(&update)))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(
+                "Communication error while updating the external links of a workflow: {}",
+                err.to_string()
+            )),
+        }
+    }
+
     async fn list(&mut self, id: crate::workflow_instance::WorkflowId) -> anyhow::Result<Vec<crate::workflow_instance::WorkflowInstance>> {
         let ret = self
             .client
@@ -429,6 +446,25 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
                 crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_instance_list(&instances),
             )),
             Err(err) => Err(tonic::Status::internal(format!("Internal error when listing workflows: {}", err))),
+        }
+    }
+
+    async fn patch(&self, update: tonic::Request<crate::grpc_impl::api::PatchRequest>) -> Result<tonic::Response<()>, tonic::Status> {
+        let parsed_update = match CommonConverters::parse_patch_request(&update.into_inner()) {
+            Ok(parsed_update) => parsed_update,
+            Err(err) => {
+                return Err(tonic::Status::invalid_argument(format!(
+                    "Error when updating the external links of workflow: {}",
+                    err
+                )));
+            }
+        };
+        match self.root_api.lock().await.patch(parsed_update).await {
+            Ok(_) => Ok(tonic::Response::new(())),
+            Err(err) => Err(tonic::Status::internal(format!(
+                "Error when updating the external links of workflow: {}",
+                err
+            ))),
         }
     }
 }

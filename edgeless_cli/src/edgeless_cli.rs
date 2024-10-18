@@ -306,6 +306,8 @@ async fn main() -> anyhow::Result<()> {
                                         configurations: res_spec.configurations,
                                     })
                                     .collect(),
+                                workflow_egress_proxies: Vec::new(),
+                                workflow_ingress_proxies: Vec::new(),
                                 annotations: workflow.annotations.clone(),
                             })
                             .await;

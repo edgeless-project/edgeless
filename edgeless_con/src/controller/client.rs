@@ -79,6 +79,10 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
             Err(_) => Err(anyhow::anyhow!("Controller Channel Error")),
         }
     }
+
+    async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]

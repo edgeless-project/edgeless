@@ -6,42 +6,76 @@
 use edgeless_api::function_instance::InstanceId;
 
 pub trait WorkflowComponent {
-    fn ports(&mut self) -> &mut ComponentPorts;
+    fn logical_ports(&mut self) -> &mut LogicalPorts;
     fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId>;
+    fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn WorkflowComponentInstance>>;
+    fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<dyn WorkflowComponentInstance>>);
+}
+
+pub trait WorkflowComponentInstance {
+    fn physical_ports(&mut self) -> &mut PhysicalPorts;
 }
 
 pub struct ActiveWorkflow {
     id: edgeless_api::workflow_instance::WorkflowId,
+
     original_request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
+
     functions: std::collections::HashMap<String, std::cell::RefCell<WorkflowFunction>>,
     resources: std::collections::HashMap<String, std::cell::RefCell<WorkflowResource>>,
+    subflows: std::collections::HashMap<String, std::cell::RefCell<SubFlow>>,
+    proxy: std::cell::RefCell<WorkflowProxy>,
+
     links: std::collections::HashMap<edgeless_api::link::LinkInstanceId, WorkflowLink>,
-    subflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, SubFlow>,
 }
 
 pub struct WorkflowFunction {
     pub image: ActorImage,
     pub annotations: std::collections::HashMap<String, String>,
 
-    pub instances: Vec<std::cell::RefCell<WorkflowFunctionInstance>>,
+    pub logical_ports: LogicalPorts,
 
-    pub ports: ComponentPorts,
+    pub instances: Vec<std::cell::RefCell<WorkflowFunctionInstance>>,
 }
 
 impl WorkflowComponent for WorkflowFunction {
-    fn ports(&mut self) -> &mut ComponentPorts {
-        &mut self.ports
+    fn logical_ports(&mut self) -> &mut LogicalPorts {
+        &mut self.logical_ports
     }
 
     fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId> {
         self.instances.iter().map(|i| i.borrow().id.clone()).collect()
+    }
+
+    fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn WorkflowComponentInstance>> {
+        self.instances
+            .iter()
+            .map(|i| i as &std::cell::RefCell<dyn WorkflowComponentInstance>)
+            .collect()
+    }
+
+    fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<dyn WorkflowComponentInstance>>) {
+        (
+            &mut self.logical_ports,
+            self.instances
+                .iter()
+                .map(|i| i as &std::cell::RefCell<dyn WorkflowComponentInstance>)
+                .collect(),
+        )
     }
 }
 
 pub struct WorkflowFunctionInstance {
     id: edgeless_api::function_instance::InstanceId,
     image: Option<ActorImage>,
-    materialized: Option<MaterializedState>,
+    desired_mapping: PhysicalPorts,
+    materialized: Option<PhysicalPorts>,
+}
+
+impl WorkflowComponentInstance for WorkflowFunctionInstance {
+    fn physical_ports(&mut self) -> &mut PhysicalPorts {
+        &mut self.desired_mapping
+    }
 }
 
 pub struct WorkflowResource {
@@ -50,25 +84,155 @@ pub struct WorkflowResource {
 
     pub instances: Vec<std::cell::RefCell<WorkflowResourceInstance>>,
 
-    pub ports: ComponentPorts,
+    pub logical_ports: LogicalPorts,
 }
 
 impl WorkflowComponent for WorkflowResource {
-    fn ports(&mut self) -> &mut ComponentPorts {
-        &mut self.ports
+    fn logical_ports(&mut self) -> &mut LogicalPorts {
+        &mut self.logical_ports
     }
 
     fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId> {
         self.instances.iter().map(|i| i.borrow().id.clone()).collect()
     }
+
+    fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn WorkflowComponentInstance>> {
+        self.instances
+            .iter()
+            .map(|i| i as &std::cell::RefCell<dyn WorkflowComponentInstance>)
+            .collect()
+    }
+
+    fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<dyn WorkflowComponentInstance>>) {
+        (
+            &mut self.logical_ports,
+            self.instances
+                .iter()
+                .map(|i| i as &std::cell::RefCell<dyn WorkflowComponentInstance>)
+                .collect(),
+        )
+    }
 }
 
 pub struct WorkflowResourceInstance {
     id: edgeless_api::function_instance::InstanceId,
-    materialized: Option<MaterializedState>,
+    desired_mapping: PhysicalPorts,
+    materialized: Option<PhysicalPorts>,
 }
 
-pub struct SubFlow {}
+impl WorkflowComponentInstance for WorkflowResourceInstance {
+    fn physical_ports(&mut self) -> &mut PhysicalPorts {
+        &mut self.desired_mapping
+    }
+}
+
+pub struct WorkflowProxy {
+    pub logical_ports: LogicalPorts,
+
+    pub external_ports: ExternalPorts,
+
+    pub instances: Vec<std::cell::RefCell<WorkflowProxyInstance>>,
+}
+
+impl WorkflowComponent for WorkflowProxy {
+    fn logical_ports(&mut self) -> &mut LogicalPorts {
+        &mut self.logical_ports
+    }
+
+    fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId> {
+        self.instances.iter().map(|i| i.borrow().id.clone()).collect()
+    }
+
+    fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn WorkflowComponentInstance>> {
+        self.instances
+            .iter()
+            .map(|i| i as &std::cell::RefCell<dyn WorkflowComponentInstance>)
+            .collect()
+    }
+
+    fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<dyn WorkflowComponentInstance>>) {
+        (
+            &mut self.logical_ports,
+            self.instances
+                .iter()
+                .map(|i| i as &std::cell::RefCell<dyn WorkflowComponentInstance>)
+                .collect(),
+        )
+    }
+}
+
+// pub struct WorkflowEgressProxy {
+//     pub id: edgeless_api::function_instance::ComponentId,
+//     pub instances: Vec<std::cell::RefCell<WorkflowProxyInstance>>
+// }
+
+pub struct WorkflowProxyInstance {
+    id: edgeless_api::function_instance::InstanceId,
+    desired_mapping: PhysicalPorts,
+    materialized: Option<PhysicalPorts>,
+}
+
+impl WorkflowComponentInstance for WorkflowProxyInstance {
+    fn physical_ports(&mut self) -> &mut PhysicalPorts {
+        &mut self.desired_mapping
+    }
+}
+
+pub struct SubFlow {
+    functions: std::collections::HashMap<String, SubFlowFunction>,
+    resources: std::collections::HashMap<String, SubFlowResource>,
+
+    logical_ports: LogicalPorts,
+
+    internal_ports: InternalPorts,
+
+    instances: Vec<std::cell::RefCell<SubFlowInstance>>,
+
+    annotations: std::collections::HashMap<String, String>,
+}
+
+impl WorkflowComponent for SubFlow {
+    fn logical_ports(&mut self) -> &mut LogicalPorts {
+        &mut self.logical_ports
+    }
+
+    fn instance_ids(&mut self) -> Vec<edgeless_api::function_instance::InstanceId> {
+        self.instances.iter().map(|i| i.borrow().id.clone()).collect()
+    }
+
+    fn instances(&mut self) -> Vec<&std::cell::RefCell<dyn WorkflowComponentInstance>> {
+        self.instances
+            .iter()
+            .map(|i| i as &std::cell::RefCell<dyn WorkflowComponentInstance>)
+            .collect()
+    }
+
+    fn split_view(&mut self) -> (&mut LogicalPorts, Vec<&std::cell::RefCell<dyn WorkflowComponentInstance>>) {
+        (
+            &mut self.logical_ports,
+            self.instances
+                .iter()
+                .map(|i| i as &std::cell::RefCell<dyn WorkflowComponentInstance>)
+                .collect(),
+        )
+    }
+}
+
+pub struct SubFlowInstance {
+    id: edgeless_api::function_instance::InstanceId,
+    desired_mapping: PhysicalPorts,
+    materialized: Option<PhysicalPorts>,
+}
+
+impl WorkflowComponentInstance for SubFlowInstance {
+    fn physical_ports(&mut self) -> &mut PhysicalPorts {
+        &mut self.desired_mapping
+    }
+}
+
+pub struct SubFlowFunction {}
+
+pub struct SubFlowResource {}
 
 pub struct WorkflowLink {
     id: edgeless_api::link::LinkInstanceId,
@@ -103,16 +267,27 @@ pub struct ActorImage {
     pub code: Vec<u8>,
 }
 
-pub struct ComponentPorts {
+#[derive(Default)]
+pub struct LogicalPorts {
     pub logical_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalOutput>,
     pub logical_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalInput>,
+}
+
+#[derive(Default)]
+pub struct PhysicalPorts {
     pub physical_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
     pub physical_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
 }
 
-pub struct MaterializedState {
-    pub physical_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
-    pub physical_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
+#[derive(Default)]
+pub struct ExternalPorts {
+    pub external_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
+    pub external_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
+}
+
+pub struct InternalPorts {
+    pub internal_input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalOutput>,
+    pub internal_output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, LogicalInput>,
 }
 
 #[derive(Debug)]
@@ -159,15 +334,38 @@ pub enum RequiredChange {
         link_id: edgeless_api::link::LinkInstanceId,
         node_id: edgeless_api::function_instance::NodeId,
     },
+    CreateSubflow {
+        subflow_id: edgeless_api::function_instance::InstanceId,
+        spawn_req: edgeless_api::workflow_instance::SpawnWorkflowRequest,
+    },
+    PatchSubflow {
+        subflow_id: edgeless_api::function_instance::InstanceId,
+        input_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
+        output_mapping: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
+    },
+    PatchProxy {
+        proxy_id: edgeless_api::function_instance::InstanceId,
+        internal_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
+        internal_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
+        external_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
+        external_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
+    },
+    CrateProxy {
+        proxy_id: edgeless_api::function_instance::InstanceId,
+        internal_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
+        internal_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
+        external_inputs: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalInput>,
+        external_outputs: std::collections::HashMap<edgeless_api::function_instance::PortId, PhysicalOutput>,
+    },
 }
 
 impl WorkflowFunction {
     fn enabled_inputs(&self) -> Vec<edgeless_api::function_instance::PortId> {
-        self.ports.logical_input_mapping.iter().map(|i| i.0.clone()).collect()
+        self.logical_ports.logical_input_mapping.iter().map(|i| i.0.clone()).collect()
     }
 
     fn enabled_outputs(&self) -> Vec<edgeless_api::function_instance::PortId> {
-        self.ports.logical_output_mapping.iter().map(|i| i.0.clone()).collect()
+        self.logical_ports.logical_output_mapping.iter().map(|i| i.0.clone()).collect()
     }
 }
 
@@ -231,7 +429,7 @@ impl ActiveWorkflow {
                             },
                             instances: Vec::new(),
                             annotations: function_req.annotations,
-                            ports: ComponentPorts {
+                            logical_ports: LogicalPorts {
                                 logical_input_mapping: function_req
                                     .input_mapping
                                     .into_iter()
@@ -250,8 +448,6 @@ impl ActiveWorkflow {
                                     })
                                     .collect(),
                                 logical_output_mapping: function_req.output_mapping.clone(),
-                                physical_input_mapping: std::collections::HashMap::new(),
-                                physical_output_mapping: std::collections::HashMap::new(),
                             },
                         }),
                     )
@@ -267,7 +463,7 @@ impl ActiveWorkflow {
                             class: resource_req.class_type,
                             configurations: resource_req.configurations,
                             instances: Vec::new(),
-                            ports: ComponentPorts {
+                            logical_ports: LogicalPorts {
                                 logical_input_mapping: resource_req
                                     .input_mapping
                                     .into_iter()
@@ -286,8 +482,6 @@ impl ActiveWorkflow {
                                     })
                                     .collect(),
                                 logical_output_mapping: resource_req.output_mapping.clone(),
-                                physical_input_mapping: std::collections::HashMap::new(),
-                                physical_output_mapping: std::collections::HashMap::new(),
                             },
                         }),
                     )
@@ -295,6 +489,38 @@ impl ActiveWorkflow {
                 .collect(),
             links: std::collections::HashMap::new(),
             subflows: std::collections::HashMap::new(),
+            proxy: std::cell::RefCell::new(WorkflowProxy {
+                logical_ports: LogicalPorts {
+                    logical_output_mapping: request
+                        .workflow_ingress_proxies
+                        .iter()
+                        .map(|i| (edgeless_api::function_instance::PortId(i.id.clone()), i.inner_output.clone()))
+                        .collect(),
+                    logical_input_mapping: request
+                        .workflow_egress_proxies
+                        .iter()
+                        .filter_map(|e| match &e.inner_input {
+                            edgeless_api::workflow_instance::PortMapping::Topic(t) => {
+                                Some((edgeless_api::function_instance::PortId(e.id.clone()), LogicalInput::Topic(t.clone())))
+                            }
+                            _ => None,
+                        })
+                        .collect(),
+                },
+                external_ports: ExternalPorts {
+                    external_input_mapping: request
+                        .workflow_ingress_proxies
+                        .iter()
+                        .map(|i| (edgeless_api::function_instance::PortId(i.id.clone()), i.external_input.clone()))
+                        .collect(),
+                    external_output_mapping: request
+                        .workflow_egress_proxies
+                        .iter()
+                        .map(|i| (edgeless_api::function_instance::PortId(i.id.clone()), i.external_output.clone()))
+                        .collect(),
+                },
+                instances: Vec::new(),
+            }),
         }
     }
 
@@ -303,9 +529,10 @@ impl ActiveWorkflow {
         orchestration_logic: &mut crate::orchestration_logic::OrchestrationLogic,
         nodes: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>,
         link_controllers: &mut std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>,
+        peer_clusters: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::PeerCluster>,
     ) -> Vec<RequiredChange> {
         self.transform_logical();
-        self.place(orchestration_logic, nodes);
+        self.place(orchestration_logic, nodes, peer_clusters);
         self.transform_physical();
         self.generate_input_mapping();
         self.create_links(nodes, link_controllers);
@@ -317,10 +544,11 @@ impl ActiveWorkflow {
         removed_node_ids: &std::collections::HashSet<edgeless_api::function_instance::NodeId>,
         orchestration_logic: &mut crate::orchestration_logic::OrchestrationLogic,
         nodes: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>,
+        peer_clusters: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::PeerCluster>,
         link_controllers: &mut std::collections::HashMap<edgeless_api::link::LinkType, Box<dyn edgeless_api::link::LinkController>>,
     ) -> Vec<RequiredChange> {
         if self.remove_nodes(removed_node_ids) {
-            self.place(orchestration_logic, nodes);
+            self.place(orchestration_logic, nodes, peer_clusters);
             self.transform_physical();
             self.generate_input_mapping();
             self.create_links(nodes, link_controllers);
@@ -328,6 +556,19 @@ impl ActiveWorkflow {
         } else {
             Vec::new()
         }
+    }
+
+    pub fn patch_external_links(&mut self, update: edgeless_api::common::PatchRequest) -> Vec<RequiredChange> {
+        {
+            let mut prx = self.proxy.borrow_mut();
+            prx.external_ports.external_input_mapping = update.input_mapping;
+            prx.external_ports.external_output_mapping = update.output_mapping;
+        }
+        self.materialize()
+    }
+
+    pub fn peer_cluster_removal(&self, removed_cluster_ids: edgeless_api::function_instance::NodeId) -> Vec<RequiredChange> {
+        Vec::new()
     }
 
     pub fn stop(&mut self) -> Vec<RequiredChange> {
@@ -338,6 +579,7 @@ impl ActiveWorkflow {
     fn transform_logical(&mut self) {
         self.convert_topic_ports();
         self.add_input_backlinks();
+        self.split_out_subflows();
         self.remove_unused_links();
     }
 
@@ -345,6 +587,7 @@ impl ActiveWorkflow {
         &mut self,
         orchestration_logic: &mut crate::orchestration_logic::OrchestrationLogic,
         nodes: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>,
+        peer_clusters: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::PeerCluster>,
     ) {
         for (f_id, function) in &mut self.functions {
             let mut function = function.borrow_mut();
@@ -354,6 +597,7 @@ impl ActiveWorkflow {
                 if let Some(dst) = dst {
                     function.instances.push(std::cell::RefCell::new(WorkflowFunctionInstance {
                         id: edgeless_api::function_instance::InstanceId::new(dst),
+                        desired_mapping: PhysicalPorts::default(),
                         image: None,
                         materialized: None,
                     }))
@@ -370,32 +614,76 @@ impl ActiveWorkflow {
                 if let Some(dst) = dst {
                     resource.instances.push(std::cell::RefCell::new(WorkflowResourceInstance {
                         id: edgeless_api::function_instance::InstanceId::new(dst),
+                        desired_mapping: PhysicalPorts::default(),
                         materialized: None,
                     }));
                 }
             }
         }
+
+        for (_, subflow) in &mut self.subflows {
+            let mut subflow = subflow.borrow_mut();
+            if subflow.instances.is_empty() {
+                if subflow.instances.is_empty() {
+                    let dst = Self::select_cluster_for_subflow(&subflow, peer_clusters);
+                    if let Some(dst) = dst {
+                        subflow.instances.push(std::cell::RefCell::new(SubFlowInstance {
+                            id: edgeless_api::function_instance::InstanceId::new(dst),
+                            desired_mapping: PhysicalPorts::default(),
+                            materialized: None,
+                        }))
+                    }
+                }
+            }
+        }
+
+        {
+            let mut proxy = self.proxy.borrow_mut();
+            if !proxy.logical_ports.logical_input_mapping.is_empty() || !proxy.logical_ports.logical_output_mapping.is_empty() {
+                if proxy.instances.is_empty() {
+                    let dst = Self::select_node_for_proxy(&proxy, nodes);
+                    if let Some(dst) = dst {
+                        proxy.instances.push(std::cell::RefCell::new(WorkflowProxyInstance {
+                            id: edgeless_api::function_instance::InstanceId::new(dst),
+                            desired_mapping: PhysicalPorts::default(),
+                            materialized: None,
+                        }));
+                    }
+                }
+            }
+        }
+    }
+
+    fn split_out_subflows(&mut self) {
+        // TODO
+        // for (f_name, f) in &self.functions {
+        //     if f.borrow_mut().annotations.get("")
+        // }
     }
 
     fn generate_input_mapping(&mut self) {
         let components = self
             .components()
             .into_iter()
-            .map(|(id, spec)| (id.clone(), spec.borrow_mut().instance_ids()))
+            .map(|(id, spec)| (id.to_string(), spec.borrow_mut().instance_ids()))
             .collect::<std::collections::HashMap<String, Vec<InstanceId>>>();
 
         for (component_id, _) in &components {
             let mut component = self.get_component(&component_id).unwrap().borrow_mut();
-            let ports = component.ports();
+            let (logical_ports, physical_instances) = component.split_view();
 
-            for (output_id, output) in &ports.logical_output_mapping {
+            for (output_id, output) in &logical_ports.logical_output_mapping {
                 match output {
                     LogicalOutput::DirectTarget(target_component, target_port_id) => {
                         let mut instances = components.get(target_component).unwrap().clone();
                         if let Some(id) = instances.pop() {
-                            ports
-                                .physical_output_mapping
-                                .insert(output_id.clone(), PhysicalOutput::Single(id, target_port_id.clone()));
+                            for c_instance in &physical_instances {
+                                c_instance
+                                    .borrow_mut()
+                                    .physical_ports()
+                                    .physical_output_mapping
+                                    .insert(output_id.clone(), PhysicalOutput::Single(id, target_port_id.clone()));
+                            }
                         }
                     }
                     LogicalOutput::AnyOfTargets(targets) => {
@@ -410,7 +698,13 @@ impl ActiveWorkflow {
                                     .collect(),
                             )
                         }
-                        ports.physical_output_mapping.insert(output_id.clone(), PhysicalOutput::Any(instances));
+                        for c_instance in &physical_instances {
+                            c_instance
+                                .borrow_mut()
+                                .physical_ports()
+                                .physical_output_mapping
+                                .insert(output_id.clone(), PhysicalOutput::Any(instances.clone()));
+                        }
                     }
                     LogicalOutput::AllOfTargets(targets) => {
                         let mut instances = Vec::new();
@@ -424,7 +718,13 @@ impl ActiveWorkflow {
                                     .collect(),
                             )
                         }
-                        ports.physical_output_mapping.insert(output_id.clone(), PhysicalOutput::All(instances));
+                        for c_instance in &physical_instances {
+                            c_instance
+                                .borrow_mut()
+                                .physical_ports()
+                                .physical_output_mapping
+                                .insert(output_id.clone(), PhysicalOutput::All(instances.clone()));
+                        }
                     }
                     LogicalOutput::Topic(_) => {}
                 }
@@ -464,14 +764,14 @@ impl ActiveWorkflow {
             for i in function.instances.iter() {
                 let mut current = i.borrow_mut();
                 if let Some(materialized) = &current.materialized {
-                    if materialized.physical_input_mapping != function.ports.physical_input_mapping
-                        || materialized.physical_output_mapping != function.ports.physical_output_mapping
+                    if materialized.physical_input_mapping != current.desired_mapping.physical_input_mapping
+                        || materialized.physical_output_mapping != current.desired_mapping.physical_output_mapping
                     {
                         changes.push(RequiredChange::PatchFunction {
                             function_id: current.id.clone(),
                             function_name: f_name.clone(),
-                            input_mapping: function.ports.physical_input_mapping.clone(),
-                            output_mapping: function.ports.physical_output_mapping.clone(),
+                            input_mapping: current.desired_mapping.physical_input_mapping.clone(),
+                            output_mapping: current.desired_mapping.physical_output_mapping.clone(),
                         });
                     }
                 } else {
@@ -483,13 +783,13 @@ impl ActiveWorkflow {
                         } else {
                             function.image.clone()
                         },
-                        input_mapping: function.ports.physical_input_mapping.clone(),
-                        output_mapping: function.ports.physical_output_mapping.clone(),
+                        input_mapping: current.desired_mapping.physical_input_mapping.clone(),
+                        output_mapping: current.desired_mapping.physical_output_mapping.clone(),
                         annotations: function.annotations.clone(),
                     });
-                    current.materialized = Some(MaterializedState {
-                        physical_input_mapping: function.ports.physical_input_mapping.clone(),
-                        physical_output_mapping: function.ports.physical_output_mapping.clone(),
+                    current.materialized = Some(PhysicalPorts {
+                        physical_input_mapping: current.desired_mapping.physical_input_mapping.clone(),
+                        physical_output_mapping: current.desired_mapping.physical_output_mapping.clone(),
                     });
                 }
             }
@@ -500,14 +800,14 @@ impl ActiveWorkflow {
             for i in &resource.instances {
                 let mut current = i.borrow_mut();
                 if let Some(materialized) = &current.materialized {
-                    if materialized.physical_input_mapping != resource.ports.physical_input_mapping
-                        || materialized.physical_output_mapping != resource.ports.physical_output_mapping
+                    if materialized.physical_input_mapping != current.desired_mapping.physical_input_mapping
+                        || materialized.physical_output_mapping != current.desired_mapping.physical_output_mapping
                     {
                         changes.push(RequiredChange::PatchResource {
                             resource_id: current.id.clone(),
                             resource_name: r_name.clone(),
-                            input_mapping: resource.ports.physical_input_mapping.clone(),
-                            output_mapping: resource.ports.physical_output_mapping.clone(),
+                            input_mapping: current.desired_mapping.physical_input_mapping.clone(),
+                            output_mapping: current.desired_mapping.physical_output_mapping.clone(),
                         });
                     }
                 } else {
@@ -515,14 +815,92 @@ impl ActiveWorkflow {
                         resource_id: current.id.clone(),
                         resource_name: r_name.clone(),
                         class_type: resource.class.clone(),
-                        output_mapping: resource.ports.physical_output_mapping.clone(),
-                        input_mapping: resource.ports.physical_input_mapping.clone(),
+                        input_mapping: current.desired_mapping.physical_input_mapping.clone(),
+                        output_mapping: current.desired_mapping.physical_output_mapping.clone(),
                         configuration: resource.configurations.clone(),
                     });
-                    current.materialized = Some(MaterializedState {
-                        physical_input_mapping: resource.ports.physical_input_mapping.clone(),
-                        physical_output_mapping: resource.ports.physical_output_mapping.clone(),
+                    current.materialized = Some(PhysicalPorts {
+                        physical_input_mapping: current.desired_mapping.physical_input_mapping.clone(),
+                        physical_output_mapping: current.desired_mapping.physical_output_mapping.clone(),
                     });
+                }
+            }
+        }
+
+        for (s_name, subflow) in &mut self.subflows {
+            let mut subflow = subflow.borrow_mut();
+            for i in &subflow.instances {
+                let mut current = i.borrow_mut();
+                if let Some(materialized) = &current.materialized {
+                    if materialized.physical_input_mapping != current.desired_mapping.physical_input_mapping
+                        || materialized.physical_output_mapping != current.desired_mapping.physical_output_mapping
+                    {
+                        changes.push(RequiredChange::PatchSubflow {
+                            subflow_id: current.id.clone(),
+                            input_mapping: current.desired_mapping.physical_input_mapping.clone(),
+                            output_mapping: current.desired_mapping.physical_output_mapping.clone(),
+                        });
+                    }
+                } else {
+                    changes.push(RequiredChange::CreateSubflow {
+                        subflow_id: current.id.clone(),
+                        spawn_req: edgeless_api::workflow_instance::SpawnWorkflowRequest {
+                            workflow_functions: Vec::new(),
+                            workflow_resources: Vec::new(),
+                            workflow_ingress_proxies: current
+                                .desired_mapping
+                                .physical_input_mapping
+                                .iter()
+                                .map(|(id, physical_port)| edgeless_api::workflow_instance::WorkflowIngressProxy {
+                                    id: id.0.clone(),
+                                    inner_output: subflow.logical_ports.logical_output_mapping.get(&id).unwrap().clone(),
+                                    external_input: physical_port.clone(),
+                                })
+                                .collect(),
+                            workflow_egress_proxies: current
+                                .desired_mapping
+                                .physical_output_mapping
+                                .iter()
+                                .map(|(id, physical_port)| edgeless_api::workflow_instance::WorkflowEgressProxy {
+                                    id: id.0.clone(),
+                                    inner_input: match subflow.logical_ports.logical_input_mapping.get(&id).unwrap().clone() {
+                                        LogicalInput::Direct(vec) => edgeless_api::workflow_instance::PortMapping::AnyOfTargets(vec),
+                                        LogicalInput::Topic(topic) => edgeless_api::workflow_instance::PortMapping::Topic(topic),
+                                    },
+                                    external_output: physical_port.clone(),
+                                })
+                                .collect(),
+                            annotations: std::collections::HashMap::new(),
+                        },
+                    });
+                }
+            }
+        }
+
+        {
+            let prx = self.proxy.borrow_mut();
+            for i in &prx.instances {
+                let current = i.borrow_mut();
+                if let Some(materialized) = &current.materialized {
+                    if materialized.physical_input_mapping != current.desired_mapping.physical_input_mapping
+                        || materialized.physical_output_mapping != current.desired_mapping.physical_output_mapping
+                    {
+                        changes.push(RequiredChange::PatchProxy {
+                            proxy_id: current.id.clone(),
+                            internal_inputs: current.desired_mapping.physical_input_mapping.clone(),
+                            internal_outputs: current.desired_mapping.physical_output_mapping.clone(),
+                            external_inputs: prx.external_ports.external_input_mapping.clone(),
+                            external_outputs: prx.external_ports.external_output_mapping.clone(),
+                        })
+                    } else {
+                        changes.push(RequiredChange::CrateProxy {
+                            proxy_id: current.id.clone(),
+                            internal_inputs: current.desired_mapping.physical_input_mapping.clone(),
+                            internal_outputs: current.desired_mapping.physical_output_mapping.clone(),
+                            external_inputs: prx.external_ports.external_input_mapping.clone(),
+                            external_outputs: prx.external_ports.external_output_mapping.clone(),
+                        });
+                    }
                 }
             }
         }
@@ -562,14 +940,14 @@ impl ActiveWorkflow {
         >::new();
 
         for (out_cid, fdesc) in self.components() {
-            for (out_port, mapping) in &fdesc.borrow_mut().ports().logical_output_mapping {
+            for (out_port, mapping) in &fdesc.borrow_mut().logical_ports().logical_output_mapping {
                 match mapping {
                     LogicalOutput::DirectTarget(target_fid, target_port) => inputs
                         .entry(target_fid.clone())
                         .or_default()
                         .entry(target_port.clone())
                         .or_default()
-                        .push((out_cid.clone(), out_port.clone())),
+                        .push((out_cid.to_string(), out_port.clone())),
                     LogicalOutput::AnyOfTargets(targets) => {
                         for (target_fid, target_port) in targets {
                             inputs
@@ -577,7 +955,7 @@ impl ActiveWorkflow {
                                 .or_default()
                                 .entry(target_port.clone())
                                 .or_default()
-                                .push((out_cid.clone(), out_port.clone()))
+                                .push((out_cid.to_string(), out_port.clone()))
                         }
                     }
                     LogicalOutput::AllOfTargets(targets) => {
@@ -587,7 +965,7 @@ impl ActiveWorkflow {
                                 .or_default()
                                 .entry(target_port.clone())
                                 .or_default()
-                                .push((out_cid.clone(), out_port.clone()))
+                                .push((out_cid.to_string(), out_port.clone()))
                         }
                     }
                     LogicalOutput::Topic(_) => {}
@@ -600,7 +978,7 @@ impl ActiveWorkflow {
                 for (target_port, sources) in links {
                     target
                         .borrow_mut()
-                        .ports
+                        .logical_ports
                         .logical_input_mapping
                         .insert(target_port.clone(), LogicalInput::Direct(sources.clone()));
                 }
@@ -609,7 +987,7 @@ impl ActiveWorkflow {
                 for (target_port, sources) in links {
                     target
                         .borrow_mut()
-                        .ports
+                        .logical_ports
                         .logical_input_mapping
                         .insert(target_port.clone(), LogicalInput::Direct(sources.clone()));
                 }
@@ -624,11 +1002,14 @@ impl ActiveWorkflow {
         for (cid, component) in &mut self.components() {
             component
                 .borrow_mut()
-                .ports()
+                .logical_ports()
                 .logical_input_mapping
                 .retain(|port_id, port_mapping| match port_mapping {
                     LogicalInput::Topic(topic) => {
-                        targets.entry(topic.clone()).or_insert(Vec::new()).push((cid.clone(), port_id.clone()));
+                        targets
+                            .entry(topic.clone())
+                            .or_insert(Vec::new())
+                            .push((cid.to_string(), port_id.clone()));
                         false
                     }
                     _ => true,
@@ -640,7 +1021,7 @@ impl ActiveWorkflow {
         for (cid, component) in &mut self.components() {
             component
                 .borrow_mut()
-                .ports()
+                .logical_ports()
                 .logical_output_mapping
                 .iter_mut()
                 .for_each(|(_port_id, port_mapping)| {
@@ -676,7 +1057,7 @@ impl ActiveWorkflow {
                 edgeless_api::function_instance::MappingNode,
                 std::collections::HashSet<edgeless_api::function_instance::MappingNode>,
             > = f.image.class.inner_structure.clone();
-            let ports = &mut f.ports;
+            let ports = &mut f.logical_ports();
             ports.logical_output_mapping.retain(|output_id, output_spec: &mut LogicalOutput| {
                 assert!(!std::matches!(output_spec, LogicalOutput::Topic(_)));
                 let this = edgeless_api::function_instance::MappingNode::Port(output_id.clone());
@@ -724,7 +1105,7 @@ impl ActiveWorkflow {
             if let Some(source) = self.functions.get_mut(target_component_id) {
                 let mut source = source.borrow_mut();
                 let mut remove = false;
-                if let Some(source_port) = source.ports.logical_input_mapping.get_mut(target_port_id) {
+                if let Some(source_port) = source.logical_ports().logical_input_mapping.get_mut(target_port_id) {
                     if let LogicalInput::Direct(sources) = source_port {
                         sources.retain(|(s_id, s_p_id)| s_id != source_component_id && s_p_id != source_port_id);
                         if sources.len() == 0 {
@@ -733,7 +1114,7 @@ impl ActiveWorkflow {
                     }
                 }
                 if remove {
-                    source.ports.logical_input_mapping.remove(target_port_id);
+                    source.logical_ports().logical_input_mapping.remove(target_port_id);
                 }
             }
         }
@@ -749,7 +1130,7 @@ impl ActiveWorkflow {
         for (f_id, f) in &mut self.functions {
             let mut f = f.borrow_mut();
             let class = f.image.class.clone();
-            let f_ports = &mut f.ports;
+            let f_ports = &mut f.logical_ports();
             f_ports.logical_input_mapping.retain(|input_id, input_spec| {
                 if let LogicalInput::Direct(mapped_inputs) = input_spec {
                     let port_method = class.inputs.get(input_id).unwrap().method.clone();
@@ -791,7 +1172,7 @@ impl ActiveWorkflow {
             if let Some(source) = self.functions.get_mut(source_id) {
                 let mut source = source.borrow_mut();
                 let mut remove = false;
-                if let Some(source_port) = source.ports.logical_output_mapping.get_mut(source_port_id) {
+                if let Some(source_port) = source.logical_ports().logical_output_mapping.get_mut(source_port_id) {
                     match source_port {
                         LogicalOutput::DirectTarget(target_id, target_port_id) => {
                             if target_id == dest_id && target_port_id == dest_port_id {
@@ -814,7 +1195,7 @@ impl ActiveWorkflow {
                     }
                 }
                 if remove {
-                    source.ports.logical_output_mapping.remove(source_port_id);
+                    source.logical_ports().logical_output_mapping.remove(source_port_id);
                 }
             }
         }
@@ -833,57 +1214,59 @@ impl ActiveWorkflow {
 
         for (c_id, c) in self.components() {
             let mut current = c.borrow_mut();
-            let current_ports = current.ports();
-            for (out_id, out) in &mut current_ports.physical_output_mapping {
-                match out {
-                    edgeless_api::common::Output::All(targets) => {
-                        if targets.len() >= 2 {
-                            let target_nodes: std::collections::HashSet<_> = targets.iter().map(|(t_id, _)| t_id.node_id.clone()).collect();
-                            let new_link = link_controllers
-                                .get_mut(&mcast)
-                                .unwrap()
-                                .new_link(target_nodes.clone().into_iter().collect())
-                                .unwrap();
+            let (logical_ports, physical_instances) = current.split_view();
+            for i in &physical_instances {
+                for (out_id, out) in &mut i.borrow_mut().physical_ports().physical_output_mapping {
+                    match out {
+                        edgeless_api::common::Output::All(targets) => {
+                            if targets.len() >= 2 {
+                                let target_nodes: std::collections::HashSet<_> = targets.iter().map(|(t_id, _)| t_id.node_id.clone()).collect();
+                                let new_link = link_controllers
+                                    .get_mut(&mcast)
+                                    .unwrap()
+                                    .new_link(target_nodes.clone().into_iter().collect())
+                                    .unwrap();
 
-                            let node_links: Vec<_> = target_nodes
-                                .iter()
-                                .map(|n| {
-                                    (
-                                        n.clone(),
-                                        nodes.get(n).unwrap().supported_link_types.get(&mcast).unwrap().clone(),
-                                        link_controllers.get(&mcast).unwrap().config_for(new_link.clone(), n.clone()).unwrap(),
-                                        false,
-                                    )
-                                })
-                                .collect();
+                                let node_links: Vec<_> = target_nodes
+                                    .iter()
+                                    .map(|n| {
+                                        (
+                                            n.clone(),
+                                            nodes.get(n).unwrap().supported_link_types.get(&mcast).unwrap().clone(),
+                                            link_controllers.get(&mcast).unwrap().config_for(new_link.clone(), n.clone()).unwrap(),
+                                            false,
+                                        )
+                                    })
+                                    .collect();
 
-                            new_links.push((
-                                new_link.clone(),
-                                WorkflowLink {
-                                    id: new_link.clone(),
-                                    class: mcast.clone(),
-                                    materialized: false,
-                                    nodes: node_links,
-                                },
-                            ));
-                            *out = PhysicalOutput::Link(new_link.clone());
+                                new_links.push((
+                                    new_link.clone(),
+                                    WorkflowLink {
+                                        id: new_link.clone(),
+                                        class: mcast.clone(),
+                                        materialized: false,
+                                        nodes: node_links,
+                                    },
+                                ));
+                                *out = PhysicalOutput::Link(new_link.clone());
 
-                            let logical_port = current_ports.logical_output_mapping.get(out_id).unwrap();
-                            if let edgeless_api::workflow_instance::PortMapping::AllOfTargets(logical_targets) = logical_port {
-                                for (target_name, target_port_id) in logical_targets {
-                                    self.get_component(&target_name)
-                                        .unwrap()
-                                        .borrow_mut()
-                                        .ports()
-                                        .physical_input_mapping
-                                        .insert(target_port_id.clone(), PhysicalInput::Link(new_link.clone()));
+                                let logical_port = logical_ports.logical_output_mapping.get(out_id).unwrap();
+                                if let edgeless_api::workflow_instance::PortMapping::AllOfTargets(logical_targets) = logical_port {
+                                    for (target_name, target_port_id) in logical_targets {
+                                        self.get_component(&target_name).unwrap().borrow_mut().instances().iter().for_each(|i| {
+                                            i.borrow_mut()
+                                                .physical_ports()
+                                                .physical_input_mapping
+                                                .insert(target_port_id.clone(), PhysicalInput::Link(new_link.clone()));
+                                        });
+                                    }
+                                } else {
+                                    panic!("Mapping is Wrong!");
                                 }
-                            } else {
-                                panic!("Mapping is Wrong!");
                             }
                         }
+                        _ => {}
                     }
-                    _ => {}
                 }
             }
         }
@@ -908,8 +1291,6 @@ impl ActiveWorkflow {
                     enabled_features.push(format!("output_{}", output.0))
                 }
 
-                // panic!("{:?}", enabled_features);
-
                 let rust_dir = edgeless_build::unpack_rust_package(&function.image.code).unwrap();
                 let wasm_file = edgeless_build::rust_to_wasm(rust_dir, enabled_features, true, false).unwrap();
                 let wasm_code = std::fs::read(wasm_file).unwrap();
@@ -927,29 +1308,37 @@ impl ActiveWorkflow {
         }
     }
 
-    fn components(&self) -> Vec<(&String, &std::cell::RefCell<dyn WorkflowComponent>)> {
+    fn components(&self) -> Vec<(&str, &std::cell::RefCell<dyn WorkflowComponent>)> {
         let mut components = self
             .functions
             .iter()
-            .map(|(f_id, f)| (f_id, f as &std::cell::RefCell<dyn WorkflowComponent>))
+            .map(|(f_id, f)| (f_id.as_str(), f as &std::cell::RefCell<dyn WorkflowComponent>))
             .collect::<Vec<_>>();
         components.append(
             &mut self
                 .resources
                 .iter()
-                .map(|(r_id, r)| (r_id, r as &std::cell::RefCell<dyn WorkflowComponent>))
+                .map(|(r_id, r)| (r_id.as_str(), r as &std::cell::RefCell<dyn WorkflowComponent>))
                 .collect::<Vec<_>>(),
         );
+        components.append(
+            &mut self
+                .subflows
+                .iter()
+                .map(|(s_id, s)| (s_id.as_str(), s as &std::cell::RefCell<dyn WorkflowComponent>))
+                .collect::<Vec<_>>(),
+        );
+        components.push(("__proxy", &self.proxy as &std::cell::RefCell<dyn WorkflowComponent>));
         components
     }
 
-    fn instances_for_component(&mut self, component_name: &str) -> Option<Vec<edgeless_api::function_instance::InstanceId>> {
-        if let Some(component) = self.get_component(component_name) {
-            Some(component.borrow_mut().instance_ids())
-        } else {
-            None
-        }
-    }
+    // fn instances_for_component(&mut self, component_name: &str) -> Option<Vec<edgeless_api::function_instance::InstanceId>> {
+    //     if let Some(component) = self.get_component(component_name) {
+    //         Some(component.borrow_mut().instance_ids())
+    //     } else {
+    //         None
+    //     }
+    // }
 
     fn get_component(&self, component_name: &str) -> Option<&std::cell::RefCell<dyn WorkflowComponent>> {
         if let Some(component) = self.functions.get(component_name) {
@@ -973,5 +1362,28 @@ impl ActiveWorkflow {
         } else {
             None
         }
+    }
+
+    fn select_node_for_proxy(
+        _proxy: &WorkflowProxy,
+        nodes: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::WorkerNode>,
+    ) -> Option<edgeless_api::function_instance::NodeId> {
+        for (node_id, node) in nodes {
+            if node.is_proxy {
+                return Some(node_id.clone());
+            }
+        }
+        return None;
+    }
+
+    fn select_cluster_for_subflow(
+        subflow: &SubFlow,
+        clusters: &std::collections::HashMap<edgeless_api::function_instance::NodeId, crate::controller::server::PeerCluster>,
+    ) -> Option<edgeless_api::function_instance::NodeId> {
+        for (cluster_id, cluster) in clusters {
+            // TODO Proper Selection
+            return Some(cluster_id.clone());
+        }
+        return None;
     }
 }

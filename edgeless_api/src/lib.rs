@@ -37,3 +37,5 @@ pub mod node_management;
 pub mod node_registration;
 
 pub mod link;
+
+pub mod proxy_instance;

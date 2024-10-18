@@ -8,6 +8,7 @@ use edgeless_api::controller::ControllerAPI;
 pub mod agent;
 pub mod base_runtime;
 pub mod container_runner;
+pub mod proxy;
 pub mod resources;
 pub mod state_management;
 #[cfg(feature = "wasmtime")]
@@ -534,9 +535,11 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     )
     .await;
 
+    let proxy_manager = Box::new(proxy::ProxyManager::start(data_plane.clone()).await);
+
     // Create the agent.
     let runtimes = runners.keys().map(|x| x.to_string()).collect::<Vec<String>>();
-    let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.general.node_id.clone(), data_plane.clone());
+    let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.general.node_id.clone(), data_plane.clone(), proxy_manager);
     let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
 
     // Wait for all the tasks to complete.

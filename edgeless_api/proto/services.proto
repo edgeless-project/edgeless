@@ -66,6 +66,8 @@ service WorkflowInstance {
     // Input: the identifier of the active workflow or a special value indicating all workflows.
     // Output: the list of status of the active workflow instances.
     rpc List (WorkflowId) returns (WorkflowInstanceList);
+
+    rpc Patch (PatchRequest) returns (google.protobuf.Empty);
 }
 
 // API to handle events (s01).
@@ -170,4 +172,10 @@ service GuestAPIHost {
 service LinkInstance {
     rpc Create (CreateLinkInstanceRequest) returns (google.protobuf.Empty);
     rpc Remove (LinkInstanceId) returns (google.protobuf.Empty);
+}
+
+service ProxyInstance {
+    rpc Start(ProxyInstanceSpec) returns (google.protobuf.Empty);
+    rpc Stop(InstanceId) returns (google.protobuf.Empty);
+    rpc Patch(ProxyInstanceSpec) returns (google.protobuf.Empty);
 }

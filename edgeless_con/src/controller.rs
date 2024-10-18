@@ -3,8 +3,8 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+mod active_workflow;
 pub mod client;
-mod deployment_state;
 pub mod server;
 #[cfg(test)]
 pub mod test;
@@ -25,6 +25,7 @@ pub(crate) enum ControllerRequest {
         // Reply Channel
         tokio::sync::oneshot::Sender<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>,
     ),
+    PATCH(edgeless_api::common::PatchRequest),
     UPDATENODE(
         edgeless_api::node_registration::UpdateNodeRequest,
         // Reply Channel
@@ -36,6 +37,7 @@ pub(crate) enum ControllerRequest {
 enum ComponentType {
     Function,
     Resource,
+    SubFlow,
 }
 
 impl Controller {
@@ -62,7 +64,7 @@ impl Controller {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
-            let mut controller_task = server::ControllerTask::new(receiver);
+            let mut controller_task = server::ControllerTask::new(uuid::Uuid::new_v4(), receiver);
             controller_task.run().await;
         });
 

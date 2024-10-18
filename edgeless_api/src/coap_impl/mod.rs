@@ -11,6 +11,7 @@ pub mod link;
 pub mod node_management;
 pub mod node_registration;
 pub mod orchestration;
+pub mod proxy_instance;
 pub mod resource_configuration;
 
 #[derive(Clone)]

@@ -74,9 +74,25 @@ pub struct WorkflowFunction {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct WorkflowIngressProxy {
+    pub id: String,
+    pub inner_output: PortMapping,
+    pub external_input: crate::common::Input,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct WorkflowEgressProxy {
+    pub id: String,
+    pub inner_input: PortMapping,
+    pub external_output: crate::common::Output,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct SpawnWorkflowRequest {
     pub workflow_functions: Vec<WorkflowFunction>,
     pub workflow_resources: Vec<WorkflowResource>,
+    pub workflow_ingress_proxies: Vec<WorkflowIngressProxy>,
+    pub workflow_egress_proxies: Vec<WorkflowEgressProxy>,
     pub annotations: std::collections::HashMap<String, String>,
 }
 
@@ -90,6 +106,7 @@ pub enum SpawnWorkflowResponse {
 pub trait WorkflowInstanceAPI: WorkflowInstanceAPIClone + Send + Sync {
     async fn start(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<SpawnWorkflowResponse>;
     async fn stop(&mut self, id: WorkflowId) -> anyhow::Result<()>;
+    async fn patch(&mut self, update: super::common::PatchRequest) -> anyhow::Result<()>;
     async fn list(&mut self, id: WorkflowId) -> anyhow::Result<Vec<WorkflowInstance>>;
 }
 

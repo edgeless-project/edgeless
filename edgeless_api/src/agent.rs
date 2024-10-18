@@ -7,4 +7,5 @@ pub trait AgentAPI {
         &mut self,
     ) -> Box<dyn crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::instance_id::InstanceId>>;
     fn link_instance_api(&mut self) -> Box<dyn crate::link::LinkInstanceAPI>;
+    fn proxy_instance_api(&mut self) -> Box<dyn crate::proxy_instance::ProxyInstanceAPI>;
 }

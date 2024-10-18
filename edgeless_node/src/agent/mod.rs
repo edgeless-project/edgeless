@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
-use edgeless_api::node_management::UpdatePeersRequest;
+use edgeless_api::{node_management::UpdatePeersRequest, proxy_instance::ProxyInstanceAPI};
 use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
 use futures::{Future, SinkExt, StreamExt};
 
@@ -25,6 +25,9 @@ enum AgentRequest {
     HealthStatus(futures::channel::oneshot::Sender<anyhow::Result<edgeless_api::node_management::HealthStatus>>),
     CreateLink(edgeless_api::link::CreateLinkRequest),
     RemoveLink(edgeless_api::link::LinkInstanceId),
+    StartProxy(edgeless_api::proxy_instance::ProxySpec),
+    PatchProxy(edgeless_api::proxy_instance::ProxySpec),
+    StopProxy(edgeless_api::function_instance::InstanceId),
 }
 
 pub struct Agent {
@@ -43,6 +46,7 @@ impl Agent {
         resources: std::collections::HashMap<String, ResourceDesc>,
         node_id: uuid::Uuid,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        proxy: Box<dyn ProxyInstanceAPI>,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
@@ -51,7 +55,7 @@ impl Agent {
         }
 
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, runners, resources, data_plane_provider).await;
+            Self::main_task(receiver, runners, resources, data_plane_provider, proxy).await;
         });
 
         (Agent { sender, node_id }, main_task)
@@ -64,6 +68,7 @@ impl Agent {
         mut runners: std::collections::HashMap<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
         resources: std::collections::HashMap<String, ResourceDesc>,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        mut proxy: Box<dyn ProxyInstanceAPI>,
     ) {
         let mut receiver = std::pin::pin!(receiver);
         let mut data_plane_provider = data_plane_provider;
@@ -321,6 +326,24 @@ impl Agent {
                         .await
                         .unwrap_or_else(|_| log::warn!("Unreported error while removing a link"));
                 }
+                AgentRequest::StartProxy(proxy_spec) => {
+                    proxy
+                        .start(proxy_spec)
+                        .await
+                        .unwrap_or_else(|_| log::warn!("Unreported error while starting proxy"));
+                }
+                AgentRequest::PatchProxy(proxy_spec) => {
+                    proxy
+                        .patch(proxy_spec)
+                        .await
+                        .unwrap_or_else(|_| log::warn!("Unreported error while patching proxy"));
+                }
+                AgentRequest::StopProxy(instance_id) => {
+                    proxy
+                        .stop(instance_id)
+                        .await
+                        .unwrap_or_else(|_| log::warn!("Unreported error while stopping proxy"));
+                }
             }
         }
     }
@@ -334,6 +357,7 @@ impl Agent {
             node_management_client: Box::new(NodeManagementClient { sender: self.sender.clone() }),
             resource_configuration_client: Box::new(ResourceConfigurationClient { sender: self.sender.clone() }),
             link_instance_client: Box::new(LinkInstanceAPIClient { sender: self.sender.clone() }),
+            proxy_instance_client: Box::new(ProxyInstanceAPIClient { sender: self.sender.clone() }),
         })
     }
 }
@@ -359,12 +383,18 @@ pub struct LinkInstanceAPIClient {
 }
 
 #[derive(Clone)]
+pub struct ProxyInstanceAPIClient {
+    sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
+}
+
+#[derive(Clone)]
 pub struct AgentClient {
     function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::InstanceId>>,
     node_management_client: Box<dyn edgeless_api::node_management::NodeManagementAPI>,
     resource_configuration_client:
         Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>>,
     link_instance_client: Box<dyn edgeless_api::link::LinkInstanceAPI>,
+    proxy_instance_client: Box<dyn edgeless_api::proxy_instance::ProxyInstanceAPI>,
 }
 
 #[async_trait::async_trait]
@@ -488,6 +518,19 @@ impl edgeless_api::link::LinkInstanceAPI for LinkInstanceAPIClient {
     }
 }
 
+#[async_trait::async_trait]
+impl edgeless_api::proxy_instance::ProxyInstanceAPI for ProxyInstanceAPIClient {
+    async fn start(&mut self, request: edgeless_api::proxy_instance::ProxySpec) -> anyhow::Result<()> {
+        Ok(())
+    }
+    async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+        Ok(())
+    }
+    async fn patch(&mut self, update: edgeless_api::proxy_instance::ProxySpec) -> anyhow::Result<()> {
+        Ok(())
+    }
+}
+
 impl edgeless_api::agent::AgentAPI for AgentClient {
     fn function_instance_api(
         &mut self,
@@ -507,5 +550,9 @@ impl edgeless_api::agent::AgentAPI for AgentClient {
 
     fn link_instance_api(&mut self) -> Box<dyn edgeless_api::link::LinkInstanceAPI> {
         self.link_instance_client.clone()
+    }
+
+    fn proxy_instance_api(&mut self) -> Box<dyn edgeless_api::proxy_instance::ProxyInstanceAPI> {
+        self.proxy_instance_client.clone()
     }
 }

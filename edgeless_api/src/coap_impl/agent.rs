@@ -19,4 +19,8 @@ impl crate::agent::AgentAPI for super::CoapClient {
     fn link_instance_api(&mut self) -> Box<dyn crate::link::LinkInstanceAPI> {
         crate::link::LinkInstanceAPIClone::clone_box(self)
     }
+
+    fn proxy_instance_api(&mut self) -> Box<dyn crate::proxy_instance::ProxyInstanceAPI> {
+        crate::proxy_instance::ProxyInstanceAPIClone::clone_box(self)
+    }
 }
