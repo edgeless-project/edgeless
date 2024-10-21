@@ -18,7 +18,7 @@ In this guide, we will:
 
 ## Prerequisites
 
-In the following, you will need to download a local copy of the [EDGELESS core repository](https://github.com/edgeless-project/edgeless) and compile the executables, as illustrated in the [building guide](../BUILDING.md).
+In the following, you will need to download a local copy of the [EDGELESS core repository](https://github.com/edgeless-project/edgeless) and compile the executables, as illustrated in the [building guide](building.md).
 
 Before proceeding, make sure that you have the following executables, which will be used in this guide and should be under `target/debug/` from the repository root.
 
