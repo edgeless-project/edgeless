@@ -36,7 +36,7 @@ This document contains some rules you should adhere to when contributing to this
 ## Licensing
 
 * When making a significant contribution to a file in the repository:
-  1. Add yourself he [list of contributors](CONTRIBUTORS.txt) and adhere to the license.
+  1. Add yourself to the [list of contributors](CONTRIBUTORS.txt) and adhere to the license.
   2. Add one `SPDX-FileCopyrightText` line to the beginning of the file, as the last
      one before the line with `SPDX-License-Identifier`
 * Do not taint this repository with incompatible licenses: everything not MIT-licensed
