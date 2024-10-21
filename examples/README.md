@@ -20,7 +20,7 @@ features provided by the platform.
 - `tutorial-01`: shows how to create a DAG of functions/resources
 - `vector_mul`: shows how to create a single function or a chain of three functions performing multiplication of an internal matrix by an input vector
 
-Before running the examples you must build the system, see [building instructions](../BUILDING.md).
+Before running the examples you must build the system, see [building instructions](../documentation/building.md).
 
 You may run all (well, most of) the examples with a single command by using
 the following script:
