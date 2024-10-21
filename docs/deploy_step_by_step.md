@@ -34,7 +34,7 @@ Before proceeding, make sure that you have the following executables, which will
 EDGELESS has a three-tier hierarchical architecture: computation nodes are grouped into orchestration domains, which participate in clusters, which may interact with one another.
 The minimal EDGELESS system, therefore, consists of a single cluster with one orchestration domain hosting just one node, as illustrated in this picture:
 
-![](minimal-deployment.png)
+![](figures/minimal-deployment.png)
 
 The picture also shows a user, who uses the CLI to locally build the WebAssembly bytecode of their functions and interact with the ε-CON for the creation of _workflows_.
 A workflow is a directed graph of abstractions that perform actions by reacting to events, with associated annotations that define the characteristics and requirements of the application/service associated with the workflow.

@@ -85,13 +85,13 @@ B the fractional part in nanoseconds.
 - The field entity in the application metrics can be `f` (function) or `w`
   (workflow).
 - Check the difference between application metrics and performance samples
-  in the [orchestration documentation](./orchestration.md).
+  in the [orchestration documentation](../docs/orchestration.md).
 
 
 ### Step by step example
 
 We assume that the repository has been downloaded and compiled in debug mode
-(see [building instructions](building.md)) and that a local instance of
+(see [building instructions](../docs/building.md)) and that a local instance of
 Redis is running (see
 [online instructions](https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/)).
 
@@ -165,7 +165,7 @@ starting with the prefix `myexp-`.
 An example of a post-processing script is [included](examples-app-metrics.py):
 
 ```shell
-% DATASET=dataset/myexp-application_metrics.csv python documentation/examples-app-metrics.py
+% DATASET=dataset/myexp-application_metrics.csv python edgeless_benchmark/examples-app-metrics.py
 the average latency of wf6 was 33.23 ms
 the average latency of wf4 was 69.67 ms
 the average latency of wf0 was 19.58 ms

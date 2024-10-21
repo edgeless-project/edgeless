@@ -10,7 +10,7 @@ Currently, two runtimes are implemented:
 
 The architecture of the container runtime is illustrated in the figure below.
 
-![](diagrams-container-runtime.png)
+![](figures/diagrams-container-runtime.png)
 
 The container function instance interacts via gRPC with the node through the interfaces `GuestAPIFunction` (as server) and `GuestAPIHost` (as client), whose methods are describe below.
 
@@ -113,4 +113,4 @@ This is merely intended to showcase the possibilities offered to the developer b
 
 The diagram below shows the finite state machine implemented in both the container function templates.
 
-![](diagrams-function-fsm.png)
+![](figures/diagrams-function-fsm.png)
