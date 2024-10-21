@@ -1,0 +1,22 @@
+name: 🤔 Question
+description: I have a question about EDGLESS (and it's not a bug or a feature request).
+labels:
+  - "type: question"
+  - "status: triage"
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your interest and taking the time to publish a question! It will be a pleasure to answer
+  - type: textarea
+    attributes:
+      label: Question
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: References
+      description: >-
+        Are there any other GitHub issues (open or closed) or pull requests that should be linked here?

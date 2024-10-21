@@ -12,7 +12,7 @@
   <!-- [![LinkedIn][linkedin-shield]][linkedin-url] -->
 
 </div>
-[Report error](https://github.com/edgeless-project/edgeless/issues/new?assignees=&labels=&projects=&template=bug_report.md) · [Feature request](https://github.com/edgeless-project/edgeless/issues/new?assignees=&labels=&projects=&template=feature_request.md)
+[Report error](https://github.com/edgeless-project/edgeless/issues/new?assignees=&labels=&projects=&template=bug_report.yaml) · [Feature request](https://github.com/edgeless-project/edgeless/issues/new?assignees=&labels=&projects=&template=feature_request.yaml)
 
 # EDGELESS Reference Implementation
 
@@ -40,6 +40,7 @@ under active development within the [EDGELESS project](https://edgeless-project.
   - [Contributing](#contributing)
   - [License](#license)
   - [Funding](#funding)
+- [TODO:](#todo)
 </details>
 
 ## Introduction
@@ -65,7 +66,7 @@ An orchestration domain is made up of:
   1) configuration and management of the resources;
 - **$\ge$ 1 nodes**, which can host the execution of the function instances of a
   given workflow, either within a [WebAssembly](https://webassembly.org/) run-time 
-  environment or inside a [Docker container](deployment/).
+  environment or inside a [Docker container](container-runtime.md).
 
 ### Workflows
 
@@ -267,3 +268,20 @@ The Repository is licensed under the MIT License. Please refer to
 
 EDGELESS received funding from the [European Health and Digital Executive Agency
  (HADEA)](https://hadea.ec.europa.eu/) program under Grant Agreement No 101092950.
+
+<p align="right"><a href="#readme-top">Back to top&#x1F53C;</a></p>
+
+<!-- Urls, Shields and Badges -->
+[contributors-shield]: https://img.shields.io/github/contributors/edgeless-project/edgeless.svg?style=for-the-badge
+[contributors-url]: https://github.com/edgeless-project/edgeless/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/edgeless-project/edgeless.svg?style=for-the-badge
+[forks-url]: https://github.com/edgeless-project/edgeless/network/members
+[stars-shield]: https://img.shields.io/github/stars/edgeless-project/edgeless.svg?style=for-the-badge
+[stars-url]: https://github.com/edgeless-project/edgeless/stargazers
+[issues-shield]: https://img.shields.io/github/issues/edgeless-project/edgeless.svg?style=for-the-badge
+[issues-url]: https://github.com/edgeless-project/edgeless/issues
+# TODO:
+[linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
+[linkedin-url]: https://www.linkedin.com/company/itisuma/
+[license-shield]: https://
+[license-url]: https://
