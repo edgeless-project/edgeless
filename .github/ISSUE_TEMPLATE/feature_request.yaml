@@ -1,0 +1,43 @@
+---
+name: 🚀 Feature request
+description: I have a suggestion (and might want to implement it myself 🙂)!
+title: "[Feature]: "
+labels:
+  - "type: feature request"
+  - "status: triage"
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this feature request!
+  - type: input
+    id: contact
+    attributes:
+      label: Contact Details
+      description: How can we get in touch with you if we need more info?
+      placeholder: ex. email@example.com
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Feature Description
+      description: A clear and concise description of what the feature is about...
+    validations:
+      required: true
+  - type: textarea
+    id: affected-resources
+    attributes:
+      label: Affected resources and data sources
+      description: List of impacted resources and data sources...
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Are there any other GitHub issues (open or closed) or pull requests that should be linked here?
+    validations:
+      required: false
