@@ -16,7 +16,7 @@ intended especially for edge nodes with limited capabilities.
 
 ![](documentation/architecture-arch-2.0.png)
 
-An EDGELESS cluster consists of one or more _orchestration domains_ (three in
+An EDGELESS cluster consists of one or more _orchestration domains_ (one in
 the example figure above) managed by an ε-CON (controller).
 
 An orchestration domain contains:
