@@ -18,7 +18,7 @@ To successfully run and interact with the demo, the edgeless environment needs t
 
 #### Build EDGELESS
 
-Make sure you have build all artifacts and binaries from the EDGELESS core. For details on doing this for the different platforms, check the documentation here - [building guide](../BUILDING.md).
+Make sure you have build all artifacts and binaries from the EDGELESS core. For details on doing this for the different platforms, check the documentation here - [building guide](building.md).
 
 After completing this you should have the following executables in the directory `target/debug/` from the repository root:
 

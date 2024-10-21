@@ -167,7 +167,7 @@ to remain up to date on future developments.
 
 ## How to build
 
-See [building instructions](BUILDING.md).
+See [building instructions](documentation/building.md).
 
 ## How to run
 

@@ -91,7 +91,7 @@ B the fractional part in nanoseconds.
 ### Step by step example
 
 We assume that the repository has been downloaded and compiled in debug mode
-(see [building instructions](../BUILDING.md)) and that a local instance of
+(see [building instructions](building.md)) and that a local instance of
 Redis is running (see
 [online instructions](https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/)).
 

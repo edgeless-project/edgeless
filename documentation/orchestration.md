@@ -196,7 +196,7 @@ The current mapping logical and physical identifier(s) can be found in the proxy
 
 Prerequisites:
 
-- A local copy of the edgeless repository is built in debug mode according to the [building instructions](../BUILDING.md).
+- A local copy of the edgeless repository is built in debug mode according to the [building instructions](building.md).
 - A Redis is reachable at 127.0.0.1:6379, see [online instructions](https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/).
 - The current working directory is the root of the repository.
 - The command-line utility `redis-cli` is installed.
