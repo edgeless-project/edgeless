@@ -381,9 +381,9 @@ Finally, the workflow can be stopped with the following command:
 
 ## Where to go next
 
-- [Repository layout](documentation/repository_layout.md)
-- [How to create a new function](documentation/rust_functions.md)
+- [Repository layout](docs/repository_layout.md)
+- [How to create a new function](docs/rust_functions.md)
   ([YouTube tutorial](https://youtu.be/1JnQIM9VTLk?si=o34YKRRJXNz0H54f))
-- [How to compose a new workflow](documentation/workflows.md)
+- [How to compose a new workflow](docs/workflows.md)
   ([YouTube tutorial](https://youtu.be/kc4Ku5p5Nrw?si=ZRxx0kmsIuAYLie1))
 - [Examples shipped with the repository](../examples/README.md)
