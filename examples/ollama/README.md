@@ -19,7 +19,7 @@ Make sure ollama is working by invoking, e.g.:
 ollama run llama3 "how are you?"
 ```
 
-Build EDGELESS (following [instructions](../../BUILDING.md)).
+Build EDGELESS (following [instructions](../documentation/building.md)).
 
 Create the default configuration files for the EDGELESS components:
 
