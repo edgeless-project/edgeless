@@ -67,7 +67,7 @@ The ε-ORC offers two optional mechanisms through a proxy:
 
 The following diagram illustrates these mechanisms, which are described separately below.
 
-![](orchestrator-delegated-orc.png)
+![](figures/orchestrator-delegated-orc.png)
 
 ### Delegated orchestration through a proxy
 
@@ -118,7 +118,7 @@ as shown in the step-by-step example below.
 EDGELESS nodes embed a telemetry system that collects some events related to
 function lifecyle management, which is shown in the diagram below.
 
-![](functions-state-diagram.png)
+![](figures/functions-state-diagram.png)
 
 The telemetry sub-system also processes other types of events: function
 instance exit (with termination status) and application-level log directives,

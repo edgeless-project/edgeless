@@ -1,8 +1,8 @@
 <a name="readme-top"></a>
 
-![](figures/edgeless-logo-alpha-200.png)
-
 <div align="center">
+
+  ![](figures/edgeless-logo-alpha-200.png)
 
   [![Contributors][contributors-shield]][contributors-url]
   [![Forks][forks-shield]][forks-url]
@@ -18,42 +18,36 @@
 
 This repository contains a research prototype of the EDGELESS platform, which is
 under active development within the [EDGELESS project](https://edgeless-project.eu/).
+EDGELESS is a framework that enables _serverless edge computing_, which is
+intended especially for edge nodes with limited capabilities.
 
 > [!NOTE]
 > There currently are no guarantees on Stability and API-Stability!
 
+[Repository layout](repository_layout.md)
 <details>
 <summary>Table of Contents</summary>
 
 - [EDGELESS Reference Implementation](#edgeless-reference-implementation)
-  - [Introduction](#introduction)
   - [Architecture Overview](#architecture-overview)
-    - [Workflows](#workflows)
-    - [Resources](#resources)
-    - [Functions](#functions)
-    - [Details](#details)
-    - [Known limitations](#known-limitations)
-    - [Repository structure](#repository-structure)
-  - [How to build](#how-to-build)
-  - [How to run](#how-to-run)
+  - [Key Concepts](#key-concepts)
+      - [*workflows*](#workflows)
+      - [*functions*](#functions)
+      - [Resources](#resources)
   - [Next steps](#next-steps)
+  - [Quickstart](#quickstart)
+    - [1. Build EDGELESS binaries](#1-build-edgeless-binaries)
+    - [2. Run them](#2-run-them)
+  - [Known limitations](#known-limitations)
   - [Contributing](#contributing)
   - [License](#license)
   - [Funding](#funding)
-- [TODO:](#todo)
 </details>
-
-## Introduction
-
-EDGELESS is a framework that enables _serverless edge computing_, which is
-intended especially for edge nodes with limited capabilities.
 
 ## Architecture Overview
 
-![](figures/architecture-arch-2.0.png)
-
 An EDGELESS cluster consists of one or more _orchestration domains_ (one in
-the example figure above), managed by an ε-CON (controller).
+the example figure below), managed by an **ε-CON** (controller).
 
 An orchestration domain is made up of:
 
@@ -68,12 +62,24 @@ An orchestration domain is made up of:
   given workflow, either within a [WebAssembly](https://webassembly.org/) run-time 
   environment or inside a [Docker container](container-runtime.md).
 
-### Workflows
+![](figures/architecture-arch-2.0.png)
 
-Users interact with the ε-CON to request the creation of _workflows_.
-A workflow specifies how a set of *functions* and *resources* should interact
+
+## Key Concepts
+
+> [!WARNING]
+> These concepts require moderate knowledge of what serverless computing is and how it works.
+
+#### *workflows*
+
+Users in EDGELESS interact with the cluster's ε-CON to request the creation of _workflows_.
+A workflow specifies how a set of ***functions*** and ***resources*** should interact
 with one another to compose the service requested by the user, by sending
 _asynchronous events_ to each other that are akin to function invocations.
+
+The e-CON proceeds to assign the requested functions and resources to the ε-ORCs
+of the *orchestration domains* it controls, and the ε-ORCs deploy the *function* and *resource instances*
+to its nodes in order to provide the best QoS.
 
 EDGELESS _functions_ live entirely within the realm of the EDGELESS run-time, while
 _resources_ are capable of interacting with the external environment, e.g. handling events
@@ -82,7 +88,34 @@ in-memory database or reading the value of a physical sensor.
 
 ![](figures/architecture-workflow.png)
 
-### Resources
+#### *functions*
+
+EDGELESS *functions* are **<u>stateful</u>**: a given *function instance* is assigned to exactly one
+workflow, thus the *function developer* may assume that data will generally
+remain available across multiple invocations of the same *function instance*.
+However such state is:
+
+- 🔒 **tied to the specific instance**: if there are multiple *function instances* for the same
+*function*, then there is no guarantee of consistency across the multiple states.
+- ⌛ **ephemeral**: if a function instance is terminated, there is no effort to
+save/persist the state.
+
+Furthermore, unlike in many other serverless computing platforms, *workflows* may
+consist of a wide variety of *function* compositions, as illustrated below.
+
+![](figures/diagrams-workflows.png)
+
+The byte code of the WASM *function instance* or the name of the Docker
+container to be started is provided by the user when requesting
+the creation of a *workflow*, which also includes *annotations* to specify the
+Quality of Service requirements (e.g. maximum completion time) and *workload
+characteristics* (e.g. average invocation rate), as well as the function's affinity
+to specific hardware properties (e.g. GPU required) or preference
+for other system parameters (e.g. location, owner, price).
+Depending on the annotations, the set of active *workflows* and the current
+system conditions, the ε-CON may reject the *workflow* creation request.
+
+#### Resources
 
 Following their configuration fiels, EDGELESS nodes can host one or more
 resource providers, but a node cannot have more than one resource of a given
@@ -117,96 +150,27 @@ With `edgeless_node_d --available-resources` you can find the list of resource
 providers that a node supports, along with the version, output channels, and
 configuration parameters for each resource provider.
 
-### Functions
+## Next steps
 
-Functions are _stateful_: a given function instance is assigned to exactly one
-workflow, thus the function developer may assume that data will generally
-remain available across multiple invocations on the same function instance.
-However such state is:
-
-- tied to the specific instance: if there are multiple instances for the same
-function, then there is no consistency guarantee across the multiple states;
-- ephemeral: if a function instance is terminated, then there is no effort to
-save/persist the state.
-
-Furthermore, unlike many other serverless computing platforms, workflows may
-consist of a wide variety of function compositions, as illustrated below.
-
-![](diagrams-workflows.png)
-
-The byte code of the WASM function instance or the name of the Docker
-container to be started is provided by the user when requesting
-the creation of a workflow, which also includes _annotations_ to specify the
-Quality of Service requirements (e.g., maximum completion time) and workload
-characteristics (e.g, average invocation rate), as well as affinity of
-functions to specific hardware properties (e.g., GPU required) or preference
-for other system parameters (e.g., location, owner, price).
-Depending on the annotations, the set of active workflows, and the current
-system conditions, the ε-CON may reject the workflow creation request.
-
-### Details
-
-Some components/features are illustrated separately:
-
+For a deeper insight on the functioning and architecture of EDGELESS, please refer to the following specific documentation:
 - [Orchestration model](orchestration.md)
 - [Support of Docker containers](container-runtime.md)
-
-### Known limitations
-
-Currently there are several known limitations, including the following ones:
-
-- the dataplane within an orchestration domain is realized through a full-mesh
-  interconnection between all the nodes and the ε-BAL;
-- the ε-CON only supports a single orchestration domain and does not perform
-  any kind of admission control;
-- no workflow-level annotations are supported; 
-- the payload of events is not encrypted;
-- the configuration of the ε-CON, ε-CON, and ε-BAL is read from a file and
-cannot be modified (e.g., it is not possible to add an orchestration domain
-or a node while running);
-- there is no persistence of the soft states of the various components.
-
-The full list of issues is tracked on
-[GitHub](https://github.com/edgeless-project/edgeless/issues).
-
-Stay tuned (star & watch [the GitHub project](https://github.com/edgeless-project/edgeless))
-to remain up to date on future developments.
-
-### Repository structure
-
-| Directory                                        | Description                                                                                                                                                                                                                                           |
-| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| deployment                                       | Docker and Docker Compose scripts                                                                                                                                                                                                                     |
-| docs                                             | Repository documentation.                                                                                                                                                                                                                             |
-| edgeless_api                                     | gRPC API definitions, both services and messages. This directory must be imported by other projects wishing to interact with EDGELESS components through its interfaces. The following interfaces are currently implemented: s01, s04, s06, s07.      |
-| edgeless_api_core                                | Work-in-progress development on minimal functions for embedded devices using CoAP.                                                                                                                                                                    |
-| edgeless_bal                                     | Reference implementation of the ε-BAL, currently a mere skeleton. The concrete implementation will be done in the next project phase when inter-domain workflows will be supported.                                                                   |
-| [edgeless_benchmark](benchmark.md) | Suite to benchmark an EDGELESS system in controlled and repeatable conditions using artificial workloads.                                                                                                                                             |
-| edgeless_cli                                     | EDGELESS command-line interface. This is used currently to locally build function instances and to interact with the ε-CON via the s04 interface to create/terminate/list workflows.                                                                  |
-| edgeless_con                                     | Reference implementation of the ε-CON, currently only supporting a single orchestration domain and ignoring workflow annotations.                                                                                                                     |
-| edgeless_container_function                      | Skeleton of a function to be deployed in a container.                                                                                                                                                                                                 |
-| edgeless_dataplane                               | EDGELESS intra-domain dataplane, which is realised through the full-mesh interconnection of gRPC services implementing the s01 API.                                                                                                                   |
-| edgeless_embedded                                | Work-in-progress implementation of special features for embedded devices.                                                                                                                                                                             |
-| edgeless_embedded_emu                            | Embedded device emulator.                                                                                                                                                                                                                             |
-| edgeless_embedded_esp32                          | Support of some ESP32 microcontrollers.                                                                                                                                                                                                               |
-| edgeless_function                                | WebAssembly Rust bindings and function programming model.                                                                                                                                                                                             |
-| edgeless_http                                    | Utility structures and methods for HTTP bindings.                                                                                                                                                                                                     |
-| edgeless_inabox                                  | Implements a minimal, yet complete, EDGELESS system consisting of an ε-CON, an ε-ORC, an ε-BAL and an edgeless node. This is intended to be used for development/validation purposes.                                                                 |
-| edgeless_node                                    | EDGELESS node with WebAssembly and [Container](container-runtime.md) run-times.                                                                                                                                                         |
-| edgeless_orc                                     | Reference implementation of the ε-ORC, supporting deployment annotations and implementing two simple function instance allocation strategies: random and round-robin. Upscaling is not supported: all the functions are deployed as single instances. |
-| edgeless_systemtests                             | Tests of EDGELESS components deployed in a system fashion, e.g., interacting through gRPC interfaces.                                                                                                                                                 |
-| edgeless_telemetry                               | Work-in-progress component that provides telemetry data regarding the EDGELESS operation, also supporting Prometheus agents.                                                                                                                          |
-| [examples](examples/README.md)                   | Contains several examples showcasing the key features of the EDGELESS reference implementation.                                                                                                                                                       |
-| [functions](functions/README.md)                 | Library of _example functions_ shipping with the EDGELESS platform and used in the examples.                                                                                                                                                          |
-| model                                            | Work-in-progress OCaml model of the EDGELESS system.                                                                                                                                                                                                  |
-| scripts                                          | Collection of scripts                                                                                                                                                                                                                                 |
+- [A step-by-step guide to deploying a minimal EDGELESS system](deploy_step_by_step.md)
+- [How to create a new function](rust_functions.md)
+  ([YouTube tutorial](https://youtu.be/1JnQIM9VTLk?si=o34YKRRJXNz0H54f))
+- [How to compose a new workflow](workflows.md)
+  ([YouTube tutorial](https://youtu.be/kc4Ku5p5Nrw?si=ZRxx0kmsIuAYLie1))
+- [Examples shipped with the repository](../examples/README.md)
 
 
-## How to build
+## Quickstart
+TODO: Probably move to anywhere else
+
+### 1. Build EDGELESS binaries
 
 See [building instructions](building.md).
 
-## How to run
+### 2. Run them
 
 It is recommended that you enable at least info-level log directives with:
 
@@ -241,17 +205,26 @@ Congratulations 🎉 now that you have a complete EDGELESS system you may want t
 
 You can find [here](examples/README.md) the full list with a short description of each.
 
-## Next steps
+## Known limitations
 
-Please refer to the following specific documentation:
+Currently there are several known limitations, including the following ones:
 
-- [A step-by-step guide to deploying a minimal EDGELESS system](deploy_step_by_step.md)
-- [Repository layout](repository_layout.md)
-- [How to create a new function](rust_functions.md)
-  ([YouTube tutorial](https://youtu.be/1JnQIM9VTLk?si=o34YKRRJXNz0H54f))
-- [How to compose a new workflow](workflows.md)
-  ([YouTube tutorial](https://youtu.be/kc4Ku5p5Nrw?si=ZRxx0kmsIuAYLie1))
-- [Examples shipped with the repository](../examples/README.md)
+- the dataplane within an orchestration domain is realized through a full-mesh
+  interconnection between all the nodes and the ε-BAL;
+- the ε-CON only supports a single orchestration domain and does not perform
+  any kind of admission control;
+- no workflow-level annotations are supported; 
+- the payload of events is not encrypted;
+- the configuration of the ε-CON, ε-CON, and ε-BAL is read from a file and
+cannot be modified (e.g., it is not possible to add an orchestration domain
+or a node while running);
+- there is no persistence of the soft states of the various components.
+
+The full list of issues is tracked on
+[GitHub](https://github.com/edgeless-project/edgeless/issues).
+
+Stay tuned (star & watch [the GitHub project](https://github.com/edgeless-project/edgeless))
+to remain up to date on future developments.
 
 ## Contributing
 
@@ -262,7 +235,7 @@ The [contributing guide](CONTRIBUTING_GUIDE.md) contains some rules you should a
 ## License
 
 The Repository is licensed under the MIT License. Please refer to
-[LICENSE](LICENSE) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
+[LICENSE](../LICENSE) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
 
 ## Funding
 
@@ -280,7 +253,7 @@ EDGELESS received funding from the [European Health and Digital Executive Agency
 [stars-url]: https://github.com/edgeless-project/edgeless/stargazers
 [issues-shield]: https://img.shields.io/github/issues/edgeless-project/edgeless.svg?style=for-the-badge
 [issues-url]: https://github.com/edgeless-project/edgeless/issues
-# TODO:
+<!-- TODO: -->
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://www.linkedin.com/company/itisuma/
 [license-shield]: https://

@@ -131,4 +131,4 @@ subsequently sends a specific set of events (`success_cb`) towards the
 
 A graphical representation of the example workflow above follows:
 
-![](workflow-example.png)
+![](figures/workflow-example.png)
