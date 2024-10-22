@@ -75,9 +75,9 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         return edgeless_function::CallRet::Reply(edgeless_function::owned_data::OwnedByteBuff::new_from_slice(&serialized));
                     };
 
-                    (return_type_ident, return_statement)
+                    (Some(return_type_ident), return_statement)
                 } else {
-                    (quote::format_ident!("()"), quote! {
+                    (None, quote! {
                         return edgeless_function::CallRet::NoReply;
                     })
                 };
@@ -97,9 +97,16 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     return edgeless_function::CallRet::NoReply;
                 });
 
-                quote! {
-                    fn #method_name(_src : InstanceId, data: Self::#type_ident) -> Self::#return_type_ident;
+                if let Some(return_type_ident) = return_type_ident {
+                    quote! {
+                        fn #method_name(_src : InstanceId, data: Self::#type_ident) -> Self::#return_type_ident;
+                    }
+                } else {
+                    quote! {
+                        fn #method_name(_src : InstanceId, data: Self::#type_ident) -> ();
+                    }
                 }
+
             }
         }
 
@@ -149,10 +156,10 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                             }
                         };
 
-                        (return_type_ident, return_statement)
+                        (Some(return_type_ident), return_statement)
                     } else {
                         (
-                            quote::format_ident!("()"),
+                            None,
                             quote! {
                                 return Ok(());
                             },
@@ -160,8 +167,17 @@ pub fn generate(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     };
 
                     let handler_ident = quote::format_ident!("call_{}", output_id);
+                    let rt = if let Some(return_type_ident) = return_type_ident  {
+                        quote!{
+                            Result<<#parsed_ident as #trait_name>::#return_type_ident, ()>
+                        }
+                    } else {
+                        quote!{
+                            Result<(), ()>
+                        }
+                    };
                     quote! {
-                        fn #handler_ident(payload: &<#parsed_ident as #trait_name>::#type_ident) -> Result<<#parsed_ident as #trait_name>::#return_type_ident, ()> {
+                        fn #handler_ident(payload: &<#parsed_ident as #trait_name>::#type_ident) -> #rt {
                             #[cfg(feature = #feature)]
                             {
                                 let serialized = <<#parsed_ident as #trait_name>::#type_ident as edgeless_function_core::Serialize>::serialize(payload);
