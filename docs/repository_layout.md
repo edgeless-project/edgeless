@@ -1,10 +1,9 @@
 # EDGELESS repository layout
 
-Each of the primary services in EDGELESS is implemented as its own Crate: `library` + (optional) `binary wrapper`.
+Each of the primary services in EDGELESS is implemented as its own Crate(`library` + optional `binary wrapper`).
 If existing, please refer to the `README.md` file of a particular component to find out more.
 
 You may want to check the [conventions of Rust's module system](https://doc.rust-lang.org/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html).
-
 
 
 | Directory                                              | Description |
