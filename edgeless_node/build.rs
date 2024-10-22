@@ -5,9 +5,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &[
             "src/resources/dda/proto/com.proto",
             "src/resources/dda/proto/state.proto",
-            "src/resources/dda/proto/store.proto"
+            "src/resources/dda/proto/store.proto",
         ],
-        &["src/resources/dda/proto"]
+        &["src/resources/dda/proto"],
     )?;
 
     // recommended method for generating rust bindings for gRPC for DDA
