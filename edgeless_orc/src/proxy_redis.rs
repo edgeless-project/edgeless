@@ -56,11 +56,11 @@ impl ProxyRedis {
         );
 
         // create the connection with the Redis server
-        let mut connection = redis::Client::open(redis_url)?.get_connection()?;
+        let mut connection: redis::Connection = redis::Client::open(redis_url)?.get_connection()?;
 
         if flushdb {
             // flush the in-memory database upon construction
-            redis::cmd("FLUSHDB").query(&mut connection)?;
+            let _: () = redis::cmd("FLUSHDB").query(&mut connection)?;
         }
 
         let additional_fields = match &dataset_settings {

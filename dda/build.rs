@@ -1,9 +1,5 @@
 // compiles all of the dda protos on build
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Add flag enabling optional proto3
-    let mut config = prost_build::Config::new();
-    config.protoc_arg("--experimental_allow_proto3_optional");
-
-    config.compile_protos(&["protos/state.proto", "protos/com.proto", "protos/store.proto"], &["protos/"])?;
+    prost_build::Config::new().compile_protos(&["protos/state.proto", "protos/com.proto", "protos/store.proto"], &["protos/"])?;
     Ok(())
 }
