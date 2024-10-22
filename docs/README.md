@@ -1,4 +1,5 @@
 <a name="readme-top"></a>
+# EDGELESS Reference Implementation
 
 <div align="center">
 
@@ -11,10 +12,11 @@
   <!-- [![MIT License][license-shield]][license-url] -->
   <!-- [![LinkedIn][linkedin-shield]][linkedin-url] -->
 
+[Report an error](https://github.com/edgeless-project/edgeless/issues/new?template=bug_report.yaml) · [Request a feature](https://github.com/edgeless-project/edgeless/issues/new?template=feature_request.yaml) · [Ask us a question](https://github.com/edgeless-project/edgeless/issues/new?template=question.yaml)
 </div>
-[Report error](https://github.com/edgeless-project/edgeless/issues/new?assignees=&labels=&projects=&template=bug_report.yaml) · [Feature request](https://github.com/edgeless-project/edgeless/issues/new?assignees=&labels=&projects=&template=feature_request.yaml)
 
-# EDGELESS Reference Implementation
+
+
 
 This repository contains a research prototype of the EDGELESS platform, which is
 under active development within the [EDGELESS project](https://edgeless-project.eu/).
@@ -33,7 +35,7 @@ intended especially for edge nodes with limited capabilities.
   - [Key Concepts](#key-concepts)
       - [*workflows*](#workflows)
       - [*functions*](#functions)
-      - [Resources](#resources)
+      - [*resources*](#resources)
   - [Next steps](#next-steps)
   - [Quickstart](#quickstart)
     - [1. Build EDGELESS binaries](#1-build-edgeless-binaries)
@@ -115,12 +117,13 @@ for other system parameters (e.g. location, owner, price).
 Depending on the annotations, the set of active *workflows* and the current
 system conditions, the ε-CON may reject the *workflow* creation request.
 
-#### Resources
+#### *resources*
 
-Following their configuration fiels, EDGELESS nodes can host one or more
-resource providers, but a node cannot have more than one resource of a given
-type.
-The resource provider ID in the configuration has a double purpose:
+When a node is registered into an *orchestration domain*, its configuration exposes
+both the hardware it wants to commit to EDGELESS, and the *resource providers*
+it can host. The only limitation is that a node can only have one resource of each type.
+
+The resource provider uuid in the configuration has a double purpose:
 
 - if empty, then the resource provider is not created;
 - otherwise, it is created and that's the identifier used.
@@ -235,7 +238,7 @@ The [contributing guide](CONTRIBUTING_GUIDE.md) contains some rules you should a
 ## License
 
 The Repository is licensed under the MIT License. Please refer to
-[LICENSE](../LICENSE) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
+[LICENSE](../LICENSE) and [CONTRIBUTORS.txt](../CONTRIBUTORS.txt). 
 
 ## Funding
 
