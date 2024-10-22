@@ -1,9 +1,7 @@
 // compiles all of the dda protos on build
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Add flag enabling optional proto3 in tonic_build
-    tonic_build::configure()
-        .protoc_arg("--experimental_allow_proto3_optional")
-        .compile(
+    tonic_build::configure().protoc_arg("--experimental_allow_proto3_optional").compile(
             &[
                 "src/resources/dda/proto/com.proto",
                 "src/resources/dda/proto/state.proto",
