@@ -10,10 +10,11 @@ use mailparse::{parse_content_disposition, parse_header};
 use reqwest::header::ACCEPT;
 use reqwest::{multipart, Body, Client};
 use std::collections::HashMap;
+use std::fs::{self};
 use std::io::Cursor;
+use std::time::SystemTime;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
-// for parse
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -219,57 +220,93 @@ async fn main() -> anyhow::Result<()> {
                     let mut ws = cargo::core::Workspace::new(&cargo_manifest, config)?;
                     ws.set_target_dir(cargo::util::Filesystem::new(build_dir.clone()));
 
-                    let pack = ws.current()?;
-
-                    let lib_name = match pack.library() {
-                        Some(val) => val.name(),
-                        None => {
-                            return Err(anyhow::anyhow!("Cargo package does not contain library."));
-                        }
-                    };
-
-                    let mut build_config = cargo::core::compiler::BuildConfig::new(
-                        config,
-                        None,
-                        false,
-                        &["wasm32-unknown-unknown".to_string()],
-                        cargo::core::compiler::CompileMode::Build,
-                    )?;
-                    build_config.requested_profile = cargo::util::interning::InternedString::new("release");
-
-                    let compile_options = cargo::ops::CompileOptions {
-                        build_config,
-                        cli_features: cargo::core::resolver::CliFeatures::new_all(false),
-                        spec: cargo::ops::Packages::Packages(Vec::new()),
-                        filter: cargo::ops::CompileFilter::Default {
-                            required_features_filterable: false,
-                        },
-                        target_rustdoc_args: None,
-                        target_rustc_args: None,
-                        target_rustc_crate_types: None,
-                        rustdoc_document_private_items: false,
-                        honor_rust_version: true,
-                    };
-
-                    cargo::ops::compile(&ws, &compile_options)?;
-
-                    let raw_result = build_dir
-                        .join(format!("wasm32-unknown-unknown/release/{}.wasm", lib_name))
-                        .to_str()
-                        .unwrap()
-                        .to_string();
                     let out_file = cargo_project_path
                         .join(format!("{}.wasm", function_spec.id))
                         .to_str()
                         .unwrap()
                         .to_string();
+                    // check if function.json, Cargo.toml, Cargo.lock or src/
+                    // have been modified since the last time the function has
+                    // been built. If not - skip the build.
+                    let function_build_time = match fs::metadata(out_file.clone()) {
+                        Ok(metadata) => metadata.modified().ok(),
+                        Err(_) => None,
+                    };
 
-                    println!(
-                        "{:?}",
-                        std::process::Command::new("wasm-opt")
-                            .args(["-Oz", &raw_result, "-o", &out_file])
-                            .status()?
-                    );
+                    // standard files - could be extended to look for more
+                    let triggering_files = vec!["Cargo.toml", "Cargo.lock", "function.json", "src/lib.rs"];
+                    let full_paths: Vec<std::path::PathBuf> = triggering_files.iter().map(|&f| cargo_project_path.join(f)).collect();
+                    let mod_timestamps: Vec<SystemTime> = full_paths
+                        .iter()
+                        .filter_map(|p| fs::metadata(p).ok())
+                        .filter_map(|m| m.modified().ok())
+                        .collect();
+                    let last_modification = mod_timestamps
+                        .iter()
+                        .max()
+                        .expect("Function to be build does not contain the required files.");
+
+                    let should_rebuild = match function_build_time {
+                        Some(t) => t < *last_modification, // we don't use the vector anywhere else, deref is fine
+                        None => true,
+                    };
+
+                    if !should_rebuild {
+                        log::info!("Skipping the function build, as no modifications to relevant files were detected.");
+                        return Ok(());
+                    } else {
+                        if function_build_time.is_some() {
+                            log::info!("Sources were modified - rebuilding the function.");
+                        } else {
+                            log::info!("Building the function for the first time.")
+                        }
+                        let pack = ws.current()?;
+
+                        let lib_name = match pack.library() {
+                            Some(val) => val.name(),
+                            None => {
+                                return Err(anyhow::anyhow!("Cargo package does not contain library."));
+                            }
+                        };
+
+                        let mut build_config = cargo::core::compiler::BuildConfig::new(
+                            config,
+                            None,
+                            false,
+                            &["wasm32-unknown-unknown".to_string()],
+                            cargo::core::compiler::CompileMode::Build,
+                        )?;
+                        build_config.requested_profile = cargo::util::interning::InternedString::new("release");
+
+                        let compile_options = cargo::ops::CompileOptions {
+                            build_config,
+                            cli_features: cargo::core::resolver::CliFeatures::new_all(false),
+                            spec: cargo::ops::Packages::Packages(Vec::new()),
+                            filter: cargo::ops::CompileFilter::Default {
+                                required_features_filterable: false,
+                            },
+                            target_rustdoc_args: None,
+                            target_rustc_args: None,
+                            target_rustc_crate_types: None,
+                            rustdoc_document_private_items: false,
+                            honor_rust_version: true,
+                        };
+
+                        cargo::ops::compile(&ws, &compile_options)?;
+
+                        let raw_result = build_dir
+                            .join(format!("wasm32-unknown-unknown/release/{}.wasm", lib_name))
+                            .to_str()
+                            .unwrap()
+                            .to_string();
+
+                        println!(
+                            "{:?}",
+                            std::process::Command::new("wasm-opt")
+                                .args(["-Oz", &raw_result, "-o", &out_file])
+                                .status()?
+                        );
+                    }
                 }
                 FunctionCommands::Invoke {
                     event_type,
