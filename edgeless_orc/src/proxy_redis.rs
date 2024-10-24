@@ -60,7 +60,7 @@ impl ProxyRedis {
 
         if flushdb {
             // flush the in-memory database upon construction
-            redis::cmd("FLUSHDB").query(&mut connection)?;
+            let _ = redis::cmd("FLUSHDB").query::<String>(&mut connection)?;
         }
 
         let additional_fields = match &dataset_settings {
