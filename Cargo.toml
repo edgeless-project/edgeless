@@ -20,4 +20,5 @@ members = [
     "edgeless_embedded_emu",
     # "edgeless_embedded"
     "dda", 
+    "edgeless_state",
 ]
