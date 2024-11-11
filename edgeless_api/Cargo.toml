@@ -3,7 +3,7 @@
 [package]
 name = "edgeless_api"
 version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
 rust-version = "1.77"
 
