@@ -5,7 +5,7 @@
 [package]
 name = "edgeless-embedded-esp32"
 version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de>>"]
+authors = [ "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
 resolver = "2"
 rust-version = "1.73"
@@ -90,3 +90,4 @@ tum_node_2_13 = ["epaper_2_13", "scd30"]
 
 [build-dependencies]
 embuild = "0.31.2"
+authors = [ "Technical University of Munich, Chair of Connected Mobility" ]

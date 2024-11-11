@@ -4,7 +4,7 @@
 [package]
 name = "edgeless_benchmark"
 version = "0.1.0"
-authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it>"]
+authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it" ]
 edition = "2021"
 
 [lib]

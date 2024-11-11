@@ -4,7 +4,7 @@
 [package]
 name = "edgeless-embedded-emu"
 version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de>>"]
+authors = [ "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
 resolver = "2"
 
