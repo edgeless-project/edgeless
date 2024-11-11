@@ -196,6 +196,10 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                     true => Some("kafka-egress-1".to_string()),
                     false => None,
                 },
+                sqlx_provider: match first_node {
+                    true => Some("sqlx-1".to_string()),
+                    false => None,
+                },
             }),
             user_node_capabilities: None,
         });

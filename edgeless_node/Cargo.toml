@@ -26,7 +26,7 @@ wasmi = ["dep:wasmi"]
 [dependencies]
 log = "0.4"
 env_logger = "0.10"
-tokio = { version = "1", features = ["full", "tracing"] }
+tokio = { version = "1", features = ["full", "tracing", "macros"] }
 tracing-subscriber = "0.3"
 console-subscriber = "0.1.5"
 futures = "0.3"
@@ -58,6 +58,9 @@ chrono = "0.4.38"
 ollama-rs = { version = "0.2.0", features = ["chat-history"] }
 rdkafka = { version = "0.36.2", optional = true }
 dda = { path = "../dda" }
+# note use sqlx 0.8.1 will inccur cargo issue
+sqlx = { version = "0.7.0", features = ["runtime-tokio-native-tls", "sqlite"]}
+
 
 [build-dependencies]
 tonic-build = "0.11"

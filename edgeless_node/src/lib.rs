@@ -106,6 +106,7 @@ pub struct EdgelessNodeResourceSettings {
     /// The resource will connect to a remote Kafka server to stream the
     /// messages received on a given topic.
     pub kafka_egress_provider: Option<String>,
+    pub sqlx_provider: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -481,6 +482,31 @@ async fn fill_resources(
                 log::error!("Could not create resource '{}' because rdkafka was disabled at compile time", provider_id);
             }
         }
+        
+         if let Some(provider_id) = &settings.sqlx_provider {
+            if !provider_id.is_empty() {
+                log::info!("Creating resource '{}'", provider_id);
+                let class_type = "sqlx".to_string();
+                ret.insert(
+                    provider_id.clone(),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::sqlx::SqlxResourceProvider::new(
+                                data_plane.clone(),
+                                edgeless_api::function_instance::InstanceId::new(node_id),
+                            )
+                            .await,
+                        ),
+                    },
+                );
+                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id: provider_id.clone(),
+                    class_type,
+                    outputs: vec![],
+                });
+            }
+        }
     }
 
     ret
@@ -754,6 +780,7 @@ file_log_provider = "file-log-1"
 redis_provider = "redis-1"
 dda_provider = "dda-1"
 kafka_egress_provider = "kafka-egress-1"
+sqlx_provider = "sqlite://sqlite.db"
 
 [resources.ollama_provider]
 host = "localhost"

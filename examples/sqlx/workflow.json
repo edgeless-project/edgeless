@@ -1,0 +1,32 @@
+{
+    "functions": [
+        {
+            "name": "sqlx_test",
+            "class_specification": {
+                "id": "sqlx_test",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/sqlx_test/sqlx_test.wasm",
+                "outputs": []
+            },
+            "output_mapping": {
+                "output": "sqlx_test"
+            },
+            "annotations": {
+                "init-payload": "42"
+            }
+        }
+    ],
+    "resources": [
+        {
+            "name": "sqlx",
+            "class_type": "sqlx",
+            "output_mapping": {},
+            "configurations": {
+                "url": "sqlite://sqlite.db",
+                "key": "random"
+            }
+        }
+    ],
+    "annotations": {}
+}

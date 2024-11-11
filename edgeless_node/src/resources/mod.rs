@@ -9,3 +9,4 @@ pub mod kafka_egress;
 pub mod metrics_collector;
 pub mod ollama;
 pub mod redis;
+pub mod sqlx;
