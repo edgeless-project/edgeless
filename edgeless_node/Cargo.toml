@@ -4,7 +4,7 @@
 
 [package]
 name = "edgeless_node"
-version = "0.1.0"
+version = "1.0.0"
 authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Lukasz Zalewski <zalewski.lukasz@siemens.com>", "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
 rust-version = "1.76"
@@ -12,6 +12,7 @@ description = "Reference implementation of an EDGELESS node"
 homepage = "https://edgeless-project.eu/"
 license = "MIT"
 repository = "https://github.com/edgeless-project/edgeless/"
+readme = "../README.md"
 
 [lib]
 name = "edgeless_node"

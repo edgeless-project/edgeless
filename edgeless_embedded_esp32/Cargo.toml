@@ -4,7 +4,7 @@
 
 [package]
 name = "edgeless-embedded-esp32"
-version = "0.1.0"
+version = "1.0.0"
 authors = [ "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
 resolver = "2"
