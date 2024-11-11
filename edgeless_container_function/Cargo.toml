@@ -7,6 +7,10 @@ version = "0.1.0"
 authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>" ]
 edition = "2021"
 rust-version = "1.76"
+description = "Skeleton of a function to be deployed in EDGELESS as a container"
+homepage = "https://edgeless-project.eu/"
+license = "MIT"
+repository = "https://github.com/edgeless-project/edgeless/"
 
 [lib]
 name = "edgeless_container_function"

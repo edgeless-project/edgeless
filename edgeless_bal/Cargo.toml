@@ -1,11 +1,16 @@
 # SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 # SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: 
+
 [package]
 name = "edgeless_bal"
 version = "0.1.0"
 authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Lukasz Zalewski <zalewski.lukasz@siemens.com>", "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
+description = "Reference implementation of EDGELESS ε-BAL"
+homepage = "https://edgeless-project.eu/"
+license = "MIT"
+repository = "https://github.com/edgeless-project/edgeless/"
 
 [lib]
 name = "edgeless_bal"
