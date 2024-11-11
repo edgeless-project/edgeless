@@ -4,7 +4,7 @@
 [package]
 name = "edgeless_node"
 version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Lukasz Zalewski <zalewski.lukasz@siemens.com>", "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
 rust-version = "1.76"
 
