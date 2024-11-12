@@ -1,4 +1,3 @@
-// SPDX-FileCopyrightText: © 2024 Technical University of Crete, Greece
 // SPDX-License-Identifier: MIT
 
 pub mod jetson;
