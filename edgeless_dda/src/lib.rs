@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: © 2024 Siemens AG
+// SPDX-License-Identifier: MIT
 use edgeless_function::*;
 use serde::{Deserialize, Serialize};
 
