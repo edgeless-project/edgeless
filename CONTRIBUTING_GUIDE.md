@@ -42,3 +42,17 @@ This document contains some rules you should adhere to when contributing to this
 * Do not taint this repository with incompatible licenses: everything not MIT-licensed
   must be kept external to this repository.
 
+## Releasing
+
+When creating a new release follow the steps below:
+
+- Run `scripts/add_spdx_headers.sh` from each crates to update the SPDX headers.
+- Update relevant document in [README.md](README.md) and [documentation](documentation).
+- Use [semantic versioning](https://semver.org/) for the new tag.
+- Update [CHANGELOG.md](CHANGELOG.md) following the guidelines [here](https://keepachangelog.com/).
+- Make sure that
+  - New contributors have been added to `CONTRIBUTORS.txt`.
+  - All tests and checks succeed with `cargo test`, `cargo fmt --check`, and
+    `cargo clippy`.
+  - All the functions build correctly with `scripts/functions_build.sh`.
+  - All the examples work with `scripts/run_all_examples.sh`.
