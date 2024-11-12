@@ -118,15 +118,15 @@ Some components/features are illustrated separately:
 
 Currently there are several known limitations, including the following ones:
 
-- the dataplane within an orchestration domain is realized through a full-mesh
-  interconnection between all the nodes and the ε-BAL;
+- the dataplane is limited within a single orchestration domain and realized
+  through a full-mesh interconnection between all the nodes;
+- the ε-BAL is a mere skeleton with no logic;
 - the ε-CON only supports a single orchestration domain and does not perform
   any kind of admission control;
 - no workflow-level annotations are supported; 
 - the payload of events is not encrypted;
-- the configuration of the ε-CON, ε-CON, and ε-BAL is read from a file and
-cannot be modified (e.g., it is not possible to add an orchestration domain
-or a node while running);
+- the configuration of the ε-CON is read from a file and cannot be modified
+  (e.g., it is not possible to add an orchestration domain);
 - there is no persistence of the soft states of the various components.
 
 The full list of issues is tracked on
