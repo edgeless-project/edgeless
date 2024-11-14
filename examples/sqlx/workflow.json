@@ -10,7 +10,7 @@
                 "outputs": []
             },
             "output_mapping": {
-                "output": "sqlx_test"
+                "output": "sqlx"
             },
             "annotations": {
                 "init-payload": "42"

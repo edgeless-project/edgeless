@@ -45,11 +45,19 @@ impl SqlxResource {
                     message,
                 } = dataplane_handle.receive_next().await;
 
+                log::info!("events come to sqlx source_id: {}", source_id);
+
+                log::info!("events come to sqlx channel_id: {}", channel_id);
+
+                log::info!("events come to sqlx message: {}", message);
+
                 let mut need_reply = false;
                 let message_data = match message {
                     Message::Call(data) => {
                         need_reply = true;
                         data
+
+                        // log::info!("call data {}", data)
                     }
                     Message::Cast(data) => data,
                     _ => {
