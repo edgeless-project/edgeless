@@ -20,7 +20,7 @@ crate-type = ["cdylib"]
 [dependencies]
 edgeless_function = { path = "../../edgeless_function" }
 edgeless_http = { path = "../../edgeless_http" }
-dda = { path = "../../dda"}
+dda = { path = "../../edgeless_dda"}
 log = "0.4"
 prost = "0.12.6"
 base64 = "0.22.1"

@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: © 2024 Yuan Yuan Luo
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
 pub struct KafkaEgressResourceSpec {}

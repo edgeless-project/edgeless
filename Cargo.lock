@@ -1348,7 +1348,7 @@ checksum = "e8566979429cf69b49a5c740c60791108e86440e8be149bbea4fe54d2c32d6e2"
 
 [[package]]
 name = "dda"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "base64 0.22.1",
  "edgeless_function",
@@ -1500,7 +1500,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless-embedded-emu"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "edgeless_api_core",
  "edgeless_embedded",
@@ -1522,7 +1522,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_api"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1542,7 +1542,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_api_core"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "coap-lite",
  "heapless",
@@ -1553,7 +1553,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_bal"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1571,7 +1571,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_benchmark"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1599,7 +1599,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_cli"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1626,7 +1626,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_con"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1643,7 +1643,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_container_function"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1661,7 +1661,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_dataplane"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1679,7 +1679,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_embedded"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "coap-lite",
  "edgeless_api_core",
@@ -1700,14 +1700,14 @@ dependencies = [
 
 [[package]]
 name = "edgeless_function"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "log",
 ]
 
 [[package]]
 name = "edgeless_http"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1718,7 +1718,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_inabox"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1742,7 +1742,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_node"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1783,7 +1783,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_orc"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1807,7 +1807,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_systemtests"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1832,7 +1832,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_telemetry"
-version = "0.1.0"
+version = "1.0.0"
 dependencies = [
  "anyhow",
  "async-trait",

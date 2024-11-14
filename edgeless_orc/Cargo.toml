@@ -1,12 +1,18 @@
 # SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+# SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 # SPDX-FileCopyrightText: © 2023 Siemens AG
 # SPDX-License-Identifier: MIT
 
 [package]
 name = "edgeless_orc"
-version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+version = "1.0.0"
+authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Lukasz Zalewski <zalewski.lukasz@siemens.com>", "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
+description = "Reference implementation of EDGELESS ε-ORC"
+homepage = "https://edgeless-project.eu/"
+license = "MIT"
+repository = "https://github.com/edgeless-project/edgeless/"
+readme = "../README.md"
 
 [lib]
 name = "edgeless_orc"
