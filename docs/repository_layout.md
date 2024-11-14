@@ -8,17 +8,17 @@ You may want to check the [conventions of Rust's module system](https://doc.rust
 
 | Directory                                              | Description |
 | ------------------------------------------------------ |------------ |
-| [dda/](../dda/README.md)                               | Crate for the [Data Distribution Agent](https://github.com/coatyio/dda) *resource* |
 | [deployment/](../deployment/README.md)                 | Directory containing docker and docker compose scripts    <!-- TODO: Rename directory to something like docker-runtime or docker-scripts --> |
 | docs/                                                  | Directory with miscellaneous documentation about the EDGELESS project |
 | edgeless_api/                                          | Library crate with all the inter-service APIs definitions. Contains the GRPC implementations of those APIs, both for services and messages. This directory must be imported by other projects wishing to interact with EDGELESS components through its interfaces. The following interfaces are currently implemented: `s01`, `s04`, `s06`, `s07` |
-| edgeless_api_core/                                     | Work-in-progress crate on minimal functions for embedded devices using CoAP |
+| edgeless_api_core/                                     | Crate building API definitions with minimal functions for embedded devices using CoAP |
 | [edgeless_bal/](../edgeless_bal/README.md)             | Crate with a reference implementation of the ε-BAL. Currently a mere skeleton, the concrete implementation will be done in the next project phase when inter-domain workflows are be supported |
 | [edgeless_benchmark/](../edgeless_benchmark/README.md) | Crate to benchmark an EDGELESS system in a controlled and deterministic environment using artificial workloads |
 | edgeless_cli/                                          | Crate to build the EDGELESS command-line interface. Currently used to locally build function instances and to interact with the ε-CON via the `s04` interface to create/terminate/list workflows |
 | edgeless_con/                                          | Crate to build the reference implementation of the ε-CON. Currently only supporting a single orchestration domain and ignoring workflow annotations |
 | edgeless_container_function/                           | Crate to build the skeleton of a function to be deployed in a container |
 | [edgeless_dataplane/](../edgeless_dataplane/README.md) | Library crate defining the EDGELESS intra-domain dataplane, which is realised through the full-mesh interconnection of gRPC services implementing the `s01` API |
+| [dda/](../edgeless_dda/README.md)                      | Crate for the [Data Distribution Agent](https://github.com/coatyio/dda) *resource* |
 | edgeless_embedded/                                     | Work-in-progress crate with the implementation of special features for embedded devices |
 | edgeless_embedded_emu/                                 | Crate with an embedded device emulator |
 | edgeless_embedded_esp32/                               | Crate for support of some ESP32 microcontrollers |
@@ -28,11 +28,11 @@ You may want to check the [conventions of Rust's module system](https://doc.rust
 | [edgeless_node/](../edgeless_node/README.md)           | Crate to build an EDGELESS node with WebAssembly and [Container](container-runtime.md) run-times |
 | [edgeless_orc/](../edgeless_orc/README.md)             | Crate to build the reference implementation of the ε-ORC, supporting deployment annotations and implementing two simple function instance allocation strategies: random and round-robin. Upscaling is not supported: all the functions are deployed as single instances |
 | edgeless_systemtests/                                  | Crate with tests of EDGELESS components deployed in a system fashion, e.g. interacting through gRPC interfaces |
-| [edgeless_telemetr/y](../edgeless_telemetry/)          | Work-in-progress crate for a component that provides telemetry data regarding the EDGELESS operation, also supporting Prometheus agents |
+| [edgeless_telemetry/](../edgeless_telemetry/README.md) | Crate for node telemetry support, also supporting Prometheus agents |
 | [examples/](../examples/README.md)                     | Directory with several examples showcasing the key features of the EDGELESS reference implementation |
 | [functions/](../functions/README.md)                   | Library of _example functions_ shipping with the EDGELESS platform used by the aforementioned examples |
 | model/                                                 | Work-in-progress OCaml model of the EDGELESS system |
-| [schemas/](../schemas/README.md)                       | TODO |
+| [schemas/](../schemas/)                                | TODO |
 | scripts/                                               | Directory containing various project-related scripts |
 
 ## Directory descriptions
