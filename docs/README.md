@@ -233,7 +233,7 @@ to remain up to date on future developments.
 
 We love the open source community of developers ❤️ and we welcome contributions to EDGELESS.
 
-The [contributing guide](CONTRIBUTING_GUIDE.md) contains some rules you should adhere to when contributing to this repository.
+The [contributing guide](../CONTRIBUTING_GUIDE.md) contains some rules you should adhere to when contributing to this repository.
 
 ## License
 
