@@ -11,7 +11,7 @@ description = "Skeleton of a function to be deployed in EDGELESS as a container"
 homepage = "https://edgeless-project.eu/"
 license = "MIT"
 repository = "https://github.com/edgeless-project/edgeless/"
-readme = "../README.md"
+readme = "../docs/README.md"
 
 
 [lib]

@@ -12,7 +12,7 @@ description = "EDGELESS Data Distribution Agent"
 homepage = "https://edgeless-project.eu/"
 license = "MIT"
 repository = "https://github.com/edgeless-project/edgeless/"
-readme = "../README.md"
+readme = "../docs/README.md"
 
 [lib]
 name = "dda"

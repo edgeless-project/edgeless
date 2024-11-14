@@ -46,10 +46,10 @@ This document contains some rules you should adhere to when contributing to this
 
 When creating a new release follow the steps below:
 
-- Run `scripts/add_spdx_headers.sh` from each crates to update the SPDX headers.
-- Update relevant document in [README.md](README.md) and [documentation](documentation).
+- Run `scripts/add_spdx_headers.sh` from each crate to update the SPDX headers.
+- Update relevant document in the corresponding [documentation files](docs/).
 - Use [semantic versioning](https://semver.org/) for the new tag.
-- Update [CHANGELOG.md](CHANGELOG.md) following the guidelines [here](https://keepachangelog.com/).
+- Update the [CHANGELOG.md](CHANGELOG.md) following the guidelines [here](https://keepachangelog.com/).
 - Make sure that
   - New contributors have been added to `CONTRIBUTORS.txt`.
   - All tests and checks succeed with `cargo test`, `cargo fmt --check`, and
