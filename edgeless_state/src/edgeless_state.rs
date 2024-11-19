@@ -131,7 +131,6 @@ async fn get_state(id: String) {
         .await
         .unwrap();
     println!("read result: {:?}", ret);
-
 }
 
 // fn update(id: String, attribute: String, value: String) {

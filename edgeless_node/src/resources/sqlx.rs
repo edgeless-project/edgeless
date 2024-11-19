@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
 use sqlx::{migrate::MigrateDatabase, FromRow, Row, Sqlite, SqlitePool};
-use tokio;
 use std::thread;
+use tokio;
 // extern crate redis;
 // use redis::Commands;
 
@@ -33,7 +33,7 @@ impl SqlxResource {
     async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, sqlx_url: &str) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
         let sqlx_url = sqlx_url.to_string();
-    
+
         // let redis_key = redis_key.to_string();
         // let db = SqlitePool::connect(sqlx_url).await.unwrap();
 
@@ -64,41 +64,29 @@ impl SqlxResource {
                 };
 
                 let db = SqlitePool::connect(&sqlx_url).await.unwrap();
-              
-                if message_data.to_string().contains("SELECT"){
-                    let response: Workflow = sqlx::query_as(message_data.as_str())
-                        .fetch_one(&db)
-                        .await
-                        .unwrap();
+
+                if message_data.to_string().contains("SELECT") {
+                    let response: Workflow = sqlx::query_as(message_data.as_str()).fetch_one(&db).await.unwrap();
                     log::info!("Response from database: {:?}", response.toString());
                 }
 
-                if message_data.to_string().contains("INSERT"){
-                    let response = sqlx::query(message_data.as_str())
-                        .execute(&db)
-                        .await;
-                        
+                if message_data.to_string().contains("INSERT") {
+                    let response = sqlx::query(message_data.as_str()).execute(&db).await;
+
                     log::info!("Response from database: {:?}", response);
                 }
 
-                if message_data.to_string().contains("DELETE"){
-                    let response = sqlx::query(message_data.as_str())
-                        .execute(&db)
-                        .await
-                        .unwrap();
-                        
+                if message_data.to_string().contains("DELETE") {
+                    let response = sqlx::query(message_data.as_str()).execute(&db).await.unwrap();
+
                     log::info!("Response from database: {:?}", response);
                 }
 
-                if message_data.to_string().contains("UPDATE"){
-                    let response = sqlx::query(message_data.as_str())
-                        .execute(&db)
-                        .await
-                        .unwrap();
-                        
+                if message_data.to_string().contains("UPDATE") {
+                    let response = sqlx::query(message_data.as_str()).execute(&db).await.unwrap();
+
                     log::info!("Response from database: {:?}", response);
                 }
-
 
                 // if need_reply {
                 //     dataplane_handle
@@ -110,14 +98,11 @@ impl SqlxResource {
                         .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
                         .await;
                 }
-
             }
         });
 
         Ok(Self { join_handle: handle })
     }
-
-   
 }
 
 impl SqlxResourceProvider {
@@ -148,7 +133,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             let mut lck = self.inner.lock().await;
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
-            
+
             match SqlxResource::new(dataplane_handle, url).await {
                 Ok(resource) => {
                     lck.instances.insert(new_id, resource);
@@ -196,5 +181,4 @@ impl Workflow {
         let data = format!("id: {}, name: {}, result: {:?},", self.id, self.name, self.result);
         data
     }
-
 }

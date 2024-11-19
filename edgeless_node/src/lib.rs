@@ -482,8 +482,8 @@ async fn fill_resources(
                 log::error!("Could not create resource '{}' because rdkafka was disabled at compile time", provider_id);
             }
         }
-        
-         if let Some(provider_id) = &settings.sqlx_provider {
+
+        if let Some(provider_id) = &settings.sqlx_provider {
             if !provider_id.is_empty() {
                 log::info!("Creating resource '{}'", provider_id);
                 let class_type = "sqlx".to_string();
@@ -492,11 +492,8 @@ async fn fill_resources(
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
                         client: Box::new(
-                            resources::sqlx::SqlxResourceProvider::new(
-                                data_plane.clone(),
-                                edgeless_api::function_instance::InstanceId::new(node_id),
-                            )
-                            .await,
+                            resources::sqlx::SqlxResourceProvider::new(data_plane.clone(), edgeless_api::function_instance::InstanceId::new(node_id))
+                                .await,
                         ),
                     },
                 );
