@@ -1813,6 +1813,7 @@ dependencies = [
  "rs-docker",
  "serde",
  "serde_json",
+ "sqlx",
  "sysinfo",
  "tokio 1.38.0",
  "toml 0.7.8",

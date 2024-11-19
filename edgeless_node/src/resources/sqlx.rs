@@ -4,6 +4,7 @@
 use edgeless_dataplane::core::Message;
 use sqlx::{migrate::MigrateDatabase, FromRow, Row, Sqlite, SqlitePool};
 use tokio;
+use std::thread;
 // extern crate redis;
 // use redis::Commands;
 
@@ -31,11 +32,14 @@ impl Drop for SqlxResource {
 impl SqlxResource {
     async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, sqlx_url: &str) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
+        let sqlx_url = sqlx_url.to_string();
     
         // let redis_key = redis_key.to_string();
-        let db = SqlitePool::connect(sqlx_url).await.unwrap();
+        // let db = SqlitePool::connect(sqlx_url).await.unwrap();
 
-        log::info!("SqlxResource created, URL: {}", sqlx_url);
+        // log::info!("SqlxResource created, URL: {}", sqlx_url);
+
+        // let response = SqlxResource::insert_state("999".to_string(), "foobar".to_string(), "007".to_string(),sqlx_url);
 
         let handle = tokio::spawn(async move {
             loop {
@@ -44,20 +48,14 @@ impl SqlxResource {
                     channel_id,
                     message,
                 } = dataplane_handle.receive_next().await;
+                // log::info!("Sqlx provider receives events: message {}", message);
 
-                log::info!("events come to sqlx source_id: {}", source_id);
-
-                log::info!("events come to sqlx channel_id: {}", channel_id);
-
-                log::info!("events come to sqlx message: {}", message);
-
+                // let response = SqlxResource::insert_state("999".to_string(), "foobar".to_string(), "007".to_string(),sqlx_url);
                 let mut need_reply = false;
                 let message_data = match message {
                     Message::Call(data) => {
                         need_reply = true;
                         data
-
-                        // log::info!("call data {}", data)
                     }
                     Message::Cast(data) => data,
                     _ => {
@@ -65,20 +63,61 @@ impl SqlxResource {
                     }
                 };
 
-                // if let Err(e) = connection.set::<&str, &str, std::string::String>(&redis_key, &message_data) {
-                //     log::error!("Could not set key '{}' to value '{}': {}", redis_key, &message_data, e);
-                // }
+                let db = SqlitePool::connect(&sqlx_url).await.unwrap();
+              
+                if message_data.to_string().contains("SELECT"){
+                    let response: Workflow = sqlx::query_as(message_data.as_str())
+                        .fetch_one(&db)
+                        .await
+                        .unwrap();
+                    log::info!("Response from database: {:?}", response.toString());
+                }
 
+                if message_data.to_string().contains("INSERT"){
+                    let response = sqlx::query(message_data.as_str())
+                        .execute(&db)
+                        .await;
+                        
+                    log::info!("Response from database: {:?}", response);
+                }
+
+                if message_data.to_string().contains("DELETE"){
+                    let response = sqlx::query(message_data.as_str())
+                        .execute(&db)
+                        .await
+                        .unwrap();
+                        
+                    log::info!("Response from database: {:?}", response);
+                }
+
+                if message_data.to_string().contains("UPDATE"){
+                    let response = sqlx::query(message_data.as_str())
+                        .execute(&db)
+                        .await
+                        .unwrap();
+                        
+                    log::info!("Response from database: {:?}", response);
+                }
+
+
+                // if need_reply {
+                //     dataplane_handle
+                //         .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(response.toString()))
+                //         .await;
+                // }
                 if need_reply {
                     dataplane_handle
                         .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
                         .await;
                 }
+
             }
         });
 
         Ok(Self { join_handle: handle })
     }
+
+   
 }
 
 impl SqlxResourceProvider {
@@ -109,7 +148,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             let mut lck = self.inner.lock().await;
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
-
+            
             match SqlxResource::new(dataplane_handle, url).await {
                 Ok(resource) => {
                     lck.instances.insert(new_id, resource);
@@ -143,4 +182,19 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         // the resource has no channels: nothing to be patched
         Ok(())
     }
+}
+
+#[derive(Clone, FromRow, Debug)]
+struct Workflow {
+    id: i64,
+    name: String,
+    result: i64,
+}
+
+impl Workflow {
+    fn toString(&self) -> String {
+        let data = format!("id: {}, name: {}, result: {:?},", self.id, self.name, self.result);
+        data
+    }
+
 }

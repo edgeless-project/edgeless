@@ -60,6 +60,7 @@ rdkafka = { version = "0.36.2", optional = true }
 dda = { path = "../dda" }
 # note use sqlx 0.8.1 will inccur cargo issue
 sqlx = { version = "0.7.0", features = ["runtime-tokio-native-tls", "sqlite"]}
+edgeless_function = { path = "../edgeless_function" }
 
 
 [build-dependencies]
