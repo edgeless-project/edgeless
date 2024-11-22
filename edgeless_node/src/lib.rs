@@ -239,7 +239,9 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
             .unwrap_or((unique_total_space.values().sum::<u64>() / (1024 * 1024)) as u32),
         num_gpus: user_node_capabilities.num_gpus.unwrap_or(crate::gpu_info::get_num_gpus() as u32),
         model_name_gpu: user_node_capabilities.model_name_gpu.unwrap_or(crate::gpu_info::get_model_name_gpu()),
-        mem_size_gpu: user_node_capabilities.mem_size_gpu.unwrap_or((crate::gpu_info::get_mem_size_gpu() / (1024) ) as u32),
+        mem_size_gpu: user_node_capabilities
+            .mem_size_gpu
+            .unwrap_or((crate::gpu_info::get_mem_size_gpu() / (1024)) as u32),
     }
 }
 
