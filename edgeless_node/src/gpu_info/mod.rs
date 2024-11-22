@@ -51,6 +51,7 @@ pub fn get_gpu_load() -> i32 {
 ///           See: each board-specific implementation for the error number (negative value)
 pub fn get_num_gpus() -> i32 {
     match board_type() {
+        BoardType::Jetson => jetson::jetson_get_num_gpus(),
         BoardType::Other => 0,
     }
 }
@@ -64,6 +65,7 @@ pub fn get_num_gpus() -> i32 {
 /// * String -  The model name of available GPU in the system or an empy string
 pub fn get_model_name_gpu() -> String {
     match board_type() {
+        BoardType::Jetson => jetson::jetson_get_model_name_gpu(),
         BoardType::Other => "".to_string(),
     }
 }
@@ -78,6 +80,7 @@ pub fn get_model_name_gpu() -> String {
 ///           See: each board-specific implementation for the error number (negative value)
 pub fn get_mem_size_gpu() -> i32 {
     match board_type() {
+        BoardType::Jetson => jetson::jetson_get_mem_size_gpu(),
         BoardType::Other => 0,
     }
 }
