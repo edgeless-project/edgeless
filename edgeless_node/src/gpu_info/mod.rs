@@ -85,7 +85,6 @@ pub fn get_mem_size_gpu() -> i32 {
     }
 }
 
-
 /// Determines the board type.
 ///
 /// # Returns
