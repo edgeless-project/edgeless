@@ -224,7 +224,6 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         log::debug!("CPUs have different frequencies, using: {}", clock_freq_cpu);
     }
 
-    // GPU information is not (yet) inferred automatically
     edgeless_api::node_registration::NodeCapabilities {
         num_cpus: user_node_capabilities.num_cpus.unwrap_or(sys.cpus().len() as u32),
         model_name_cpu: user_node_capabilities.model_name_cpu.unwrap_or(model_name_cpu),
@@ -238,9 +237,9 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         disk_tot_space: user_node_capabilities
             .disk_tot_space
             .unwrap_or((unique_total_space.values().sum::<u64>() / (1024 * 1024)) as u32),
-        num_gpus: user_node_capabilities.num_gpus.unwrap_or_default(),
-        model_name_gpu: user_node_capabilities.model_name_gpu.unwrap_or_default(),
-        mem_size_gpu: user_node_capabilities.mem_size_gpu.unwrap_or_default(),
+        num_gpus: user_node_capabilities.num_gpus.unwrap_or(crate::gpu_info::get_num_gpus() as u32),
+        model_name_gpu: user_node_capabilities.model_name_gpu.unwrap_or(crate::gpu_info::get_model_name_gpu()),
+        mem_size_gpu: user_node_capabilities.mem_size_gpu.unwrap_or((crate::gpu_info::get_mem_size_gpu() / (1024) ) as u32),
     }
 }
 
@@ -724,7 +723,7 @@ pub fn edgeless_node_default_conf() -> String {
     let caps = get_capabilities(vec!["RUST_WASM".to_string()], NodeCapabilitiesUser::empty());
 
     format!(
-        "[general]\nnode_id = \"{}\"\n{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}disk_tot_space = {}{}",
+        "[general]\nnode_id = \"{}\"\n{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}disk_tot_space = {}\nnum_gpus = {}\nmodel_name_gpu = \"{}\"\nmem_size_gpu = {}{}",
         uuid::Uuid::new_v4(),
         r##"
 agent_url = "http://127.0.0.1:7021"
@@ -774,10 +773,10 @@ is_tee_running = false
 has_tpm = false
 "##,
         caps.disk_tot_space,
+        caps.num_gpus,
+        caps.model_name_gpu,
+        caps.mem_size_gpu,
         r##"
-num_gpus = 0
-model_name_gpu = ""
-mem_size_gpu = 0
 "##
     )
 }
