@@ -1,4 +1,5 @@
-use sqlx::{migrate::MigrateDatabase, FromRow, Row, Sqlite, SqlitePool};
+// use sqlx::{migrate::MigrateDatabase, FromRow, Row, Sqlite, SqlitePool};
+use sqlx::{migrate::MigrateDatabase, FromRow, Sqlite, SqlitePool};
 use tokio;
 const DB_URL: &str = "sqlite://sqlite.db";
 

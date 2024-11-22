@@ -1,12 +1,9 @@
-// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
-// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 University of Cambridge, System Research Group
+// SPDX-FileCopyrightText: © 2024 Chen Chen <cc2181@cam.ac.uk>
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
-use sqlx::{migrate::MigrateDatabase, FromRow, Row, Sqlite, SqlitePool};
-use std::thread;
+use sqlx::{FromRow, Row, SqlitePool};
 use tokio;
-// extern crate redis;
-// use redis::Commands;
 
 #[derive(Clone)]
 pub struct SqlxResourceProvider {
@@ -34,13 +31,6 @@ impl SqlxResource {
         let mut dataplane_handle = dataplane_handle;
         let sqlx_url = sqlx_url.to_string();
 
-        // let redis_key = redis_key.to_string();
-        // let db = SqlitePool::connect(sqlx_url).await.unwrap();
-
-        // log::info!("SqlxResource created, URL: {}", sqlx_url);
-
-        // let response = SqlxResource::insert_state("999".to_string(), "foobar".to_string(), "007".to_string(),sqlx_url);
-
         let handle = tokio::spawn(async move {
             loop {
                 let edgeless_dataplane::core::DataplaneEvent {
@@ -48,9 +38,7 @@ impl SqlxResource {
                     channel_id,
                     message,
                 } = dataplane_handle.receive_next().await;
-                // log::info!("Sqlx provider receives events: message {}", message);
 
-                // let response = SqlxResource::insert_state("999".to_string(), "foobar".to_string(), "007".to_string(),sqlx_url);
                 let mut need_reply = false;
                 let message_data = match message {
                     Message::Call(data) => {
@@ -66,38 +54,48 @@ impl SqlxResource {
                 let db = SqlitePool::connect(&sqlx_url).await.unwrap();
 
                 if message_data.to_string().contains("SELECT") {
-                    let response: Workflow = sqlx::query_as(message_data.as_str()).fetch_one(&db).await.unwrap();
-                    log::info!("Response from database: {:?}", response.toString());
-                }
+                    let result: sqlx::Result<Workflow, sqlx::Error> = sqlx::query_as(message_data.as_str()).fetch_one(&db).await;
 
-                if message_data.to_string().contains("INSERT") {
-                    let response = sqlx::query(message_data.as_str()).execute(&db).await;
+                    match result {
+                        Ok(response) => {
+                            log::info!("Response from database: {:?}", response.to_string());
+                            if need_reply {
+                                dataplane_handle
+                                    .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(response.to_string()))
+                                    .await;
+                            }
+                        }
+                        Err(e) => {
+                            log::info!("Response from database: {:?}", e.to_string())
+                        }
+                    }
+                } else if message_data.to_string().contains("INSERT")
+                    || message_data.to_string().contains("UPDATE")
+                    || message_data.to_string().contains("DELETE")
+                {
+                    let result = sqlx::query(message_data.as_str()).execute(&db).await;
+                    match result {
+                        Ok(response) => {
+                            log::info!("Response from database: {:?}", response);
+                            if need_reply {
+                                let res = format!(
+                                    "rows_affected: {}, last_insert_rowid: {}.",
+                                    response.rows_affected(),
+                                    response.last_insert_rowid()
+                                );
+                                dataplane_handle
+                                    .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(res))
+                                    .await;
+                            }
+                        }
 
-                    log::info!("Response from database: {:?}", response);
-                }
-
-                if message_data.to_string().contains("DELETE") {
-                    let response = sqlx::query(message_data.as_str()).execute(&db).await.unwrap();
-
-                    log::info!("Response from database: {:?}", response);
-                }
-
-                if message_data.to_string().contains("UPDATE") {
-                    let response = sqlx::query(message_data.as_str()).execute(&db).await.unwrap();
-
-                    log::info!("Response from database: {:?}", response);
-                }
-
-                // if need_reply {
-                //     dataplane_handle
-                //         .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(response.toString()))
-                //         .await;
-                // }
-                if need_reply {
-                    dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
-                        .await;
-                }
+                        Err(e) => {
+                            log::info!("Error from state management: {:?}", e);
+                        }
+                    }
+                } else {
+                    log::info!("Unknow operation in state management");
+                };
             }
         });
 
@@ -126,7 +124,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
-        if let (Some(url), Some(key)) = (
+        if let (Some(url), Some(_key)) = (
             instance_specification.configuration.get("url"),
             instance_specification.configuration.get("key"),
         ) {
@@ -177,7 +175,7 @@ struct Workflow {
 }
 
 impl Workflow {
-    fn toString(&self) -> String {
+    fn to_string(&self) -> String {
         let data = format!("id: {}, name: {}, result: {:?},", self.id, self.name, self.result);
         data
     }
