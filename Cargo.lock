@@ -1796,6 +1796,7 @@ dependencies = [
  "dda",
  "edgeless_api",
  "edgeless_dataplane",
+ "edgeless_function",
  "edgeless_http",
  "edgeless_telemetry",
  "env_logger",
