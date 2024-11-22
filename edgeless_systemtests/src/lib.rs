@@ -110,6 +110,7 @@ mod tests {
                             dda_provider: None,
                             ollama_provider: None,
                             kafka_egress_provider: None,
+                            sqlx_provider: None,
                         }),
                         user_node_capabilities: None,
                     },
