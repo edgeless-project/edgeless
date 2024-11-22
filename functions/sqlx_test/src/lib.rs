@@ -18,6 +18,8 @@ impl EdgeFunction for Sqlx_test {
         log::info!("sqlx init");
 
         let res = call("database", b"INSERT INTO workflow (id, name, result) Values(1009, 'foobar', 9527)");
+        //if error why stoped here
+        log::info!("call keep running");
         call("database", b"SELECT id, name,  result FROM workflow WHERE id=1008");
         call("database", b"UPDATE workflow SET name='this is to test football'  WHERE id = 1008");
         call("database", b"DELETE FROM workflow WHERE id=1008");

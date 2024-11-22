@@ -66,7 +66,10 @@ impl SqlxResource {
                             }
                         }
                         Err(e) => {
-                            log::info!("Response from database: {:?}", e.to_string())
+                            log::info!("Response from database: {:?}", e.to_string());
+                            dataplane_handle
+                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(e.to_string()))
+                                .await;
                         }
                     }
                 } else if message_data.to_string().contains("INSERT")
@@ -91,10 +94,16 @@ impl SqlxResource {
 
                         Err(e) => {
                             log::info!("Error from state management: {:?}", e);
+                            dataplane_handle
+                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(e.to_string()))
+                                .await;
                         }
                     }
                 } else {
                     log::info!("Unknow operation in state management");
+                    dataplane_handle
+                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
+                        .await;
                 };
             }
         });
