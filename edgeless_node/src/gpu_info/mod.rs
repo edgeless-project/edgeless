@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: © 2024 Technical University of Crete
 // SPDX-License-Identifier: MIT
 
 pub mod jetson;
@@ -40,6 +41,48 @@ pub fn get_gpu_load() -> i32 {
     }
 }
 
+/// Retrieves the number of GPUs that exist on the system
+///
+/// If the system is a known BoardType, it calls the board-specific implementation.
+/// Otherwise, it returns 0.
+///
+/// # Returns
+/// * `i32` - The number of available GPUs in the system, or a negative number if the operation fails.
+///           See: each board-specific implementation for the error number (negative value)
+pub fn get_num_gpus() -> i32 {
+    match board_type() {
+        BoardType::Other => 0,
+    }
+}
+
+/// Retrieves the model name of the GPU
+///
+/// If the system is a known BoardType, it calls the board-specific implementation.
+/// Otherwise, it returns an empty string.
+///
+/// # Returns
+/// * String -  The model name of available GPU in the system or an empy string
+pub fn get_model_name_gpu() -> String {
+    match board_type() {
+        BoardType::Other => "".to_string(),
+    }
+}
+
+/// Retrieves the GPU memory size in kilobytes
+///
+/// If the system is a known BoardType, it calls the board-specific implementation.
+/// Otherwise, it returns 0.
+///
+/// # Returns
+/// * `i32` - The number of available GPU memory, or a negative number if the operation fails.
+///           See: each board-specific implementation for the error number (negative value)
+pub fn get_mem_size_gpu() -> i32 {
+    match board_type() {
+        BoardType::Other => 0,
+    }
+}
+
+
 /// Determines the board type.
 ///
 /// # Returns
@@ -67,5 +110,23 @@ mod tests {
     fn test_get_gpu_load() {
         let result = get_gpu_load();
         println!("GPU Load: {:?}", result);
+    }
+
+    #[test]
+    fn test_get_num_gpus() {
+        let result = get_num_gpus();
+        println!("Num of GPUs: {:?}", result);
+    }
+
+    #[test]
+    fn test_get_model_name_gpu() {
+        let result = get_model_name_gpu();
+        println!("GPU Model name: {:?}", result);
+    }
+
+    #[test]
+    fn test_get_mem_size_gpu() {
+        let result = get_mem_size_gpu();
+        println!("GPU mem size: {:?}", result);
     }
 }
