@@ -1851,17 +1851,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "edgeless_state"
-version = "0.1.0"
-dependencies = [
- "schemars",
- "serde",
- "serde_json",
- "sqlx",
- "tokio 1.38.0",
-]
-
-[[package]]
 name = "edgeless_systemtests"
 version = "0.1.0"
 dependencies = [
