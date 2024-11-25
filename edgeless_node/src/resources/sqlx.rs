@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2024 Chen Chen <cc2181@cam.ac.uk>
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
-use sqlx::{FromRow, Row, SqlitePool};
+use sqlx::{migrate::MigrateDatabase, FromRow, Sqlite, SqlitePool};
 use tokio;
 
 #[derive(Clone)]
@@ -51,7 +51,27 @@ impl SqlxResource {
                     }
                 };
 
+                if !Sqlite::database_exists(&sqlx_url).await.unwrap_or(false) {
+                    println!("Creating database {}", sqlx_url);
+                    match Sqlite::create_database(&sqlx_url).await {
+                        Ok(_) => log::info!("Create sqlx db success"),
+                        Err(error) => panic!("error: {}", error),
+                    }
+                } else {
+                    // log::info!("sqlx Database exists");
+                }
+
                 let db = SqlitePool::connect(&sqlx_url).await.unwrap();
+
+                let response = sqlx::query(
+                    "CREATE TABLE IF NOT EXISTS workflow (
+                    id INTEGER PRIMARY KEY,
+                    name VARCHAR(255)  NOT NULL,
+                    result INTEGER NOT NULL);",
+                )
+                .execute(&db)
+                .await
+                .unwrap();
 
                 if message_data.to_string().contains("SELECT") {
                     let result: sqlx::Result<Workflow, sqlx::Error> = sqlx::query_as(message_data.as_str()).fetch_one(&db).await;
@@ -105,6 +125,8 @@ impl SqlxResource {
                         .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
                         .await;
                 };
+
+                db.close().await;
             }
         });
 
