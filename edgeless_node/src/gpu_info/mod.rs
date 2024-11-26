@@ -3,6 +3,17 @@
 
 pub mod jetson;
 
+// =====================================================================================
+// *** IMPORTANT ***
+// To support an additional GPU in the future, follow these steps:
+//
+//  1. Create a new .rs file in the same directory for the newly supported GPU.
+//  2. Update `enum BoardType` to accommodate the new hardware.
+//  3. Implement accessors (getters) for the newly supported hardware in its .rs file,
+//         e.g., is_nvidia_board(), nvidia::nvidia_get_gpu_temp(), etc.
+//  4. Update this source code's API calls to handle the new hardware if it is detected.
+// =====================================================================================
+
 /// Enum to represent different board types.
 /// If you need to support more board types, add them here.
 #[derive(Debug, PartialEq)]
