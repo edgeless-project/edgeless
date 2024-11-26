@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::orc::OrchestratorAPI;
+use edgeless_api::api::orc::OrchestratorAPI;
 use futures::Future;
 use resources::resource_provider_specs::ResourceProviderSpecs;
 

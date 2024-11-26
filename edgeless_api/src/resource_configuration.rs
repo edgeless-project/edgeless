@@ -43,8 +43,8 @@ impl Clone for Box<dyn ResourceConfigurationAPI<crate::function_instance::Instan
     }
 }
 
-impl Clone for Box<dyn ResourceConfigurationAPI<crate::orc::DomainManagedInstanceId>> {
-    fn clone(&self) -> Box<dyn ResourceConfigurationAPI<crate::orc::DomainManagedInstanceId>> {
+impl Clone for Box<dyn ResourceConfigurationAPI<crate::function_instance::DomainManagedInstanceId>> {
+    fn clone(&self) -> Box<dyn ResourceConfigurationAPI<crate::function_instance::DomainManagedInstanceId>> {
         self.clone_box()
     }
 }

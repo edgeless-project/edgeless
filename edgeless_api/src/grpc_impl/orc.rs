@@ -3,9 +3,10 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 pub struct OrchestratorAPIClient {
-    function_instance_client: Box<dyn crate::function_instance::FunctionInstanceAPI<crate::orc::DomainManagedInstanceId>>,
+    function_instance_client: Box<dyn crate::function_instance::FunctionInstanceAPI<crate::function_instance::DomainManagedInstanceId>>,
     node_registration_client: Box<dyn crate::node_registration::NodeRegistrationAPI>,
-    resource_configuration_client: Box<dyn crate::resource_configuration::ResourceConfigurationAPI<crate::orc::DomainManagedInstanceId>>,
+    resource_configuration_client:
+        Box<dyn crate::resource_configuration::ResourceConfigurationAPI<crate::function_instance::DomainManagedInstanceId>>,
 }
 
 impl OrchestratorAPIClient {
@@ -13,7 +14,7 @@ impl OrchestratorAPIClient {
         let function_instance_client = crate::grpc_impl::function_instance::FunctionInstanceAPIClient::new(api_addr, retry_interval).await;
         let node_registration_client = crate::grpc_impl::node_registration::NodeRegistrationClient::new(api_addr, retry_interval).await;
         let resource_configuration_client: Result<
-            super::resource_configuration::ResourceConfigurationClient<crate::orc::DomainManagedInstanceId>,
+            super::resource_configuration::ResourceConfigurationClient<crate::function_instance::DomainManagedInstanceId>,
             anyhow::Error,
         > = Ok(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(api_addr, retry_interval).await);
 
@@ -28,8 +29,8 @@ impl OrchestratorAPIClient {
     }
 }
 
-impl crate::orc::OrchestratorAPI for OrchestratorAPIClient {
-    fn function_instance_api(&mut self) -> Box<dyn crate::function_instance::FunctionInstanceAPI<crate::orc::DomainManagedInstanceId>> {
+impl crate::api::orc::OrchestratorAPI for OrchestratorAPIClient {
+    fn function_instance_api(&mut self) -> Box<dyn crate::function_instance::FunctionInstanceAPI<crate::function_instance::DomainManagedInstanceId>> {
         self.function_instance_client.clone()
     }
 
@@ -39,7 +40,7 @@ impl crate::orc::OrchestratorAPI for OrchestratorAPIClient {
 
     fn resource_configuration_api(
         &mut self,
-    ) -> Box<dyn crate::resource_configuration::ResourceConfigurationAPI<crate::orc::DomainManagedInstanceId>> {
+    ) -> Box<dyn crate::resource_configuration::ResourceConfigurationAPI<crate::function_instance::DomainManagedInstanceId>> {
         self.resource_configuration_client.clone()
     }
 }
@@ -47,16 +48,16 @@ impl crate::orc::OrchestratorAPI for OrchestratorAPIClient {
 pub struct OrchestratorAPIServer {}
 
 impl OrchestratorAPIServer {
-    pub fn run(agent_api: Box<dyn crate::orc::OrchestratorAPI + Send>, orchestrator_url: String) -> futures::future::BoxFuture<'static, ()> {
+    pub fn run(agent_api: Box<dyn crate::api::orc::OrchestratorAPI + Send>, orchestrator_url: String) -> futures::future::BoxFuture<'static, ()> {
         let mut agent_api = agent_api;
-        let function_api = crate::grpc_impl::function_instance::FunctionInstanceAPIServer::<crate::orc::DomainManagedInstanceId> {
+        let function_api = crate::grpc_impl::function_instance::FunctionInstanceAPIServer::<crate::function_instance::DomainManagedInstanceId> {
             root_api: tokio::sync::Mutex::new(agent_api.function_instance_api()),
         };
         let node_registration_api = crate::grpc_impl::node_registration::NodeRegistrationAPIService {
             node_registration_api: tokio::sync::Mutex::new(agent_api.node_registration_api()),
         };
         let resource_configuration_api =
-            crate::grpc_impl::resource_configuration::ResourceConfigurationServerHandler::<crate::orc::DomainManagedInstanceId> {
+            crate::grpc_impl::resource_configuration::ResourceConfigurationServerHandler::<crate::function_instance::DomainManagedInstanceId> {
                 root_api: tokio::sync::Mutex::new(agent_api.resource_configuration_api()),
             };
         Box::pin(async move {
