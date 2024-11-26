@@ -3,7 +3,7 @@
 
 use crate::workflow_type::WorkflowType;
 use anyhow::anyhow;
-use edgeless_api::controller::ControllerAPI;
+use edgeless_api::api::controller::ControllerAPI;
 use edgeless_api::workflow_instance::{SpawnWorkflowResponse, WorkflowFunction, WorkflowId, WorkflowInstanceAPI};
 use rand::prelude::*;
 use rand::SeedableRng;

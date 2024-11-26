@@ -200,14 +200,18 @@ pub struct Orchestrator {
 enum OrchestratorRequest {
     StartFunction(
         edgeless_api::function_instance::SpawnFunctionRequest,
-        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>>,
+        tokio::sync::oneshot::Sender<
+            anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::DomainManagedInstanceId>>,
+        >,
     ),
-    StopFunction(edgeless_api::orc::DomainManagedInstanceId),
+    StopFunction(edgeless_api::function_instance::DomainManagedInstanceId),
     StartResource(
         edgeless_api::resource_configuration::ResourceInstanceSpecification,
-        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>>,
+        tokio::sync::oneshot::Sender<
+            anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::DomainManagedInstanceId>>,
+        >,
     ),
-    StopResource(edgeless_api::orc::DomainManagedInstanceId),
+    StopResource(edgeless_api::function_instance::DomainManagedInstanceId),
     Patch(edgeless_api::common::PatchRequest),
     UpdateNode(
         edgeless_api::node_registration::UpdateNodeRequest,
@@ -305,14 +309,16 @@ impl std::fmt::Display for ResourceProvider {
 }
 
 pub struct OrchestratorClient {
-    function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId>>,
+    function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::DomainManagedInstanceId>>,
     node_registration_client: Box<dyn edgeless_api::node_registration::NodeRegistrationAPI>,
     resource_configuration_client:
-        Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId>>,
+        Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::DomainManagedInstanceId>>,
 }
 
-impl edgeless_api::orc::OrchestratorAPI for OrchestratorClient {
-    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId>> {
+impl edgeless_api::api::orc::OrchestratorAPI for OrchestratorClient {
+    fn function_instance_api(
+        &mut self,
+    ) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::DomainManagedInstanceId>> {
         self.function_instance_client.clone()
     }
 
@@ -322,7 +328,7 @@ impl edgeless_api::orc::OrchestratorAPI for OrchestratorClient {
 
     fn resource_configuration_api(
         &mut self,
-    ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId>> {
+    ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::DomainManagedInstanceId>> {
         self.resource_configuration_client.clone()
     }
 }
@@ -347,7 +353,7 @@ impl OrchestratorFunctionInstanceOrcClient {}
 pub struct ClientDesc {
     pub agent_url: String,
     pub invocation_url: String,
-    pub api: Box<dyn edgeless_api::agent::AgentAPI + Send>,
+    pub api: Box<dyn edgeless_api::api::agent::AgentAPI + Send>,
     pub capabilities: edgeless_api::node_registration::NodeCapabilities,
 }
 
@@ -1071,7 +1077,7 @@ impl Orchestrator {
                                 );
 
                                 let (proto, host, port) = edgeless_api::util::parse_http_host(&agent_url).unwrap();
-                                let api: Box<dyn edgeless_api::agent::AgentAPI + Send> = match proto {
+                                let api: Box<dyn edgeless_api::api::agent::AgentAPI + Send> = match proto {
                                     edgeless_api::util::Proto::COAP => {
                                         let addr = std::net::SocketAddrV4::new(host.parse().unwrap(), port);
                                         Box::new(edgeless_api::coap_impl::CoapClient::new(addr).await)
@@ -1405,7 +1411,7 @@ impl Orchestrator {
         }
     }
 
-    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::orc::OrchestratorAPI + Send> {
+    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::api::orc::OrchestratorAPI + Send> {
         Box::new(OrchestratorClient {
             function_instance_client: Box::new(OrchestratorFunctionInstanceOrcClient { sender: self.sender.clone() }),
             node_registration_client: Box::new(NodeRegistrationClient { sender: self.sender.clone() }),
@@ -1415,14 +1421,16 @@ impl Orchestrator {
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId> for OrchestratorFunctionInstanceOrcClient {
+impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::DomainManagedInstanceId>
+    for OrchestratorFunctionInstanceOrcClient
+{
     async fn start(
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::DomainManagedInstanceId>> {
         log::debug!("FunctionInstance::start() {:?}", request);
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
-            anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>,
+            anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::DomainManagedInstanceId>>,
         >();
         if let Err(err) = self.sender.send(OrchestratorRequest::StartFunction(request, reply_sender)).await {
             return Err(anyhow::anyhow!(
@@ -1439,7 +1447,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::Dom
         }
     }
 
-    async fn stop(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
+    async fn stop(&mut self, id: edgeless_api::function_instance::DomainManagedInstanceId) -> anyhow::Result<()> {
         log::debug!("FunctionInstance::stop() {:?}", id);
         match self.sender.send(OrchestratorRequest::StopFunction(id)).await {
             Ok(_) => Ok(()),
@@ -1485,14 +1493,16 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for NodeRegistrationCl
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId> for ResourceConfigurationClient {
+impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::DomainManagedInstanceId>
+    for ResourceConfigurationClient
+{
     async fn start(
         &mut self,
         request: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::DomainManagedInstanceId>> {
         log::debug!("ResourceConfigurationAPI::start() {:?}", request);
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
-            anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>>,
+            anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::DomainManagedInstanceId>>,
         >();
         if let Err(err) = self.sender.send(OrchestratorRequest::StartResource(request, reply_sender)).await {
             return Err(anyhow::anyhow!(
@@ -1509,7 +1519,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         }
     }
 
-    async fn stop(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
+    async fn stop(&mut self, id: edgeless_api::function_instance::DomainManagedInstanceId) -> anyhow::Result<()> {
         log::debug!("ResourceConfigurationAPI::stop() {:?}", id);
         match self.sender.send(OrchestratorRequest::StopResource(id)).await {
             Ok(_) => Ok(()),

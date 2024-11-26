@@ -38,7 +38,7 @@ impl Controller {
         controller_settings: crate::EdgelessConSettings,
     ) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
         // Connect to all orchestrators.
-        let mut orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>::new();
+        let mut orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::api::orc::OrchestratorAPI>>::new();
         for orc in &controller_settings.orchestrators {
             match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&orc.orchestrator_url, Some(1)).await {
                 Ok(val) => {
@@ -54,7 +54,7 @@ impl Controller {
     }
 
     fn new(
-        orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>,
+        orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::api::orc::OrchestratorAPI>>,
     ) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
@@ -66,7 +66,7 @@ impl Controller {
         (Controller { sender }, main_task)
     }
 
-    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::controller::ControllerAPI + Send> {
+    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::api::controller::ControllerAPI + Send> {
         client::ControllerClient::new(self.sender.clone())
     }
 }

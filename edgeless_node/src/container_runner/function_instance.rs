@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::container_function::ContainerFunctionAPI;
+use edgeless_api::api::container_function::ContainerFunctionAPI;
 
 /// FunctionInstance implementation allowing to execute functions defined
 /// as computational containers through a gRPC API.
