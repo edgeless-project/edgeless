@@ -6,6 +6,7 @@
 pub mod api;
 pub mod coap_impl;
 pub mod common;
+pub mod domain_registration;
 pub mod function_instance;
 #[cfg(feature = "grpc_impl")]
 pub mod grpc_impl;

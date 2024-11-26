@@ -82,13 +82,13 @@ message StartComponentResponse {
     optional InstanceIdVariant instance_id = 2;
 }
 
-// Possible message types of FunctionInstance::UpdateNode().
+// Possible message types of NodeRegistrationAPI::UpdateNode().
 enum UpdateNodeRequestType {
     REGISTER   = 0;
     DEREGISTER = 1;
 }
 
-// Request message of FunctionInstance::UpdateNode().
+// Request message of NodeRegistrationAPI::UpdateNode().
 message UpdateNodeRequest {
     // Request type: registration or deregistration. Always present.
     UpdateNodeRequestType request_type                        = 1;
@@ -135,7 +135,7 @@ message NodeCapabilities {
     uint32 mem_size_gpu      = 82;
 }
 
-// Response message of FunctionInstance::UpdateNode().
+// Response message of NodeRegistrationAPI::UpdateNode().
 message UpdateNodeResponse {
     // If present it means that the request has been rejected.
     // In this case, other fields may not be present or contain meaningful data.
@@ -328,6 +328,52 @@ message WorkflowId {
 message WorkflowInstanceList {
     repeated WorkflowInstanceStatus workflow_statuses = 1;
 }
+
+// Request message of DomainRegistrationAPI::UpdateDomain().
+message UpdateDomainRequest {
+    // Domain name.
+    string domain_id              = 10;
+    // URL of the orchestrator server.
+    string orchestrator_url       = 20;
+    // Domain capabilities.
+    DomainCapabilities capabilities = 30;
+    // Deadline for refreshing the domain request, in seconds since Unix epoch.
+    // After this time the orchestration domain can be considered to be offline.
+    uint64 refresh_deadline       = 40;
+}
+
+// Domain capabilities exposed from the orchestrator to the controller.
+message DomainCapabilities {
+    // Total number of (actual or virtual) CPUs.
+    uint32 num_cpus          = 10;
+    // Total number of physical cores.
+    uint32 num_cores         = 11;
+    // Total size of memory available, in MiB.
+    uint32 mem_size          = 12;
+    // Superset of all the labels advertised by the nodes in the domain.
+    repeated string labels   = 20;
+    // Number of nodes with a Trusted Execution Environment.
+    uint32 num_tee           = 30;
+    // Number of nodes with a Trusted Platform Module.
+    uint32 num_tpm           = 40;
+    // Superset of all the run-times supported by the nodes in the domain.
+    repeated string runtimes = 50;
+    // Total disk space, in MiB.
+    uint32 disk_tot_space    = 60;
+    // Total number of (actual or virtual) GPUs.
+    uint32 num_gpus          = 70;
+    // Total GPU memory available, in MiB.
+    uint32 mem_size_gpu      = 71;
+}
+
+// Response message of DomainRegistrationAPI::UpdateDomain().
+message UpdateDomainResponse {
+    // If present it means that the request has been rejected.
+    // In this case, other fields may not be present or contain meaningful data.
+    optional ResponseError response_error = 1;
+}
+
+// message Domain
 
 // Event types.
 enum EventType {
