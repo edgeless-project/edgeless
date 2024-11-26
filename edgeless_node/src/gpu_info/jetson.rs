@@ -189,7 +189,9 @@ pub fn jetson_get_mem_size_gpu() -> i32 {
 /// # Returns
 /// * `i32` - The number of available GPUs or a negative number if the operation fails
 pub fn jetson_get_num_gpus() -> i32 {
-    1 // TODO: implement this
+    // Jetson boards only contain a single GPU
+    // see: https://forums.developer.nvidia.com/t/detect-number-of-gpus/314622
+    1
 }
 
 /// Determines if the system is a Jetson board by checking `/sys/firmware/devicetree/base/model`.
