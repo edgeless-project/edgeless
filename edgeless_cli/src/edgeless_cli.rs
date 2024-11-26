@@ -235,7 +235,7 @@ async fn main() -> anyhow::Result<()> {
                     };
 
                     // standard files - could be extended to look for more
-                    let triggering_files = vec!["Cargo.toml", "Cargo.lock", "function.json", "src/lib.rs"];
+                    let triggering_files = ["Cargo.toml", "Cargo.lock", "function.json", "src/lib.rs"];
                     let full_paths: Vec<std::path::PathBuf> = triggering_files.iter().map(|&f| cargo_project_path.join(f)).collect();
                     let mod_timestamps: Vec<SystemTime> = full_paths
                         .iter()
