@@ -42,13 +42,23 @@ service NodeManagement {
     rpc KeepAlive (google.protobuf.Empty) returns (KeepAliveResponse);
 }
 
-// API that allows nodes to register themselves with the orchestrator
+// API that allows nodes to register themselves with the orchestrator.
 service NodeRegistration {
     // Register a new node on an orchestrator or deregister an existing node.
     // Input: registration: identifier of the new node and agent/invocation URLs;
     // deregistration: identifier of the existing node to be deregistered.
     // Output: UpdateNodeResponse.
     rpc UpdateNode (UpdateNodeRequest) returns (UpdateNodeResponse);
+}
+
+// API that allows the orchestrators to register with the controller.
+service DomainRegistration {
+    // Register a new orchestration domain on a controller.
+    // Input: registration data, including a deadline by which the orchestration
+    // domain can be considered offline; to disconnect a domain, use a value in
+    // the past for this deadline
+    // Output: UpdateDomainResponse.
+    rpc UpdateDomain (UpdateDomainRequest) returns (UpdateDomainResponse);
 }
 
 // API to manage the lifecycle of workflow instances (s04).
