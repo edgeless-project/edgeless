@@ -5,7 +5,7 @@
 mod workflow_spec;
 
 use clap::Parser;
-use edgeless_api::{controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
+use edgeless_api::{api::controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
 
 use mailparse::{parse_content_disposition, parse_header};
 use reqwest::header::ACCEPT;

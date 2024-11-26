@@ -7,7 +7,7 @@
 mod tests {
     // use super::*;
 
-    use edgeless_api::controller::ControllerAPI;
+    use edgeless_api::api::controller::ControllerAPI;
     use edgeless_api::workflow_instance::WorkflowInstanceAPI;
     use edgeless_orc::proxy::Proxy;
 

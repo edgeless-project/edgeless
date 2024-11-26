@@ -35,7 +35,7 @@ struct MockNode {
     sender: futures::channel::mpsc::UnboundedSender<MockAgentEvent>,
 }
 
-impl edgeless_api::agent::AgentAPI for MockNode {
+impl edgeless_api::api::agent::AgentAPI for MockNode {
     fn function_instance_api(
         &mut self,
     ) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::InstanceId>> {
@@ -164,7 +164,7 @@ fn test_create_clients_resources(
                 api: Box::new(MockNode {
                     node_id,
                     sender: mock_node_sender,
-                }) as Box<dyn edgeless_api::agent::AgentAPI + Send>,
+                }) as Box<dyn edgeless_api::api::agent::AgentAPI + Send>,
                 capabilities,
             },
         );
@@ -187,8 +187,8 @@ async fn test_setup(
     num_nodes: u32,
     num_resources_per_node: u32,
 ) -> (
-    Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId>>,
-    Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId>>,
+    Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::DomainManagedInstanceId>>,
+    Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::DomainManagedInstanceId>>,
     Box<dyn edgeless_api::node_registration::NodeRegistrationAPI>,
     std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>,
     uuid::Uuid,

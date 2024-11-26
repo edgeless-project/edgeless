@@ -14,7 +14,7 @@ impl ControllerAPIClient {
     }
 }
 
-impl crate::controller::ControllerAPI for ControllerAPIClient {
+impl crate::api::controller::ControllerAPI for ControllerAPIClient {
     fn workflow_instance_api(&mut self) -> Box<dyn crate::workflow_instance::WorkflowInstanceAPI> {
         self.workflow_instance_client.clone()
     }
@@ -23,7 +23,10 @@ impl crate::controller::ControllerAPI for ControllerAPIClient {
 pub struct WorkflowInstanceAPIServer {}
 
 impl WorkflowInstanceAPIServer {
-    pub fn run(controller_api: Box<dyn crate::controller::ControllerAPI + Send>, controller_url: String) -> futures::future::BoxFuture<'static, ()> {
+    pub fn run(
+        controller_api: Box<dyn crate::api::controller::ControllerAPI + Send>,
+        controller_url: String,
+    ) -> futures::future::BoxFuture<'static, ()> {
         let mut controller_api = controller_api;
         let workflow_api = crate::grpc_impl::workflow_instance::WorkflowInstanceAPIServer {
             root_api: tokio::sync::Mutex::new(controller_api.workflow_instance_api()),
