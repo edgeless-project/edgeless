@@ -31,6 +31,8 @@ mod tests {
             port
         };
 
+        let domain_registration_url = format!("http://{}:{}", address, next_port());
+
         let mut orchestrators = vec![];
         for domain_i in 0..num_domains {
             let orchestrator_url = format!("http://{}:{}", address, next_port());
@@ -126,6 +128,7 @@ mod tests {
 
         let (task, handle) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
             controller_url: controller_url.clone(),
+            domain_registration_url,
             orchestrators,
         }));
         tokio::spawn(task);
