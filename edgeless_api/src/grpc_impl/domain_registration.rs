@@ -4,15 +4,11 @@
 // SPDX-License-Identifier: MIT
 
 #[derive(Clone)]
-pub struct DomainRegistrationClient {
+pub struct DomainRegistrationAPIClient {
     client: crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient<tonic::transport::Channel>,
 }
 
-pub struct DomainRegistrationAPIService {
-    pub domain_registration_api: tokio::sync::Mutex<Box<dyn crate::domain_registration::DomainRegistrationAPI>>,
-}
-
-impl DomainRegistrationClient {
+impl DomainRegistrationAPIClient {
     pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
         loop {
             match crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient::connect(server_addr.to_string()).await {
@@ -32,7 +28,7 @@ impl DomainRegistrationClient {
 }
 
 #[async_trait::async_trait]
-impl crate::domain_registration::DomainRegistrationAPI for DomainRegistrationClient {
+impl crate::domain_registration::DomainRegistrationAPI for DomainRegistrationAPIClient {
     async fn update_domain(
         &mut self,
         request: crate::domain_registration::UpdateDomainRequest,
@@ -48,8 +44,12 @@ impl crate::domain_registration::DomainRegistrationAPI for DomainRegistrationCli
     }
 }
 
+pub struct DomainRegistrationAPIServer {
+    pub domain_registration_api: tokio::sync::Mutex<Box<dyn crate::domain_registration::DomainRegistrationAPI>>,
+}
+
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::domain_registration_server::DomainRegistration for DomainRegistrationAPIService {
+impl crate::grpc_impl::api::domain_registration_server::DomainRegistration for DomainRegistrationAPIServer {
     async fn update_domain(
         &self,
         request: tonic::Request<crate::grpc_impl::api::UpdateDomainRequest>,

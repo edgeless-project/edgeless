@@ -11,6 +11,7 @@ pub mod common;
 pub mod container_function;
 pub mod container_runtime;
 pub mod controller;
+pub mod domain_register;
 pub mod domain_registration;
 pub mod function_instance;
 pub mod guest_api_function;
