@@ -4,6 +4,9 @@
 #![allow(clippy::all)]
 
 use edgeless_api::function_instance::{FunctionClassSpecification, StatePolicy, StateSpecification};
+use futures::channel::mpsc::UnboundedReceiver;
+
+use crate::subscriber::SubscriberRequest;
 
 use super::*;
 enum MockAgentEvent {
@@ -192,6 +195,7 @@ async fn test_setup(
     Box<dyn edgeless_api::node_registration::NodeRegistrationAPI>,
     std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>,
     uuid::Uuid,
+    UnboundedReceiver<SubscriberRequest>,
 ) {
     let (nodes, clients, resource_providers, stable_node_id) = test_create_clients_resources(num_nodes, num_resources_per_node);
     let (subscriber_sender, subscriber_receiver) = futures::channel::mpsc::unbounded();
@@ -214,6 +218,7 @@ async fn test_setup(
         orchestrator.get_api_client().node_registration_api(),
         nodes,
         stable_node_id,
+        subscriber_receiver,
     )
 }
 
@@ -317,7 +322,7 @@ fn make_start_resource_request(class_type: &str) -> edgeless_api::resource_confi
 
 #[tokio::test]
 async fn test_orc_single_node_function_start_stop() {
-    let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes, _) = test_setup(1, 0).await;
+    let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes, _, _) = test_setup(1, 0).await;
     assert_eq!(1, nodes.len());
     let (node_id, mock_node_receiver) = nodes.iter_mut().next().unwrap();
     assert!(!node_id.is_nil());
@@ -369,7 +374,7 @@ async fn test_orc_single_node_function_start_stop() {
 
 #[tokio::test]
 async fn test_orc_multiple_nodes_function_start_stop() {
-    let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes, _) = test_setup(3, 0).await;
+    let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes, _, _) = test_setup(3, 0).await;
     assert_eq!(3, nodes.len());
 
     // Start 100 functions.
@@ -425,7 +430,7 @@ async fn test_orc_multiple_nodes_function_start_stop() {
 
 #[tokio::test]
 async fn test_orc_multiple_resources_start_stop() {
-    let (mut _fun_client, mut res_client, mut _mgt_client, mut nodes, _) = test_setup(3, 3).await;
+    let (mut _fun_client, mut res_client, mut _mgt_client, mut nodes, _, _) = test_setup(3, 3).await;
     assert_eq!(3, nodes.len());
 
     // Start 100 resources.
@@ -493,7 +498,7 @@ async fn test_orc_multiple_resources_start_stop() {
 
 #[tokio::test]
 async fn test_orc_patch() {
-    let (mut fun_client, mut res_client, mut _mgt_client, mut nodes, _) = test_setup(1, 1).await;
+    let (mut fun_client, mut res_client, mut _mgt_client, mut nodes, _, _) = test_setup(1, 1).await;
     assert_eq!(1, nodes.len());
     let client_node_id = *nodes.keys().next().unwrap();
 
@@ -601,9 +606,7 @@ async fn test_orc_patch() {
 #[tokio::test]
 #[serial_test::serial]
 async fn test_orc_node_with_fun_disconnects() {
-    let _ = env_logger::try_init();
-
-    let (mut fun_client, mut _res_client, mut mgt_client, mut nodes, stable_node_id) = test_setup(10, 0).await;
+    let (mut fun_client, mut _res_client, mut mgt_client, mut nodes, stable_node_id, _) = test_setup(10, 0).await;
     assert_eq!(10, nodes.len());
 
     // Start this workflow
@@ -821,9 +824,7 @@ async fn test_orc_node_with_fun_disconnects() {
 
 #[tokio::test]
 async fn orc_node_with_res_disconnects() {
-    let _ = env_logger::try_init();
-
-    let (mut fun_client, mut res_client, mut mgt_client, mut nodes, stable_node_id) = test_setup(10, 1).await;
+    let (mut fun_client, mut res_client, mut mgt_client, mut nodes, stable_node_id, _) = test_setup(10, 1).await;
     assert_eq!(10, nodes.len());
 
     // Start this workflow
@@ -984,9 +985,7 @@ async fn orc_node_with_res_disconnects() {
 
 #[tokio::test]
 async fn test_patch_after_fun_stop() {
-    let _ = env_logger::try_init();
-
-    let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes, _stable_node_id) = test_setup(10, 0).await;
+    let (mut fun_client, mut _res_client, mut _mgt_client, mut nodes, _stable_node_id, _) = test_setup(10, 0).await;
     assert_eq!(10, nodes.len());
 
     // Start this workflow
@@ -1110,9 +1109,7 @@ async fn test_patch_after_fun_stop() {
 #[tokio::test]
 #[serial_test::serial]
 async fn test_recreate_fun_after_disconnect() {
-    let _ = env_logger::try_init();
-
-    let (mut fun_client, mut _res_client, mut mgt_client, mut nodes, stable_node_id) = test_setup(2, 0).await;
+    let (mut fun_client, mut _res_client, mut mgt_client, mut nodes, stable_node_id, _) = test_setup(2, 0).await;
     assert_eq!(2, nodes.len());
 
     // Start this workflow
@@ -1295,6 +1292,45 @@ async fn test_recreate_fun_after_disconnect() {
 
     // Make sure there are no pending events.
     no_function_event(&mut nodes).await;
+}
+
+#[tokio::test]
+#[serial_test::serial]
+async fn test_update_domain_capabilities() {
+    {
+        let _ = FAILING_NODES.set(std::sync::Mutex::new(std::collections::HashSet::new()));
+    }
+
+    let (_fun_client, mut _res_client, mut mgt_client, _nodes, _stable_node_id, mut subscriber_receiver) = test_setup(10, 0).await;
+
+    let _ = mgt_client.keep_alive().await;
+
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    let mut num_events = 0;
+    let mut expected_caps = edgeless_api::domain_registration::DomainCapabilities::default();
+    expected_caps.num_nodes = 10;
+    expected_caps.num_cpus = 10;
+    expected_caps.num_cores = 10;
+    expected_caps.labels.insert("stable".to_string());
+    expected_caps.labels.insert("unstable".to_string());
+    expected_caps.runtimes.insert("RUST_WASM".to_string());
+    while let Ok(event) = subscriber_receiver.try_next() {
+        match event {
+            Some(event) => match event {
+                SubscriberRequest::Update(actual_caps) => {
+                    log::info!("XXX {:?}", actual_caps);
+                    assert_eq!(expected_caps, actual_caps);
+                    num_events += 1;
+                }
+                SubscriberRequest::Refresh() => {
+                    panic!("unexpected refresh event received");
+                }
+            },
+            None => break,
+        }
+    }
+    assert_eq!(1, num_events);
 }
 
 #[test]
