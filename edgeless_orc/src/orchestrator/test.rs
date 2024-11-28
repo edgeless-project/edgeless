@@ -35,7 +35,7 @@ struct MockNode {
     sender: futures::channel::mpsc::UnboundedSender<MockAgentEvent>,
 }
 
-impl edgeless_api::api::agent::AgentAPI for MockNode {
+impl edgeless_api::outer::agent::AgentAPI for MockNode {
     fn function_instance_api(
         &mut self,
     ) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::InstanceId>> {
@@ -164,7 +164,7 @@ fn test_create_clients_resources(
                 api: Box::new(MockNode {
                     node_id,
                     sender: mock_node_sender,
-                }) as Box<dyn edgeless_api::api::agent::AgentAPI + Send>,
+                }) as Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
                 capabilities,
             },
         );

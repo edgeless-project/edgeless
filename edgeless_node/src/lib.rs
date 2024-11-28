@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::api::orc::OrchestratorAPI;
+use edgeless_api::outer::orc::OrchestratorAPI;
 use futures::Future;
 use resources::resource_provider_specs::ResourceProviderSpecs;
 
@@ -256,7 +256,7 @@ pub async fn register_node(
         &settings.orchestrator_url,
         capabilities
     );
-    match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&settings.orchestrator_url, None).await {
+    match edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&settings.orchestrator_url, None).await {
         Ok(mut orc_client) => match orc_client
             .node_registration_api()
             .update_node(edgeless_api::node_registration::UpdateNodeRequest::Registration(
@@ -559,7 +559,7 @@ pub async fn create_metrics_collector_node(
         data_plane.clone(),
         telemetry_performance_target,
     );
-    let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), agent_url);
+    let agent_api_server = edgeless_api::grpc_impl::outer::agent::AgentAPIServer::run(agent.get_api_client(), agent_url);
 
     (node_id, agent_task, agent_api_server, resource_provider_specifications)
 }
@@ -661,7 +661,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                 let (container_runtime, container_runtime_task, container_runtime_api) = container_runner::container_runtime::ContainerRuntime::new(
                     std::collections::HashMap::from([("guest_api_host_url".to_string(), container_runtime_settings.guest_api_host_url.clone())]),
                 );
-                let server_task = edgeless_api::grpc_impl::container_runtime::GuestAPIHostServer::run(
+                let server_task = edgeless_api::grpc_impl::outer::container_runtime::GuestAPIHostServer::run(
                     container_runtime_api,
                     container_runtime_settings.guest_api_host_url,
                 );
@@ -705,7 +705,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         data_plane.clone(),
         telemetry_performance_target,
     );
-    let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
+    let agent_api_server = edgeless_api::grpc_impl::outer::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
 
     // Wait for all the tasks to complete.
     let _ = futures::join!(
