@@ -377,6 +377,7 @@ impl Orchestrator {
     pub async fn new(
         settings: crate::EdgelessOrcBaselineSettings,
         proxy: Box<dyn super::proxy::Proxy>,
+        subscriber_sender: futures::channel::mpsc::UnboundedSender<super::subscriber::SubscriberRequest>,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
@@ -386,6 +387,7 @@ impl Orchestrator {
                 std::collections::HashMap::new(),
                 std::collections::HashMap::new(),
                 proxy,
+                subscriber_sender,
             )
             .await;
         });
@@ -398,10 +400,19 @@ impl Orchestrator {
         settings: crate::EdgelessOrcBaselineSettings,
         clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
         resource_providers: std::collections::HashMap<String, ResourceProvider>,
+        subscriber_sender: futures::channel::mpsc::UnboundedSender<super::subscriber::SubscriberRequest>,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, settings, clients, resource_providers, Box::new(super::proxy_none::ProxyNone {})).await;
+            Self::main_task(
+                receiver,
+                settings,
+                clients,
+                resource_providers,
+                Box::new(super::proxy_none::ProxyNone {}),
+                subscriber_sender,
+            )
+            .await;
         });
 
         (Orchestrator { sender }, main_task)
@@ -822,14 +833,39 @@ impl Orchestrator {
         dependencies
     }
 
+    fn domain_capabilities(nodes: &std::collections::HashMap<uuid::Uuid, ClientDesc>) -> edgeless_api::domain_registration::DomainCapabilities {
+        let mut ret = edgeless_api::domain_registration::DomainCapabilities::default();
+        for client_desc in nodes.values() {
+            let caps = &client_desc.capabilities;
+            ret.num_nodes += 1;
+            ret.num_cpus += caps.num_cpus;
+            ret.num_cores += caps.num_cores;
+            ret.mem_size += caps.mem_size;
+            ret.labels.extend(caps.labels.iter().cloned());
+            if caps.is_tee_running {
+                ret.num_tee += 1;
+            }
+            if caps.has_tpm {
+                ret.num_tpm += 1;
+            }
+            ret.runtimes.extend(caps.runtimes.iter().cloned());
+            ret.disk_tot_space += caps.disk_tot_space;
+            ret.num_gpus += caps.num_gpus;
+            ret.mem_size_gpu += caps.mem_size_gpu;
+        }
+        ret
+    }
+
     async fn main_task(
         receiver: futures::channel::mpsc::UnboundedReceiver<OrchestratorRequest>,
         orchestrator_settings: crate::EdgelessOrcBaselineSettings,
         nodes: std::collections::HashMap<uuid::Uuid, ClientDesc>,
         resource_providers: std::collections::HashMap<String, ResourceProvider>,
         mut proxy: Box<dyn super::proxy::Proxy>,
+        subscriber_sender: futures::channel::mpsc::UnboundedSender<super::subscriber::SubscriberRequest>,
     ) {
         let mut receiver = receiver;
+        let mut subscriber_sender = subscriber_sender;
         let mut orchestration_logic = crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy);
         let mut rng = rand::rngs::StdRng::from_entropy();
 
@@ -874,6 +910,8 @@ impl Orchestrator {
         //        value: ext_fid (target function)
         let mut dependency_graph = std::collections::HashMap::new();
         let mut dependency_graph_changed = false;
+
+        let mut last_domain_capabilities = edgeless_api::domain_registration::DomainCapabilities::default();
 
         // main orchestration loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
@@ -1232,6 +1270,13 @@ impl Orchestrator {
                     }
 
                     // Update the orchestration logic and proxy.
+                    let new_domain_capabilities = Self::domain_capabilities(&nodes);
+                    if new_domain_capabilities != last_domain_capabilities {
+                        last_domain_capabilities = new_domain_capabilities.clone();
+                        let _ = subscriber_sender
+                            .send(super::subscriber::SubscriberRequest::Update(new_domain_capabilities))
+                            .await;
+                    }
                     orchestration_logic.update_nodes(&nodes, &resource_providers);
                     proxy.update_nodes(&nodes);
                     proxy.push_keep_alive_responses(keep_alive_responses);
