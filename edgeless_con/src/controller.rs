@@ -5,12 +5,14 @@
 
 pub mod client;
 mod deployment_state;
+pub mod domain_register_client;
 pub mod server;
 #[cfg(test)]
 pub mod test;
 
 pub struct Controller {
-    sender: futures::channel::mpsc::UnboundedSender<ControllerRequest>,
+    workflow_instance_sender: futures::channel::mpsc::UnboundedSender<ControllerRequest>,
+    domain_register_sender: futures::channel::mpsc::UnboundedSender<DomainRegisterRequest>,
 }
 
 pub(crate) enum ControllerRequest {
@@ -24,6 +26,14 @@ pub(crate) enum ControllerRequest {
         edgeless_api::workflow_instance::WorkflowId,
         // Reply Channel
         tokio::sync::oneshot::Sender<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>,
+    ),
+}
+
+pub(crate) enum DomainRegisterRequest {
+    Update(
+        edgeless_api::domain_registration::UpdateDomainRequest,
+        // Reply Channel
+        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::domain_registration::UpdateDomainResponse>>,
     ),
 }
 
@@ -56,17 +66,28 @@ impl Controller {
     fn new(
         orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::outer::orc::OrchestratorAPI>>,
     ) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
-        let (sender, receiver) = futures::channel::mpsc::unbounded();
+        let (workflow_instance_sender, workflow_instance_receiver) = futures::channel::mpsc::unbounded();
+        let (domain_register_sender, domain_register_receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
-            let mut controller_task = server::ControllerTask::new(receiver, orchestrators);
+            let mut controller_task = server::ControllerTask::new(workflow_instance_receiver, domain_register_receiver, orchestrators);
             controller_task.run().await;
         });
 
-        (Controller { sender }, main_task)
+        (
+            Controller {
+                workflow_instance_sender: workflow_instance_sender,
+                domain_register_sender,
+            },
+            main_task,
+        )
     }
 
-    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::outer::controller::ControllerAPI + Send> {
-        client::ControllerClient::new(self.sender.clone())
+    pub fn get_workflow_instance_client(&mut self) -> Box<dyn edgeless_api::outer::controller::ControllerAPI + Send> {
+        client::ControllerClient::new(self.workflow_instance_sender.clone())
+    }
+
+    pub fn get_domain_register_client(&mut self) -> Box<dyn edgeless_api::outer::domain_register::DomainRegisterAPI + Send> {
+        domain_register_client::DomainRegisterClient::new(self.domain_register_sender.clone())
     }
 }
