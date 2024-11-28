@@ -127,8 +127,19 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     )
     .await;
 
+    // Create the component that subscribes to the domain register to
+    // notify domain updates (periodically refreshed).
+    let (mut subscriber, subscriber_task, refresh_task) = subscriber::Subscriber::new(
+        settings.general.domain_id.clone(),
+        settings.general.orchestrator_url.clone(),
+        settings.general.domain_register_url,
+        settings.general.subscription_refresh_interval_sec,
+    )
+    .await;
+
     // Create the orchestrator.
-    let (mut orchestrator, orchestrator_task) = orchestrator::Orchestrator::new(settings.baseline.clone(), make_proxy(settings.proxy)).await;
+    let (mut orchestrator, orchestrator_task) =
+        orchestrator::Orchestrator::new(settings.baseline.clone(), make_proxy(settings.proxy), subscriber.get_subscriber_sender()).await;
 
     let orchestrator_server =
         edgeless_api::grpc_impl::outer::orc::OrchestratorAPIServer::run(orchestrator.get_api_client(), settings.general.orchestrator_url.clone());
@@ -155,15 +166,6 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
             }
         });
     }
-
-    // Create the component that will subscribe to the controller.
-    let (subscriber, subscriber_task, refresh_task) = subscriber::Subscriber::new(
-        settings.general.domain_id.clone(),
-        settings.general.orchestrator_url.clone(),
-        settings.general.domain_register_url,
-        settings.general.subscription_refresh_interval_sec,
-    )
-    .await;
 
     // Wait for all the tasks to come to an end.
     join!(
