@@ -44,6 +44,8 @@ mod tests {
 
             let (task, handle) = futures::future::abortable(edgeless_orc::edgeless_orc_main(edgeless_orc::EdgelessOrcSettings {
                 general: edgeless_orc::EdgelessOrcGeneralSettings {
+                    controller_url: controller_url.clone(),
+                    subscription_refresh_interval_sec: 1,
                     domain_id: domain_id.to_string(),
                     orchestrator_url: orchestrator_url.to_string(),
                     orchestrator_url_announced: "".to_string(),
