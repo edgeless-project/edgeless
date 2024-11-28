@@ -12,14 +12,14 @@ pub struct ControllerClient {
 impl ControllerClient {
     pub fn new(
         sender: futures::channel::mpsc::UnboundedSender<super::ControllerRequest>,
-    ) -> Box<dyn edgeless_api::api::controller::ControllerAPI + Send> {
+    ) -> Box<dyn edgeless_api::outer::controller::ControllerAPI + Send> {
         Box::new(ControllerClient {
             workflow_instance_client: Box::new(ControllerWorkflowInstanceClient { sender }),
         })
     }
 }
 
-impl edgeless_api::api::controller::ControllerAPI for ControllerClient {
+impl edgeless_api::outer::controller::ControllerAPI for ControllerClient {
     fn workflow_instance_api(&mut self) -> Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI> {
         self.workflow_instance_client.clone()
     }

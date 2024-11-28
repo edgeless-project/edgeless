@@ -16,7 +16,7 @@ impl ContainerFunctionAPIClient {
     }
 }
 
-impl crate::api::container_function::ContainerFunctionAPI for ContainerFunctionAPIClient {
+impl crate::outer::container_function::ContainerFunctionAPI for ContainerFunctionAPIClient {
     fn guest_api_function(&mut self) -> Box<dyn crate::guest_api_function::GuestAPIFunction> {
         self.guest_api_function.clone()
     }
@@ -26,7 +26,7 @@ pub struct GuestAPIFunctionServer {}
 
 impl GuestAPIFunctionServer {
     pub fn run(
-        container_function_api: Box<dyn crate::api::container_function::ContainerFunctionAPI + Send>,
+        container_function_api: Box<dyn crate::outer::container_function::ContainerFunctionAPI + Send>,
         container_function_url: String,
     ) -> futures::future::BoxFuture<'static, ()> {
         let mut container_function_api = container_function_api;

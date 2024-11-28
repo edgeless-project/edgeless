@@ -368,7 +368,7 @@ impl Agent {
         }
     }
 
-    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::api::agent::AgentAPI + Send> {
+    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::outer::agent::AgentAPI + Send> {
         Box::new(AgentClient {
             function_instance_client: Box::new(FunctionInstanceNodeClient {
                 sender: self.sender.clone(),
@@ -514,7 +514,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 }
 
-impl edgeless_api::api::agent::AgentAPI for AgentClient {
+impl edgeless_api::outer::agent::AgentAPI for AgentClient {
     fn function_instance_api(
         &mut self,
     ) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::InstanceId>> {

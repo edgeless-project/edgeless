@@ -5,7 +5,7 @@
 mod workflow_spec;
 
 use clap::Parser;
-use edgeless_api::{api::controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
+use edgeless_api::{outer::controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
 
 use mailparse::{parse_content_disposition, parse_header};
 use reqwest::header::ACCEPT;
@@ -118,7 +118,7 @@ async fn main() -> anyhow::Result<()> {
                 }
                 log::debug!("Got Config");
                 let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
-                let mut con_client = edgeless_api::grpc_impl::controller::ControllerAPIClient::new(&conf.controller_url).await;
+                let mut con_client = edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(&conf.controller_url).await;
                 let mut con_wf_client = con_client.workflow_instance_api();
                 match workflow_command {
                     WorkflowCommands::Start { spec_file } => {

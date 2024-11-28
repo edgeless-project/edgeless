@@ -13,7 +13,7 @@ impl DomainRegisterAPIClient {
     }
 }
 
-impl crate::api::domain_register::DomainRegisterAPI for DomainRegisterAPIClient {
+impl crate::outer::domain_register::DomainRegisterAPI for DomainRegisterAPIClient {
     fn domain_registration_api(&mut self) -> Box<dyn crate::domain_registration::DomainRegistrationAPI> {
         self.domain_registration_client.clone()
     }
@@ -23,7 +23,7 @@ pub struct DomainRegistrationAPIServer {}
 
 impl DomainRegistrationAPIServer {
     pub fn run(
-        domain_register_api: Box<dyn crate::api::domain_register::DomainRegisterAPI + Send>,
+        domain_register_api: Box<dyn crate::outer::domain_register::DomainRegisterAPI + Send>,
         domain_registration_url: String,
     ) -> futures::future::BoxFuture<'static, ()> {
         let mut domain_register_api = domain_register_api;

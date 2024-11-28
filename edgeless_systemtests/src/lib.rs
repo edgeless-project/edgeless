@@ -7,7 +7,7 @@
 mod tests {
     // use super::*;
 
-    use edgeless_api::api::controller::ControllerAPI;
+    use edgeless_api::outer::controller::ControllerAPI;
     use edgeless_api::workflow_instance::WorkflowInstanceAPI;
     use edgeless_orc::proxy::Proxy;
 
@@ -134,7 +134,7 @@ mod tests {
         tokio::spawn(task);
         handles.push(handle);
 
-        let mut con_client = edgeless_api::grpc_impl::controller::ControllerAPIClient::new(controller_url.as_str()).await;
+        let mut con_client = edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(controller_url.as_str()).await;
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 

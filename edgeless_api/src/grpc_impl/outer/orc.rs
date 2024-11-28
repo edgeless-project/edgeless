@@ -14,7 +14,7 @@ impl OrchestratorAPIClient {
         let function_instance_client = crate::grpc_impl::function_instance::FunctionInstanceAPIClient::new(api_addr, retry_interval).await;
         let node_registration_client = crate::grpc_impl::node_registration::NodeRegistrationClient::new(api_addr, retry_interval).await;
         let resource_configuration_client: Result<
-            super::resource_configuration::ResourceConfigurationClient<crate::function_instance::DomainManagedInstanceId>,
+            crate::grpc_impl::resource_configuration::ResourceConfigurationClient<crate::function_instance::DomainManagedInstanceId>,
             anyhow::Error,
         > = Ok(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(api_addr, retry_interval).await);
 
@@ -29,7 +29,7 @@ impl OrchestratorAPIClient {
     }
 }
 
-impl crate::api::orc::OrchestratorAPI for OrchestratorAPIClient {
+impl crate::outer::orc::OrchestratorAPI for OrchestratorAPIClient {
     fn function_instance_api(&mut self) -> Box<dyn crate::function_instance::FunctionInstanceAPI<crate::function_instance::DomainManagedInstanceId>> {
         self.function_instance_client.clone()
     }
@@ -48,7 +48,7 @@ impl crate::api::orc::OrchestratorAPI for OrchestratorAPIClient {
 pub struct OrchestratorAPIServer {}
 
 impl OrchestratorAPIServer {
-    pub fn run(agent_api: Box<dyn crate::api::orc::OrchestratorAPI + Send>, orchestrator_url: String) -> futures::future::BoxFuture<'static, ()> {
+    pub fn run(agent_api: Box<dyn crate::outer::orc::OrchestratorAPI + Send>, orchestrator_url: String) -> futures::future::BoxFuture<'static, ()> {
         let mut agent_api = agent_api;
         let function_api = crate::grpc_impl::function_instance::FunctionInstanceAPIServer::<crate::function_instance::DomainManagedInstanceId> {
             root_api: tokio::sync::Mutex::new(agent_api.function_instance_api()),

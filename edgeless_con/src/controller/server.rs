@@ -7,14 +7,14 @@ use futures::StreamExt;
 
 pub struct ControllerTask {
     request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
-    orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::api::orc::OrchestratorAPI>>,
+    orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::outer::orc::OrchestratorAPI>>,
     active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::deployment_state::ActiveWorkflow>,
 }
 
 impl ControllerTask {
     pub fn new(
         request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
-        orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::api::orc::OrchestratorAPI>>,
+        orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::outer::orc::OrchestratorAPI>>,
     ) -> Self {
         Self {
             request_receiver,
