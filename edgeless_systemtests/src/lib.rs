@@ -31,7 +31,7 @@ mod tests {
             port
         };
 
-        let domain_registration_url = format!("http://{}:{}", address, next_port());
+        let domain_register_url = format!("http://{}:{}", address, next_port());
 
         let mut orchestrators = vec![];
         for domain_i in 0..num_domains {
@@ -44,7 +44,7 @@ mod tests {
 
             let (task, handle) = futures::future::abortable(edgeless_orc::edgeless_orc_main(edgeless_orc::EdgelessOrcSettings {
                 general: edgeless_orc::EdgelessOrcGeneralSettings {
-                    controller_url: controller_url.clone(),
+                    domain_register_url: domain_register_url.clone(),
                     subscription_refresh_interval_sec: 1,
                     domain_id: domain_id.to_string(),
                     orchestrator_url: orchestrator_url.to_string(),
@@ -130,7 +130,7 @@ mod tests {
 
         let (task, handle) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
             controller_url: controller_url.clone(),
-            domain_registration_url,
+            domain_register_url,
             orchestrators,
         }));
         tokio::spawn(task);

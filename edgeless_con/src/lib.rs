@@ -13,7 +13,7 @@ pub struct EdgelessConOrcConfig {
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessConSettings {
     pub controller_url: String,
-    pub domain_registration_url: String,
+    pub domain_register_url: String,
     pub orchestrators: Vec<EdgelessConOrcConfig>,
 }
 
@@ -32,7 +32,7 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
 pub fn edgeless_con_default_conf() -> String {
     String::from(
         r##"controller_url = "http://127.0.0.1:7001"
-domain_registration_url = "http://127.0.0.1:7004"
+domain_register_url = "http://127.0.0.1:7004"
 orchestrators = [
     { domain_id = "domain-1", orchestrator_url="http://127.0.0.1:7011" }
 ]
