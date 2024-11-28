@@ -22,8 +22,8 @@ pub struct EdgelessOrcSettings {
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessOrcGeneralSettings {
-    /// The URL of the controller with which this orchestrator registers.
-    pub controller_url: String,
+    /// The URL of the domain register.
+    pub domain_register_url: String,
     /// The interval at which the orchestrator refreshes subscription, s.
     pub subscription_refresh_interval_sec: u64,
     /// The identifier of the orchestration domain managed by this orchestrator.
@@ -160,7 +160,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     let (subscriber, subscriber_task, refresh_task) = subscriber::Subscriber::new(
         settings.general.domain_id.clone(),
         settings.general.orchestrator_url.clone(),
-        settings.general.controller_url,
+        settings.general.domain_register_url,
         settings.general.subscription_refresh_interval_sec,
     )
     .await;
@@ -197,7 +197,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
 pub fn edgeless_orc_default_conf() -> String {
     String::from(
         r##"[general]
-controller_url = "http://127.0.0.1:7001"
+domain_register_url = "http://127.0.0.1:7004"
 subscription_refresh_interval_sec = 10
 domain_id = "domain-1"
 orchestrator_url = "http://127.0.0.1:7011"

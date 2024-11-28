@@ -87,7 +87,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     };
 
     let controller_url = next_url();
-    let domain_registration_url = next_url();
+    let domain_register_url = next_url();
 
     // At first generate endpoints for invocation_urls and orc_agent_urls
     let mut node_invocation_urls: HashMap<Uuid, String> = HashMap::new();
@@ -110,7 +110,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     // Orchestrator
     let orc_conf = edgeless_orc::EdgelessOrcSettings {
         general: edgeless_orc::EdgelessOrcGeneralSettings {
-            controller_url: controller_url.clone(),
+            domain_register_url: domain_register_url.clone(),
             subscription_refresh_interval_sec: 1,
             domain_id: "domain-1".to_string(),
             orchestrator_url: next_url(),
@@ -140,7 +140,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     // Controller
     let con_conf = edgeless_con::EdgelessConSettings {
         controller_url,
-        domain_registration_url,
+        domain_register_url,
         // for now only one orchestrator
         orchestrators: vec![EdgelessConOrcConfig {
             domain_id: orc_conf.general.domain_id.clone(),
