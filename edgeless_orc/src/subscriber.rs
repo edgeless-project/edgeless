@@ -10,7 +10,7 @@ pub struct Subscriber {
 }
 
 #[derive(Clone)]
-enum SubscriberRequest {
+pub enum SubscriberRequest {
     Update(edgeless_api::domain_registration::DomainCapabilities),
     Refresh(),
 }
@@ -64,11 +64,11 @@ impl Subscriber {
         while let Some(req) = receiver.next().await {
             match req {
                 SubscriberRequest::Update(new_caps) => {
-                    log::info!("XXX update");
+                    log::debug!("Subscriber Update {:?}", new_caps);
                     last_caps = new_caps;
                 }
                 SubscriberRequest::Refresh() => {
-                    log::info!("XXX refresh");
+                    log::debug!("Subscriber Refresh");
                     // The refresh deadline is set to twice the refresh period
                     // to reduce the likelihood of a race condition on the domai
                     // register side.
@@ -89,5 +89,9 @@ impl Subscriber {
                 }
             }
         }
+    }
+
+    pub fn get_subscriber_sender(&mut self) -> futures::channel::mpsc::UnboundedSender<SubscriberRequest> {
+        self.sender.clone()
     }
 }
