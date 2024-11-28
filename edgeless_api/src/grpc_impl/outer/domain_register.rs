@@ -6,10 +6,10 @@ pub struct DomainRegisterAPIClient {
 }
 
 impl DomainRegisterAPIClient {
-    pub async fn new(api_addr: &str) -> anyhow::Result<Self> {
-        Ok(Self {
-            domain_registration_client: Box::new(crate::grpc_impl::domain_registration::DomainRegistrationAPIClient::new(api_addr, Some(1)).await?),
-        })
+    pub async fn new(api_addr: String) -> Self {
+        Self {
+            domain_registration_client: Box::new(crate::grpc_impl::domain_registration::DomainRegistrationAPIClient::new(api_addr)),
+        }
     }
 }
 

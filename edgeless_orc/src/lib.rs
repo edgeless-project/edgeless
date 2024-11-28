@@ -157,8 +157,13 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     }
 
     // Create the component that will subscribe to the controller.
-    let (subscriber, subscriber_task) =
-        subscriber::Subscriber::new(settings.general.controller_url, settings.general.subscription_refresh_interval_sec).await;
+    let (subscriber, subscriber_task, refresh_task) = subscriber::Subscriber::new(
+        settings.general.domain_id.clone(),
+        settings.general.orchestrator_url.clone(),
+        settings.general.controller_url,
+        settings.general.subscription_refresh_interval_sec,
+    )
+    .await;
 
     // Wait for all the tasks to come to an end.
     join!(
@@ -168,6 +173,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
         orchestrator_server,
         orchestrator_coap_server,
         subscriber_task,
+        refresh_task,
         edgeless_node::register_node(
             edgeless_node::EdgelessNodeGeneralSettings {
                 node_id,
