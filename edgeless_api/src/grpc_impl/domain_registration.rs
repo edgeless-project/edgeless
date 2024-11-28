@@ -5,25 +5,27 @@
 
 #[derive(Clone)]
 pub struct DomainRegistrationAPIClient {
-    client: crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient<tonic::transport::Channel>,
+    client: Option<crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient<tonic::transport::Channel>>,
+    server_addr: String,
 }
 
 impl DomainRegistrationAPIClient {
-    pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
-        loop {
-            match crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient::connect(server_addr.to_string()).await {
+    pub fn new(server_addr: String) -> Self {
+        Self { client: None, server_addr }
+    }
+
+    /// Try connecting, if not already connected.
+    pub async fn try_connect(&mut self) -> anyhow::Result<()> {
+        if self.client.is_none() {
+            self.client = match crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient::connect(self.server_addr.clone()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    return Ok(Self { client });
+                    Some(client)
                 }
-                Err(err) => match retry_interval {
-                    Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
-                    None => {
-                        return Err(anyhow::anyhow!("Error when connecting to {}: {}", server_addr, err));
-                    }
-                },
+                Err(err) => anyhow::bail!(err),
             }
         }
+        Ok(())
     }
 }
 
@@ -33,13 +35,24 @@ impl crate::domain_registration::DomainRegistrationAPI for DomainRegistrationAPI
         &mut self,
         request: crate::domain_registration::UpdateDomainRequest,
     ) -> anyhow::Result<crate::domain_registration::UpdateDomainResponse> {
-        match self
-            .client
-            .update_domain(tonic::Request::new(serialize_update_domain_request(&request)))
-            .await
-        {
-            Ok(res) => parse_update_domain_response(&res.into_inner()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while updating a domain: {}", err.to_string())),
+        match self.try_connect().await {
+            Ok(_) => {
+                if let Some(client) = &mut self.client {
+                    match client.update_domain(tonic::Request::new(serialize_update_domain_request(&request))).await {
+                        Ok(res) => parse_update_domain_response(&res.into_inner()),
+                        Err(err) => Err(anyhow::anyhow!(
+                            "Error when updating a domain to {}: {}",
+                            self.server_addr,
+                            err.to_string()
+                        )),
+                    }
+                } else {
+                    panic!("the impossible happened");
+                }
+            }
+            Err(err) => {
+                anyhow::bail!("Error when connecting to {}: {}", self.server_addr, err);
+            }
         }
     }
 }
