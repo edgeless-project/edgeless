@@ -3,7 +3,7 @@
 
 use crate::workflow_type::WorkflowType;
 use anyhow::anyhow;
-use edgeless_api::api::controller::ControllerAPI;
+use edgeless_api::outer::controller::ControllerAPI;
 use edgeless_api::workflow_instance::{SpawnWorkflowResponse, WorkflowFunction, WorkflowId, WorkflowInstanceAPI};
 use rand::prelude::*;
 use rand::SeedableRng;
@@ -75,7 +75,7 @@ pub struct Engine {
 impl Engine {
     pub async fn new(controller_url: &str, wf_type: WorkflowType, seed: u64, redis_client: Option<crate::redis_dumper::RedisDumper>) -> Self {
         Self {
-            client: edgeless_api::grpc_impl::controller::ControllerAPIClient::new(controller_url)
+            client: edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(controller_url)
                 .await
                 .workflow_instance_api(),
             wf_type,

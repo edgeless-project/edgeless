@@ -35,7 +35,7 @@ struct MockOrchestrator {
     sender: futures::channel::mpsc::UnboundedSender<MockFunctionInstanceEvent>,
 }
 
-impl edgeless_api::api::orc::OrchestratorAPI for MockOrchestrator {
+impl edgeless_api::outer::orc::OrchestratorAPI for MockOrchestrator {
     fn function_instance_api(
         &mut self,
     ) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::DomainManagedInstanceId>> {
@@ -140,9 +140,9 @@ async fn test_setup() -> (
         sender: mock_orc_sender,
     };
 
-    let orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::api::orc::OrchestratorAPI>>::from([(
+    let orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::outer::orc::OrchestratorAPI>>::from([(
         "domain-1".to_string(),
-        Box::new(mock_orc) as Box<dyn edgeless_api::api::orc::OrchestratorAPI>,
+        Box::new(mock_orc) as Box<dyn edgeless_api::outer::orc::OrchestratorAPI>,
     )]);
 
     let (mut controller, controller_task) = Controller::new(orc_clients);

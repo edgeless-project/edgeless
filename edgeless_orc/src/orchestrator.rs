@@ -315,7 +315,7 @@ pub struct OrchestratorClient {
         Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::DomainManagedInstanceId>>,
 }
 
-impl edgeless_api::api::orc::OrchestratorAPI for OrchestratorClient {
+impl edgeless_api::outer::orc::OrchestratorAPI for OrchestratorClient {
     fn function_instance_api(
         &mut self,
     ) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::DomainManagedInstanceId>> {
@@ -353,7 +353,7 @@ impl OrchestratorFunctionInstanceOrcClient {}
 pub struct ClientDesc {
     pub agent_url: String,
     pub invocation_url: String,
-    pub api: Box<dyn edgeless_api::api::agent::AgentAPI + Send>,
+    pub api: Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
     pub capabilities: edgeless_api::node_registration::NodeCapabilities,
 }
 
@@ -1077,12 +1077,12 @@ impl Orchestrator {
                                 );
 
                                 let (proto, host, port) = edgeless_api::util::parse_http_host(&agent_url).unwrap();
-                                let api: Box<dyn edgeless_api::api::agent::AgentAPI + Send> = match proto {
+                                let api: Box<dyn edgeless_api::outer::agent::AgentAPI + Send> = match proto {
                                     edgeless_api::util::Proto::COAP => {
                                         let addr = std::net::SocketAddrV4::new(host.parse().unwrap(), port);
                                         Box::new(edgeless_api::coap_impl::CoapClient::new(addr).await)
                                     }
-                                    _ => Box::new(edgeless_api::grpc_impl::agent::AgentAPIClient::new(&agent_url).await),
+                                    _ => Box::new(edgeless_api::grpc_impl::outer::agent::AgentAPIClient::new(&agent_url).await),
                                 };
                                 log::info!("got api");
 
@@ -1411,7 +1411,7 @@ impl Orchestrator {
         }
     }
 
-    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::api::orc::OrchestratorAPI + Send> {
+    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::outer::orc::OrchestratorAPI + Send> {
         Box::new(OrchestratorClient {
             function_instance_client: Box::new(OrchestratorFunctionInstanceOrcClient { sender: self.sender.clone() }),
             node_registration_client: Box::new(NodeRegistrationClient { sender: self.sender.clone() }),

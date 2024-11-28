@@ -3,7 +3,6 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-pub mod api;
 pub mod coap_impl;
 pub mod common;
 pub mod domain_registration;
@@ -15,6 +14,7 @@ pub mod guest_api_host;
 pub mod invocation;
 pub mod node_management;
 pub mod node_registration;
+pub mod outer;
 pub mod resource_configuration;
 pub mod util;
 pub mod workflow_instance;
