@@ -86,6 +86,7 @@ impl crate::grpc_impl::api::domain_registration_server::DomainRegistration for D
 
 fn parse_domain_capabilities(api_instance: &crate::grpc_impl::api::DomainCapabilities) -> crate::domain_registration::DomainCapabilities {
     crate::domain_registration::DomainCapabilities {
+        num_nodes: api_instance.num_nodes,
         num_cpus: api_instance.num_cpus,
         num_cores: api_instance.num_cores,
         mem_size: api_instance.mem_size,
@@ -101,6 +102,7 @@ fn parse_domain_capabilities(api_instance: &crate::grpc_impl::api::DomainCapabil
 
 fn serialize_domain_capabilities(req: &crate::domain_registration::DomainCapabilities) -> crate::grpc_impl::api::DomainCapabilities {
     crate::grpc_impl::api::DomainCapabilities {
+        num_nodes: req.num_nodes,
         num_cpus: req.num_cpus,
         num_cores: req.num_cores,
         mem_size: req.mem_size,
