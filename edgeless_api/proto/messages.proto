@@ -344,6 +344,8 @@ message UpdateDomainRequest {
 
 // Domain capabilities exposed from the orchestrator to the controller.
 message DomainCapabilities {
+    // Number of nodes.
+    uint32 num_nodes         = 1;
     // Total number of (actual or virtual) CPUs.
     uint32 num_cpus          = 10;
     // Total number of physical cores.

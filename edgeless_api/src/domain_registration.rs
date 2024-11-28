@@ -3,6 +3,8 @@
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DomainCapabilities {
+    // Number of nodes.
+    pub num_nodes: u32,
     // Total number of (actual or virtual) CPUs.
     pub num_cpus: u32,
     // Total number of physical cores.
@@ -29,7 +31,8 @@ impl std::fmt::Display for DomainCapabilities {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{} CPUs ({} cores) with {} MiB, labels [{}], num TEE {}, num TPM {}, runtimes [{}], disk space {} MiB, {} GPUs with {} MiB",
+            "{} nodes, {} CPUs ({} cores) with {} MiB, labels [{}], num TEE {}, num TPM {}, runtimes [{}], disk space {} MiB, {} GPUs with {} MiB",
+            self.num_nodes,
             self.num_cpus,
             self.num_cores,
             self.mem_size,
