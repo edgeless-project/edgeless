@@ -147,7 +147,7 @@ async fn test_setup() -> (
 
     let (mut controller, controller_task) = Controller::new(orc_clients);
     tokio::spawn(controller_task);
-    let mut client = controller.get_api_client();
+    let mut client = controller.get_workflow_instance_client();
     let wf_client = client.workflow_instance_api();
 
     (wf_client, mock_orc_receiver, node_id)

@@ -6,18 +6,21 @@
 use futures::StreamExt;
 
 pub struct ControllerTask {
-    request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
+    workflow_instance_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
+    domain_registration_receiver: futures::channel::mpsc::UnboundedReceiver<super::DomainRegisterRequest>,
     orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::outer::orc::OrchestratorAPI>>,
     active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::deployment_state::ActiveWorkflow>,
 }
 
 impl ControllerTask {
     pub fn new(
-        request_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
+        workflow_instance_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
+        domain_registration_receiver: futures::channel::mpsc::UnboundedReceiver<super::DomainRegisterRequest>,
         orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::outer::orc::OrchestratorAPI>>,
     ) -> Self {
         Self {
-            request_receiver,
+            workflow_instance_receiver,
+            domain_registration_receiver,
             orchestrators,
             active_workflows: std::collections::HashMap::new(),
         }
@@ -46,26 +49,43 @@ impl ControllerTask {
     }
 
     async fn main_loop(&mut self) {
-        while let Some(req) = self.request_receiver.next().await {
-            match req {
-                super::ControllerRequest::Start(spawn_workflow_request, reply_sender) => {
-                    let reply = self.start_workflow(spawn_workflow_request).await;
-                    match reply_sender.send(reply) {
-                        Ok(_) => {}
-                        Err(err) => {
-                            log::error!("Unhandled: {:?}", err);
+        loop {
+            tokio::select! {
+                Some(req) = self.workflow_instance_receiver.next() => {
+                    match req {
+                        super::ControllerRequest::Start(spawn_workflow_request, reply_sender) => {
+                            let reply = self.start_workflow(spawn_workflow_request).await;
+                            match reply_sender.send(reply) {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    log::error!("Unhandled: {:?}", err);
+                                }
+                            }
+                        }
+                        super::ControllerRequest::Stop(wf_id) => {
+                            self.stop_workflow(&wf_id).await;
+                        }
+                        super::ControllerRequest::List(workflow_id, reply_sender) => {
+                            let reply = self.list_workflows(&workflow_id).await;
+                            match reply_sender.send(reply) {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    log::error!("Unhandled: {:?}", err);
+                                }
+                            }
                         }
                     }
-                }
-                super::ControllerRequest::Stop(wf_id) => {
-                    self.stop_workflow(&wf_id).await;
-                }
-                super::ControllerRequest::List(workflow_id, reply_sender) => {
-                    let reply = self.list_workflows(&workflow_id).await;
-                    match reply_sender.send(reply) {
-                        Ok(_) => {}
-                        Err(err) => {
-                            log::error!("Unhandled: {:?}", err);
+                },
+                Some(req) = self.domain_registration_receiver.next() => {
+                    match req {
+                        super::DomainRegisterRequest::Update(update_domain_request, reply_sender) => {
+                            let reply = self.update_domain(&update_domain_request).await;
+                            match reply_sender.send(reply) {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    log::error!("Unhandled: {:?}", err);
+                                }
+                            }
                         }
                     }
                 }
@@ -278,6 +298,14 @@ impl ControllerTask {
                 .collect();
         }
         Ok(ret)
+    }
+
+    async fn update_domain(
+        &mut self,
+        update_domain_request: &edgeless_api::domain_registration::UpdateDomainRequest,
+    ) -> anyhow::Result<edgeless_api::domain_registration::UpdateDomainResponse> {
+        log::info!("XXX {:?}", update_domain_request);
+        Ok(edgeless_api::domain_registration::UpdateDomainResponse::Accepted)
     }
 
     async fn start_workflow_function_in_domain(
