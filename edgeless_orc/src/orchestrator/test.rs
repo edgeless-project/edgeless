@@ -194,6 +194,7 @@ async fn test_setup(
     uuid::Uuid,
 ) {
     let (nodes, clients, resource_providers, stable_node_id) = test_create_clients_resources(num_nodes, num_resources_per_node);
+    let (subscriber_sender, subscriber_receiver) = futures::channel::mpsc::unbounded();
 
     let (mut orchestrator, orchestrator_task) = Orchestrator::new_with_clients(
         crate::EdgelessOrcBaselineSettings {
@@ -202,6 +203,7 @@ async fn test_setup(
         },
         clients,
         resource_providers,
+        subscriber_sender,
     )
     .await;
     tokio::spawn(orchestrator_task);
