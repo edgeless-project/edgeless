@@ -26,7 +26,7 @@ impl AgentAPIClient {
     }
 }
 
-impl crate::api::agent::AgentAPI for AgentAPIClient {
+impl crate::outer::agent::AgentAPI for AgentAPIClient {
     fn function_instance_api(&mut self) -> Box<dyn crate::function_instance::FunctionInstanceAPI<edgeless_api_core::instance_id::InstanceId>> {
         self.function_instance_client.clone()
     }
@@ -45,7 +45,7 @@ impl crate::api::agent::AgentAPI for AgentAPIClient {
 pub struct AgentAPIServer {}
 
 impl AgentAPIServer {
-    pub fn run(agent_api: Box<dyn crate::api::agent::AgentAPI + Send>, agent_url: String) -> futures::future::BoxFuture<'static, ()> {
+    pub fn run(agent_api: Box<dyn crate::outer::agent::AgentAPI + Send>, agent_url: String) -> futures::future::BoxFuture<'static, ()> {
         let mut agent_api = agent_api;
         let function_api = crate::grpc_impl::function_instance::FunctionInstanceAPIServer::<edgeless_api_core::instance_id::InstanceId> {
             root_api: tokio::sync::Mutex::new(agent_api.function_instance_api()),
