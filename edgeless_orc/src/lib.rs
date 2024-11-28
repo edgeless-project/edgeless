@@ -8,6 +8,7 @@ pub mod orchestrator;
 pub mod proxy;
 pub mod proxy_none;
 pub mod proxy_redis;
+pub mod subscriber;
 
 use futures::join;
 
@@ -21,6 +22,10 @@ pub struct EdgelessOrcSettings {
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessOrcGeneralSettings {
+    /// The URL of the controller with which this orchestrator registers.
+    pub controller_url: String,
+    /// The interval at which the orchestrator refreshes subscription, s.
+    pub subscription_refresh_interval_sec: u64,
     /// The identifier of the orchestration domain managed by this orchestrator.
     pub domain_id: String,
     /// The URL to which the orchestrator is bound.
@@ -137,6 +142,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
         Box::pin(async {})
     };
 
+    // Enable node keep-alive mechanism.
     if settings.baseline.keep_alive_interval_secs == 0 {
         log::info!("node keep-alive disabled");
     } else {
@@ -150,12 +156,18 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
         });
     }
 
+    // Create the component that will subscribe to the controller.
+    let (subscriber, subscriber_task) =
+        subscriber::Subscriber::new(settings.general.controller_url, settings.general.subscription_refresh_interval_sec).await;
+
+    // Wait for all the tasks to come to an end.
     join!(
         agent_task,
         agent_api_server,
         orchestrator_task,
         orchestrator_server,
         orchestrator_coap_server,
+        subscriber_task,
         edgeless_node::register_node(
             edgeless_node::EdgelessNodeGeneralSettings {
                 node_id,
@@ -179,6 +191,8 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
 pub fn edgeless_orc_default_conf() -> String {
     String::from(
         r##"[general]
+controller_url = "http://127.0.0.1:7001"
+subscription_refresh_interval_sec = 10
 domain_id = "domain-1"
 orchestrator_url = "http://127.0.0.1:7011"
 orchestrator_url_announced = ""

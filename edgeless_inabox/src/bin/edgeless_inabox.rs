@@ -110,6 +110,8 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     // Orchestrator
     let orc_conf = edgeless_orc::EdgelessOrcSettings {
         general: edgeless_orc::EdgelessOrcGeneralSettings {
+            controller_url: controller_url.clone(),
+            subscription_refresh_interval_sec: 1,
             domain_id: "domain-1".to_string(),
             orchestrator_url: next_url(),
             orchestrator_url_announced: "".to_string(),
