@@ -3,9 +3,7 @@ name: Build and Publish Docker Images
 on:
   release:
     types: [published]
-  push:
-    branches:
-      - docker-images
+  workflow_dispatch:
 
 jobs:
   build-and-push:
