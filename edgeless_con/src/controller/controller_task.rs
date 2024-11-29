@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use futures::StreamExt;
+use rand::{seq::SliceRandom, SeedableRng};
 
 struct OrchestratorDesc {
     client: Box<dyn edgeless_api::outer::orc::OrchestratorAPI>,
@@ -18,6 +19,7 @@ pub struct ControllerTask {
     domain_registration_receiver: futures::channel::mpsc::UnboundedReceiver<super::DomainRegisterRequest>,
     orchestrators: std::collections::HashMap<String, OrchestratorDesc>,
     active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::deployment_state::ActiveWorkflow>,
+    rng: rand::rngs::StdRng,
 }
 
 impl ControllerTask {
@@ -30,6 +32,7 @@ impl ControllerTask {
             domain_registration_receiver,
             orchestrators: std::collections::HashMap::new(),
             active_workflows: std::collections::HashMap::new(),
+            rng: rand::rngs::StdRng::from_entropy(),
         }
     }
 
@@ -91,6 +94,32 @@ impl ControllerTask {
             );
         }
 
+        // Find a domain that can host all the workflow's functions and
+        // resources.
+        //
+        // [TODO] It is also possible to split a workflow across multiple
+        // domains, but this requires an inter-domain dataplane, which is not
+        // yet supported as of today (Nov 2024).
+        //
+
+        let mut candidate_domains = vec![];
+        for (domain_id, desc) in &self.orchestrators {
+            if Self::compatible(&desc, &spawn_workflow_request) {
+                candidate_domains.push(domain_id.clone());
+            }
+        }
+        let target_domain = match candidate_domains.choose(&mut self.rng) {
+            Some(val) => val,
+            None => {
+                return Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
+                    edgeless_api::common::ResponseError {
+                        summary: "Workflow creation failed".to_string(),
+                        detail: Some("No single domain supporting all the functions/resources found".to_string()),
+                    },
+                ));
+            }
+        };
+
         // Assign a new identifier to the newly-created workflow.
         let wf_id = edgeless_api::workflow_instance::WorkflowId {
             workflow_id: uuid::Uuid::new_v4(),
@@ -120,9 +149,7 @@ impl ControllerTask {
                 break;
             }
 
-            let function_domain = self.orchestrators.iter_mut().next().unwrap().0.clone();
-
-            res = self.start_workflow_function_in_domain(&wf_id, function, &function_domain).await;
+            res = self.start_workflow_function_in_domain(&wf_id, function, &target_domain).await;
         }
 
         // Start the resources on the orchestration domain.
@@ -132,9 +159,7 @@ impl ControllerTask {
                 break;
             }
 
-            let resource_domain = self.orchestrators.iter_mut().next().unwrap().0.clone();
-
-            res = self.start_workflow_resource_in_domain(&wf_id, resource, &resource_domain).await;
+            res = self.start_workflow_resource_in_domain(&wf_id, resource, &target_domain).await;
         }
 
         //
@@ -153,8 +178,6 @@ impl ControllerTask {
             // (once for each orchestration domain to which the
             // function/resource was allocated).
             for origin_fid in self.active_workflows.get_mut(&wf_id).unwrap().mapped_fids(component_name).unwrap() {
-                let origin_domain = self.orchestrators.iter_mut().next().unwrap().0.clone();
-
                 let output_mapping = self.output_mapping_for(&wf_id, component_name).await;
 
                 if output_mapping.is_empty() {
@@ -163,7 +186,7 @@ impl ControllerTask {
 
                 let component_type = self.active_workflows.get_mut(&wf_id).unwrap().component_type(component_name).unwrap();
                 res = self
-                    .patch_outputs(&origin_domain, origin_fid, component_type, output_mapping, component_name)
+                    .patch_outputs(&target_domain, origin_fid, component_type, output_mapping, component_name)
                     .await;
             }
         }
@@ -350,6 +373,24 @@ impl ControllerTask {
         };
 
         Ok(edgeless_api::domain_registration::UpdateDomainResponse::Accepted)
+    }
+
+    fn compatible(desc: &OrchestratorDesc, workflow: &edgeless_api::workflow_instance::SpawnWorkflowRequest) -> bool {
+        for function in &workflow.workflow_functions {
+            if !desc
+                .capabilities
+                .runtimes
+                .contains(&function.function_class_specification.function_class_type)
+            {
+                return false;
+            }
+        }
+        for resource in &workflow.workflow_resources {
+            if !desc.capabilities.resource_classes.contains(&resource.class_type) {
+                return false;
+            }
+        }
+        true
     }
 
     async fn start_workflow_function_in_domain(
