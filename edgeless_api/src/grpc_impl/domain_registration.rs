@@ -97,6 +97,8 @@ fn parse_domain_capabilities(api_instance: &crate::grpc_impl::api::DomainCapabil
         disk_tot_space: api_instance.disk_tot_space,
         num_gpus: api_instance.num_gpus,
         mem_size_gpu: api_instance.mem_size_gpu,
+        resource_providers: std::collections::HashSet::from_iter(api_instance.resource_providers.iter().cloned()),
+        resource_classes: std::collections::HashSet::from_iter(api_instance.resource_classes.iter().cloned()),
     }
 }
 
@@ -113,6 +115,8 @@ fn serialize_domain_capabilities(req: &crate::domain_registration::DomainCapabil
         disk_tot_space: req.disk_tot_space,
         num_gpus: req.num_gpus,
         mem_size_gpu: req.mem_size_gpu,
+        resource_providers: req.resource_providers.iter().cloned().collect::<Vec<String>>(),
+        resource_classes: req.resource_classes.iter().cloned().collect::<Vec<String>>(),
     }
 }
 
@@ -175,12 +179,34 @@ mod test {
 
     #[test]
     fn serialize_deserialize_update_domain_request() {
-        let messages = vec![UpdateDomainRequest {
-            domain_id: "my-domain".to_string(),
-            orchestrator_url: "http://127.0.0.1:10000".to_string(),
-            capabilities: DomainCapabilities::default(),
-            refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(313714800),
-        }];
+        let messages = vec![
+            UpdateDomainRequest {
+                domain_id: "my-domain".to_string(),
+                orchestrator_url: "http://127.0.0.1:10000".to_string(),
+                capabilities: DomainCapabilities::default(),
+                refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(313714800),
+            },
+            UpdateDomainRequest {
+                domain_id: "my-domain".to_string(),
+                orchestrator_url: "http://127.0.0.1:10000".to_string(),
+                capabilities: DomainCapabilities {
+                    num_nodes: 1,
+                    num_cpus: 2,
+                    num_cores: 3,
+                    mem_size: 4,
+                    labels: std::collections::HashSet::from(["a".to_string(), "b".to_string()]),
+                    num_tee: 5,
+                    num_tpm: 6,
+                    runtimes: std::collections::HashSet::from(["c".to_string(), "d".to_string()]),
+                    disk_tot_space: 7,
+                    num_gpus: 8,
+                    mem_size_gpu: 9,
+                    resource_providers: std::collections::HashSet::from(["e".to_string(), "f".to_string()]),
+                    resource_classes: std::collections::HashSet::from(["g".to_string(), "h".to_string()]),
+                },
+                refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(313714800),
+            },
+        ];
         for msg in messages {
             match parse_update_domain_request(&serialize_update_domain_request(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
