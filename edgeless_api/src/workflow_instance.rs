@@ -84,6 +84,10 @@ pub trait WorkflowInstanceAPI: WorkflowInstanceAPIClone + Send + Sync {
     async fn start(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<SpawnWorkflowResponse>;
     async fn stop(&mut self, id: WorkflowId) -> anyhow::Result<()>;
     async fn list(&mut self, id: WorkflowId) -> anyhow::Result<Vec<WorkflowInstance>>;
+    async fn domains(
+        &mut self,
+        domain_id: String,
+    ) -> anyhow::Result<std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>>;
 }
 
 // https://stackoverflow.com/a/30353928

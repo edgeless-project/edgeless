@@ -49,6 +49,12 @@ enum FunctionCommands {
 }
 
 #[derive(Debug, clap::Subcommand)]
+enum DomainCommands {
+    Inspect { id: String },
+    List {},
+}
+
+#[derive(Debug, clap::Subcommand)]
 enum Commands {
     Workflow {
         #[command(subcommand)]
@@ -57,6 +63,10 @@ enum Commands {
     Function {
         #[command(subcommand)]
         function_command: FunctionCommands,
+    },
+    Domain {
+        #[command(subcommand)]
+        domain_command: DomainCommands,
     },
 }
 
@@ -96,6 +106,18 @@ pub fn edgeless_cli_default_conf() -> String {
     )
 }
 
+async fn wf_client(config_file: &str) -> anyhow::Result<Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>> {
+    anyhow::ensure!(
+        !std::fs::metadata(config_file).is_err(),
+        "configuration file does not exist or cannot be accessed: {}",
+        config_file
+    );
+
+    let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(config_file).unwrap()).unwrap();
+    let mut con_client = edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(&conf.controller_url).await;
+    Ok(con_client.workflow_instance_api())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -110,22 +132,13 @@ async fn main() -> anyhow::Result<()> {
         None => log::debug!("Bye"),
         Some(x) => match x {
             Commands::Workflow { workflow_command } => {
-                if std::fs::metadata(&args.config_file).is_err() {
-                    return Err(anyhow::anyhow!(
-                        "configuration file does not exist or cannot be accessed: {}",
-                        &args.config_file
-                    ));
-                }
-                log::debug!("Got Config");
-                let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
-                let mut con_client = edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(&conf.controller_url).await;
-                let mut con_wf_client = con_client.workflow_instance_api();
+                let mut wf_client = wf_client(&args.config_file).await?;
                 match workflow_command {
                     WorkflowCommands::Start { spec_file } => {
                         log::debug!("Start Workflow");
                         let workflow: workflow_spec::WorkflowSpec =
                             serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
-                        let res = con_wf_client
+                        let res = wf_client
                             .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
                                 workflow_functions: workflow
                                     .functions
@@ -187,7 +200,7 @@ async fn main() -> anyhow::Result<()> {
                     }
                     WorkflowCommands::Stop { id } => {
                         let parsed_id = uuid::Uuid::parse_str(&id)?;
-                        match con_wf_client
+                        match wf_client
                             .stop(edgeless_api::workflow_instance::WorkflowId { workflow_id: parsed_id })
                             .await
                         {
@@ -195,7 +208,7 @@ async fn main() -> anyhow::Result<()> {
                             Err(err) => println!("{}", err),
                         }
                     }
-                    WorkflowCommands::List {} => match con_wf_client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
+                    WorkflowCommands::List {} => match wf_client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
                         Ok(instances) => {
                             for instance in instances.iter() {
                                 println!("workflow: {}", instance.workflow_id);
@@ -476,6 +489,23 @@ async fn main() -> anyhow::Result<()> {
                     println!("post_response body: {:?}", post_response);
                 }
             },
+            Commands::Domain { domain_command } => {
+                let mut wf_client = wf_client(&args.config_file).await?;
+                match domain_command {
+                    DomainCommands::List {} => {
+                        for (domain_id, caps) in wf_client.domains(String::from("")).await? {
+                            println!("domain {} ({} nodes)", domain_id, caps.num_nodes);
+                        }
+                    }
+                    DomainCommands::Inspect { id } => {
+                        let domains = wf_client.domains(id.clone()).await?;
+                        match domains.get(&id) {
+                            None => println!("domain {} not found", id),
+                            Some(caps) => println!("{}", caps),
+                        }
+                    }
+                }
+            }
         },
     }
     Ok(())

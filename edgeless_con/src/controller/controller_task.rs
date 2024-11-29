@@ -5,10 +5,18 @@
 
 use futures::StreamExt;
 
+struct OrchestratorDesc {
+    client: Box<dyn edgeless_api::outer::orc::OrchestratorAPI>,
+    orchestrator_url: String,
+    capabilities: edgeless_api::domain_registration::DomainCapabilities,
+    refresh_deadline: std::time::SystemTime,
+    counter: u64,
+}
+
 pub struct ControllerTask {
     workflow_instance_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
     domain_registration_receiver: futures::channel::mpsc::UnboundedReceiver<super::DomainRegisterRequest>,
-    orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::outer::orc::OrchestratorAPI>>,
+    orchestrators: std::collections::HashMap<String, OrchestratorDesc>,
     active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::deployment_state::ActiveWorkflow>,
 }
 
@@ -16,50 +24,26 @@ impl ControllerTask {
     pub fn new(
         workflow_instance_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
         domain_registration_receiver: futures::channel::mpsc::UnboundedReceiver<super::DomainRegisterRequest>,
-        orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::outer::orc::OrchestratorAPI>>,
     ) -> Self {
         Self {
             workflow_instance_receiver,
             domain_registration_receiver,
-            orchestrators,
+            orchestrators: std::collections::HashMap::new(),
             active_workflows: std::collections::HashMap::new(),
         }
     }
 
+    /// Main loop of the controller task serving events received on the
+    /// WorkflowInstanceAPI or DomainRegistrationAPI.
     pub async fn run(&mut self) {
-        if self.orchestrators.is_empty() {
-            log::error!("No orchestration domains configured for this controller");
-            return;
-        }
-
-        // For now, use the first orchestration domain only and issue a warning
-        // if there are more.
-        let num_orchestrators = self.orchestrators.len();
-        let orc_entry = self.orchestrators.iter_mut().next().unwrap();
-        let orc_domain = orc_entry.0.clone();
-        if num_orchestrators > 1 {
-            log::warn!(
-                "The controller is configured with {} orchestration domains, but it will use only: {}",
-                num_orchestrators,
-                orc_domain
-            )
-        }
-
-        self.main_loop().await;
-    }
-
-    async fn main_loop(&mut self) {
         loop {
             tokio::select! {
                 Some(req) = self.workflow_instance_receiver.next() => {
                     match req {
                         super::ControllerRequest::Start(spawn_workflow_request, reply_sender) => {
                             let reply = self.start_workflow(spawn_workflow_request).await;
-                            match reply_sender.send(reply) {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    log::error!("Unhandled: {:?}", err);
-                                }
+                            if let Err(err) = reply_sender.send(reply) {
+                                log::error!("Unhandled: {:?}", err);
                             }
                         }
                         super::ControllerRequest::Stop(wf_id) => {
@@ -67,11 +51,14 @@ impl ControllerTask {
                         }
                         super::ControllerRequest::List(workflow_id, reply_sender) => {
                             let reply = self.list_workflows(&workflow_id).await;
-                            match reply_sender.send(reply) {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    log::error!("Unhandled: {:?}", err);
-                                }
+                            if let Err(err) =  reply_sender.send(reply) {
+                                log::error!("Unhandled: {:?}", err);
+                            }
+                        }
+                        super::ControllerRequest::Domains(domain_id, reply_sender) => {
+                            let reply = self.domains(&domain_id).await;
+                            if let Err(err) = reply_sender.send(reply) {
+                                log::error!("Unhandled: {:?}", err);
                             }
                         }
                     }
@@ -222,35 +209,32 @@ impl ControllerTask {
 
         // Stop all the functions/resources.
         for component in workflow.domain_mapping.values() {
+            log::debug!("stopping function/resource of workflow {}: {}", wf_id.to_string(), &component);
             let orc_api = match self.orchestrators.get_mut(&component.domain_id) {
                 None => {
                     log::warn!(
-                        "orchestration domain for workflow {} function {} disappeared: {}",
-                        wf_id.to_string(),
+                        "Orchestration domain '{}' for workflow '{}' component '{}' disappeared",
+                        &component.domain_id,
+                        wf_id,
                         &component.name,
-                        &component.domain_id
                     );
                     continue;
                 }
                 Some(val) => val,
             };
-            let mut fn_client = orc_api.function_instance_api();
-            let mut resource_client = orc_api.resource_configuration_api();
-
-            log::debug!("stopping function/resource of workflow {}: {}", wf_id.to_string(), &component);
+            let mut fn_client = orc_api.client.function_instance_api();
+            let mut resource_client = orc_api.client.resource_configuration_api();
             match component.component_type {
-                super::ComponentType::Function => match fn_client.stop(component.fid).await {
-                    Ok(_) => {}
-                    Err(err) => {
-                        log::error!("Unhandled: {}", err);
+                super::ComponentType::Function => {
+                    if let Err(err) = fn_client.stop(component.lid).await {
+                        log::error!("Unhandled error when stopping wf '{}' function '{}': {}", wf_id, component.name, err);
                     }
-                },
-                super::ComponentType::Resource => match resource_client.stop(component.fid).await {
-                    Ok(_) => {}
-                    Err(err) => {
-                        log::error!("Unhandled: {}", err);
+                }
+                super::ComponentType::Resource => {
+                    if let Err(err) = resource_client.stop(component.lid).await {
+                        log::error!("Unhandled error when stopping wf '{}' resource '{}': {}", wf_id, component.name, err);
                     }
-                },
+                }
             }
         }
 
@@ -273,7 +257,7 @@ impl ControllerTask {
                         .values()
                         .map(|component| edgeless_api::workflow_instance::WorkflowFunctionMapping {
                             name: component.name.to_string(),
-                            function_id: component.fid,
+                            function_id: component.lid,
                             domain_id: component.domain_id.clone(),
                         })
                         .collect(),
@@ -290,7 +274,7 @@ impl ControllerTask {
                         .values()
                         .map(|component| edgeless_api::workflow_instance::WorkflowFunctionMapping {
                             name: component.name.to_string(),
-                            function_id: component.fid,
+                            function_id: component.lid,
                             domain_id: component.domain_id.clone(),
                         })
                         .collect(),
@@ -300,11 +284,72 @@ impl ControllerTask {
         Ok(ret)
     }
 
+    async fn domains(
+        &mut self,
+        domain_id: &str,
+    ) -> anyhow::Result<std::collections::HashMap<String, edgeless_api::domain_registration::DomainCapabilities>> {
+        let mut ret = std::collections::HashMap::new();
+
+        for (id, desc) in &self.orchestrators {
+            if domain_id.is_empty() || domain_id == id {
+                ret.insert(id.clone(), desc.capabilities.clone());
+            }
+        }
+
+        Ok(ret)
+    }
+
     async fn update_domain(
         &mut self,
         update_domain_request: &edgeless_api::domain_registration::UpdateDomainRequest,
     ) -> anyhow::Result<edgeless_api::domain_registration::UpdateDomainResponse> {
-        log::info!("XXX {:?}", update_domain_request);
+        log::debug!("Update domain request received {:?}", update_domain_request);
+
+        if update_domain_request.domain_id.is_empty() {
+            return Ok(edgeless_api::domain_registration::UpdateDomainResponse::ResponseError(
+                edgeless_api::common::ResponseError {
+                    summary: String::from("Empty domain identifier"),
+                    detail: None,
+                },
+            ));
+        }
+
+        let desc = &mut self.orchestrators.get_mut(&update_domain_request.domain_id);
+        match desc {
+            None => {
+                self.orchestrators.insert(
+                    update_domain_request.domain_id.clone(),
+                    OrchestratorDesc {
+                        client: Box::new(
+                            edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&update_domain_request.orchestrator_url, Some(1)).await?,
+                        ),
+                        orchestrator_url: update_domain_request.orchestrator_url.clone(),
+                        capabilities: update_domain_request.capabilities.clone(),
+                        refresh_deadline: update_domain_request.refresh_deadline,
+                        counter: update_domain_request.counter,
+                    },
+                );
+            }
+            Some(desc) => {
+                // If the counter has not been incremented, then update only
+                // the refresh deadline, all the other fields are assumed
+                // to remain the same.
+                if desc.counter != update_domain_request.counter {
+                    desc.counter = update_domain_request.counter;
+                    desc.capabilities = update_domain_request.capabilities.clone();
+
+                    // Update the client if needed.
+                    if desc.orchestrator_url != update_domain_request.orchestrator_url {
+                        desc.orchestrator_url = update_domain_request.orchestrator_url.clone();
+                        desc.client = Box::new(
+                            edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&update_domain_request.orchestrator_url, Some(1)).await?,
+                        );
+                    }
+                }
+                desc.refresh_deadline = update_domain_request.refresh_deadline;
+            }
+        };
+
         Ok(edgeless_api::domain_registration::UpdateDomainResponse::Accepted)
     }
 
@@ -347,7 +392,7 @@ impl ControllerTask {
                             component_type: super::ComponentType::Function,
                             name: function.name.clone(),
                             domain_id: domain.to_string(),
-                            fid: id,
+                            lid: id,
                         },
                     );
                     Ok(())
@@ -388,7 +433,7 @@ impl ControllerTask {
                             component_type: super::ComponentType::Resource,
                             name: resource.name.clone(),
                             domain_id: domain.to_string(),
-                            fid: id,
+                            lid: id,
                         },
                     );
                     Ok(())
@@ -476,10 +521,10 @@ impl ControllerTask {
     }
 
     fn fn_client(&mut self, domain: &str) -> Option<Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<uuid::Uuid>>> {
-        Some(self.orchestrators.get_mut(domain)?.function_instance_api())
+        Some(self.orchestrators.get_mut(domain)?.client.function_instance_api())
     }
 
     fn resource_client(&mut self, domain: &str) -> Option<Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<uuid::Uuid>>> {
-        Some(self.orchestrators.get_mut(domain)?.resource_configuration_api())
+        Some(self.orchestrators.get_mut(domain)?.client.resource_configuration_api())
     }
 }

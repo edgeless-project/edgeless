@@ -4,9 +4,9 @@
 // SPDX-License-Identifier: MIT
 
 pub mod client;
+pub mod controller_task;
 mod deployment_state;
 pub mod domain_register_client;
-pub mod server;
 #[cfg(test)]
 pub mod test;
 
@@ -27,6 +27,11 @@ pub(crate) enum ControllerRequest {
         // Reply Channel
         tokio::sync::oneshot::Sender<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>,
     ),
+    Domains(
+        String,
+        // Reply Channel
+        tokio::sync::oneshot::Sender<anyhow::Result<std::collections::HashMap<String, edgeless_api::domain_registration::DomainCapabilities>>>,
+    ),
 }
 
 pub(crate) enum DomainRegisterRequest {
@@ -44,33 +49,12 @@ enum ComponentType {
 }
 
 impl Controller {
-    pub async fn new_from_config(
-        controller_settings: crate::EdgelessConSettings,
-    ) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
-        // Connect to all orchestrators.
-        let mut orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::outer::orc::OrchestratorAPI>>::new();
-        for orc in &controller_settings.orchestrators {
-            match edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&orc.orchestrator_url, Some(1)).await {
-                Ok(val) => {
-                    orc_clients.insert(orc.domain_id.to_string(), Box::new(val));
-                }
-                Err(err) => {
-                    log::error!("Could not connect to e-ORC {}: {}", &orc.orchestrator_url, err);
-                }
-            }
-        }
-
-        Self::new(orc_clients)
-    }
-
-    fn new(
-        orchestrators: std::collections::HashMap<String, Box<dyn edgeless_api::outer::orc::OrchestratorAPI>>,
-    ) -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
+    pub fn new() -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
         let (workflow_instance_sender, workflow_instance_receiver) = futures::channel::mpsc::unbounded();
         let (domain_register_sender, domain_register_receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
-            let mut controller_task = server::ControllerTask::new(workflow_instance_receiver, domain_register_receiver, orchestrators);
+            let mut controller_task = controller_task::ControllerTask::new(workflow_instance_receiver, domain_register_receiver);
             controller_task.run().await;
         });
 
