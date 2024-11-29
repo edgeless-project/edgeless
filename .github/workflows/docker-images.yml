@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      custom_tag:
+        description: 'Tag for manual builds'
+        required: false
+        default: 'manual-build'
 
 jobs:
   build-and-push:
@@ -28,6 +33,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.github_token }}
 
+      - name: Determine version tag
+        id: get_tag
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ -z "${{ github.event.inputs.custom_tag }}" ]; then
+              echo "tag=manual-build" >> $GITHUB_ENV
+            else
+              echo "tag=${{ github.event.inputs.custom_tag }}" >> $GITHUB_ENV
+            fi
+          fi
+        shell: bash
+
       - name: Build and push edgeless_con image
         uses: docker/build-push-action@v4
         with:
@@ -36,7 +55,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/edgeless-project/edgeless_con:${{ github.ref_name }}
+            ghcr.io/edgeless-project/edgeless_con:${{ env.tag }}
             ghcr.io/edgeless-project/edgeless_con:latest
 
       - name: Build and push edgeless_orc image
@@ -47,7 +66,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/edgeless-project/edgeless_orc:${{ github.ref_name }}
+            ghcr.io/edgeless-project/edgeless_orc:${{ env.tag }}
             ghcr.io/edgeless-project/edgeless_orc:latest
 
       - name: Build and push edgeless_node image
@@ -58,5 +77,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/edgeless-project/edgeless_node:${{ github.ref_name }}
+            ghcr.io/edgeless-project/edgeless_node:${{ env.tag }}
             ghcr.io/edgeless-project/edgeless_node:latest
