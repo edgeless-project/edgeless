@@ -25,6 +25,10 @@ pub struct DomainCapabilities {
     pub num_gpus: u32,
     // Total GPU memory available, in MiB.
     pub mem_size_gpu: u32,
+    // Superset of the names of the resource providers advertised by the nodes.
+    pub resource_providers: std::collections::HashSet<String>,
+    // Superset of the classes of the resource providers advertised by the nodes.
+    pub resource_classes: std::collections::HashSet<String>,
 }
 
 impl std::fmt::Display for DomainCapabilities {

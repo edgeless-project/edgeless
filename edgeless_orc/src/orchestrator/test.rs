@@ -1301,7 +1301,9 @@ async fn test_update_domain_capabilities() {
         let _ = FAILING_NODES.set(std::sync::Mutex::new(std::collections::HashSet::new()));
     }
 
-    let (_fun_client, mut _res_client, mut mgt_client, _nodes, _stable_node_id, mut subscriber_receiver) = test_setup(10, 0).await;
+    let num_nodes = 10;
+    let num_resources = 5;
+    let (_fun_client, mut _res_client, mut mgt_client, _nodes, _stable_node_id, mut subscriber_receiver) = test_setup(num_nodes, num_resources).await;
 
     let _ = mgt_client.keep_alive().await;
 
@@ -1309,17 +1311,24 @@ async fn test_update_domain_capabilities() {
 
     let mut num_events = 0;
     let mut expected_caps = edgeless_api::domain_registration::DomainCapabilities::default();
-    expected_caps.num_nodes = 10;
-    expected_caps.num_cpus = 10;
-    expected_caps.num_cores = 10;
+    expected_caps.num_nodes = num_nodes;
+    expected_caps.num_cpus = num_nodes;
+    expected_caps.num_cores = num_nodes;
     expected_caps.labels.insert("stable".to_string());
     expected_caps.labels.insert("unstable".to_string());
     expected_caps.runtimes.insert("RUST_WASM".to_string());
+    for node_id in 0..num_nodes {
+        for res_id in 0..num_resources {
+            expected_caps
+                .resource_providers
+                .insert(format!("node-{}-resource-{}-provider", node_id, res_id));
+        }
+    }
+    expected_caps.resource_classes.insert("rc-1".to_string());
     while let Ok(event) = subscriber_receiver.try_next() {
         match event {
             Some(event) => match event {
                 SubscriberRequest::Update(actual_caps) => {
-                    log::info!("XXX {:?}", actual_caps);
                     assert_eq!(expected_caps, actual_caps);
                     num_events += 1;
                 }

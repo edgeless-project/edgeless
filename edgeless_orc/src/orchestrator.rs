@@ -833,7 +833,10 @@ impl Orchestrator {
         dependencies
     }
 
-    fn domain_capabilities(nodes: &std::collections::HashMap<uuid::Uuid, ClientDesc>) -> edgeless_api::domain_registration::DomainCapabilities {
+    fn domain_capabilities(
+        nodes: &std::collections::HashMap<uuid::Uuid, ClientDesc>,
+        resource_providers: &std::collections::HashMap<String, ResourceProvider>,
+    ) -> edgeless_api::domain_registration::DomainCapabilities {
         let mut ret = edgeless_api::domain_registration::DomainCapabilities::default();
         for client_desc in nodes.values() {
             let caps = &client_desc.capabilities;
@@ -852,6 +855,10 @@ impl Orchestrator {
             ret.disk_tot_space += caps.disk_tot_space;
             ret.num_gpus += caps.num_gpus;
             ret.mem_size_gpu += caps.mem_size_gpu;
+        }
+        for (provider_id, provider) in resource_providers.iter() {
+            ret.resource_providers.insert(provider_id.clone());
+            ret.resource_classes.insert(provider.class_type.clone());
         }
         ret
     }
@@ -1270,7 +1277,7 @@ impl Orchestrator {
                     }
 
                     // Update the orchestration logic and proxy.
-                    let new_domain_capabilities = Self::domain_capabilities(&nodes);
+                    let new_domain_capabilities = Self::domain_capabilities(&nodes, &resource_providers);
                     if new_domain_capabilities != last_domain_capabilities {
                         last_domain_capabilities = new_domain_capabilities.clone();
                         let _ = subscriber_sender
