@@ -3,6 +3,13 @@
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
+///
+/// gRPC client of a DomainRegistrationAPI
+///
+/// The connection is lazy: when a new instance is created with new() nothing
+/// happens, while the client tries to connect just once at every new method
+/// call.
+///
 #[derive(Clone)]
 pub struct DomainRegistrationAPIClient {
     client: Option<crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient<tonic::transport::Channel>>,
@@ -15,6 +22,9 @@ impl DomainRegistrationAPIClient {
     }
 
     /// Try connecting, if not already connected.
+    ///
+    /// If an error is returned, then the client is set to None (disconnected).
+    /// Otherwise, the client is set to some value (connected).
     pub async fn try_connect(&mut self) -> anyhow::Result<()> {
         if self.client.is_none() {
             self.client = match crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient::connect(self.server_addr.clone()).await {
@@ -26,6 +36,11 @@ impl DomainRegistrationAPIClient {
             }
         }
         Ok(())
+    }
+
+    /// Disconnect the client.
+    pub fn disconnect(&mut self) {
+        self.client = None;
     }
 }
 
@@ -40,14 +55,17 @@ impl crate::domain_registration::DomainRegistrationAPI for DomainRegistrationAPI
                 if let Some(client) = &mut self.client {
                     match client.update_domain(tonic::Request::new(serialize_update_domain_request(&request))).await {
                         Ok(res) => parse_update_domain_response(&res.into_inner()),
-                        Err(err) => Err(anyhow::anyhow!(
-                            "Error when updating a domain to {}: {}",
-                            self.server_addr,
-                            err.to_string()
-                        )),
+                        Err(err) => {
+                            self.disconnect();
+                            Err(anyhow::anyhow!(
+                                "Error when updating a domain to {}: {}",
+                                self.server_addr,
+                                err.to_string()
+                            ))
+                        }
                     }
                 } else {
-                    panic!("the impossible happened");
+                    panic!("The impossible happened");
                 }
             }
             Err(err) => {
