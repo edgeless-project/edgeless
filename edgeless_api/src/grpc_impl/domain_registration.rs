@@ -102,7 +102,7 @@ impl crate::grpc_impl::api::domain_registration_server::DomainRegistration for D
     }
 }
 
-fn parse_domain_capabilities(api_instance: &crate::grpc_impl::api::DomainCapabilities) -> crate::domain_registration::DomainCapabilities {
+pub fn parse_domain_capabilities(api_instance: &crate::grpc_impl::api::DomainCapabilities) -> crate::domain_registration::DomainCapabilities {
     crate::domain_registration::DomainCapabilities {
         num_nodes: api_instance.num_nodes,
         num_cpus: api_instance.num_cpus,
@@ -120,7 +120,7 @@ fn parse_domain_capabilities(api_instance: &crate::grpc_impl::api::DomainCapabil
     }
 }
 
-fn serialize_domain_capabilities(req: &crate::domain_registration::DomainCapabilities) -> crate::grpc_impl::api::DomainCapabilities {
+pub fn serialize_domain_capabilities(req: &crate::domain_registration::DomainCapabilities) -> crate::grpc_impl::api::DomainCapabilities {
     crate::grpc_impl::api::DomainCapabilities {
         num_nodes: req.num_nodes,
         num_cpus: req.num_cpus,
@@ -150,6 +150,7 @@ fn parse_update_domain_request(
         orchestrator_url: api_instance.orchestrator_url.clone(),
         capabilities,
         refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(api_instance.refresh_deadline),
+        counter: api_instance.counter,
     })
 }
 
@@ -185,6 +186,7 @@ fn serialize_update_domain_request(req: &crate::domain_registration::UpdateDomai
         orchestrator_url: req.orchestrator_url.clone(),
         capabilities: Some(serialize_domain_capabilities(&req.capabilities)),
         refresh_deadline: req.refresh_deadline.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+        counter: req.counter,
     }
 }
 
@@ -203,6 +205,7 @@ mod test {
                 orchestrator_url: "http://127.0.0.1:10000".to_string(),
                 capabilities: DomainCapabilities::default(),
                 refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(313714800),
+                counter: 1,
             },
             UpdateDomainRequest {
                 domain_id: "my-domain".to_string(),
@@ -223,6 +226,7 @@ mod test {
                     resource_classes: std::collections::HashSet::from(["g".to_string(), "h".to_string()]),
                 },
                 refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(313714800),
+                counter: 42,
             },
         ];
         for msg in messages {

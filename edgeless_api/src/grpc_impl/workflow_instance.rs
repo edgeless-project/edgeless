@@ -128,6 +128,21 @@ impl WorkflowInstanceConverters {
         Ok(ret)
     }
 
+    pub fn parse_domain_capabilities_list(
+        api_instance: &crate::grpc_impl::api::DomainCapabilitiesList,
+    ) -> anyhow::Result<std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>> {
+        let mut ret = std::collections::HashMap::new();
+        for entry in &api_instance.domain_capabilities {
+            if let Some(domain_capabilities) = &entry.domain_capabilities {
+                ret.insert(
+                    entry.domain_id.clone(),
+                    crate::grpc_impl::domain_registration::parse_domain_capabilities(domain_capabilities),
+                );
+            }
+        }
+        Ok(ret)
+    }
+
     pub fn serialize_workflow_id(crate_id: &crate::workflow_instance::WorkflowId) -> crate::grpc_impl::api::WorkflowId {
         crate::grpc_impl::api::WorkflowId {
             workflow_id: crate_id.workflow_id.to_string(),
@@ -195,6 +210,20 @@ impl WorkflowInstanceConverters {
     pub fn serialize_workflow_instance_list(instances: &[crate::workflow_instance::WorkflowInstance]) -> crate::grpc_impl::api::WorkflowInstanceList {
         crate::grpc_impl::api::WorkflowInstanceList {
             workflow_statuses: instances.iter().map(Self::serialize_workflow_instance).collect(),
+        }
+    }
+
+    pub fn serialize_domain_capabilities_list(
+        domains: &std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>,
+    ) -> crate::grpc_impl::api::DomainCapabilitiesList {
+        crate::grpc_impl::api::DomainCapabilitiesList {
+            domain_capabilities: domains
+                .iter()
+                .map(|(domain_id, caps)| crate::grpc_impl::api::DomainCapabilitiesEntry {
+                    domain_id: domain_id.clone(),
+                    domain_capabilities: Some(crate::grpc_impl::domain_registration::serialize_domain_capabilities(caps)),
+                })
+                .collect(),
         }
     }
 
@@ -271,6 +300,19 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             Err(err) => Err(anyhow::anyhow!("Communication error while listing workflows: {}", err.to_string())),
         }
     }
+    async fn domains(
+        &mut self,
+        domain_id: String,
+    ) -> anyhow::Result<std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>> {
+        let ret = self
+            .client
+            .domains(tonic::Request::new(crate::grpc_impl::api::DomainId { domain_id }))
+            .await;
+        match ret {
+            Ok(ret) => return crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_domain_capabilities_list(&ret.into_inner()),
+            Err(err) => Err(anyhow::anyhow!("Communication error while listing workflows: {}", err.to_string())),
+        }
+    }
 }
 
 pub struct WorkflowInstanceAPIServer {
@@ -336,6 +378,20 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
                 crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_instance_list(&instances),
             )),
             Err(err) => Err(tonic::Status::internal(format!("Internal error when listing workflows: {}", err))),
+        }
+    }
+    async fn domains(
+        &self,
+        domain_id: tonic::Request<crate::grpc_impl::api::DomainId>,
+    ) -> Result<tonic::Response<crate::grpc_impl::api::DomainCapabilitiesList>, tonic::Status> {
+        match self.root_api.lock().await.domains(domain_id.into_inner().domain_id).await {
+            Ok(instances) => Ok(tonic::Response::new(
+                crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_domain_capabilities_list(&instances),
+            )),
+            Err(err) => Err(tonic::Status::internal(format!(
+                "Internal error when listing domain capabilities: {}",
+                err
+            ))),
         }
     }
 }

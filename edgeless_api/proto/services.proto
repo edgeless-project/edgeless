@@ -77,6 +77,11 @@ service WorkflowInstance {
     // Input: the identifier of the active workflow or a special value indicating all workflows.
     // Output: the list of status of the active workflow instances.
     rpc List (WorkflowId) returns (WorkflowInstanceList);
+
+    // List the domain capabilities.
+    // Input: the identifier of the domain or an empty value to query all.
+    // Output: the list of capabilities of the known domains.
+    rpc Domains (DomainId) returns (DomainCapabilitiesList);
 }
 
 // API to handle events (s01).

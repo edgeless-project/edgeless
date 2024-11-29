@@ -59,12 +59,14 @@ impl Subscriber {
 
         let mut client = edgeless_api::grpc_impl::outer::domain_register::DomainRegisterAPIClient::new(controller_url).await;
         let mut last_caps = edgeless_api::domain_registration::DomainCapabilities::default();
+        let mut counter = 0;
 
         // main orchestration loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
             match req {
                 SubscriberRequest::Update(new_caps) => {
                     log::debug!("Subscriber Update {:?}", new_caps);
+                    counter += 1;
                     last_caps = new_caps;
                 }
                 SubscriberRequest::Refresh() => {
@@ -77,6 +79,7 @@ impl Subscriber {
                         orchestrator_url: orchestrator_url.clone(),
                         capabilities: last_caps.clone(),
                         refresh_deadline: std::time::SystemTime::now() + std::time::Duration::from_secs(subscription_refresh_interval_sec * 2),
+                        counter,
                     };
                     match client.domain_registration_api().update_domain(update_domain_request).await {
                         Ok(response) => {
