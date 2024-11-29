@@ -9,6 +9,10 @@ on:
         default: 'manual-build'
   release:
     types: [published]
+  push:
+    branches:
+      - docker-images
+  
 
 jobs:
   build-and-push:
@@ -44,6 +48,8 @@ jobs:
             else
               echo "tag=${{ github.event.inputs.custom_tag }}" >> $GITHUB_ENV
             fi
+          elif [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref_name }}" == "docker-images" ]; then
+            echo "tag=v1.0.0" >> $GITHUB_ENV
           fi
         shell: bash
 
