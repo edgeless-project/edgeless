@@ -32,15 +32,15 @@ RUN apt-get update && apt-get install -y gettext-base && rm -rf /var/lib/apt/lis
 RUN echo '\
 [general]\n\
 node_id = "${NODE_ID}"\n\
-agent_url = "${AGENT_URL}"\n\
+agent_url = "http://0.0.0.0:${AGENT_PORT}"\n\
 agent_url_announced = "${AGENT_URL_ANNOUNCED}"\n\
-invocation_url = "${INVOCATION_URL}"\n\
+invocation_url = "http://0.0.0.0:${INVOCATION_PORT}"\n\
 invocation_url_announced = "${INVOCATION_URL_ANNOUNCED}"\n\
-metrics_url = "${METRICS_URL}"\n\
+metrics_url = "http://0.0.0.0:${METRICS_PORT}"\n\
 orchestrator_url = "${ORCHESTRATOR_URL}"\n\
 \n\
 [telemetry]\n\
-metrics_url = "${TELEMETRY_METRICS_URL}"\n\
+metrics_url = "http://0.0.0.0:${TELEMETRY_METRICS_PORT}"\n\
 log_level = "${TELEMETRY_LOG_LEVEL}"\n\
 performance_samples = ${TELEMETRY_PERFORMANCE_SAMPLES}\n\
 \n\
@@ -52,7 +52,7 @@ enabled = ${CONTAINER_RUNTIME_ENABLED}\n\
 guest_api_host_url = "${GUEST_API_HOST_URL}"\n\
 \n\
 [resources]\n\
-http_ingress_url = "${HTTP_INGRESS_URL}"\n\
+http_ingress_url = "http://0.0.0.0:${HTTP_INGRESS_PORT}"\n\
 http_ingress_provider = "${HTTP_INGRESS_PROVIDER}"\n\
 http_egress_provider = "${HTTP_EGRESS_PROVIDER}"\n\
 file_log_provider = "${FILE_LOG_PROVIDER}"\n\
@@ -71,19 +71,19 @@ has_tpm = ${HAS_TPM}\n' > /usr/local/etc/node-template.toml
 # Replace the variables and run the application
 ENTRYPOINT ["/bin/bash", "-c", "\
   export NODE_ID=${NODE_ID:-'fda6ce79-46df-4f96-a0d2-456f720f606c'} && \
-  export AGENT_URL=${AGENT_URL:-http://127.0.0.1:7021} && \
+  export AGENT_PORT=${AGENT_PORT:-7021} && \
   export AGENT_URL_ANNOUNCED=${AGENT_URL_ANNOUNCED:-} && \
-  export INVOCATION_URL=${INVOCATION_URL:-http://127.0.0.1:7002} && \
+  export INVOCATION_PORT=${INVOCATION_PORT:-7002} && \
   export INVOCATION_URL_ANNOUNCED=${INVOCATION_URL_ANNOUNCED:-} && \
-  export METRICS_URL=${METRICS_URL:-http://127.0.0.1:7003} && \
-  export ORCHESTRATOR_URL=${ORCHESTRATOR_URL:-http://127.0.0.1:7011} && \
-  export TELEMETRY_METRICS_URL=${TELEMETRY_METRICS_URL:-http://127.0.0.1:7003} && \
+  export METRICS_PORT=${METRICS_PORT:-7003} && \
+  export ORCHESTRATOR_URL=${ORCHESTRATOR_URL:-} && \
+  export TELEMETRY_METRICS_PORT=${TELEMETRY_METRICS_PORT:-7003} && \
   export TELEMETRY_LOG_LEVEL=${TELEMETRY_LOG_LEVEL:-info} && \
   export TELEMETRY_PERFORMANCE_SAMPLES=${TELEMETRY_PERFORMANCE_SAMPLES:-true} && \
   export WASM_RUNTIME_ENABLED=${WASM_RUNTIME_ENABLED:-true} && \
   export CONTAINER_RUNTIME_ENABLED=${CONTAINER_RUNTIME_ENABLED:-false} && \
   export GUEST_API_HOST_URL=${GUEST_API_HOST_URL:-} && \
-  export HTTP_INGRESS_URL=${HTTP_INGRESS_URL:-http://127.0.0.1:7035} && \
+  export HTTP_INGRESS_PORT=${HTTP_INGRESS_PORT:-7035} && \
   export HTTP_INGRESS_PROVIDER=${HTTP_INGRESS_PROVIDER:-http-ingress-1} && \
   export HTTP_EGRESS_PROVIDER=${HTTP_EGRESS_PROVIDER:-http-egress-1} && \
   export FILE_LOG_PROVIDER=${FILE_LOG_PROVIDER:-file-log-1} && \

@@ -32,11 +32,11 @@ RUN apt-get update && apt-get install -y gettext-base && rm -rf /var/lib/apt/lis
 RUN echo '\
 [general]\n\
 domain_id = "${DOMAIN_ID}"\n\
-orchestrator_url = "${ORCHESTRATOR_URL}"\n\
+orchestrator_url = "http://0.0.0.0:${ORCHESTRATOR_PORT}"\n\
 orchestrator_url_announced = "${ORCHESTRATOR_URL_ANNOUNCED}"\n\
-agent_url = "${AGENT_URL}"\n\
+agent_url = "http://0.0.0.0:${AGENT_PORT}"\n\
 agent_url_announced = "${AGENT_URL_ANNOUNCED}"\n\
-invocation_url = "${INVOCATION_URL}"\n\
+invocation_url = "http://0.0.0.0:${INVOCATION_PORT}"\n\
 invocation_url_announced = "${INVOCATION_URL_ANNOUNCED}"\n\
 \n\
 [baseline]\n\
@@ -54,11 +54,11 @@ redis_url = "${COLLECTOR_REDIS_URL}"\n' > /usr/local/etc/orchestrator-template.t
 # Replace the variables and run the application
 ENTRYPOINT ["/bin/bash", "-c", "\
   export DOMAIN_ID=${DOMAIN_ID:-domain-1} && \
-  export ORCHESTRATOR_URL=${ORCHESTRATOR_URL:-http://127.0.0.1:7011} && \
+  export ORCHESTRATOR_PORT=${ORCHESTRATOR_PORT:-7011} && \
   export ORCHESTRATOR_URL_ANNOUNCED=${ORCHESTRATOR_URL_ANNOUNCED:-} && \
-  export AGENT_URL=${AGENT_URL:-http://127.0.0.1:7121} && \
+  export AGENT_PORT=${AGENT_PORT:-7121} && \
   export AGENT_URL_ANNOUNCED=${AGENT_URL_ANNOUNCED:-} && \
-  export INVOCATION_URL=${INVOCATION_URL:-http://127.0.0.1:7102} && \
+  export INVOCATION_PORT=${INVOCATION_PORT:-7102} && \
   export INVOCATION_URL_ANNOUNCED=${INVOCATION_URL_ANNOUNCED:-} && \
   export ORCHESTRATION_STRATEGY=${ORCHESTRATION_STRATEGY:-Random} && \
   export KEEP_ALIVE_INTERVAL_SECS=${KEEP_ALIVE_INTERVAL_SECS:-2} && \
