@@ -25,7 +25,7 @@ impl DomainRegistrationAPIClient {
     ///
     /// If an error is returned, then the client is set to None (disconnected).
     /// Otherwise, the client is set to some value (connected).
-    pub async fn try_connect(&mut self) -> anyhow::Result<()> {
+    async fn try_connect(&mut self) -> anyhow::Result<()> {
         if self.client.is_none() {
             self.client = match crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient::connect(self.server_addr.clone()).await {
                 Ok(client) => {
@@ -39,7 +39,7 @@ impl DomainRegistrationAPIClient {
     }
 
     /// Disconnect the client.
-    pub fn disconnect(&mut self) {
+    fn disconnect(&mut self) {
         self.client = None;
     }
 }
@@ -58,7 +58,7 @@ impl crate::domain_registration::DomainRegistrationAPI for DomainRegistrationAPI
                         Err(err) => {
                             self.disconnect();
                             Err(anyhow::anyhow!(
-                                "Error when updating a domain to {}: {}",
+                                "Error when updating a domain at {}: {}",
                                 self.server_addr,
                                 err.to_string()
                             ))

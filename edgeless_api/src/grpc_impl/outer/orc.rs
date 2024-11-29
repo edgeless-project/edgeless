@@ -10,22 +10,14 @@ pub struct OrchestratorAPIClient {
 }
 
 impl OrchestratorAPIClient {
-    pub async fn new(api_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
-        let function_instance_client = crate::grpc_impl::function_instance::FunctionInstanceAPIClient::new(api_addr, retry_interval).await;
-        let node_registration_client = crate::grpc_impl::node_registration::NodeRegistrationClient::new(api_addr, retry_interval).await;
-        let resource_configuration_client: Result<
-            crate::grpc_impl::resource_configuration::ResourceConfigurationClient<crate::function_instance::DomainManagedInstanceId>,
-            anyhow::Error,
-        > = Ok(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(api_addr, retry_interval).await);
-
-        match (function_instance_client, node_registration_client, resource_configuration_client) {
-            (Ok(function_instance_client), Ok(node_registration_client), Ok(resource_configuration_client)) => Ok(Self {
-                function_instance_client: Box::new(function_instance_client),
-                node_registration_client: Box::new(node_registration_client),
-                resource_configuration_client: Box::new(resource_configuration_client),
-            }),
-            _ => Err(anyhow::anyhow!("One of the orc connections failed")),
-        }
+    pub async fn new(api_addr: &str) -> anyhow::Result<Self> {
+        Ok(Self {
+            function_instance_client: Box::new(crate::grpc_impl::function_instance::FunctionInstanceAPIClient::new(api_addr.to_string())),
+            node_registration_client: Box::new(crate::grpc_impl::node_registration::NodeRegistrationClient::new(api_addr.to_string())),
+            resource_configuration_client: Box::new(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(
+                api_addr.to_string(),
+            )),
+        })
     }
 }
 
