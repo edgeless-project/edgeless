@@ -6,7 +6,6 @@ use std::{collections::HashMap, path::Path};
 
 use anyhow::anyhow;
 use clap::Parser;
-use edgeless_con::EdgelessConOrcConfig;
 use edgeless_inabox::InABoxConfig;
 use edgeless_node::{EdgelessNodeGeneralSettings, EdgelessNodeResourceSettings, EdgelessNodeSettings, EdgelessNodeTelemetrySettings};
 use std::fs;
@@ -141,11 +140,6 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
     let con_conf = edgeless_con::EdgelessConSettings {
         controller_url,
         domain_register_url,
-        // for now only one orchestrator
-        orchestrators: vec![EdgelessConOrcConfig {
-            domain_id: orc_conf.general.domain_id.clone(),
-            orchestrator_url: orc_conf.general.orchestrator_url.clone(),
-        }],
     };
 
     // Nodes

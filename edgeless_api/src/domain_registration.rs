@@ -62,6 +62,8 @@ pub struct UpdateDomainRequest {
     // Deadline for refreshing the domain request.
     // After this time the orchestration domain can be considered to be offline.
     pub refresh_deadline: std::time::SystemTime,
+    // Incremental counter updated every time the capabilities change.
+    pub counter: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
