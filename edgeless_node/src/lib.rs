@@ -256,7 +256,7 @@ pub async fn register_node(
         &settings.orchestrator_url,
         capabilities
     );
-    match edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&settings.orchestrator_url, None).await {
+    match edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&settings.orchestrator_url).await {
         Ok(mut orc_client) => match orc_client
             .node_registration_api()
             .update_node(edgeless_api::node_registration::UpdateNodeRequest::Registration(
