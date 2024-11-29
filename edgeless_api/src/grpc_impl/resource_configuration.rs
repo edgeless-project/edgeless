@@ -45,32 +45,40 @@ impl ResourceConfigurationConverters {
 #[derive(Clone)]
 pub struct ResourceConfigurationClient<ResourceIdType> {
     client: Option<crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient<tonic::transport::Channel>>,
+    server_addr: String,
     _phantom: std::marker::PhantomData<ResourceIdType>,
 }
 
 impl<ResourceIdType> ResourceConfigurationClient<ResourceIdType> {
-    pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> Self {
-        loop {
-            match crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient::connect(server_addr.to_string()).await {
-                Ok(client) => {
-                    let client = client.max_decoding_message_size(usize::MAX);
-                    return Self {
-                        client: Some(client),
-                        _phantom: std::marker::PhantomData {},
-                    };
-                }
-                Err(err) => match retry_interval {
-                    Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
-                    None => {
-                        log::warn!("Error when connecting to {}: {}", server_addr, err);
-                        return Self {
-                            client: None,
-                            _phantom: std::marker::PhantomData {},
-                        };
-                    }
-                },
-            }
+    pub fn new(server_addr: String) -> Self {
+        Self {
+            client: None,
+            server_addr,
+            _phantom: std::marker::PhantomData {},
         }
+    }
+
+    /// Try connecting, if not already connected.
+    ///
+    /// If an error is returned, then the client is set to None (disconnected).
+    /// Otherwise, the client is set to some value (connected).
+    async fn try_connect(&mut self) -> anyhow::Result<()> {
+        if self.client.is_none() {
+            self.client =
+                match crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient::connect(self.server_addr.clone()).await {
+                    Ok(client) => {
+                        let client = client.max_decoding_message_size(usize::MAX);
+                        Some(client)
+                    }
+                    Err(err) => anyhow::bail!(err),
+                }
+        }
+        Ok(())
+    }
+
+    /// Disconnect the client.
+    fn disconnect(&mut self) {
+        self.client = None;
     }
 }
 
@@ -84,46 +92,81 @@ where
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<crate::common::StartComponentResponse<ResourceIdType>> {
-        match &mut self.client {
-            Some(client) => {
-                let serialized_request = ResourceConfigurationConverters::serialize_resource_instance_specification(&instance_specification);
-                match client.start(tonic::Request::new(serialized_request)).await {
-                    Ok(ret) => CommonConverters::parse_start_component_response(&ret.into_inner()),
-                    Err(err) => Err(anyhow::anyhow!("Resource configuration request failed: {}", err)),
+        match self.try_connect().await {
+            Ok(_) => {
+                if let Some(client) = &mut self.client {
+                    match client
+                        .start(tonic::Request::new(
+                            ResourceConfigurationConverters::serialize_resource_instance_specification(&instance_specification),
+                        ))
+                        .await
+                    {
+                        Ok(res) => CommonConverters::parse_start_component_response(&res.into_inner()),
+                        Err(err) => {
+                            self.disconnect();
+                            Err(anyhow::anyhow!(
+                                "Error when starting a resource at {}: {}",
+                                self.server_addr,
+                                err.to_string()
+                            ))
+                        }
+                    }
+                } else {
+                    panic!("The impossible happened");
                 }
             }
-            None => {
-                return Err(anyhow::anyhow!("Resource configuration not connected"));
+            Err(err) => {
+                anyhow::bail!("Error when connecting to {}: {}", self.server_addr, err);
             }
         }
     }
 
     async fn stop(&mut self, resource_id: ResourceIdType) -> anyhow::Result<()> {
-        match &mut self.client {
-            Some(client) => {
-                let encoded_id = SerializeableId::serialize(&resource_id);
-                match client.stop(encoded_id).await {
-                    Ok(_) => Ok(()),
-                    Err(err) => Err(anyhow::anyhow!("Resource stop request failed: {}", err)),
+        match self.try_connect().await {
+            Ok(_) => {
+                if let Some(client) = &mut self.client {
+                    match client.stop(SerializeableId::serialize(&resource_id)).await {
+                        Ok(_) => Ok(()),
+                        Err(err) => {
+                            self.disconnect();
+                            Err(anyhow::anyhow!(
+                                "Error when stopping a resource at {}: {}",
+                                self.server_addr,
+                                err.to_string()
+                            ))
+                        }
+                    }
+                } else {
+                    panic!("The impossible happened");
                 }
             }
-            None => {
-                return Err(anyhow::anyhow!("Resource configuration not connected"));
+            Err(err) => {
+                anyhow::bail!("Error when connecting to {}: {}", self.server_addr, err);
             }
         }
     }
 
     async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()> {
-        match &mut self.client {
-            Some(client) => {
-                let encoded_request = CommonConverters::serialize_patch_request(&update);
-                match client.patch(encoded_request).await {
-                    Ok(_) => Ok(()),
-                    Err(err) => Err(anyhow::anyhow!("Resource patch request failed: {}", err)),
+        match self.try_connect().await {
+            Ok(_) => {
+                if let Some(client) = &mut self.client {
+                    match client.patch(CommonConverters::serialize_patch_request(&update)).await {
+                        Ok(_) => Ok(()),
+                        Err(err) => {
+                            self.disconnect();
+                            Err(anyhow::anyhow!(
+                                "Error when patching a resource at {}: {}",
+                                self.server_addr,
+                                err.to_string()
+                            ))
+                        }
+                    }
+                } else {
+                    panic!("The impossible happened");
                 }
             }
-            None => {
-                return Err(anyhow::anyhow!("Resource configuration not connected"));
+            Err(err) => {
+                anyhow::bail!("Error when connecting to {}: {}", self.server_addr, err);
             }
         }
     }
