@@ -35,7 +35,7 @@ impl std::fmt::Display for DomainCapabilities {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "{} nodes, {} CPUs ({} cores) with {} MiB, labels [{}], num TEE {}, num TPM {}, runtimes [{}], disk space {} MiB, {} GPUs with {} MiB",
+            "{} nodes, {} CPUs ({} cores) with {} MiB, labels [{}], num TEE {}, num TPM {}, runtimes [{}], resources classes [{}] providers [{}], disk space {} MiB, {} GPUs with {} MiB",
             self.num_nodes,
             self.num_cpus,
             self.num_cores,
@@ -44,6 +44,8 @@ impl std::fmt::Display for DomainCapabilities {
             self.num_tee,
             self.num_tpm,
             self.runtimes.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
+            self.resource_classes.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
+            self.resource_providers.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
             self.disk_tot_space,
             self.num_gpus,
             self.mem_size_gpu,
