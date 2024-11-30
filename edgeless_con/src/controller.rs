@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use futures::SinkExt;
+
 pub mod client;
 pub mod controller_task;
 mod deployment_state;
@@ -53,21 +55,36 @@ enum ComponentType {
 }
 
 impl Controller {
-    pub fn new() -> (Self, std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>) {
+    pub fn new() -> (
+        Self,
+        std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>,
+        std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>,
+    ) {
         let (workflow_instance_sender, workflow_instance_receiver) = futures::channel::mpsc::unbounded();
         let (domain_register_sender, domain_register_receiver) = futures::channel::mpsc::unbounded();
+        let (internal_sender, internal_receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
-            let mut controller_task = controller_task::ControllerTask::new(workflow_instance_receiver, domain_register_receiver);
+            let mut controller_task = controller_task::ControllerTask::new(workflow_instance_receiver, domain_register_receiver, internal_receiver);
             controller_task.run().await;
+        });
+
+        let refresh_task = Box::pin(async move {
+            let mut sender = internal_sender;
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
+            loop {
+                interval.tick().await;
+                let _ = sender.send(InternalRequest::Poll()).await;
+            }
         });
 
         (
             Controller {
-                workflow_instance_sender: workflow_instance_sender,
+                workflow_instance_sender,
                 domain_register_sender,
             },
             main_task,
+            refresh_task,
         )
     }
 
