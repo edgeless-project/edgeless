@@ -15,7 +15,7 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
     log::info!("Starting Edgeless Controller at {}", settings.controller_url);
     log::debug!("Settings: {:?}", settings);
 
-    let (mut controller, controller_task) = controller::Controller::new();
+    let (mut controller, controller_task, refresh_task) = controller::Controller::new();
 
     let workflow_instance_server_task = edgeless_api::grpc_impl::outer::controller::WorkflowInstanceAPIServer::run(
         controller.get_workflow_instance_client(),
@@ -27,7 +27,7 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
         settings.domain_register_url,
     );
 
-    futures::join!(controller_task, workflow_instance_server_task, domain_register_server_task);
+    futures::join!(controller_task, refresh_task, workflow_instance_server_task, domain_register_server_task);
 }
 
 pub fn edgeless_con_default_conf() -> String {

@@ -145,7 +145,7 @@ async fn test_setup() -> (
         Box::new(mock_orc) as Box<dyn edgeless_api::outer::orc::OrchestratorAPI>,
     )]);
 
-    let (mut controller, controller_task) = Controller::new();
+    let (mut controller, controller_task, refresh_task) = Controller::new();
     tokio::spawn(controller_task);
     let mut client = controller.get_workflow_instance_client();
     let wf_client = client.workflow_instance_api();
