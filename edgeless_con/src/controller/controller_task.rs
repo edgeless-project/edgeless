@@ -19,6 +19,7 @@ pub struct ControllerTask {
     domain_registration_receiver: futures::channel::mpsc::UnboundedReceiver<super::DomainRegisterRequest>,
     orchestrators: std::collections::HashMap<String, OrchestratorDesc>,
     active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::deployment_state::ActiveWorkflow>,
+    orphan_workflows: Vec<edgeless_api::workflow_instance::SpawnWorkflowRequest>,
     rng: rand::rngs::StdRng,
 }
 
@@ -32,6 +33,7 @@ impl ControllerTask {
             domain_registration_receiver,
             orchestrators: std::collections::HashMap::new(),
             active_workflows: std::collections::HashMap::new(),
+            orphan_workflows: vec![],
             rng: rand::rngs::StdRng::from_entropy(),
         }
     }
@@ -44,7 +46,10 @@ impl ControllerTask {
                 Some(req) = self.workflow_instance_receiver.next() => {
                     match req {
                         super::ControllerRequest::Start(spawn_workflow_request, reply_sender) => {
-                            let reply = self.start_workflow(spawn_workflow_request).await;
+                            let reply = match self.start_workflow(spawn_workflow_request).await {
+                                Ok(val) => Ok(val),
+                                Err(_) => Err(anyhow::anyhow!(""))
+                            };
                             if let Err(err) = reply_sender.send(reply) {
                                 log::error!("Unhandled: {:?}", err);
                             }
@@ -86,7 +91,7 @@ impl ControllerTask {
     async fn start_workflow(
         &mut self,
         spawn_workflow_request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
-    ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse> {
+    ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse, edgeless_api::workflow_instance::SpawnWorkflowRequest> {
         if !spawn_workflow_request.annotations.is_empty() {
             log::warn!(
                 "Workflow annotations ({}) are currently ignored",
@@ -102,12 +107,7 @@ impl ControllerTask {
         // yet supported as of today (Nov 2024).
         //
 
-        let mut candidate_domains = vec![];
-        for (domain_id, desc) in &self.orchestrators {
-            if Self::compatible(&desc, &spawn_workflow_request) {
-                candidate_domains.push(domain_id.clone());
-            }
-        }
+        let candidate_domains = Self::compatible_domains(&self.orchestrators, &spawn_workflow_request);
         let target_domain = match candidate_domains.choose(&mut self.rng) {
             Some(val) => val,
             None => {
@@ -221,11 +221,14 @@ impl ControllerTask {
         reply
     }
 
-    async fn stop_workflow(&mut self, wf_id: &edgeless_api::workflow_instance::WorkflowId) {
+    async fn stop_workflow(
+        &mut self,
+        wf_id: &edgeless_api::workflow_instance::WorkflowId,
+    ) -> Option<edgeless_api::workflow_instance::SpawnWorkflowRequest> {
         let workflow = match self.active_workflows.get(wf_id) {
             None => {
                 log::error!("trying to tear-down a workflow that does not exist: {}", wf_id.to_string());
-                return;
+                return None;
             }
             Some(val) => val,
         };
@@ -264,6 +267,7 @@ impl ControllerTask {
         // Remove the workflow from the active set.
         let remove_res = self.active_workflows.remove(wf_id);
         assert!(remove_res.is_some());
+        Some(remove_res.unwrap().desired_state)
     }
 
     async fn list_workflows(
@@ -338,7 +342,7 @@ impl ControllerTask {
         }
 
         let desc = &mut self.orchestrators.get_mut(&update_domain_request.domain_id);
-        match desc {
+        let try_fix_orphans = match desc {
             None => {
                 self.orchestrators.insert(
                     update_domain_request.domain_id.clone(),
@@ -352,11 +356,13 @@ impl ControllerTask {
                         counter: update_domain_request.counter,
                     },
                 );
+                true
             }
             Some(desc) => {
                 // If the counter has not been incremented, then update only
                 // the refresh deadline, all the other fields are assumed
                 // to remain the same.
+                desc.refresh_deadline = update_domain_request.refresh_deadline;
                 if desc.counter != update_domain_request.counter {
                     desc.counter = update_domain_request.counter;
                     desc.capabilities = update_domain_request.capabilities.clone();
@@ -367,15 +373,23 @@ impl ControllerTask {
                         desc.client =
                             Box::new(edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&update_domain_request.orchestrator_url).await?);
                     }
+                    true
+                } else {
+                    false
                 }
-                desc.refresh_deadline = update_domain_request.refresh_deadline;
             }
         };
+
+        if try_fix_orphans {
+            self.try_fix_orphans().await;
+        }
 
         Ok(edgeless_api::domain_registration::UpdateDomainResponse::Accepted)
     }
 
-    fn compatible(desc: &OrchestratorDesc, workflow: &edgeless_api::workflow_instance::SpawnWorkflowRequest) -> bool {
+    /// Return true if the given orchestration domain is compatible with the
+    /// workflow request, i.e., it can host all its functions and resources.
+    fn is_compatible(desc: &OrchestratorDesc, workflow: &edgeless_api::workflow_instance::SpawnWorkflowRequest) -> bool {
         for function in &workflow.workflow_functions {
             if !desc
                 .capabilities
@@ -391,6 +405,87 @@ impl ControllerTask {
             }
         }
         true
+    }
+
+    /// Return the list of orchestration domains that are compatible with the
+    /// given workflow request.
+    fn compatible_domains(
+        orchestrators: &std::collections::HashMap<String, OrchestratorDesc>,
+        workflow_request: &edgeless_api::workflow_instance::SpawnWorkflowRequest,
+    ) -> Vec<String> {
+        let mut ret = vec![];
+        for (domain_id, desc) in orchestrators {
+            if Self::is_compatible(&desc, workflow_request) {
+                ret.push(domain_id.clone());
+            }
+        }
+        ret
+    }
+
+    /// Check all active workflows.
+    /// If a workflow has at least one resource or function that is not assigned
+    /// to a domain, then it is called an orphan.
+    /// This method tries to fix all orphan workflows by stopping it on their
+    /// current domain and starting it again on another that compatible with it.
+    async fn try_fix_orphans(&mut self) {
+        // Find the workflows that can be fixed, i.e., those for which there is
+        // at least one orchestration domain that can host them.
+        let mut workflows_to_fix = vec![];
+        for (wf_id, workflow) in &mut self.active_workflows {
+            if workflow.is_orphan() {
+                match Self::compatible_domains(&self.orchestrators, &workflow.desired_state).choose(&mut self.rng) {
+                    None => {}
+                    Some(new_domain) => workflows_to_fix.push((wf_id.clone(), new_domain.clone())),
+                };
+            }
+        }
+
+        // For the fixable workflows, try to deploy them to the assigned new
+        // orchestration domains. If this fails for some workflows, they go
+        // into the orphan list.
+        for (wf_id, new_domain) in workflows_to_fix {
+            assert!(!new_domain.is_empty());
+            if let Some(workflow_request) = self.stop_workflow(&wf_id).await {
+                match self.start_workflow(workflow_request).await {
+                    Ok(response) => {
+                        if let edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_) = response {
+                            log::info!("orphan workflow '{}' relocated to domain '{}'", wf_id, new_domain);
+                            continue;
+                        }
+                    }
+                    Err(workflow_request) => self.orphan_workflows.push(workflow_request),
+                }
+            }
+        }
+
+        // Do the same for the workflow requests in the orphan list.
+        let mut workflow_requests_fixable = vec![];
+        let mut workflow_requests_unfixable = vec![];
+        while let Some(workflow_request) = self.orphan_workflows.pop() {
+            match Self::compatible_domains(&self.orchestrators, &workflow_request).choose(&mut self.rng) {
+                None => workflow_requests_unfixable.push(workflow_request),
+                Some(new_domain) => workflow_requests_fixable.push((new_domain.clone(), workflow_request)),
+            };
+        }
+        assert!(self.orphan_workflows.is_empty());
+
+        std::mem::swap(&mut self.orphan_workflows, &mut workflow_requests_unfixable);
+
+        // Try to deploy the orphan workflows to the assigned orchestration
+        // domains. If this fails for some workflows, they go back to the
+        // orphan list.
+        for (new_domain, workflow_request) in workflow_requests_fixable {
+            assert!(!new_domain.is_empty());
+            match self.start_workflow(workflow_request).await {
+                Ok(response) => {
+                    if let edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_) = response {
+                        log::info!("orphan workflow assigned to domain '{}'", new_domain);
+                        continue;
+                    }
+                }
+                Err(workflow_request) => self.orphan_workflows.push(workflow_request),
+            }
+        }
     }
 
     async fn start_workflow_function_in_domain(
