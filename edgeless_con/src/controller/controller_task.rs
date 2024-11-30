@@ -17,6 +17,7 @@ struct OrchestratorDesc {
 pub struct ControllerTask {
     workflow_instance_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
     domain_registration_receiver: futures::channel::mpsc::UnboundedReceiver<super::DomainRegisterRequest>,
+    internal_receiver: futures::channel::mpsc::UnboundedReceiver<super::InternalRequest>,
     orchestrators: std::collections::HashMap<String, OrchestratorDesc>,
     active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::deployment_state::ActiveWorkflow>,
     orphan_workflows: Vec<edgeless_api::workflow_instance::SpawnWorkflowRequest>,
@@ -27,10 +28,12 @@ impl ControllerTask {
     pub fn new(
         workflow_instance_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
         domain_registration_receiver: futures::channel::mpsc::UnboundedReceiver<super::DomainRegisterRequest>,
+        internal_receiver: futures::channel::mpsc::UnboundedReceiver<super::InternalRequest>,
     ) -> Self {
         Self {
             workflow_instance_receiver,
             domain_registration_receiver,
+            internal_receiver,
             orchestrators: std::collections::HashMap::new(),
             active_workflows: std::collections::HashMap::new(),
             orphan_workflows: vec![],
@@ -81,6 +84,13 @@ impl ControllerTask {
                                     log::error!("Unhandled: {:?}", err);
                                 }
                             }
+                        }
+                    }
+                }
+                Some(req) = self.internal_receiver.next() => {
+                    match req {
+                        super::InternalRequest::Poll() => {
+                            self.check_domains().await;
                         }
                     }
                 }
@@ -385,6 +395,40 @@ impl ControllerTask {
         }
 
         Ok(edgeless_api::domain_registration::UpdateDomainResponse::Accepted)
+    }
+
+    async fn check_domains(&mut self) {
+        log::debug!("Checking domains");
+
+        // Find all domains that are stale, i.e., which have not been
+        // refreshed by their own indicated deadline.
+        let mut stale_domains = vec![];
+        for (domain_id, desc) in &self.orchestrators {
+            if std::time::SystemTime::now() > desc.refresh_deadline {
+                stale_domains.push(domain_id.clone());
+            }
+        }
+
+        // Delete all stale domains, also invalidating all mapping of functions
+        // and resources of active flows.
+        let try_fix_orphans = !stale_domains.is_empty();
+        for stale_domain in stale_domains {
+            log::info!("Removing domain '{}' because it is stale", stale_domain);
+            self.orchestrators.remove(&stale_domain);
+
+            for (_wf_id, workflow) in &mut self.active_workflows {
+                for (_name, component) in &mut workflow.domain_mapping {
+                    if component.domain_id == stale_domain {
+                        component.domain_id.clear();
+                    }
+                }
+            }
+        }
+
+        // If some domains were removed, try to fix the situation.
+        if !try_fix_orphans {
+            self.try_fix_orphans().await;
+        }
     }
 
     /// Return true if the given orchestration domain is compatible with the
