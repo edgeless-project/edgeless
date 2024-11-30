@@ -21,6 +21,9 @@ pub struct ActiveComponent {
 
     // Name of the domain that manages the lifecycle of this function/resource.
     //
+    // If the domain name is an empty string, then the component is current
+    // not assigned to any domain, and the field `lid` is meaningless.
+    //
     // [TODO] In principle a logical component could be mapped to _multiple_
     //  domains, in which case this field should be transformed in a container.
     pub domain_id: String,
@@ -30,6 +33,15 @@ pub struct ActiveComponent {
 }
 
 impl ActiveWorkflow {
+    pub fn is_orphan(&self) -> bool {
+        for (_name, component) in &self.domain_mapping {
+            if component.domain_id.is_empty() {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn mapped_fids(&self, component_name: &str) -> Option<Vec<edgeless_api::function_instance::ComponentId>> {
         let comp = self.domain_mapping.get(component_name)?;
         Some(vec![comp.lid])

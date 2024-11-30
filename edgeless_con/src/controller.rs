@@ -42,6 +42,10 @@ pub(crate) enum DomainRegisterRequest {
     ),
 }
 
+pub(crate) enum InternalRequest {
+    Poll(),
+}
+
 #[derive(Clone)]
 enum ComponentType {
     Function,
