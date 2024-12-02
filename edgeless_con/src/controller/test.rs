@@ -1,8 +1,9 @@
+use controller_task::OrchestratorDesc;
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-use edgeless_api::workflow_instance::SpawnWorkflowResponse;
+use edgeless_api::{domain_registration::DomainCapabilities, workflow_instance::SpawnWorkflowResponse};
 
 use super::*;
 
@@ -31,7 +32,6 @@ enum MockFunctionInstanceEvent {
 }
 
 struct MockOrchestrator {
-    _node_id: uuid::Uuid,
     sender: futures::channel::mpsc::UnboundedSender<MockFunctionInstanceEvent>,
 }
 
@@ -131,31 +131,47 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for MockNodeRegistrati
 async fn test_setup() -> (
     Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>,
     futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>,
-    uuid::Uuid,
 ) {
     let (mock_orc_sender, mock_orc_receiver) = futures::channel::mpsc::unbounded::<MockFunctionInstanceEvent>();
-    let node_id = uuid::Uuid::new_v4();
-    let mock_orc = MockOrchestrator {
-        _node_id: node_id,
-        sender: mock_orc_sender,
-    };
+    let mock_orc = MockOrchestrator { sender: mock_orc_sender };
 
-    let orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::outer::orc::OrchestratorAPI>>::from([(
-        "domain-1".to_string(),
-        Box::new(mock_orc) as Box<dyn edgeless_api::outer::orc::OrchestratorAPI>,
+    let (workflow_instance_sender, workflow_instance_receiver) = futures::channel::mpsc::unbounded();
+    let (_domain_registration_sender, domain_registration_receiver) = futures::channel::mpsc::unbounded();
+    let (_internal_sender, internal_receiver) = futures::channel::mpsc::unbounded();
+
+    let mut capabilities = DomainCapabilities::default();
+    capabilities.runtimes.insert(String::from("RUST_WASM"));
+    capabilities.resource_classes.insert(String::from("test-res"));
+    let orchestrators = std::collections::HashMap::from([(
+        String::from("domain-1"),
+        OrchestratorDesc {
+            client: Box::new(mock_orc) as Box<dyn edgeless_api::outer::orc::OrchestratorAPI>,
+            orchestrator_url: String::default(),
+            capabilities,
+            refresh_deadline: std::time::SystemTime::now(),
+            counter: 0,
+        },
     )]);
 
-    let (mut controller, controller_task, refresh_task) = Controller::new();
+    let controller_task = Box::pin(async move {
+        let mut controller_task = controller_task::ControllerTask::new_with_orchestrators(
+            workflow_instance_receiver,
+            domain_registration_receiver,
+            internal_receiver,
+            orchestrators,
+        );
+        controller_task.run().await;
+    });
     tokio::spawn(controller_task);
-    let mut client = controller.get_workflow_instance_client();
-    let wf_client = client.workflow_instance_api();
 
-    (wf_client, mock_orc_receiver, node_id)
+    let wf_client = client::ControllerClient::new(workflow_instance_sender).workflow_instance_api();
+
+    (wf_client, mock_orc_receiver)
 }
 
 #[tokio::test]
 async fn single_function_start_stop() {
-    let (mut wf_client, mut mock_orc_receiver, _node_id) = test_setup().await;
+    let (mut wf_client, mut mock_orc_receiver) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
 
@@ -217,7 +233,7 @@ async fn single_function_start_stop() {
 
 #[tokio::test]
 async fn resource_to_function_start_stop() {
-    let (mut wf_client, mut mock_orc_receiver, _node_id) = test_setup().await;
+    let (mut wf_client, mut mock_orc_receiver) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
 
@@ -319,7 +335,7 @@ async fn resource_to_function_start_stop() {
 
 #[tokio::test]
 async fn function_link_loop_start_stop() {
-    let (mut wf_client, mut mock_orc_receiver, _node_id) = test_setup().await;
+    let (mut wf_client, mut mock_orc_receiver) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
 
