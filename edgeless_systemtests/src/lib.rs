@@ -366,6 +366,80 @@ mod system_tests {
         terminate(handles)
     }
 
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn system_test_three_domains_simple() -> anyhow::Result<()> {
+        let _ = env_logger::try_init();
+
+        // Create the EDGELESS system.
+        let (handles, mut client) = setup(3, 1, None).await;
+
+        assert!(wf_list(&mut client).await.is_empty());
+
+        // Wait for all the nodes to be visible.
+        let mut num_nodes_founds = 0;
+        for _ in 0..100 {
+            num_nodes_founds = 0;
+            for domain_id in 0..3 {
+                num_nodes_founds += nodes_in_domain(format!("domain-{}", domain_id).as_str(), &mut client).await;
+            }
+            if num_nodes_founds == 3 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(3, num_nodes_founds);
+
+        // Create 100 workflows
+        let mut workflow_ids = vec![];
+        let mut domains = std::collections::HashSet::new();
+        for _ in 0..100 {
+            let res = client
+                .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
+                    workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
+                        name: "f1".to_string(),
+                        function_class_specification: fixture_spec(),
+                        output_mapping: std::collections::HashMap::new(),
+                        annotations: std::collections::HashMap::new(),
+                    }],
+                    workflow_resources: vec![],
+                    annotations: std::collections::HashMap::new(),
+                })
+                .await;
+            workflow_ids.push(match res {
+                Ok(response) => match &response {
+                    edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => {
+                        panic!("workflow rejected: {}", err)
+                    }
+                    edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val) => {
+                        assert_eq!(1, val.domain_mapping.len());
+                        assert_eq!("f1", val.domain_mapping[0].name);
+                        domains.insert(val.domain_mapping[0].domain_id.clone());
+                        val.workflow_id.clone()
+                    }
+                },
+                Err(err) => panic!("could not start the workflow: {}", err),
+            });
+        }
+        assert_eq!(100, wf_list(&mut client).await.len());
+
+        assert_eq!(
+            std::collections::HashSet::from([String::from("domain-0"), String::from("domain-1"), String::from("domain-2"),]),
+            domains
+        );
+
+        // Stop the workflows
+        for workflow_id in workflow_ids {
+            match client.stop(workflow_id).await {
+                Ok(_) => {}
+                Err(err) => panic!("could not stop the workflow: {}", err),
+            }
+        }
+        assert!(wf_list(&mut client).await.is_empty());
+
+        terminate(handles)
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     #[serial_test::serial]
     async fn system_test_orchestration_intent_migration_redis() -> anyhow::Result<()> {
