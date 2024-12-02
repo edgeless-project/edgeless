@@ -5,6 +5,32 @@ extern crate redis;
 use futures::{SinkExt, StreamExt};
 use redis::Commands;
 
+pub struct MetricsCollectorResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for MetricsCollectorResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("metrics-collector")
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([
+            (
+                String::from("alpha"),
+                String::from("Coefficient to filter averages with exponential smoothing"),
+            ),
+            (String::from("wf_name"), String::from("Workflow identifier used to save stats")),
+        ])
+    }
+
+    fn version(&self) -> String {
+        String::from("1.0")
+    }
+}
+
 #[derive(Clone)]
 pub struct MetricsCollectorResourceProvider {
     inner: std::sync::Arc<tokio::sync::Mutex<MetricsCollectorResourceProviderInner>>,
