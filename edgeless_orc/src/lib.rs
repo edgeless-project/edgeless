@@ -17,7 +17,6 @@ pub struct EdgelessOrcSettings {
     pub general: EdgelessOrcGeneralSettings,
     pub baseline: EdgelessOrcBaselineSettings,
     pub proxy: EdgelessOrcProxySettings,
-    pub collector: EdgelessOrcCollectorSettings,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -38,17 +37,6 @@ pub struct EdgelessOrcGeneralSettings {
     /// The COAP URL to which the orchestrator can be reached, which may be
     /// different from `orchestrator_url`, e.g., for NAT traversal.
     pub orchestrator_coap_url_announced: Option<String>,
-    /// The URL of the agent of the node embedded in the orchestrator.
-    pub agent_url: String,
-    /// The agent URL announced by the node.
-    /// It is the end-point used by the orchestrator to manage the node.
-    /// It can be different from `agent_url`, e.g., for NAT traversal.
-    pub agent_url_announced: String,
-    /// The URL of the data plane of the node embedded in the orchestrator.
-    pub invocation_url: String,
-    /// The invocation URL announced by the node.
-    /// It can be different from `invocation_url`, e.g., for NAT traversal.
-    pub invocation_url_announced: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -84,15 +72,6 @@ pub struct EdgelessOrcProxyDatasetSettings {
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct EdgelessOrcCollectorSettings {
-    /// Type of the metrics collector that is used to store run-time
-    /// measurements from function instances.
-    pub collector_type: String,
-    /// If collector_type is "Redis" then this is the URL of the Redis server.
-    pub redis_url: Option<String>,
-}
-
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum OrchestrationStrategy {
     /// Random strategy utilizes a random number generator to select the worker
     /// node where a function instance is started. It is the default strategy.
@@ -117,15 +96,6 @@ pub fn make_proxy(settings: EdgelessOrcProxySettings) -> Box<dyn proxy::Proxy> {
 pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     log::info!("Starting Edgeless Orchestrator at {}", settings.general.orchestrator_url,);
     log::debug!("Settings: {:?}", settings);
-
-    // Create a node embedded in the orchestrator for metrics collection.
-    let (node_id, agent_task, agent_api_server, resource_provider_specifications) = edgeless_node::create_metrics_collector_node(
-        settings.general.invocation_url.clone(),
-        settings.general.agent_url.clone(),
-        settings.collector.collector_type,
-        settings.collector.redis_url,
-    )
-    .await;
 
     // Create the component that subscribes to the domain register to
     // notify domain updates (periodically refreshed).
@@ -179,30 +149,11 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
 
     // Wait for all the tasks to come to an end.
     join!(
-        agent_task,
-        agent_api_server,
         orchestrator_task,
         orchestrator_server,
         orchestrator_coap_server,
         subscriber_task,
-        refresh_task,
-        edgeless_node::register_node(
-            edgeless_node::EdgelessNodeGeneralSettings {
-                node_id,
-                agent_url: settings.general.agent_url,
-                agent_url_announced: settings.general.agent_url_announced,
-                invocation_url: settings.general.invocation_url,
-                invocation_url_announced: settings.general.invocation_url_announced,
-                invocation_url_coap: None,
-                invocation_url_announced_coap: None,
-                orchestrator_url: match settings.general.orchestrator_url_announced.is_empty() {
-                    true => settings.general.orchestrator_url,
-                    false => settings.general.orchestrator_url_announced.clone(),
-                },
-            },
-            edgeless_api::node_registration::NodeCapabilities::empty(),
-            resource_provider_specifications
-        )
+        refresh_task
     );
 }
 
@@ -216,10 +167,6 @@ orchestrator_url = "http://127.0.0.1:7011"
 orchestrator_url_announced = ""
 orchestrator_coap_url = "coap://127.0.0.1:7050"
 orchestrator_coap_url_announced = ""
-agent_url = "http://127.0.0.1:7121"
-agent_url_announced = ""
-invocation_url = "http://127.0.0.1:7102"
-invocation_url_announced = ""
 
 [baseline]
 orchestration_strategy = "Random"
@@ -234,10 +181,6 @@ dataset_path = ""
 append = true
 additional_fields = ""
 additional_header = ""
-
-[collector]
-collector_type = "None"
-redis_url = ""
 "##,
     )
 }

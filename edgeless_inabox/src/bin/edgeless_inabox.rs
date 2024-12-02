@@ -116,10 +116,6 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
             orchestrator_url_announced: "".to_string(),
             orchestrator_coap_url: None,
             orchestrator_coap_url_announced: None,
-            agent_url: next_url(),
-            agent_url_announced: "".to_string(),
-            invocation_url: next_url(),
-            invocation_url_announced: "".to_string(),
         },
         baseline: edgeless_orc::EdgelessOrcBaselineSettings {
             orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
@@ -129,10 +125,6 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
             proxy_type: "None".to_string(),
             redis_url: None,
             dataset_settings: None,
-        },
-        collector: edgeless_orc::EdgelessOrcCollectorSettings {
-            collector_type: "None".to_string(),
-            redis_url: None,
         },
     };
 
@@ -195,6 +187,7 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                     true => Some("kafka-egress-1".to_string()),
                     false => None,
                 },
+                metrics_collector_provider: None,
             }),
             user_node_capabilities: None,
         });
