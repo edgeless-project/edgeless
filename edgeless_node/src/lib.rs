@@ -107,6 +107,8 @@ pub struct EdgelessNodeResourceSettings {
     /// The resource will connect to a remote Kafka server to stream the
     /// messages received on a given topic.
     pub kafka_egress_provider: Option<String>,
+    /// The metrics collector settings.
+    pub metrics_collector_provider: Option<MetricsCollectorProviderSettings>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -118,6 +120,17 @@ pub struct OllamaProviderSettings {
     /// The maximum number of messages in the history of the ollama resource.
     pub messages_number_limit: u16,
     /// If not empty, an ollama resource provider with that name is created.
+    pub provider: String,
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct MetricsCollectorProviderSettings {
+    /// Type of the metrics collector that is used to store run-time
+    /// measurements from function instances.
+    pub collector_type: String,
+    /// If collector_type is "Redis" then this is the URL of the Redis server.
+    pub redis_url: Option<String>,
+    /// If not empty, a metrics collector resource provider with that name is created.
     pub provider: String,
 }
 
@@ -300,7 +313,7 @@ async fn fill_resources(
         if let (Some(http_ingress_url), Some(provider_id)) = (&settings.http_ingress_url, &settings.http_ingress_provider) {
             if !http_ingress_url.is_empty() && !provider_id.is_empty() {
                 let class_type = resources::http_ingress::HttpIngressResourceSpec {}.class_type();
-                log::info!("Creating resource '{}' at {}", provider_id, http_ingress_url);
+                log::info!("Creating http-ingress resource provider '{}' at {}", provider_id, http_ingress_url);
                 ret.insert(
                     provider_id.clone(),
                     agent::ResourceDesc {
@@ -323,7 +336,7 @@ async fn fill_resources(
 
         if let Some(provider_id) = &settings.http_egress_provider {
             if !provider_id.is_empty() {
-                log::info!("Creating resource '{}'", provider_id);
+                log::info!("Creating http-egress resource provider '{}'", provider_id);
                 let class_type = resources::http_egress::HttpEgressResourceSpec {}.class_type();
                 ret.insert(
                     provider_id.clone(),
@@ -348,7 +361,7 @@ async fn fill_resources(
 
         if let Some(provider_id) = &settings.file_log_provider {
             if !provider_id.is_empty() {
-                log::info!("Creating resource '{}'", provider_id);
+                log::info!("Creating file-log resource provider '{}'", provider_id);
                 let class_type = resources::file_log::FileLogResourceSpec {}.class_type();
                 ret.insert(
                     provider_id.clone(),
@@ -373,7 +386,7 @@ async fn fill_resources(
 
         if let Some(provider_id) = &settings.redis_provider {
             if !provider_id.is_empty() {
-                log::info!("Creating resource '{}'", provider_id);
+                log::info!("Creating redis resource provider '{}'", provider_id);
                 let class_type = resources::redis::RedisResourceSpec {}.class_type();
                 ret.insert(
                     provider_id.clone(),
@@ -422,7 +435,7 @@ async fn fill_resources(
         if let Some(settings) = &settings.ollama_provider {
             if !settings.host.is_empty() && !settings.provider.is_empty() {
                 log::info!(
-                    "Creating resource '{}' towards {}:{} (limit to {} messages per chat)",
+                    "Creating ollama resource provider '{}' towards {}:{} (limit to {} messages per chat)",
                     settings.provider,
                     settings.host,
                     settings.port,
@@ -458,7 +471,7 @@ async fn fill_resources(
             if !provider_id.is_empty() {
                 #[cfg(feature = "rdkafka")]
                 {
-                    log::info!("Creating resource '{}'", provider_id);
+                    log::info!("Creating kakfa-egress resource provider '{}'", provider_id);
                     let class_type = resources::kafka_egress::KafkaEgressResourceSpec {}.class_type();
                     ret.insert(
                         provider_id.clone(),
@@ -480,7 +493,62 @@ async fn fill_resources(
                     });
                 }
                 #[cfg(not(feature = "rdkafka"))]
-                log::error!("Could not create resource '{}' because rdkafka was disabled at compile time", provider_id);
+                log::error!(
+                    "Could not create resource provider '{}' because rdkafka was disabled at compile time",
+                    provider_id
+                );
+            }
+        }
+
+        if let Some(settings) = &settings.metrics_collector_provider {
+            if !settings.provider.is_empty() {
+                match settings.collector_type.to_lowercase().as_str() {
+                    "redis" => match &settings.redis_url {
+                        Some(redis_url) => {
+                            match redis::Client::open(redis_url.clone()) {
+                                Ok(client) => match client.get_connection() {
+                                    Ok(redis_connection) => {
+                                        let class_type = resources::metrics_collector::MetricsCollectorResourceSpec {}.class_type();
+                                        log::info!(
+                                            "Creating metrics-collector resource provider '{}' connected to a Redis server at {}",
+                                            settings.provider,
+                                            redis_url
+                                        );
+                                        ret.insert(
+                                            settings.provider.clone(),
+                                            agent::ResourceDesc {
+                                                class_type: class_type.clone(),
+                                                client: Box::new(
+                                                    resources::metrics_collector::MetricsCollectorResourceProvider::new(
+                                                        data_plane.clone(),
+                                                        edgeless_api::function_instance::InstanceId::new(node_id),
+                                                        redis_connection,
+                                                    )
+                                                    .await,
+                                                ),
+                                            },
+                                        );
+                                        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                                            provider_id: settings.provider.clone(),
+                                            class_type,
+                                            outputs: vec![],
+                                        });
+
+                                        log::info!("metrics collector connected to Redis at {}", redis_url);
+                                    }
+                                    Err(err) => log::error!("error when connecting to Redis at {}: {}", redis_url, err),
+                                },
+                                Err(err) => log::error!("error when creating a Redis client at {}: {}", redis_url, err),
+                            };
+                        }
+                        None => {
+                            log::error!("redis_url not specified for a Redis metrics collector");
+                        }
+                    },
+                    _ => {
+                        log::error!("unknown  metrics collector type");
+                    }
+                }
             }
         }
     }
@@ -757,11 +825,16 @@ redis_provider = "redis-1"
 dda_provider = "dda-1"
 kafka_egress_provider = "kafka-egress-1"
 
-[resources.ollama_provider]
-host = "localhost"
-port = 11434
-messages_number_limit = 30
-provider = "ollama-1"
+#[resources.ollama_provider]
+#host = "localhost"
+#port = 11434
+#messages_number_limit = 30
+#provider = "ollama-1"
+
+#[resources.metrics_collector_provider]
+#collector_type = "Redis"
+#redis_url = "redis://localhost:6379"
+#provider = "metrics-collector-1"
 
 [user_node_capabilities]
 "##,
