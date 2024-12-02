@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 #[cfg(test)]
-mod tests {
+mod system_tests {
     // use super::*;
 
     use edgeless_api::outer::controller::ControllerAPI;
@@ -125,7 +125,7 @@ mod tests {
 
         let (task, handle) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
             controller_url: controller_url.clone(),
-            domain_register_url,
+            domain_register_url: domain_register_url.clone(),
         }));
         tokio::spawn(task);
         handles.push(handle);
@@ -139,6 +139,18 @@ mod tests {
 
     async fn wf_list(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> Vec<edgeless_api::workflow_instance::WorkflowInstance> {
         (client.list(edgeless_api::workflow_instance::WorkflowId::none()).await).unwrap_or_default()
+    }
+
+    async fn num_nodes(domain_id: &str, client: &mut Box<(dyn WorkflowInstanceAPI)>) -> u32 {
+        let res = client.domains(String::default()).await.unwrap_or_default();
+        if res.is_empty() {
+            return 0;
+        }
+        if let Some(entry) = res.get(domain_id) {
+            entry.num_nodes
+        } else {
+            0
+        }
     }
 
     fn fixture_spec() -> edgeless_api::function_instance::FunctionClassSpecification {
@@ -167,6 +179,14 @@ mod tests {
         let (handles, mut client) = setup(1, 1, None).await;
 
         assert!(wf_list(&mut client).await.is_empty());
+
+        for _ in 0..100 {
+            if num_nodes("domain-0", &mut client).await == 1 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(1, num_nodes("domain-0", &mut client).await);
 
         // Create 10 workflows
         let mut workflow_ids = vec![];

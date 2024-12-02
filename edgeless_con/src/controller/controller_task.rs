@@ -6,12 +6,12 @@
 use futures::StreamExt;
 use rand::{seq::SliceRandom, SeedableRng};
 
-struct OrchestratorDesc {
-    client: Box<dyn edgeless_api::outer::orc::OrchestratorAPI>,
-    orchestrator_url: String,
-    capabilities: edgeless_api::domain_registration::DomainCapabilities,
-    refresh_deadline: std::time::SystemTime,
-    counter: u64,
+pub struct OrchestratorDesc {
+    pub client: Box<dyn edgeless_api::outer::orc::OrchestratorAPI>,
+    pub orchestrator_url: String,
+    pub capabilities: edgeless_api::domain_registration::DomainCapabilities,
+    pub refresh_deadline: std::time::SystemTime,
+    pub counter: u64,
 }
 
 pub struct ControllerTask {
@@ -35,6 +35,24 @@ impl ControllerTask {
             domain_registration_receiver,
             internal_receiver,
             orchestrators: std::collections::HashMap::new(),
+            active_workflows: std::collections::HashMap::new(),
+            orphan_workflows: vec![],
+            rng: rand::rngs::StdRng::from_entropy(),
+        }
+    }
+
+    #[cfg(test)]
+    pub fn new_with_orchestrators(
+        workflow_instance_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
+        domain_registration_receiver: futures::channel::mpsc::UnboundedReceiver<super::DomainRegisterRequest>,
+        internal_receiver: futures::channel::mpsc::UnboundedReceiver<super::InternalRequest>,
+        orchestrators: std::collections::HashMap<String, OrchestratorDesc>,
+    ) -> Self {
+        Self {
+            workflow_instance_receiver,
+            domain_registration_receiver,
+            internal_receiver,
+            orchestrators,
             active_workflows: std::collections::HashMap::new(),
             orphan_workflows: vec![],
             rng: rand::rngs::StdRng::from_entropy(),
