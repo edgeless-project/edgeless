@@ -46,10 +46,6 @@ mod system_tests {
                     orchestrator_url_announced: "".to_string(),
                     orchestrator_coap_url: None,
                     orchestrator_coap_url_announced: None,
-                    agent_url: format!("http://{}:{}", address, next_port()),
-                    agent_url_announced: "".to_string(),
-                    invocation_url: format!("http://{}:{}", address, next_port()),
-                    invocation_url_announced: "".to_string(),
                 },
                 baseline: edgeless_orc::EdgelessOrcBaselineSettings {
                     orchestration_strategy: edgeless_orc::OrchestrationStrategy::RoundRobin,
@@ -65,16 +61,6 @@ mod system_tests {
                         proxy_type: "Redis".to_string(),
                         redis_url: Some(url.to_string()),
                         dataset_settings: None,
-                    },
-                },
-                collector: match redis_url {
-                    None => edgeless_orc::EdgelessOrcCollectorSettings {
-                        collector_type: "None".to_string(),
-                        redis_url: None,
-                    },
-                    Some(url) => edgeless_orc::EdgelessOrcCollectorSettings {
-                        collector_type: "Redis".to_string(),
-                        redis_url: Some(url.to_string()),
                     },
                 },
             }));
@@ -111,6 +97,7 @@ mod system_tests {
                             dda_provider: None,
                             ollama_provider: None,
                             kafka_egress_provider: None,
+                            metrics_collector_provider: None,
                         }),
                         user_node_capabilities: None,
                     },
@@ -141,7 +128,7 @@ mod system_tests {
         (client.list(edgeless_api::workflow_instance::WorkflowId::none()).await).unwrap_or_default()
     }
 
-    async fn num_nodes(domain_id: &str, client: &mut Box<(dyn WorkflowInstanceAPI)>) -> u32 {
+    async fn nodes_in_domain(domain_id: &str, client: &mut Box<(dyn WorkflowInstanceAPI)>) -> u32 {
         let res = client.domains(String::default()).await.unwrap_or_default();
         if res.is_empty() {
             return 0;
@@ -173,20 +160,21 @@ mod system_tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn system_test_single_domain_single_node() -> anyhow::Result<()> {
-        let _ = env_logger::try_init();
+        // let _ = env_logger::try_init();
 
         // Create the EDGELESS system.
         let (handles, mut client) = setup(1, 1, None).await;
 
         assert!(wf_list(&mut client).await.is_empty());
 
+        // Wait for all the nodes to be visible.
         for _ in 0..100 {
-            if num_nodes("domain-0", &mut client).await == 1 {
+            if nodes_in_domain("domain-0", &mut client).await == 1 {
                 break;
             }
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         }
-        assert_eq!(1, num_nodes("domain-0", &mut client).await);
+        assert_eq!(1, nodes_in_domain("domain-0", &mut client).await);
 
         // Create 10 workflows
         let mut workflow_ids = vec![];
@@ -247,12 +235,21 @@ mod system_tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     #[serial_test::serial]
     async fn system_test_single_domain_three_nodes() -> anyhow::Result<()> {
-        let _ = env_logger::try_init();
+        // let _ = env_logger::try_init();
 
         // Create the EDGELESS system.
         let (handles, mut client) = setup(1, 3, None).await;
 
         assert!(wf_list(&mut client).await.is_empty());
+
+        // Wait for all the nodes to be visible.
+        for _ in 0..100 {
+            if nodes_in_domain("domain-0", &mut client).await == 3 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(3, nodes_in_domain("domain-0", &mut client).await);
 
         let num_workflows = 3;
 
@@ -372,7 +369,7 @@ mod system_tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     #[serial_test::serial]
     async fn system_test_orchestration_intent_migration_redis() -> anyhow::Result<()> {
-        let _ = env_logger::try_init();
+        // let _ = env_logger::try_init();
 
         // Skip the test if there is no local Redis listening on default port.
         let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true, None) {
@@ -384,7 +381,8 @@ mod system_tests {
         };
 
         // Create an EDGELESS system with a single domain and two nodes.
-        let (handles, mut client) = setup(1, 2, Some("redis://127.0.0.1:6379")).await;
+        let num_nodes = 2;
+        let (handles, mut client) = setup(1, num_nodes, Some("redis://127.0.0.1:6379")).await;
 
         // Check that in the Redis there are two regular nodes, in addition to
         // the one for metrics collection in the orchestrator.
@@ -399,11 +397,20 @@ mod system_tests {
             .keys()
             .cloned()
             .collect::<Vec<edgeless_api::function_instance::NodeId>>();
-        assert_eq!(node_uuids.len(), 1 + 2);
-        assert_eq!(redis_proxy.fetch_node_health().len(), 1 + 2);
+        assert_eq!(node_uuids.len() as u32, num_nodes);
+        assert_eq!(redis_proxy.fetch_node_health().len() as u32, num_nodes);
 
         // Check that there is no workflow through the client.
         assert!(wf_list(&mut client).await.is_empty());
+
+        // Wait for all the nodes to be visible.
+        for _ in 0..100 {
+            if nodes_in_domain("domain-0", &mut client).await == num_nodes {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(num_nodes, nodes_in_domain("domain-0", &mut client).await);
 
         // Clean-up closures.
         let removeme_filename = || "removeme.log".to_string();
