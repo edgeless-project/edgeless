@@ -5,17 +5,17 @@ use edgeless_api::outer::domain_register::DomainRegisterAPI;
 use futures::{Future, SinkExt, StreamExt};
 
 #[derive(Clone)]
-pub struct Subscriber {
-    sender: futures::channel::mpsc::UnboundedSender<SubscriberRequest>,
+pub struct DomainSubscriber {
+    sender: futures::channel::mpsc::UnboundedSender<DomainSubscriberRequest>,
 }
 
 #[derive(Clone)]
-pub enum SubscriberRequest {
+pub enum DomainSubscriberRequest {
     Update(edgeless_api::domain_registration::DomainCapabilities),
     Refresh(),
 }
 
-impl Subscriber {
+impl DomainSubscriber {
     pub async fn new(
         domain_id: String,
         orchestrator_url: String,
@@ -39,12 +39,12 @@ impl Subscriber {
         (Self { sender }, main_task, refresh_task)
     }
 
-    async fn refresh_task(sender: futures::channel::mpsc::UnboundedSender<SubscriberRequest>, subscription_refresh_interval_sec: u64) {
+    async fn refresh_task(sender: futures::channel::mpsc::UnboundedSender<DomainSubscriberRequest>, subscription_refresh_interval_sec: u64) {
         let mut sender = sender;
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(subscription_refresh_interval_sec));
         loop {
             interval.tick().await;
-            let _ = sender.send(SubscriberRequest::Refresh()).await;
+            let _ = sender.send(DomainSubscriberRequest::Refresh()).await;
         }
     }
 
@@ -53,7 +53,7 @@ impl Subscriber {
         orchestrator_url: String,
         controller_url: String,
         subscription_refresh_interval_sec: u64,
-        receiver: futures::channel::mpsc::UnboundedReceiver<SubscriberRequest>,
+        receiver: futures::channel::mpsc::UnboundedReceiver<DomainSubscriberRequest>,
     ) {
         let mut receiver = receiver;
 
@@ -61,15 +61,14 @@ impl Subscriber {
         let mut last_caps = edgeless_api::domain_registration::DomainCapabilities::default();
         let mut counter = 0;
 
-        // main orchestration loop that reacts to events on the receiver channel
         while let Some(req) = receiver.next().await {
             match req {
-                SubscriberRequest::Update(new_caps) => {
+                DomainSubscriberRequest::Update(new_caps) => {
                     log::debug!("Subscriber Update {:?}", new_caps);
                     counter += 1;
                     last_caps = new_caps;
                 }
-                SubscriberRequest::Refresh() => {
+                DomainSubscriberRequest::Refresh() => {
                     log::debug!("Subscriber Refresh");
                     // The refresh deadline is set to twice the refresh period
                     // to reduce the likelihood of a race condition on the domai
@@ -94,7 +93,7 @@ impl Subscriber {
         }
     }
 
-    pub fn get_subscriber_sender(&mut self) -> futures::channel::mpsc::UnboundedSender<SubscriberRequest> {
+    pub fn get_subscriber_sender(&mut self) -> futures::channel::mpsc::UnboundedSender<DomainSubscriberRequest> {
         self.sender.clone()
     }
 }

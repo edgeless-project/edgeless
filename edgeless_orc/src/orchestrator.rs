@@ -213,11 +213,6 @@ enum OrchestratorRequest {
     ),
     StopResource(edgeless_api::function_instance::DomainManagedInstanceId),
     Patch(edgeless_api::common::PatchRequest),
-    UpdateNode(
-        edgeless_api::node_registration::UpdateNodeRequest,
-        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>,
-    ),
-    KeepAlive(),
 }
 
 #[derive(serde::Serialize)]
@@ -310,7 +305,6 @@ impl std::fmt::Display for ResourceProvider {
 
 pub struct OrchestratorClient {
     function_instance_client: Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::DomainManagedInstanceId>>,
-    node_registration_client: Box<dyn edgeless_api::node_registration::NodeRegistrationAPI>,
     resource_configuration_client:
         Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::DomainManagedInstanceId>>,
 }
@@ -320,10 +314,6 @@ impl edgeless_api::outer::orc::OrchestratorAPI for OrchestratorClient {
         &mut self,
     ) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::DomainManagedInstanceId>> {
         self.function_instance_client.clone()
-    }
-
-    fn node_registration_api(&mut self) -> Box<dyn edgeless_api::node_registration::NodeRegistrationAPI> {
-        self.node_registration_client.clone()
     }
 
     fn resource_configuration_api(
@@ -377,7 +367,7 @@ impl Orchestrator {
     pub async fn new(
         settings: crate::EdgelessOrcBaselineSettings,
         proxy: Box<dyn super::proxy::Proxy>,
-        subscriber_sender: futures::channel::mpsc::UnboundedSender<super::subscriber::SubscriberRequest>,
+        subscriber_sender: futures::channel::mpsc::UnboundedSender<super::domain_subscriber::DomainSubscriberRequest>,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
@@ -400,7 +390,7 @@ impl Orchestrator {
         settings: crate::EdgelessOrcBaselineSettings,
         clients: std::collections::HashMap<uuid::Uuid, ClientDesc>,
         resource_providers: std::collections::HashMap<String, ResourceProvider>,
-        subscriber_sender: futures::channel::mpsc::UnboundedSender<super::subscriber::SubscriberRequest>,
+        subscriber_sender: futures::channel::mpsc::UnboundedSender<super::domain_subscriber::DomainSubscriberRequest>,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
@@ -418,9 +408,10 @@ impl Orchestrator {
         (Orchestrator { sender }, main_task)
     }
 
-    pub async fn keep_alive(&mut self) {
-        let _ = self.sender.send(OrchestratorRequest::KeepAlive()).await;
-    }
+    // XXX
+    // pub async fn keep_alive(&mut self) {
+    //     let _ = self.sender.send(OrchestratorRequest::KeepAlive()).await;
+    // }
 
     fn ext_to_int(
         active_instances: &std::collections::HashMap<edgeless_api::function_instance::ComponentId, ActiveInstance>,
@@ -869,7 +860,7 @@ impl Orchestrator {
         nodes: std::collections::HashMap<uuid::Uuid, ClientDesc>,
         resource_providers: std::collections::HashMap<String, ResourceProvider>,
         mut proxy: Box<dyn super::proxy::Proxy>,
-        subscriber_sender: futures::channel::mpsc::UnboundedSender<super::subscriber::SubscriberRequest>,
+        subscriber_sender: futures::channel::mpsc::UnboundedSender<super::domain_subscriber::DomainSubscriberRequest>,
     ) {
         let mut receiver = receiver;
         let mut subscriber_sender = subscriber_sender;
@@ -1060,405 +1051,405 @@ impl Orchestrator {
 
                     // Apply the patch.
                     Self::apply_patches(&active_instances, &dependency_graph, &mut nodes, vec![origin_ext_fid]).await;
-                }
-                OrchestratorRequest::UpdateNode(request, reply_channel) => {
-                    // Update the map of clients and, at the same time, prepare
-                    // the edgeless_api::node_management::UpdatePeersRequest message to be sent to all the
-                    // clients to notify that a new node exists (Register) or
-                    // that an existing node left the system (Deregister).
-                    let mut this_node_id = None;
-                    let msg = match request {
-                        edgeless_api::node_registration::UpdateNodeRequest::Registration(
-                            node_id,
-                            agent_url,
-                            invocation_url,
-                            resources,
-                            capabilities,
-                        ) => {
-                            let mut dup_entry = false;
-                            if let Some(client_desc) = nodes.get(&node_id) {
-                                if client_desc.agent_url == agent_url && client_desc.invocation_url == invocation_url {
-                                    dup_entry = true;
-                                }
-                            }
-                            if dup_entry {
-                                // A client with same node_id, agent_url, and
-                                // invocation_url already exists.
-                                None
-                            } else {
-                                this_node_id = Some(node_id);
+                } // XXX
+                  // OrchestratorRequest::UpdateNode(request, reply_channel) => {
+                  //     // Update the map of clients and, at the same time, prepare
+                  //     // the edgeless_api::node_management::UpdatePeersRequest message to be sent to all the
+                  //     // clients to notify that a new node exists (Register) or
+                  //     // that an existing node left the system (Deregister).
+                  //     let mut this_node_id = None;
+                  //     let msg = match request {
+                  //         edgeless_api::node_registration::UpdateNodeRequest::Registration(
+                  //             node_id,
+                  //             agent_url,
+                  //             invocation_url,
+                  //             resources,
+                  //             capabilities,
+                  //         ) => {
+                  //             let mut dup_entry = false;
+                  //             if let Some(client_desc) = nodes.get(&node_id) {
+                  //                 if client_desc.agent_url == agent_url && client_desc.invocation_url == invocation_url {
+                  //                     dup_entry = true;
+                  //                 }
+                  //             }
+                  //             if dup_entry {
+                  //                 // A client with same node_id, agent_url, and
+                  //                 // invocation_url already exists.
+                  //                 None
+                  //             } else {
+                  //                 this_node_id = Some(node_id);
 
-                                // Create the resource configuration APIs.
-                                for resource in &resources {
-                                    log::info!("new resource advertised by node {}: {}", this_node_id.unwrap(), resource);
+                  //                 // Create the resource configuration APIs.
+                  //                 for resource in &resources {
+                  //                     log::info!("new resource advertised by node {}: {}", this_node_id.unwrap(), resource);
 
-                                    if resource_providers.contains_key(&resource.provider_id) {
-                                        log::warn!(
-                                            "cannot add resource because another one exists with the same provider_id: {}",
-                                            resource.provider_id
-                                        )
-                                    } else {
-                                        assert!(this_node_id.is_some());
+                  //                     if resource_providers.contains_key(&resource.provider_id) {
+                  //                         log::warn!(
+                  //                             "cannot add resource because another one exists with the same provider_id: {}",
+                  //                             resource.provider_id
+                  //                         )
+                  //                     } else {
+                  //                         assert!(this_node_id.is_some());
 
-                                        resource_providers.insert(
-                                            resource.provider_id.clone(),
-                                            ResourceProvider {
-                                                class_type: resource.class_type.clone(),
-                                                node_id: this_node_id.unwrap(),
-                                                outputs: resource.outputs.clone(),
-                                            },
-                                        );
-                                        resource_providers_changed = true;
-                                    }
-                                }
+                  //                         resource_providers.insert(
+                  //                             resource.provider_id.clone(),
+                  //                             ResourceProvider {
+                  //                                 class_type: resource.class_type.clone(),
+                  //                                 node_id: this_node_id.unwrap(),
+                  //                                 outputs: resource.outputs.clone(),
+                  //                             },
+                  //                         );
+                  //                         resource_providers_changed = true;
+                  //                     }
+                  //                 }
 
-                                // Create the agent API.
-                                log::info!(
-                                    "added function instance client: node_id {}, agent URL {}, invocation URL {}, capabilities {}",
-                                    node_id,
-                                    agent_url,
-                                    invocation_url,
-                                    capabilities
-                                );
+                  //                 // Create the agent API.
+                  //                 log::info!(
+                  //                     "added function instance client: node_id {}, agent URL {}, invocation URL {}, capabilities {}",
+                  //                     node_id,
+                  //                     agent_url,
+                  //                     invocation_url,
+                  //                     capabilities
+                  //                 );
 
-                                let (proto, host, port) = edgeless_api::util::parse_http_host(&agent_url).unwrap();
-                                let api: Box<dyn edgeless_api::outer::agent::AgentAPI + Send> = match proto {
-                                    edgeless_api::util::Proto::COAP => {
-                                        let addr = std::net::SocketAddrV4::new(host.parse().unwrap(), port);
-                                        Box::new(edgeless_api::coap_impl::CoapClient::new(addr).await)
-                                    }
-                                    _ => Box::new(edgeless_api::grpc_impl::outer::agent::AgentAPIClient::new(&agent_url).await),
-                                };
-                                log::info!("got api");
+                  //                 let (proto, host, port) = edgeless_api::util::parse_http_host(&agent_url).unwrap();
+                  //                 let api: Box<dyn edgeless_api::outer::agent::AgentAPI + Send> = match proto {
+                  //                     edgeless_api::util::Proto::COAP => {
+                  //                         let addr = std::net::SocketAddrV4::new(host.parse().unwrap(), port);
+                  //                         Box::new(edgeless_api::coap_impl::CoapClient::new(addr).await)
+                  //                     }
+                  //                     _ => Box::new(edgeless_api::grpc_impl::outer::agent::AgentAPIClient::new(&agent_url).await),
+                  //                 };
+                  //                 log::info!("got api");
 
-                                nodes.insert(
-                                    node_id,
-                                    ClientDesc {
-                                        agent_url: agent_url.clone(),
-                                        invocation_url: invocation_url.clone(),
-                                        api,
-                                        capabilities,
-                                    },
-                                );
+                  //                 nodes.insert(
+                  //                     node_id,
+                  //                     ClientDesc {
+                  //                         agent_url: agent_url.clone(),
+                  //                         invocation_url: invocation_url.clone(),
+                  //                         api,
+                  //                         capabilities,
+                  //                     },
+                  //                 );
 
-                                Some(edgeless_api::node_management::UpdatePeersRequest::Add(node_id, invocation_url))
-                            }
-                        }
-                        edgeless_api::node_registration::UpdateNodeRequest::Deregistration(node_id) => {
-                            if !nodes.contains_key(&node_id) {
-                                // There is no client with that node_id
-                                None
-                            } else {
-                                nodes.remove(&node_id);
-                                Some(edgeless_api::node_management::UpdatePeersRequest::Del(node_id))
-                            }
-                        }
-                    };
+                  //                 Some(edgeless_api::node_management::UpdatePeersRequest::Add(node_id, invocation_url))
+                  //             }
+                  //         }
+                  //         edgeless_api::node_registration::UpdateNodeRequest::Deregistration(node_id) => {
+                  //             if !nodes.contains_key(&node_id) {
+                  //                 // There is no client with that node_id
+                  //                 None
+                  //             } else {
+                  //                 nodes.remove(&node_id);
+                  //                 Some(edgeless_api::node_management::UpdatePeersRequest::Del(node_id))
+                  //             }
+                  //         }
+                  //     };
 
-                    // If no operation was done (either a new node was already
-                    // present with same agent/invocation URLs or a deregistering
-                    // node did not exist) we accept the command.
-                    let mut response = edgeless_api::node_registration::UpdateNodeResponse::Accepted;
+                  //     // If no operation was done (either a new node was already
+                  //     // present with same agent/invocation URLs or a deregistering
+                  //     // node did not exist) we accept the command.
+                  //     let mut response = edgeless_api::node_registration::UpdateNodeResponse::Accepted;
 
-                    if let Some(msg) = msg {
-                        // Update the orchestration logic & proxy with the new set of nodes.
-                        orchestration_logic.update_nodes(&nodes, &resource_providers);
-                        proxy.update_nodes(&nodes);
+                  //     if let Some(msg) = msg {
+                  //         // Update the orchestration logic & proxy with the new set of nodes.
+                  //         orchestration_logic.update_nodes(&nodes, &resource_providers);
+                  //         proxy.update_nodes(&nodes);
 
-                        // Update all the peers (including the node, unless it
-                        // was a deregister operation).
-                        let mut num_failures: u32 = 0;
-                        for (_node_id, client) in nodes.iter_mut() {
-                            if client.api.node_management_api().update_peers(msg.clone()).await.is_err() {
-                                num_failures += 1;
-                            }
-                        }
+                  //         // Update all the peers (including the node, unless it
+                  //         // was a deregister operation).
+                  //         let mut num_failures: u32 = 0;
+                  //         for (_node_id, client) in nodes.iter_mut() {
+                  //             if client.api.node_management_api().update_peers(msg.clone()).await.is_err() {
+                  //                 num_failures += 1;
+                  //             }
+                  //         }
 
-                        log::info!("updated peers");
+                  //         log::info!("updated peers");
 
-                        // Only with registration, we also update the new node
-                        // by adding as peers all the existing nodes.
-                        if let Some(this_node_id) = this_node_id {
-                            let mut new_node_client = nodes.get_mut(&this_node_id).unwrap().api.node_management_api();
-                            for (other_node_id, client_desc) in nodes.iter_mut() {
-                                if other_node_id.eq(&this_node_id) {
-                                    continue;
-                                }
-                                if new_node_client
-                                    .update_peers(edgeless_api::node_management::UpdatePeersRequest::Add(
-                                        *other_node_id,
-                                        client_desc.invocation_url.clone(),
-                                    ))
-                                    .await
-                                    .is_err()
-                                {
-                                    num_failures += 1;
-                                }
-                            }
-                        }
+                  //         // Only with registration, we also update the new node
+                  //         // by adding as peers all the existing nodes.
+                  //         if let Some(this_node_id) = this_node_id {
+                  //             let mut new_node_client = nodes.get_mut(&this_node_id).unwrap().api.node_management_api();
+                  //             for (other_node_id, client_desc) in nodes.iter_mut() {
+                  //                 if other_node_id.eq(&this_node_id) {
+                  //                     continue;
+                  //                 }
+                  //                 if new_node_client
+                  //                     .update_peers(edgeless_api::node_management::UpdatePeersRequest::Add(
+                  //                         *other_node_id,
+                  //                         client_desc.invocation_url.clone(),
+                  //                     ))
+                  //                     .await
+                  //                     .is_err()
+                  //                 {
+                  //                     num_failures += 1;
+                  //                 }
+                  //             }
+                  //         }
 
-                        response = match num_failures {
-                            0 => edgeless_api::node_registration::UpdateNodeResponse::Accepted,
-                            _ => edgeless_api::node_registration::UpdateNodeResponse::ResponseError(edgeless_api::common::ResponseError {
-                                summary: "UpdatePeers() failed on some node when updating a node".to_string(),
-                                detail: None,
-                            }),
-                        };
-                    }
+                  //         response = match num_failures {
+                  //             0 => edgeless_api::node_registration::UpdateNodeResponse::Accepted,
+                  //             _ => edgeless_api::node_registration::UpdateNodeResponse::ResponseError(edgeless_api::common::ResponseError {
+                  //                 summary: "UpdatePeers() failed on some node when updating a node".to_string(),
+                  //                 detail: None,
+                  //             }),
+                  //         };
+                  //     }
 
-                    if let Err(err) = reply_channel.send(Ok(response)) {
-                        log::error!("Orchestrator channel error in UPDATENODE: {:?}", err);
-                    }
-                }
-                OrchestratorRequest::KeepAlive() => {
-                    // First check if there are nodes that must be disconnected
-                    // because they failed to reply to a keep-alive.
-                    let mut to_be_disconnected = std::collections::HashSet::new();
-                    log::debug!(
-                        "nodes to be polled: {}",
-                        nodes.keys().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
-                    );
+                  //     if let Err(err) = reply_channel.send(Ok(response)) {
+                  //         log::error!("Orchestrator channel error in UPDATENODE: {:?}", err);
+                  //     }
+                  // }
+                  // OrchestratorRequest::KeepAlive() => {
+                  //     // First check if there are nodes that must be disconnected
+                  //     // because they failed to reply to a keep-alive.
+                  //     let mut to_be_disconnected = std::collections::HashSet::new();
+                  //     log::debug!(
+                  //         "nodes to be polled: {}",
+                  //         nodes.keys().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                  //     );
 
-                    let mut keep_alive_responses = vec![];
-                    for (node_id, client_desc) in &mut nodes {
-                        log::debug!("polling node {} begin", node_id);
-                        match client_desc.api.node_management_api().keep_alive().await {
-                            Ok(keep_alive_response) => {
-                                log::debug!(
-                                    "node uuid {} health status {} performance [function execution times: {} samples]",
-                                    node_id,
-                                    keep_alive_response.health_status,
-                                    keep_alive_response.performance_samples.function_execution_times.len()
-                                );
-                                keep_alive_responses.push((*node_id, keep_alive_response));
-                            }
-                            Err(_) => {
-                                to_be_disconnected.insert(*node_id);
-                            }
-                        };
-                        log::debug!("polling node {} end", node_id);
-                    }
+                  //     let mut keep_alive_responses = vec![];
+                  //     for (node_id, client_desc) in &mut nodes {
+                  //         log::debug!("polling node {} begin", node_id);
+                  //         match client_desc.api.node_management_api().keep_alive().await {
+                  //             Ok(keep_alive_response) => {
+                  //                 log::debug!(
+                  //                     "node uuid {} health status {} performance [function execution times: {} samples]",
+                  //                     node_id,
+                  //                     keep_alive_response.health_status,
+                  //                     keep_alive_response.performance_samples.function_execution_times.len()
+                  //                 );
+                  //                 keep_alive_responses.push((*node_id, keep_alive_response));
+                  //             }
+                  //             Err(_) => {
+                  //                 to_be_disconnected.insert(*node_id);
+                  //             }
+                  //         };
+                  //         log::debug!("polling node {} end", node_id);
+                  //     }
 
-                    // Second, remove all those nodes from the map of clients.
-                    for node_id in to_be_disconnected.iter() {
-                        log::info!("disconnected node not replying to keep-alive: {}", &node_id);
-                        let val = nodes.remove(node_id);
-                        assert!(val.is_some());
-                    }
+                  //     // Second, remove all those nodes from the map of clients.
+                  //     for node_id in to_be_disconnected.iter() {
+                  //         log::info!("disconnected node not replying to keep-alive: {}", &node_id);
+                  //         let val = nodes.remove(node_id);
+                  //         assert!(val.is_some());
+                  //     }
 
-                    // Third, remove all the resource providers associated with
-                    // the removed nodes.
-                    resource_providers.retain(|_k, v| {
-                        if to_be_disconnected.contains(&v.node_id) {
-                            log::info!("removed resource from disconnected node: {}", v);
-                            resource_providers_changed = true;
-                            false
-                        } else {
-                            true
-                        }
-                    });
+                  //     // Third, remove all the resource providers associated with
+                  //     // the removed nodes.
+                  //     resource_providers.retain(|_k, v| {
+                  //         if to_be_disconnected.contains(&v.node_id) {
+                  //             log::info!("removed resource from disconnected node: {}", v);
+                  //             resource_providers_changed = true;
+                  //             false
+                  //         } else {
+                  //             true
+                  //         }
+                  //     });
 
-                    // Update the peers of (still alive) nodes by
-                    // deleting the missing-in-action peers.
-                    for removed_node_id in &to_be_disconnected {
-                        for (_, client_desc) in nodes.iter_mut() {
-                            match client_desc
-                                .api
-                                .node_management_api()
-                                .update_peers(edgeless_api::node_management::UpdatePeersRequest::Del(*removed_node_id))
-                                .await
-                            {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    log::error!("Unhandled: {}", err);
-                                }
-                            }
-                        }
-                    }
+                  //     // Update the peers of (still alive) nodes by
+                  //     // deleting the missing-in-action peers.
+                  //     for removed_node_id in &to_be_disconnected {
+                  //         for (_, client_desc) in nodes.iter_mut() {
+                  //             match client_desc
+                  //                 .api
+                  //                 .node_management_api()
+                  //                 .update_peers(edgeless_api::node_management::UpdatePeersRequest::Del(*removed_node_id))
+                  //                 .await
+                  //             {
+                  //                 Ok(_) => {}
+                  //                 Err(err) => {
+                  //                     log::error!("Unhandled: {}", err);
+                  //                 }
+                  //             }
+                  //         }
+                  //     }
 
-                    // Update the orchestration logic and proxy.
-                    let new_domain_capabilities = Self::domain_capabilities(&nodes, &resource_providers);
-                    if new_domain_capabilities != last_domain_capabilities {
-                        last_domain_capabilities = new_domain_capabilities.clone();
-                        let _ = subscriber_sender
-                            .send(super::subscriber::SubscriberRequest::Update(new_domain_capabilities))
-                            .await;
-                    }
-                    orchestration_logic.update_nodes(&nodes, &resource_providers);
-                    proxy.update_nodes(&nodes);
-                    proxy.push_keep_alive_responses(keep_alive_responses);
+                  //     // Update the orchestration logic and proxy.
+                  //     let new_domain_capabilities = Self::domain_capabilities(&nodes, &resource_providers);
+                  //     if new_domain_capabilities != last_domain_capabilities {
+                  //         last_domain_capabilities = new_domain_capabilities.clone();
+                  //         let _ = subscriber_sender
+                  //             .send(super::subscriber::SubscriberRequest::Update(new_domain_capabilities))
+                  //             .await;
+                  //     }
+                  //     orchestration_logic.update_nodes(&nodes, &resource_providers);
+                  //     proxy.update_nodes(&nodes);
+                  //     proxy.push_keep_alive_responses(keep_alive_responses);
 
-                    //
-                    // Make sure that all active logical functions are assigned
-                    // to one instance: for all the function instances that
-                    // were running in disconnected nodes, create new function
-                    // instances on other nodes, if possible and there were no
-                    // other running function instances.
-                    //
+                  //     //
+                  //     // Make sure that all active logical functions are assigned
+                  //     // to one instance: for all the function instances that
+                  //     // were running in disconnected nodes, create new function
+                  //     // instances on other nodes, if possible and there were no
+                  //     // other running function instances.
+                  //     //
 
-                    // List of ext_fid that will have to be repatched
-                    // because of the allocation of new function instances
-                    // following node disconnection.
-                    let mut to_be_repatched = vec![]; // ext_fid
+                  //     // List of ext_fid that will have to be repatched
+                  //     // because of the allocation of new function instances
+                  //     // following node disconnection.
+                  //     let mut to_be_repatched = vec![]; // ext_fid
 
-                    // Function instances that have to be created to make up for
-                    // the loss of those assigned to disconnected nodes.
-                    // key:   ext_fid
-                    // value: function request
-                    let mut fun_to_be_created = std::collections::HashMap::new();
+                  //     // Function instances that have to be created to make up for
+                  //     // the loss of those assigned to disconnected nodes.
+                  //     // key:   ext_fid
+                  //     // value: function request
+                  //     let mut fun_to_be_created = std::collections::HashMap::new();
 
-                    // Resources that have to be created to make up for the
-                    // loss of those assigned to disconnected nodes.
-                    // key:   ext_fid
-                    // value: resource specs
-                    let mut res_to_be_created = std::collections::HashMap::new();
+                  //     // Resources that have to be created to make up for the
+                  //     // loss of those assigned to disconnected nodes.
+                  //     // key:   ext_fid
+                  //     // value: resource specs
+                  //     let mut res_to_be_created = std::collections::HashMap::new();
 
-                    // List of ext_fid that will have to be repatched.
-                    let mut active_instances_to_be_updated = vec![];
+                  //     // List of ext_fid that will have to be repatched.
+                  //     let mut active_instances_to_be_updated = vec![];
 
-                    // Find all the functions/resources affected.
-                    // Also attempt to start functions and resources that
-                    // are active but for which no active instance is present
-                    // (this happens because in the past a node with active
-                    // functions/resources has disappeared and it was not
-                    // possible to fix the situation immediately).
-                    for (origin_ext_fid, instance) in active_instances.iter() {
-                        match instance {
-                            ActiveInstance::Function(start_req, instances) => {
-                                let num_disconnected = instances.iter().filter(|x| to_be_disconnected.contains(&x.node_id)).count();
-                                assert!(num_disconnected <= instances.len());
-                                if instances.is_empty() || num_disconnected > 0 {
-                                    to_be_repatched.push(*origin_ext_fid);
-                                    if instances.is_empty() || num_disconnected == instances.len() {
-                                        // If all the function instances
-                                        // disappared, then we must enforce the
-                                        // creation of (at least) a new
-                                        // function instance.
-                                        fun_to_be_created.insert(*origin_ext_fid, start_req.clone());
-                                    } else {
-                                        // Otherwise, we just remove the
-                                        // disappeared function instances and
-                                        // let the others still alive handle
-                                        // the logical function.
-                                        active_instances_to_be_updated.push(*origin_ext_fid);
-                                    }
-                                }
-                            }
-                            ActiveInstance::Resource(start_req, instance) => {
-                                if instance.is_none() || to_be_disconnected.contains(&instance.node_id) {
-                                    to_be_repatched.push(*origin_ext_fid);
-                                    res_to_be_created.insert(*origin_ext_fid, start_req.clone());
-                                }
-                            }
-                        }
-                    }
+                  //     // Find all the functions/resources affected.
+                  //     // Also attempt to start functions and resources that
+                  //     // are active but for which no active instance is present
+                  //     // (this happens because in the past a node with active
+                  //     // functions/resources has disappeared and it was not
+                  //     // possible to fix the situation immediately).
+                  //     for (origin_ext_fid, instance) in active_instances.iter() {
+                  //         match instance {
+                  //             ActiveInstance::Function(start_req, instances) => {
+                  //                 let num_disconnected = instances.iter().filter(|x| to_be_disconnected.contains(&x.node_id)).count();
+                  //                 assert!(num_disconnected <= instances.len());
+                  //                 if instances.is_empty() || num_disconnected > 0 {
+                  //                     to_be_repatched.push(*origin_ext_fid);
+                  //                     if instances.is_empty() || num_disconnected == instances.len() {
+                  //                         // If all the function instances
+                  //                         // disappared, then we must enforce the
+                  //                         // creation of (at least) a new
+                  //                         // function instance.
+                  //                         fun_to_be_created.insert(*origin_ext_fid, start_req.clone());
+                  //                     } else {
+                  //                         // Otherwise, we just remove the
+                  //                         // disappeared function instances and
+                  //                         // let the others still alive handle
+                  //                         // the logical function.
+                  //                         active_instances_to_be_updated.push(*origin_ext_fid);
+                  //                     }
+                  //                 }
+                  //             }
+                  //             ActiveInstance::Resource(start_req, instance) => {
+                  //                 if instance.is_none() || to_be_disconnected.contains(&instance.node_id) {
+                  //                     to_be_repatched.push(*origin_ext_fid);
+                  //                     res_to_be_created.insert(*origin_ext_fid, start_req.clone());
+                  //                 }
+                  //             }
+                  //         }
+                  //     }
 
-                    // Also schedule to repatch all the functions that
-                    // depend on the functions/resources modified.
-                    for (origin_ext_fid, output_mapping) in dependency_graph.iter() {
-                        for (_output, target_ext_fid) in output_mapping.iter() {
-                            if active_instances_to_be_updated.contains(target_ext_fid)
-                                || fun_to_be_created.contains_key(target_ext_fid)
-                                || res_to_be_created.contains_key(target_ext_fid)
-                            {
-                                to_be_repatched.push(*origin_ext_fid);
-                            }
-                        }
-                    }
+                  //     // Also schedule to repatch all the functions that
+                  //     // depend on the functions/resources modified.
+                  //     for (origin_ext_fid, output_mapping) in dependency_graph.iter() {
+                  //         for (_output, target_ext_fid) in output_mapping.iter() {
+                  //             if active_instances_to_be_updated.contains(target_ext_fid)
+                  //                 || fun_to_be_created.contains_key(target_ext_fid)
+                  //                 || res_to_be_created.contains_key(target_ext_fid)
+                  //             {
+                  //                 to_be_repatched.push(*origin_ext_fid);
+                  //             }
+                  //         }
+                  //     }
 
-                    // Update the active instances of logical functions
-                    // where at least one function instance went missing but
-                    // there are others that are still assigned and alive.
-                    for ext_fid in active_instances_to_be_updated.iter() {
-                        match active_instances.get_mut(ext_fid) {
-                            None => panic!("ext_fid {} just disappeared", ext_fid),
-                            Some(active_instance) => {
-                                active_instances_changed = true;
-                                match active_instance {
-                                    ActiveInstance::Resource(_, _) => panic!("expecting a function, found a resource for ext_fid {}", ext_fid),
-                                    ActiveInstance::Function(_, instances) => instances.retain(|x| !to_be_disconnected.contains(&x.node_id)),
-                                }
-                            }
-                        }
-                    }
+                  //     // Update the active instances of logical functions
+                  //     // where at least one function instance went missing but
+                  //     // there are others that are still assigned and alive.
+                  //     for ext_fid in active_instances_to_be_updated.iter() {
+                  //         match active_instances.get_mut(ext_fid) {
+                  //             None => panic!("ext_fid {} just disappeared", ext_fid),
+                  //             Some(active_instance) => {
+                  //                 active_instances_changed = true;
+                  //                 match active_instance {
+                  //                     ActiveInstance::Resource(_, _) => panic!("expecting a function, found a resource for ext_fid {}", ext_fid),
+                  //                     ActiveInstance::Function(_, instances) => instances.retain(|x| !to_be_disconnected.contains(&x.node_id)),
+                  //                 }
+                  //             }
+                  //         }
+                  //     }
 
-                    // Create the functions that went missing.
-                    // If the operation fails for a function now, then the
-                    // function remains in the active_instances, but it is
-                    // assigned no function instance.
-                    for (ext_fid, spawn_req) in fun_to_be_created.into_iter() {
-                        let res = match Self::select_node(&spawn_req, &mut orchestration_logic) {
-                            Ok(node_id) => {
-                                // Start the function instance.
-                                match Self::start_function(&spawn_req, &mut active_instances, &mut nodes, &ext_fid, &node_id).await {
-                                    Ok(_) => Ok(()),
-                                    Err(err) => Err(err),
-                                }
-                            }
-                            Err(err) => Err(err),
-                        };
-                        if let Err(err) = res {
-                            log::error!("error when creating a new function assigned with ext_fid {}: {}", ext_fid, err);
-                            match active_instances.get_mut(&ext_fid).unwrap() {
-                                ActiveInstance::Function(_spawn_req, instances) => instances.clear(),
-                                ActiveInstance::Resource(_, _) => {
-                                    panic!("expecting a function to be associated with ext_fid {}, found a resource", ext_fid)
-                                }
-                            }
-                        }
-                        active_instances_changed = true;
-                    }
+                  //     // Create the functions that went missing.
+                  //     // If the operation fails for a function now, then the
+                  //     // function remains in the active_instances, but it is
+                  //     // assigned no function instance.
+                  //     for (ext_fid, spawn_req) in fun_to_be_created.into_iter() {
+                  //         let res = match Self::select_node(&spawn_req, &mut orchestration_logic) {
+                  //             Ok(node_id) => {
+                  //                 // Start the function instance.
+                  //                 match Self::start_function(&spawn_req, &mut active_instances, &mut nodes, &ext_fid, &node_id).await {
+                  //                     Ok(_) => Ok(()),
+                  //                     Err(err) => Err(err),
+                  //                 }
+                  //             }
+                  //             Err(err) => Err(err),
+                  //         };
+                  //         if let Err(err) = res {
+                  //             log::error!("error when creating a new function assigned with ext_fid {}: {}", ext_fid, err);
+                  //             match active_instances.get_mut(&ext_fid).unwrap() {
+                  //                 ActiveInstance::Function(_spawn_req, instances) => instances.clear(),
+                  //                 ActiveInstance::Resource(_, _) => {
+                  //                     panic!("expecting a function to be associated with ext_fid {}, found a resource", ext_fid)
+                  //                 }
+                  //             }
+                  //         }
+                  //         active_instances_changed = true;
+                  //     }
 
-                    // Create the resources that went missing.
-                    // If the operation fails for a resource now, then the
-                    // resource remains in the active_instances, but it is
-                    // assigned an invalid function instance.
-                    for (ext_fid, start_req) in res_to_be_created.into_iter() {
-                        match Self::start_resource(start_req, &mut resource_providers, &mut active_instances, &mut nodes, ext_fid, &mut rng).await {
-                            Ok(_) => {}
-                            Err(err) => {
-                                log::error!("error when creating a new resource assigned with ext_fid {}: {}", ext_fid, err);
-                                match active_instances.get_mut(&ext_fid).unwrap() {
-                                    ActiveInstance::Function(_, _) => {
-                                        panic!("expecting a resource to be associated with ext_fid {}, found a function", ext_fid)
-                                    }
-                                    ActiveInstance::Resource(_start_req, instance_id) => {
-                                        *instance_id = edgeless_api::function_instance::InstanceId::none();
-                                    }
-                                }
-                            }
-                        }
-                        active_instances_changed = true;
-                    }
+                  //     // Create the resources that went missing.
+                  //     // If the operation fails for a resource now, then the
+                  //     // resource remains in the active_instances, but it is
+                  //     // assigned an invalid function instance.
+                  //     for (ext_fid, start_req) in res_to_be_created.into_iter() {
+                  //         match Self::start_resource(start_req, &mut resource_providers, &mut active_instances, &mut nodes, ext_fid, &mut rng).await {
+                  //             Ok(_) => {}
+                  //             Err(err) => {
+                  //                 log::error!("error when creating a new resource assigned with ext_fid {}: {}", ext_fid, err);
+                  //                 match active_instances.get_mut(&ext_fid).unwrap() {
+                  //                     ActiveInstance::Function(_, _) => {
+                  //                         panic!("expecting a resource to be associated with ext_fid {}, found a function", ext_fid)
+                  //                     }
+                  //                     ActiveInstance::Resource(_start_req, instance_id) => {
+                  //                         *instance_id = edgeless_api::function_instance::InstanceId::none();
+                  //                     }
+                  //                 }
+                  //             }
+                  //         }
+                  //         active_instances_changed = true;
+                  //     }
 
-                    // Check if there are intents from the proxy.
-                    for intent in proxy.retrieve_deploy_intents() {
-                        match intent {
-                            DeployIntent::Migrate(component, targets) => {
-                                Orchestrator::migrate(&mut active_instances, &mut nodes, &orchestration_logic, &component, &targets).await;
-                                to_be_repatched.push(component)
-                            }
-                        }
-                        active_instances_changed = true;
-                    }
+                  //     // Check if there are intents from the proxy.
+                  //     for intent in proxy.retrieve_deploy_intents() {
+                  //         match intent {
+                  //             DeployIntent::Migrate(component, targets) => {
+                  //                 Orchestrator::migrate(&mut active_instances, &mut nodes, &orchestration_logic, &component, &targets).await;
+                  //                 to_be_repatched.push(component)
+                  //             }
+                  //         }
+                  //         active_instances_changed = true;
+                  //     }
 
-                    // Repatch everything that needs to be repatched.
-                    Self::apply_patches(&active_instances, &dependency_graph, &mut nodes, to_be_repatched).await;
+                  //     // Repatch everything that needs to be repatched.
+                  //     Self::apply_patches(&active_instances, &dependency_graph, &mut nodes, to_be_repatched).await;
 
-                    // Update the proxy, if necessary.
-                    if resource_providers_changed {
-                        proxy.update_resource_providers(&resource_providers);
-                        resource_providers_changed = false;
-                    }
-                    if active_instances_changed {
-                        proxy.update_active_instances(&active_instances);
-                        active_instances_changed = false;
-                    }
-                    if dependency_graph_changed {
-                        proxy.update_dependency_graph(&dependency_graph);
-                        dependency_graph_changed = false;
-                    }
-                }
+                  //     // Update the proxy, if necessary.
+                  //     if resource_providers_changed {
+                  //         proxy.update_resource_providers(&resource_providers);
+                  //         resource_providers_changed = false;
+                  //     }
+                  //     if active_instances_changed {
+                  //         proxy.update_active_instances(&active_instances);
+                  //         active_instances_changed = false;
+                  //     }
+                  //     if dependency_graph_changed {
+                  //         proxy.update_dependency_graph(&dependency_graph);
+                  //         dependency_graph_changed = false;
+                  //     }
+                  // }
             }
         }
     }
@@ -1466,7 +1457,6 @@ impl Orchestrator {
     pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::outer::orc::OrchestratorAPI + Send> {
         Box::new(OrchestratorClient {
             function_instance_client: Box::new(OrchestratorFunctionInstanceOrcClient { sender: self.sender.clone() }),
-            node_registration_client: Box::new(NodeRegistrationClient { sender: self.sender.clone() }),
             resource_configuration_client: Box::new(ResourceConfigurationClient { sender: self.sender.clone() }),
         })
     }
@@ -1519,28 +1509,6 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
                 err.to_string()
             )),
         }
-    }
-}
-
-#[async_trait::async_trait]
-impl edgeless_api::node_registration::NodeRegistrationAPI for NodeRegistrationClient {
-    async fn update_node(
-        &mut self,
-        request: edgeless_api::node_registration::UpdateNodeRequest,
-    ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
-        log::debug!("NodeRegistrationAPI::update_node() {:?}", request);
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>();
-        if let Err(err) = self.sender.send(OrchestratorRequest::UpdateNode(request, reply_sender)).await {
-            return Err(anyhow::anyhow!("Orchestrator channel error when updating a node: {}", err.to_string()));
-        }
-        match reply_receiver.await {
-            Ok(res) => res,
-            Err(err) => Err(anyhow::anyhow!("Orchestrator channel error  when updating a node: {}", err.to_string())),
-        }
-    }
-    async fn keep_alive(&mut self) {
-        log::debug!("NodeRegistrationAPI::keep_alive()");
-        let _ = self.sender.send(OrchestratorRequest::KeepAlive()).await;
     }
 }
 

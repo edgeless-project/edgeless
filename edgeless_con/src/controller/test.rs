@@ -27,8 +27,6 @@ enum MockFunctionInstanceEvent {
     ),
     StopResource(edgeless_api::function_instance::DomainManagedInstanceId),
     Patch(edgeless_api::common::PatchRequest),
-    #[allow(dead_code)]
-    UpdateNode(edgeless_api::node_registration::UpdateNodeRequest),
 }
 
 struct MockOrchestrator {
@@ -42,10 +40,6 @@ impl edgeless_api::outer::orc::OrchestratorAPI for MockOrchestrator {
         Box::new(MockFunctionInstanceAPI { sender: self.sender.clone() })
     }
 
-    fn node_registration_api(&mut self) -> Box<dyn edgeless_api::node_registration::NodeRegistrationAPI> {
-        Box::new(MockNodeRegistrationAPI { sender: self.sender.clone() })
-    }
-
     fn resource_configuration_api(
         &mut self,
     ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::DomainManagedInstanceId>> {
@@ -55,11 +49,6 @@ impl edgeless_api::outer::orc::OrchestratorAPI for MockOrchestrator {
 
 #[derive(Clone)]
 struct MockFunctionInstanceAPI {
-    sender: futures::channel::mpsc::UnboundedSender<MockFunctionInstanceEvent>,
-}
-
-#[derive(Clone)]
-struct MockNodeRegistrationAPI {
     sender: futures::channel::mpsc::UnboundedSender<MockFunctionInstanceEvent>,
 }
 
@@ -114,18 +103,6 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         self.sender.send(MockFunctionInstanceEvent::Patch(update)).await.unwrap();
         Ok(())
     }
-}
-
-#[async_trait::async_trait]
-impl edgeless_api::node_registration::NodeRegistrationAPI for MockNodeRegistrationAPI {
-    async fn update_node(
-        &mut self,
-        request: edgeless_api::node_registration::UpdateNodeRequest,
-    ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
-        self.sender.send(MockFunctionInstanceEvent::UpdateNode(request)).await.unwrap();
-        Ok(edgeless_api::node_registration::UpdateNodeResponse::Accepted)
-    }
-    async fn keep_alive(&mut self) {}
 }
 
 async fn test_setup() -> (

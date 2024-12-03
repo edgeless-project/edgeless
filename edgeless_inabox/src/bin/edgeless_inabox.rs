@@ -116,10 +116,10 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
             orchestrator_url_announced: "".to_string(),
             orchestrator_coap_url: None,
             orchestrator_coap_url_announced: None,
+            node_register_url: next_url(),
         },
         baseline: edgeless_orc::EdgelessOrcBaselineSettings {
             orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
-            keep_alive_interval_secs: 2,
         },
         proxy: edgeless_orc::EdgelessOrcProxySettings {
             proxy_type: "None".to_string(),
@@ -148,7 +148,8 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
                 invocation_url_announced: "".to_string(),
                 invocation_url_coap: Some(node_coap_invocation_urls.get(node_id).expect("").clone()), // we are sure that it is there
                 invocation_url_announced_coap: Some("".to_string()),
-                orchestrator_url: orc_conf.general.orchestrator_url.clone(),
+                node_register_url: orc_conf.general.node_register_url.clone(),
+                subscription_refresh_interval_sec: 10,
             },
             telemetry: EdgelessNodeTelemetrySettings {
                 metrics_url: next_url(),

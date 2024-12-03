@@ -3,12 +3,14 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+pub mod domain_subscriber;
+pub mod node_register;
+pub mod node_register_client;
 mod orchestration_logic;
 pub mod orchestrator;
 pub mod proxy;
 pub mod proxy_none;
 pub mod proxy_redis;
-pub mod subscriber;
 
 use futures::join;
 
@@ -37,15 +39,14 @@ pub struct EdgelessOrcGeneralSettings {
     /// The COAP URL to which the orchestrator can be reached, which may be
     /// different from `orchestrator_url`, e.g., for NAT traversal.
     pub orchestrator_coap_url_announced: Option<String>,
+    /// The URL of the node register, for the orchestration domain formation.
+    pub node_register_url: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessOrcBaselineSettings {
     /// The orchestration strategy.
     pub orchestration_strategy: OrchestrationStrategy,
-    /// The periodic interval at which nodes are polled for keep-alive and
-    /// data structures are updated on the proxy.
-    pub keep_alive_interval_secs: u64,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -94,12 +95,12 @@ pub fn make_proxy(settings: EdgelessOrcProxySettings) -> Box<dyn proxy::Proxy> {
 }
 
 pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
-    log::info!("Starting Edgeless Orchestrator at {}", settings.general.orchestrator_url,);
+    log::info!("Starting Edgeless Orchestrator");
     log::debug!("Settings: {:?}", settings);
 
     // Create the component that subscribes to the domain register to
     // notify domain updates (periodically refreshed).
-    let (mut subscriber, subscriber_task, refresh_task) = subscriber::Subscriber::new(
+    let (mut subscriber, subscriber_task, refresh_task) = domain_subscriber::DomainSubscriber::new(
         settings.general.domain_id.clone(),
         settings.general.orchestrator_url.clone(),
         settings.general.domain_register_url,
@@ -112,7 +113,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
         orchestrator::Orchestrator::new(settings.baseline.clone(), make_proxy(settings.proxy), subscriber.get_subscriber_sender()).await;
 
     let orchestrator_server =
-        edgeless_api::grpc_impl::outer::orc::OrchestratorAPIServer::run(orchestrator.get_api_client(), settings.general.orchestrator_url.clone());
+        edgeless_api::grpc_impl::outer::orc::OrchestratorAPIServer::run(orchestrator.get_api_client(), settings.general.orchestrator_url);
 
     let orchestrator_coap_server = if let Some(url) = settings.general.orchestrator_coap_url {
         if let Ok((proto, address, port)) = edgeless_api::util::parse_http_host(&url) {
@@ -122,36 +123,34 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
             if address != "0.0.0.0" {
                 log::warn!("Orchestrator CoAP server address field ({}) ignored, binding to 0.0.0.0 instead", address);
             }
-            edgeless_api::coap_impl::orchestration::CoapOrchestrationServer::run(
-                orchestrator.get_api_client().node_registration_api(),
-                std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
-            )
+            // XXX
+            // edgeless_api::coap_impl::orchestration::CoapOrchestrationServer::run(
+            //     orchestrator.get_api_client().node_registration_api(),
+            //     std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
+            // )
+            panic!("XXX");
         } else {
-            Box::pin(async {})
+            panic!("XXX");
         }
     } else {
         Box::pin(async {})
     };
 
-    // Enable node keep-alive mechanism.
-    if settings.baseline.keep_alive_interval_secs == 0 {
-        log::info!("node keep-alive disabled");
-    } else {
-        log::info!("node keep-alive enabled every {} seconds", settings.baseline.keep_alive_interval_secs);
-        let _keep_alive_task = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(settings.baseline.keep_alive_interval_secs));
-            loop {
-                interval.tick().await;
-                orchestrator.keep_alive().await;
-            }
-        });
-    }
+    // Create the node register.
+    let (mut node_register, node_register_task) = node_register::NodeRegister::new().await;
+
+    let node_register_server = edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIServer::run(
+        node_register.get_node_registration_client(),
+        settings.general.node_register_url,
+    );
 
     // Wait for all the tasks to come to an end.
     join!(
         orchestrator_task,
         orchestrator_server,
         orchestrator_coap_server,
+        node_register_task,
+        node_register_server,
         subscriber_task,
         refresh_task
     );
@@ -163,14 +162,14 @@ pub fn edgeless_orc_default_conf() -> String {
 domain_register_url = "http://127.0.0.1:7004"
 subscription_refresh_interval_sec = 10
 domain_id = "domain-1"
-orchestrator_url = "http://127.0.0.1:7011"
-orchestrator_url_announced = ""
+orchestrator_url = "http://0.0.0.0:7011"
+orchestrator_url_announced = "http://127.0.0.1:7011"
 orchestrator_coap_url = "coap://127.0.0.1:7050"
 orchestrator_coap_url_announced = ""
+node_register_url = "http://0.0.0.0:7012"
 
 [baseline]
 orchestration_strategy = "Random"
-keep_alive_interval_secs = 2
 
 [proxy]
 proxy_type = "None"

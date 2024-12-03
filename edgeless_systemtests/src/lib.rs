@@ -35,6 +35,7 @@ mod system_tests {
 
         for domain_i in 0..num_domains {
             let orchestrator_url = format!("http://{}:{}", address, next_port());
+            let node_register_url = format!("http://{}:{}", address, next_port());
             let domain_id = format!("domain-{}", domain_i);
 
             let (task, handle) = futures::future::abortable(edgeless_orc::edgeless_orc_main(edgeless_orc::EdgelessOrcSettings {
@@ -46,10 +47,10 @@ mod system_tests {
                     orchestrator_url_announced: "".to_string(),
                     orchestrator_coap_url: None,
                     orchestrator_coap_url_announced: None,
+                    node_register_url: node_register_url.clone(),
                 },
                 baseline: edgeless_orc::EdgelessOrcBaselineSettings {
                     orchestration_strategy: edgeless_orc::OrchestrationStrategy::RoundRobin,
-                    keep_alive_interval_secs: 1,
                 },
                 proxy: match redis_url {
                     None => edgeless_orc::EdgelessOrcProxySettings {
@@ -79,7 +80,8 @@ mod system_tests {
                             invocation_url_announced: "".to_string(),
                             invocation_url_coap: None,
                             invocation_url_announced_coap: None,
-                            orchestrator_url: orchestrator_url.to_string(),
+                            node_register_url: node_register_url.clone(),
+                            subscription_refresh_interval_sec: 2,
                         },
                         telemetry: edgeless_node::EdgelessNodeTelemetrySettings {
                             metrics_url: format!("http://{}:{}", address, next_port()),

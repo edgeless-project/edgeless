@@ -82,27 +82,28 @@ message StartComponentResponse {
     optional InstanceIdVariant instance_id = 2;
 }
 
-// Possible message types of NodeRegistrationAPI::UpdateNode().
-enum UpdateNodeRequestType {
-    REGISTER   = 0;
-    DEREGISTER = 1;
-}
-
 // Request message of NodeRegistrationAPI::UpdateNode().
 message UpdateNodeRequest {
-    // Request type: registration or deregistration. Always present.
-    UpdateNodeRequestType request_type                        = 1;
-    // Identifier of the node that is entering/leaving the orchestration domain.
-    // This field must be always present.
-    string node_id                                            = 2;
-    // URL of the node's agent server. Always present if REGISTER type.
-    optional string agent_url                                 = 3;
-    // URL of the node's invocation server. Always present if REGISTER type.
-    optional string invocation_url                            = 4;
-    // Resources offered by this node. May be only present if REGISTER type.
+    // Identifier of the node.
+    string node_id                             = 2;
+    // URL of the node's agent server.
+    string agent_url                           = 3;
+    // URL of the node's invocation server.
+    string invocation_url                      = 4;
+    // Resources offered by this node.
     repeated ResourceProviderSpecification resource_providers = 5;
-    // Node capabilities. May be only present if REGISTER type.
-    NodeCapabilities capabilities                             = 6;
+    // Node capabilities.
+    NodeCapabilities capabilities              = 6;
+    // Deadline for refreshing the node request, in seconds since Unix epoch.
+    // After this time the node can be considered to be offline.
+    uint64 refresh_deadline                    = 10;
+    // Incremental counter updated every time the capabilities change.
+    uint64 counter                             = 11;
+    // Node health status.
+    NodeHealthStatus health_status             = 20;
+    // Node performance info.
+    NodePerformanceSamples performance_samples = 30;
+
 }
 
 // Node capabilities exposed to the orchestrator.
@@ -234,15 +235,6 @@ message NodePerformanceSamples {
     // The identifier is the physical component identifier.
     // Samples are execution times, in fractional seconds.
     repeated Samples function_execution_times = 100;
-}
-
-// Response message of FunctionInstance::KeepAlive().
-message KeepAliveResponse {
-    // Node health status.
-    NodeHealthStatus       health_status       = 1;
-
-    // Node performance info.
-    NodePerformanceSamples performance_samples = 2;
 }
 
 // Message to request the update of a function instance.
