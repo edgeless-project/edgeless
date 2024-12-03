@@ -68,7 +68,6 @@ impl crate::node_registration::NodeRegistrationAPI for NodeRegistrationClient {
             }
         }
     }
-    async fn keep_alive(&mut self) {}
 }
 
 #[async_trait::async_trait]
@@ -131,43 +130,37 @@ fn serialize_node_capabilities(req: &crate::node_registration::NodeCapabilities)
 }
 
 fn parse_update_node_request(api_instance: &crate::grpc_impl::api::UpdateNodeRequest) -> anyhow::Result<crate::node_registration::UpdateNodeRequest> {
-    let node_id = uuid::Uuid::from_str(api_instance.node_id.as_str());
-    if let Err(err) = node_id {
-        return Err(anyhow::anyhow!("Ill-formed node_id field in UpdateNodeRequest message: {}", err));
-    }
-    match api_instance.request_type {
-        x if x == crate::grpc_impl::api::UpdateNodeRequestType::Register as i32 => {
-            let mut resource_providers = vec![];
-            for resource_provider in &api_instance.resource_providers {
-                match parse_resource_provider_specification(resource_provider) {
-                    Ok(val) => resource_providers.push(val),
-                    Err(err) => {
-                        return Err(anyhow::anyhow!("Ill-formed resource provider in UpdateNodeRequest message: {}", err));
-                    }
-                }
-            }
-            if let (Some(agent_url), Some(invocation_url)) = (api_instance.agent_url.as_ref(), api_instance.invocation_url.as_ref()) {
-                Ok(crate::node_registration::UpdateNodeRequest::Registration(
-                    node_id.unwrap(),
-                    agent_url.to_string(),
-                    invocation_url.to_string(),
-                    resource_providers,
-                    match &api_instance.capabilities {
-                        Some(val) => parse_node_capabilities(val),
-                        None => crate::node_registration::NodeCapabilities::empty(),
-                    },
-                ))
-            } else {
-                Err(anyhow::anyhow!(
-                    "Ill-formed UpdateNodeRequest message: agent or invocation URL not present in registration"
-                ))
+    let node_id = uuid::Uuid::from_str(api_instance.node_id.as_str())?;
+    let mut resource_providers = vec![];
+    for resource_provider in &api_instance.resource_providers {
+        match parse_resource_provider_specification(resource_provider) {
+            Ok(val) => resource_providers.push(val),
+            Err(err) => {
+                return Err(anyhow::anyhow!("Ill-formed resource provider in UpdateNodeRequest message: {}", err));
             }
         }
-        x if x == crate::grpc_impl::api::UpdateNodeRequestType::Deregister as i32 => {
-            Ok(crate::node_registration::UpdateNodeRequest::Deregistration(node_id.unwrap()))
-        }
-        x => Err(anyhow::anyhow!("Ill-formed UpdateNodeRequest message: unknown type {}", x)),
     }
+
+    Ok(crate::node_registration::UpdateNodeRequest {
+        node_id,
+        agent_url: api_instance.agent_url.clone(),
+        invocation_url: api_instance.invocation_url.clone(),
+        resource_providers,
+        refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(api_instance.refresh_deadline),
+        capabilities: match &api_instance.capabilities {
+            Some(val) => parse_node_capabilities(val),
+            None => crate::node_registration::NodeCapabilities::default(),
+        },
+        counter: api_instance.counter,
+        health_status: match &api_instance.health_status {
+            Some(val) => parse_node_health_status(val),
+            None => crate::node_registration::NodeHealthStatus::default(),
+        },
+        performance_samples: match &api_instance.performance_samples {
+            Some(val) => parse_node_performance_samples(val),
+            None => crate::node_registration::NodePerformanceSamples::default(),
+        },
+    })
 }
 
 fn serialize_update_node_response(req: &crate::node_registration::UpdateNodeResponse) -> crate::grpc_impl::api::UpdateNodeResponse {
@@ -197,25 +190,16 @@ fn parse_update_node_response(
 }
 
 fn serialize_update_node_request(req: &crate::node_registration::UpdateNodeRequest) -> crate::grpc_impl::api::UpdateNodeRequest {
-    match req {
-        crate::node_registration::UpdateNodeRequest::Registration(node_id, agent_url, invocation_url, resource_providers, capabilities) => {
-            crate::grpc_impl::api::UpdateNodeRequest {
-                request_type: crate::grpc_impl::api::UpdateNodeRequestType::Register as i32,
-                node_id: node_id.to_string(),
-                agent_url: Some(agent_url.to_string()),
-                invocation_url: Some(invocation_url.to_string()),
-                resource_providers: resource_providers.iter().map(serialize_resource_provider_specification).collect(),
-                capabilities: Some(serialize_node_capabilities(capabilities)),
-            }
-        }
-        crate::node_registration::UpdateNodeRequest::Deregistration(node_id) => crate::grpc_impl::api::UpdateNodeRequest {
-            request_type: crate::grpc_impl::api::UpdateNodeRequestType::Deregister as i32,
-            node_id: node_id.to_string(),
-            agent_url: None,
-            invocation_url: None,
-            resource_providers: vec![],
-            capabilities: None,
-        },
+    crate::grpc_impl::api::UpdateNodeRequest {
+        node_id: req.node_id.to_string(),
+        agent_url: req.agent_url.clone(),
+        invocation_url: req.invocation_url.clone(),
+        resource_providers: req.resource_providers.iter().map(serialize_resource_provider_specification).collect(),
+        capabilities: Some(serialize_node_capabilities(&req.capabilities)),
+        refresh_deadline: req.refresh_deadline.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+        counter: req.counter,
+        health_status: Some(serialize_node_health_status(&req.health_status)),
+        performance_samples: Some(serialize_node_performance_samples(&req.performance_samples)),
     }
 }
 
@@ -249,51 +233,152 @@ fn serialize_resource_provider_specification(
     }
 }
 
+pub fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealthStatus) -> crate::node_registration::NodeHealthStatus {
+    crate::node_registration::NodeHealthStatus {
+        mem_free: api_instance.mem_free,
+        mem_used: api_instance.mem_used,
+        mem_available: api_instance.mem_available,
+        proc_cpu_usage: api_instance.proc_cpu_usage,
+        proc_memory: api_instance.proc_memory,
+        proc_vmemory: api_instance.proc_vmemory,
+        load_avg_1: api_instance.load_avg_1,
+        load_avg_5: api_instance.load_avg_5,
+        load_avg_15: api_instance.load_avg_15,
+        tot_rx_bytes: api_instance.tot_rx_bytes,
+        tot_rx_pkts: api_instance.tot_rx_pkts,
+        tot_rx_errs: api_instance.tot_rx_errs,
+        tot_tx_pkts: api_instance.tot_tx_pkts,
+        tot_tx_bytes: api_instance.tot_tx_bytes,
+        tot_tx_errs: api_instance.tot_tx_errs,
+        disk_free_space: api_instance.disk_free_space,
+        disk_tot_reads: api_instance.disk_tot_reads,
+        disk_tot_writes: api_instance.disk_tot_writes,
+        gpu_load_perc: api_instance.gpu_load_perc,
+        gpu_temp_cels: api_instance.gpu_temp_cels,
+    }
+}
+
+fn serialize_node_health_status(req: &crate::node_registration::NodeHealthStatus) -> crate::grpc_impl::api::NodeHealthStatus {
+    crate::grpc_impl::api::NodeHealthStatus {
+        mem_free: req.mem_free,
+        mem_used: req.mem_used,
+        mem_available: req.mem_available,
+        proc_cpu_usage: req.proc_cpu_usage,
+        proc_memory: req.proc_memory,
+        proc_vmemory: req.proc_vmemory,
+        load_avg_1: req.load_avg_1,
+        load_avg_5: req.load_avg_5,
+        load_avg_15: req.load_avg_15,
+        tot_rx_bytes: req.tot_rx_bytes,
+        tot_rx_pkts: req.tot_rx_pkts,
+        tot_rx_errs: req.tot_rx_errs,
+        tot_tx_pkts: req.tot_tx_pkts,
+        tot_tx_bytes: req.tot_tx_bytes,
+        tot_tx_errs: req.tot_tx_errs,
+        disk_free_space: req.disk_free_space,
+        disk_tot_reads: req.disk_tot_reads,
+        disk_tot_writes: req.disk_tot_writes,
+        gpu_load_perc: req.gpu_load_perc,
+        gpu_temp_cels: req.gpu_temp_cels,
+    }
+}
+
+pub fn parse_node_performance_samples(
+    api_instance: &crate::grpc_impl::api::NodePerformanceSamples,
+) -> crate::node_registration::NodePerformanceSamples {
+    crate::node_registration::NodePerformanceSamples {
+        function_execution_times: api_instance
+            .function_execution_times
+            .iter()
+            .filter_map(|x| match uuid::Uuid::from_str(&x.id) {
+                Ok(val) => Some((val, x.samples.clone())),
+                _ => None,
+            })
+            .collect(),
+    }
+}
+
+fn serialize_node_performance_samples(req: &crate::node_registration::NodePerformanceSamples) -> crate::grpc_impl::api::NodePerformanceSamples {
+    crate::grpc_impl::api::NodePerformanceSamples {
+        function_execution_times: req
+            .function_execution_times
+            .iter()
+            .map(|(id, samples)| crate::grpc_impl::api::Samples {
+                id: id.to_string(),
+                samples: samples.clone(),
+            })
+            .collect(),
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::node_registration::NodeCapabilities;
+    use crate::node_registration::NodeHealthStatus;
+    use crate::node_registration::NodePerformanceSamples;
     use crate::node_registration::ResourceProviderSpecification;
     use crate::node_registration::UpdateNodeRequest;
     use crate::node_registration::UpdateNodeResponse;
 
     #[test]
     fn serialize_deserialize_update_node_request() {
-        let messages = vec![
-            UpdateNodeRequest::Registration(
-                uuid::Uuid::new_v4(),
-                "http://127.0.0.1:10000".to_string(),
-                "http://127.0.0.1:10001".to_string(),
-                vec![ResourceProviderSpecification {
-                    provider_id: "provider-1".to_string(),
-                    class_type: "class-type-1".to_string(),
-                    outputs: vec!["out1".to_string(), "out2".to_string()],
-                }],
-                NodeCapabilities {
-                    num_cpus: 4,
-                    model_name_cpu: "ARMv8 Processor rev 0 (v8l)".to_string(),
-                    clock_freq_cpu: 62.50,
-                    num_cores: 20,
-                    mem_size: 15827,
-                    labels: vec!["red".to_string(), "powerful".to_string()],
-                    is_tee_running: true,
-                    has_tpm: true,
-                    runtimes: vec!["RUST_WASM".to_string()],
-                    disk_tot_space: 999,
-                    num_gpus: 3,
-                    model_name_gpu: "NVIDIA A100".to_string(),
-                    mem_size_gpu: 80 * 1024,
-                },
-            ),
-            UpdateNodeRequest::Registration(
-                uuid::Uuid::new_v4(),
-                "http://127.0.0.1:10000".to_string(),
-                "http://127.0.0.1:10001".to_string(),
-                vec![],
-                NodeCapabilities::empty(),
-            ),
-            UpdateNodeRequest::Deregistration(uuid::Uuid::new_v4()),
-        ];
+        let messages = vec![UpdateNodeRequest {
+            node_id: uuid::Uuid::new_v4(),
+            agent_url: "http://127.0.0.1:10000".to_string(),
+            invocation_url: "http://127.0.0.1:10001".to_string(),
+            resource_providers: vec![ResourceProviderSpecification {
+                provider_id: "provider-1".to_string(),
+                class_type: "class-type-1".to_string(),
+                outputs: vec!["out1".to_string(), "out2".to_string()],
+            }],
+            capabilities: NodeCapabilities {
+                num_cpus: 4,
+                model_name_cpu: "ARMv8 Processor rev 0 (v8l)".to_string(),
+                clock_freq_cpu: 62.50,
+                num_cores: 20,
+                mem_size: 15827,
+                labels: vec!["red".to_string(), "powerful".to_string()],
+                is_tee_running: true,
+                has_tpm: true,
+                runtimes: vec!["RUST_WASM".to_string()],
+                disk_tot_space: 999,
+                num_gpus: 3,
+                model_name_gpu: "NVIDIA A100".to_string(),
+                mem_size_gpu: 80 * 1024,
+            },
+            refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(313714800),
+            counter: 1,
+            health_status: NodeHealthStatus {
+                mem_free: 3,
+                mem_used: 4,
+                mem_available: 6,
+                proc_cpu_usage: 7,
+                proc_memory: 8,
+                proc_vmemory: 9,
+                load_avg_1: 10,
+                load_avg_5: 11,
+                load_avg_15: 12,
+                tot_rx_bytes: 13,
+                tot_rx_pkts: 14,
+                tot_rx_errs: 15,
+                tot_tx_bytes: 16,
+                tot_tx_pkts: 17,
+                tot_tx_errs: 18,
+                disk_free_space: 20,
+                disk_tot_reads: 21,
+                disk_tot_writes: 22,
+                gpu_load_perc: 23,
+                gpu_temp_cels: 24,
+            },
+            performance_samples: NodePerformanceSamples {
+                function_execution_times: std::collections::HashMap::from([
+                    (uuid::Uuid::new_v4(), vec![1.0, 2.5, 3.0]),
+                    (uuid::Uuid::new_v4(), vec![]),
+                    (uuid::Uuid::new_v4(), vec![0.1, 0.2, 999.0]),
+                ]),
+            },
+        }];
         for msg in messages {
             match parse_update_node_request(&serialize_update_node_request(&msg)) {
                 Ok(val) => assert_eq!(msg, val),

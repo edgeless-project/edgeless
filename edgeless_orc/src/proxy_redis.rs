@@ -106,7 +106,7 @@ impl ProxyRedis {
             "metric,identifier,value,timestamp".to_string(),
             "timestamp,logical_id,node_id,physical_id".to_string(),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeCapabilities::csv_header()),
-            format!("timestamp,node_id,{}", edgeless_api::node_management::NodeHealthStatus::csv_header()),
+            format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeHealthStatus::csv_header()),
         ];
         let mut outfiles = vec![];
         for (filename, header) in filenames.iter().zip(headers.iter()) {
@@ -331,52 +331,52 @@ impl super::proxy::Proxy for ProxyRedis {
         self.dependency_uuids = new_dependency_uuids;
     }
 
-    fn push_keep_alive_responses(&mut self, keep_alive_responses: Vec<(uuid::Uuid, edgeless_api::node_management::KeepAliveResponse)>) {
+    fn push_node_health(&mut self, node_id: &uuid::Uuid, node_health: edgeless_api::node_registration::NodeHealthStatus) {
         let timestamp = ProxyRedis::timestamp_now();
 
-        // serialize the nodes' health status and performance samples to Redis
-        let mut new_node_health_status = std::collections::HashMap::new();
-        for (uuid, keep_alive_response) in keep_alive_responses {
-            // Save health status.
-            redis::pipe()
-                .set::<&str, &str>(
-                    format!("node:health:{}", uuid).as_str(),
-                    serde_json::to_string(&keep_alive_response.health_status).unwrap_or_default().as_str(),
-                )
-                .execute(&mut self.connection);
-            let new_health_status = keep_alive_response.health_status.to_csv();
-            if let Some(outfile) = &mut self.health_status_file {
-                let write = if let Some(old_health_status) = self.node_health_status.get(&uuid) {
-                    *old_health_status != new_health_status
-                } else {
-                    true
-                };
-                if write {
-                    let _ = writeln!(outfile, "{},{},{},{}", self.additional_fields, timestamp, &uuid, new_health_status);
-                }
+        // Save to Redis.
+        redis::pipe()
+            .set::<&str, &str>(
+                format!("node:health:{}", node_id).as_str(),
+                serde_json::to_string(&node_health).unwrap_or_default().as_str(),
+            )
+            .execute(&mut self.connection);
+        let new_health_status = node_health.to_csv();
+
+        // Save to dataset output.
+        if let Some(outfile) = &mut self.health_status_file {
+            let write = if let Some(old_health_status) = self.node_health_status.get(node_id) {
+                *old_health_status != new_health_status
+            } else {
+                true
+            };
+            if write {
+                let _ = writeln!(outfile, "{},{},{},{}", self.additional_fields, timestamp, node_id, new_health_status);
             }
-            new_node_health_status.insert(uuid, new_health_status);
+        }
+    }
 
-            // Save performance samples.
-            for (function_id, values) in keep_alive_response.performance_samples.function_execution_times {
-                let key = format!("performance:function_execution_time:{}", function_id);
-                for value in values {
-                    redis::pipe()
-                        .rpush::<&str, &str>(&key, format!("{},{}", value, &timestamp).as_str())
-                        .execute(&mut self.connection);
+    fn push_performance_samples(&mut self, _node_id: &uuid::Uuid, performance_samples: edgeless_api::node_registration::NodePerformanceSamples) {
+        let timestamp = ProxyRedis::timestamp_now();
 
-                    // Save to dataset output.
-                    if let Some(outfile) = &mut self.performance_samples_file {
-                        let _ = writeln!(
-                            outfile,
-                            "{},function_execution_time,{},{},{}",
-                            self.additional_fields, function_id, value, &timestamp
-                        );
-                    }
+        // Save to Redis.
+        for (function_id, values) in performance_samples.function_execution_times {
+            let key = format!("performance:function_execution_time:{}", function_id);
+            for value in values {
+                redis::pipe()
+                    .rpush::<&str, &str>(&key, format!("{},{}", value, &timestamp).as_str())
+                    .execute(&mut self.connection);
+
+                // Save to dataset output.
+                if let Some(outfile) = &mut self.performance_samples_file {
+                    let _ = writeln!(
+                        outfile,
+                        "{},function_execution_time,{},{},{}",
+                        self.additional_fields, function_id, value, &timestamp
+                    );
                 }
             }
         }
-        let _ = std::mem::replace(&mut self.node_health_status, new_node_health_status);
     }
 
     fn add_deploy_intents(&mut self, intents: Vec<super::orchestrator::DeployIntent>) {
@@ -443,7 +443,7 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_node_health(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_management::NodeHealthStatus> {
+    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeHealthStatus> {
         let mut health = std::collections::HashMap::new();
         for node_key in self.connection.keys::<&str, Vec<String>>("node:health:*").unwrap_or(vec![]) {
             let tokens: Vec<&str> = node_key.split(':').collect();
@@ -452,7 +452,7 @@ impl super::proxy::Proxy for ProxyRedis {
             assert_eq!("health", tokens[1]);
             if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2]) {
                 if let Ok(val) = self.connection.get::<&str, String>(&node_key) {
-                    if let Ok(val) = serde_json::from_str::<edgeless_api::node_management::NodeHealthStatus>(&val) {
+                    if let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(&val) {
                         health.insert(node_id, val);
                     }
                 }
@@ -685,7 +685,7 @@ mod test {
         }
 
         // Check health status and performance samples.
-        let health_status = edgeless_api::node_management::NodeHealthStatus {
+        let health_status = edgeless_api::node_registration::NodeHealthStatus {
             mem_free: 3,
             mem_used: 4,
             mem_available: 6,
@@ -712,16 +712,13 @@ mod test {
         let node_id_perf = uuid::Uuid::new_v4();
         let fid_perf_1 = uuid::Uuid::new_v4();
         let fid_perf_2 = uuid::Uuid::new_v4();
-        let keep_alive_responses = vec![(
-            node_id_perf,
-            edgeless_api::node_management::KeepAliveResponse {
-                health_status: health_status.clone(),
-                performance_samples: edgeless_api::node_management::NodePerformanceSamples {
-                    function_execution_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
-                },
+        redis_proxy.push_node_health(&node_id_perf, health_status.clone());
+        redis_proxy.push_performance_samples(
+            &node_id_perf,
+            edgeless_api::node_registration::NodePerformanceSamples {
+                function_execution_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
             },
-        )];
-        redis_proxy.push_keep_alive_responses(keep_alive_responses);
+        );
 
         let node_health_res = redis_proxy.fetch_node_health();
         assert_eq!(std::collections::HashMap::from([(node_id_perf, health_status)]), node_health_res);

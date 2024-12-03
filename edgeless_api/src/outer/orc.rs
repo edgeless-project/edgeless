@@ -8,5 +8,4 @@ pub trait OrchestratorAPI: Send {
     fn resource_configuration_api(
         &mut self,
     ) -> Box<dyn crate::resource_configuration::ResourceConfigurationAPI<crate::function_instance::DomainManagedInstanceId>>;
-    fn node_registration_api(&mut self) -> Box<dyn crate::node_registration::NodeRegistrationAPI>;
 }
