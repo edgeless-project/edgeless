@@ -9,7 +9,8 @@ impl super::proxy::Proxy for ProxyNone {
     fn update_resource_providers(&mut self, _resource_providers: &std::collections::HashMap<String, super::orchestrator::ResourceProvider>) {}
     fn update_active_instances(&mut self, _active_instances: &std::collections::HashMap<uuid::Uuid, super::orchestrator::ActiveInstance>) {}
     fn update_dependency_graph(&mut self, _dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>) {}
-    fn push_keep_alive_responses(&mut self, _keep_alive_responses: Vec<(uuid::Uuid, edgeless_api::node_management::KeepAliveResponse)>) {}
+    fn push_node_health(&mut self, _node_id: &uuid::Uuid, _node_health: edgeless_api::node_registration::NodeHealthStatus) {}
+    fn push_performance_samples(&mut self, _node_id: &uuid::Uuid, _performance_samples: edgeless_api::node_registration::NodePerformanceSamples) {}
     fn add_deploy_intents(&mut self, _intents: Vec<super::orchestrator::DeployIntent>) {}
     fn retrieve_deploy_intents(&mut self) -> Vec<super::orchestrator::DeployIntent> {
         vec![]
@@ -21,7 +22,7 @@ impl super::proxy::Proxy for ProxyNone {
     }
     fn fetch_node_health(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_management::NodeHealthStatus> {
+    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeHealthStatus> {
         std::collections::HashMap::new()
     }
     fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, std::collections::HashMap<String, Vec<(f64, f64)>>> {

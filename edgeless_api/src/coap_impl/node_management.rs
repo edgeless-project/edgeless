@@ -2,8 +2,6 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
-use crate::node_management::{KeepAliveResponse, NodeHealthStatus, NodePerformanceSamples};
-
 #[async_trait::async_trait]
 impl crate::node_management::NodeManagementAPI for super::CoapClient {
     async fn update_peers(&mut self, request: crate::node_management::UpdatePeersRequest) -> anyhow::Result<()> {
@@ -48,19 +46,6 @@ impl crate::node_management::NodeManagementAPI for super::CoapClient {
             crate::node_management::UpdatePeersRequest::Clear => {
                 panic!("UpdatePeersRequest::Clear not implemented");
             }
-        }
-    }
-
-    async fn keep_alive(&mut self) -> anyhow::Result<crate::node_management::KeepAliveResponse> {
-        match self
-            .call_with_reply(|token, addr, buffer| edgeless_api_core::coap_mapping::COAPEncoder::encode_keepalive(addr, token, buffer))
-            .await
-        {
-            Ok(_) => Ok(KeepAliveResponse {
-                health_status: NodeHealthStatus::invalid(),
-                performance_samples: NodePerformanceSamples::empty(),
-            }),
-            Err(err) => Err(anyhow::anyhow!(String::from_utf8(err).unwrap())),
         }
     }
 }

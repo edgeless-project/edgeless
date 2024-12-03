@@ -23,7 +23,6 @@ enum AgentRequest {
     Patch(edgeless_api::common::PatchRequest),
     PatchResource(edgeless_api::common::PatchRequest, futures::channel::oneshot::Sender<anyhow::Result<()>>),
     UpdatePeers(edgeless_api::node_management::UpdatePeersRequest),
-    KeepAlive(futures::channel::oneshot::Sender<anyhow::Result<edgeless_api::node_management::KeepAliveResponse>>),
 }
 
 pub struct Agent {
@@ -296,74 +295,74 @@ impl Agent {
                             update.function_id
                         )))
                         .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                }
-                AgentRequest::KeepAlive(responder) => {
-                    // Refresh system/process information.
-                    sys.refresh_all();
-                    networks.refresh();
-                    disks.refresh_list();
-                    disks.refresh();
+                } // XXX
+                  // AgentRequest::KeepAlive(responder) => {
+                  //     // Refresh system/process information.
+                  //     sys.refresh_all();
+                  //     networks.refresh();
+                  //     disks.refresh_list();
+                  //     disks.refresh();
 
-                    let to_kb = |x| (x / 1024) as i32;
-                    let proc = sys.process(my_pid).unwrap();
-                    let load_avg = sysinfo::System::load_average();
-                    let mut tot_rx_bytes: i64 = 0;
-                    let mut tot_rx_pkts: i64 = 0;
-                    let mut tot_rx_errs: i64 = 0;
-                    let mut tot_tx_bytes: i64 = 0;
-                    let mut tot_tx_pkts: i64 = 0;
-                    let mut tot_tx_errs: i64 = 0;
-                    for (_interface_name, network) in &networks {
-                        tot_rx_bytes += network.total_received() as i64;
-                        tot_rx_pkts += network.total_packets_received() as i64;
-                        tot_rx_errs += network.total_errors_on_received() as i64;
-                        tot_tx_bytes += network.total_packets_transmitted() as i64;
-                        tot_tx_pkts += network.total_transmitted() as i64;
-                        tot_tx_errs += network.total_errors_on_transmitted() as i64;
-                    }
-                    let mut disk_tot_reads = 0;
-                    let mut disk_tot_writes = 0;
-                    for process in sys.processes().values() {
-                        let disk_usage = process.disk_usage();
-                        disk_tot_reads += disk_usage.total_read_bytes as i64;
-                        disk_tot_writes += disk_usage.total_written_bytes as i64;
-                    }
-                    let unique_available_space = disks
-                        .iter()
-                        .map(|x| (x.name().to_str().unwrap_or_default(), x.total_space()))
-                        .collect::<std::collections::BTreeMap<&str, u64>>();
-                    let health_status = edgeless_api::node_management::NodeHealthStatus {
-                        mem_free: to_kb(sys.free_memory()),
-                        mem_used: to_kb(sys.used_memory()),
-                        mem_available: to_kb(sys.available_memory()),
-                        proc_cpu_usage: proc.cpu_usage() as i32,
-                        proc_memory: to_kb(proc.memory()),
-                        proc_vmemory: to_kb(proc.virtual_memory()),
-                        load_avg_1: (load_avg.one * 100_f64).round() as i32,
-                        load_avg_5: (load_avg.five * 100_f64).round() as i32,
-                        load_avg_15: (load_avg.fifteen * 100_f64).round() as i32,
-                        tot_rx_bytes,
-                        tot_rx_pkts,
-                        tot_rx_errs,
-                        tot_tx_bytes,
-                        tot_tx_pkts,
-                        tot_tx_errs,
-                        disk_free_space: unique_available_space.values().sum::<u64>() as i64,
-                        disk_tot_reads,
-                        disk_tot_writes,
-                        gpu_load_perc: crate::gpu_info::get_gpu_load(),
-                        gpu_temp_cels: (crate::gpu_info::get_gpu_temp() * 1000.0) as i32,
-                    };
-                    let performance_samples = edgeless_api::node_management::NodePerformanceSamples {
-                        function_execution_times: telemetry_performance_target.get_metrics().function_execution_times,
-                    };
-                    responder
-                        .send(Ok(edgeless_api::node_management::KeepAliveResponse {
-                            health_status,
-                            performance_samples,
-                        }))
-                        .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                }
+                  //     let to_kb = |x| (x / 1024) as i32;
+                  //     let proc = sys.process(my_pid).unwrap();
+                  //     let load_avg = sysinfo::System::load_average();
+                  //     let mut tot_rx_bytes: i64 = 0;
+                  //     let mut tot_rx_pkts: i64 = 0;
+                  //     let mut tot_rx_errs: i64 = 0;
+                  //     let mut tot_tx_bytes: i64 = 0;
+                  //     let mut tot_tx_pkts: i64 = 0;
+                  //     let mut tot_tx_errs: i64 = 0;
+                  //     for (_interface_name, network) in &networks {
+                  //         tot_rx_bytes += network.total_received() as i64;
+                  //         tot_rx_pkts += network.total_packets_received() as i64;
+                  //         tot_rx_errs += network.total_errors_on_received() as i64;
+                  //         tot_tx_bytes += network.total_packets_transmitted() as i64;
+                  //         tot_tx_pkts += network.total_transmitted() as i64;
+                  //         tot_tx_errs += network.total_errors_on_transmitted() as i64;
+                  //     }
+                  //     let mut disk_tot_reads = 0;
+                  //     let mut disk_tot_writes = 0;
+                  //     for process in sys.processes().values() {
+                  //         let disk_usage = process.disk_usage();
+                  //         disk_tot_reads += disk_usage.total_read_bytes as i64;
+                  //         disk_tot_writes += disk_usage.total_written_bytes as i64;
+                  //     }
+                  //     let unique_available_space = disks
+                  //         .iter()
+                  //         .map(|x| (x.name().to_str().unwrap_or_default(), x.total_space()))
+                  //         .collect::<std::collections::BTreeMap<&str, u64>>();
+                  //     let health_status = edgeless_api::node_registration::NodeHealthStatus {
+                  //         mem_free: to_kb(sys.free_memory()),
+                  //         mem_used: to_kb(sys.used_memory()),
+                  //         mem_available: to_kb(sys.available_memory()),
+                  //         proc_cpu_usage: proc.cpu_usage() as i32,
+                  //         proc_memory: to_kb(proc.memory()),
+                  //         proc_vmemory: to_kb(proc.virtual_memory()),
+                  //         load_avg_1: (load_avg.one * 100_f64).round() as i32,
+                  //         load_avg_5: (load_avg.five * 100_f64).round() as i32,
+                  //         load_avg_15: (load_avg.fifteen * 100_f64).round() as i32,
+                  //         tot_rx_bytes,
+                  //         tot_rx_pkts,
+                  //         tot_rx_errs,
+                  //         tot_tx_bytes,
+                  //         tot_tx_pkts,
+                  //         tot_tx_errs,
+                  //         disk_free_space: unique_available_space.values().sum::<u64>() as i64,
+                  //         disk_tot_reads,
+                  //         disk_tot_writes,
+                  //         gpu_load_perc: crate::gpu_info::get_gpu_load(),
+                  //         gpu_temp_cels: (crate::gpu_info::get_gpu_temp() * 1000.0) as i32,
+                  //     };
+                  //     let performance_samples = edgeless_api::node_registration::NodePerformanceSamples {
+                  //         function_execution_times: telemetry_performance_target.get_metrics().function_execution_times,
+                  //     };
+                  //     responder
+                  //         .send(Ok(edgeless_api::node_management::KeepAliveResponse {
+                  //             health_status,
+                  //             performance_samples,
+                  //         }))
+                  //         .unwrap_or_else(|_| log::warn!("Responder Send Error"));
+                  // }
             }
         }
     }
@@ -458,18 +457,6 @@ impl edgeless_api::node_management::NodeManagementAPI for NodeManagementClient {
                 err.to_string()
             )),
         }
-    }
-
-    async fn keep_alive(&mut self) -> anyhow::Result<edgeless_api::node_management::KeepAliveResponse> {
-        let (rsp_sender, rsp_receiver) = futures::channel::oneshot::channel::<anyhow::Result<edgeless_api::node_management::KeepAliveResponse>>();
-        let _ = self
-            .sender
-            .send(AgentRequest::KeepAlive(rsp_sender))
-            .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when querying health status: {}", err.to_string()))?;
-        rsp_receiver
-            .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when querying health status: {}", err.to_string()))?
     }
 }
 

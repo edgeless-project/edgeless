@@ -35,17 +35,13 @@ service NodeManagement {
     // Input: the node identifier and invocation URL (only for add operations).
     // Output: none.
     rpc UpdatePeers (UpdatePeersRequest) returns (google.protobuf.Empty);
-
-    // Check if the component is still alive.
-    // Input: none.
-    // Output: health status information.
-    rpc KeepAlive (google.protobuf.Empty) returns (KeepAliveResponse);
 }
 
 // API that allows nodes to register themselves with the orchestrator.
 service NodeRegistration {
-    // Register a new node on an orchestrator or deregister an existing node.
-    // Input: registration: identifier of the new node and agent/invocation URLs;
+    // Notify that the node is alive (also acts as registration).
+    // Input: registration: identifier of the new node and agent/invocation
+    // URLs, health status information, and performance samples.
     // deregistration: identifier of the existing node to be deregistered.
     // Output: UpdateNodeResponse.
     rpc UpdateNode (UpdateNodeRequest) returns (UpdateNodeResponse);

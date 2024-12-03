@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+
 pub struct OrchestratorAPIClient {
     function_instance_client: Box<dyn crate::function_instance::FunctionInstanceAPI<crate::function_instance::DomainManagedInstanceId>>,
-    node_registration_client: Box<dyn crate::node_registration::NodeRegistrationAPI>,
     resource_configuration_client:
         Box<dyn crate::resource_configuration::ResourceConfigurationAPI<crate::function_instance::DomainManagedInstanceId>>,
 }
@@ -13,7 +13,6 @@ impl OrchestratorAPIClient {
     pub async fn new(api_addr: &str) -> anyhow::Result<Self> {
         Ok(Self {
             function_instance_client: Box::new(crate::grpc_impl::function_instance::FunctionInstanceAPIClient::new(api_addr.to_string())),
-            node_registration_client: Box::new(crate::grpc_impl::node_registration::NodeRegistrationClient::new(api_addr.to_string())),
             resource_configuration_client: Box::new(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(
                 api_addr.to_string(),
             )),
@@ -24,10 +23,6 @@ impl OrchestratorAPIClient {
 impl crate::outer::orc::OrchestratorAPI for OrchestratorAPIClient {
     fn function_instance_api(&mut self) -> Box<dyn crate::function_instance::FunctionInstanceAPI<crate::function_instance::DomainManagedInstanceId>> {
         self.function_instance_client.clone()
-    }
-
-    fn node_registration_api(&mut self) -> Box<dyn crate::node_registration::NodeRegistrationAPI> {
-        self.node_registration_client.clone()
     }
 
     fn resource_configuration_api(
@@ -45,9 +40,6 @@ impl OrchestratorAPIServer {
         let function_api = crate::grpc_impl::function_instance::FunctionInstanceAPIServer::<crate::function_instance::DomainManagedInstanceId> {
             root_api: tokio::sync::Mutex::new(agent_api.function_instance_api()),
         };
-        let node_registration_api = crate::grpc_impl::node_registration::NodeRegistrationAPIService {
-            node_registration_api: tokio::sync::Mutex::new(agent_api.node_registration_api()),
-        };
         let resource_configuration_api =
             crate::grpc_impl::resource_configuration::ResourceConfigurationServerHandler::<crate::function_instance::DomainManagedInstanceId> {
                 root_api: tokio::sync::Mutex::new(agent_api.resource_configuration_api()),
@@ -60,10 +52,6 @@ impl OrchestratorAPIServer {
                     match tonic::transport::Server::builder()
                         .add_service(
                             crate::grpc_impl::api::function_instance_server::FunctionInstanceServer::new(function_api)
-                                .max_decoding_message_size(usize::MAX),
-                        )
-                        .add_service(
-                            crate::grpc_impl::api::node_registration_server::NodeRegistrationServer::new(node_registration_api)
                                 .max_decoding_message_size(usize::MAX),
                         )
                         .add_service(
