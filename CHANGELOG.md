@@ -1,5 +1,31 @@
 # Changelog
 
+## [Unrelease]
+
+New features:
+
+- Add ε-CON support to multiple orchestration domains.
+- Implement dynamic cluster formation, with domain capabilities announced by
+  the ε-ORCs (periodically refreshed).
+- Refactor orchestration domain formation: the keep-alive mechanism has been
+  removed from the ε-ORC, substituted by nodes periodically refreshing their
+  registration.
+
+Improvements:
+
+- Remove need for components to be started in a specific order. The ε-CON,
+  ε-ORC, and nodes can be started independently and automatically reconnect
+  if the connection with their peer is lost.
+- Improve scalability of the ε-ORC by separating control vs. management
+  operations.
+
+API changes:
+
+- Add service DomainRegistration.
+- Update service NodeRegistration.
+- Move node health status and performance samples from NodeManagement to
+  NodeManagement.
+
 ## [1.0.0] - 2024-11-12
 
 Initial stable release.
