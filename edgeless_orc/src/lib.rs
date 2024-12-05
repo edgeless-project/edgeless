@@ -41,13 +41,10 @@ pub struct EdgelessOrcGeneralSettings {
     /// The URL to which the orchestrator can be reached, which may be
     /// different from `orchestrator_url`, e.g., for NAT traversal.
     pub orchestrator_url_announced: String,
-    /// The COAP URL to which the orchestrator is bound.
-    pub orchestrator_coap_url: Option<String>,
-    /// The COAP URL to which the orchestrator can be reached, which may be
-    /// different from `orchestrator_url`, e.g., for NAT traversal.
-    pub orchestrator_coap_url_announced: Option<String>,
-    /// The URL of the node register, for the orchestration domain formation.
+    /// The gRPC URL of the node register.
     pub node_register_url: String,
+    /// The CoAP URL of the node register.
+    pub node_register_coap_url: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -125,25 +122,6 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     let orchestrator_server =
         edgeless_api::grpc_impl::outer::orc::OrchestratorAPIServer::run(orchestrator.get_api_client(), settings.general.orchestrator_url);
 
-    let orchestrator_coap_server = if let Some(url) = settings.general.orchestrator_coap_url {
-        if let Ok((proto, address, port)) = edgeless_api::util::parse_http_host(&url) {
-            if proto != edgeless_api::util::Proto::COAP {
-                log::warn!("Wrong protocol found in orchestrator's CoAP server URL");
-            }
-            if address != "0.0.0.0" {
-                log::warn!("Orchestrator CoAP server address field ({}) ignored, binding to 0.0.0.0 instead", address);
-            }
-            edgeless_api::coap_impl::orchestration::CoapOrchestrationServer::run(
-                orchestrator.get_api_client().node_registration_api(),
-                std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
-            )
-        } else {
-            Box::pin(async {})
-        }
-    } else {
-        Box::pin(async {})
-    };
-
     // Create the node register.
     let (mut node_register, node_register_task, node_register_refresh_task) =
         node_register::NodeRegister::new(proxy, orchestrator.get_sender()).await;
@@ -153,15 +131,35 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
         settings.general.node_register_url,
     );
 
+    let node_register_coap_server = if let Some(url) = settings.general.node_register_coap_url {
+        if let Ok((proto, address, port)) = edgeless_api::util::parse_http_host(&url) {
+            if proto != edgeless_api::util::Proto::COAP {
+                log::warn!("Wrong protocol for the CoAP node register ({}): assuming coap://", url);
+            }
+            if address != "0.0.0.0" {
+                log::warn!("CoAP node register requested to be bound at {}: ignored, using 0.0.0.0 instead", address);
+            }
+            edgeless_api::coap_impl::node_register::CoapNodeRegisterServer::run(
+                node_register.get_node_registration_client().node_registration_api(),
+                std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
+            )
+        } else {
+            log::error!("Wrong URL for the CoAP node register: {}", url);
+            Box::pin(async {})
+        }
+    } else {
+        Box::pin(async {})
+    };
+
     // Wait for all the tasks to come to an end.
     join!(
         orchestrator_task,
         orchestrator_refresh_task,
         orchestrator_server,
-        orchestrator_coap_server,
         node_register_task,
         node_register_refresh_task,
         node_register_server,
+        node_register_coap_server,
         subscriber_task,
         subscriber_refresh_task
     );
@@ -175,9 +173,8 @@ subscription_refresh_interval_sec = 10
 domain_id = "domain-1"
 orchestrator_url = "http://0.0.0.0:7011"
 orchestrator_url_announced = "http://127.0.0.1:7011"
-orchestrator_coap_url = "coap://127.0.0.1:7050"
-orchestrator_coap_url_announced = ""
 node_register_url = "http://0.0.0.0:7012"
+node_register_coap_url = "coap://0.0.0.0:7050"
 
 [baseline]
 orchestration_strategy = "Random"

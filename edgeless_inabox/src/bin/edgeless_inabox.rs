@@ -114,9 +114,8 @@ fn generate_configs(number_of_nodes: i32) -> Result<InABoxConfig, String> {
             domain_id: "domain-1".to_string(),
             orchestrator_url: next_url(),
             orchestrator_url_announced: "".to_string(),
-            orchestrator_coap_url: None,
-            orchestrator_coap_url_announced: None,
             node_register_url: next_url(),
+            node_register_coap_url: None,
         },
         baseline: edgeless_orc::EdgelessOrcBaselineSettings {
             orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
