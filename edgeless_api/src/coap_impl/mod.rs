@@ -9,8 +9,8 @@ pub mod agent;
 pub mod function_instance;
 pub mod invocation;
 pub mod node_management;
+pub mod node_register;
 pub mod node_registration;
-pub mod orchestration;
 pub mod resource_configuration;
 
 #[derive(Clone)]
