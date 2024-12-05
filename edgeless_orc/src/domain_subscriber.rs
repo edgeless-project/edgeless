@@ -11,7 +11,7 @@ pub struct DomainSubscriber {
 
 #[derive(Clone)]
 pub enum DomainSubscriberRequest {
-    Update(edgeless_api::domain_registration::DomainCapabilities),
+    Update(Box<edgeless_api::domain_registration::DomainCapabilities>),
     Refresh(),
 }
 
@@ -66,7 +66,7 @@ impl DomainSubscriber {
                 DomainSubscriberRequest::Update(new_caps) => {
                     log::debug!("Subscriber Update {:?}", new_caps);
                     counter += 1;
-                    last_caps = new_caps;
+                    last_caps = *new_caps;
                 }
                 DomainSubscriberRequest::Refresh() => {
                     log::debug!("Subscriber Refresh");

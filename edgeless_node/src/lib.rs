@@ -655,19 +655,9 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     // Create the component that subscribes to the node register to
     // notify updates (periodically refreshed).
     let (_subscriber, subscriber_task, refresh_task) = node_subscriber::NodeSubscriber::new(
-        settings.general.node_register_url.clone(),
-        settings.general.node_id.clone(),
-        match settings.general.agent_url_announced.is_empty() {
-            true => settings.general.agent_url.clone(),
-            false => settings.general.agent_url_announced.clone(),
-        },
-        match settings.general.invocation_url_announced.is_empty() {
-            true => settings.general.invocation_url.clone(),
-            false => settings.general.invocation_url_announced.clone(),
-        },
+        settings.general,
         resource_provider_specifications.clone(),
         get_capabilities(runtimes, settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
-        settings.general.subscription_refresh_interval_sec,
         telemetry_performance_target,
     )
     .await;
