@@ -45,9 +45,8 @@ mod system_tests {
                     domain_id: domain_id.to_string(),
                     orchestrator_url: orchestrator_url.to_string(),
                     orchestrator_url_announced: "".to_string(),
-                    orchestrator_coap_url: None,
-                    orchestrator_coap_url_announced: None,
                     node_register_url: node_register_url.clone(),
+                    node_register_coap_url: None,
                 },
                 baseline: edgeless_orc::EdgelessOrcBaselineSettings {
                     orchestration_strategy: edgeless_orc::OrchestrationStrategy::RoundRobin,

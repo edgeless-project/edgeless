@@ -8,11 +8,6 @@ use std::str::FromStr;
 trait NodeRegistrationHelper {
     async fn register(&mut self, update: crate::node_registration::UpdateNodeRequest)
         -> anyhow::Result<crate::node_registration::UpdateNodeResponse>;
-    #[allow(dead_code)]
-    async fn deregister(
-        &mut self,
-        update: crate::node_registration::UpdateNodeRequest,
-    ) -> anyhow::Result<crate::node_registration::UpdateNodeResponse>;
 }
 
 #[async_trait::async_trait]
@@ -65,12 +60,5 @@ impl NodeRegistrationHelper for super::CoapClient {
             Ok(_) => return Ok(crate::node_registration::UpdateNodeResponse::Accepted),
             Err(err) => return Err(anyhow::anyhow!(core::str::from_utf8(&err).unwrap().to_string())),
         }
-    }
-
-    async fn deregister(
-        &mut self,
-        _update: crate::node_registration::UpdateNodeRequest,
-    ) -> anyhow::Result<crate::node_registration::UpdateNodeResponse> {
-        todo!("deregistration not implemented (and likely not needed")
     }
 }
