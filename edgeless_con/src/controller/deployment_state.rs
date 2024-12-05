@@ -34,7 +34,7 @@ pub struct ActiveComponent {
 
 impl ActiveWorkflow {
     pub fn is_orphan(&self) -> bool {
-        for (_name, component) in &self.domain_mapping {
+        for component in self.domain_mapping.values() {
             if component.domain_id.is_empty() {
                 return true;
             }

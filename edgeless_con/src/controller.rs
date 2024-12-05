@@ -54,12 +54,10 @@ enum ComponentType {
     Resource,
 }
 
+type Task = std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>;
+
 impl Controller {
-    pub fn new() -> (
-        Self,
-        std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>,
-        std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>,
-    ) {
+    pub fn new() -> (Self, Task, Task) {
         let (workflow_instance_sender, workflow_instance_receiver) = futures::channel::mpsc::unbounded();
         let (domain_register_sender, domain_register_receiver) = futures::channel::mpsc::unbounded();
         let (internal_sender, internal_receiver) = futures::channel::mpsc::unbounded();

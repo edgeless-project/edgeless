@@ -108,7 +108,7 @@ pub fn edgeless_cli_default_conf() -> String {
 
 async fn wf_client(config_file: &str) -> anyhow::Result<Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>> {
     anyhow::ensure!(
-        !std::fs::metadata(config_file).is_err(),
+        std::fs::metadata(config_file).is_ok(),
         "configuration file does not exist or cannot be accessed: {}",
         config_file
     );
