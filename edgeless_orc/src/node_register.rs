@@ -110,21 +110,19 @@ impl NodeRegister {
                                     existing_node.refresh_deadline = request.refresh_deadline;
                                     false
                                 } else {
-                                    let _ = orchestrator_sender.send(super::orchestrator::OrchestratorRequest::DelNode(request.node_id)).await;
+                                    let _ = orchestrator_sender.send(crate::orchestrator::OrchestratorRequest::DelNode(request.node_id)).await;
                                     true
                                 }
                             }
                         };
                         if add_node {
-                            let _ = orchestrator_sender.send(super::orchestrator::OrchestratorRequest::AddNode(
-                                super::orchestrator::NewNodeData {
-                                    node_id: request.node_id,
-                                    agent_url: request.agent_url,
-                                    invocation_url: request.invocation_url,
-                                    resource_providers: request.resource_providers,
-                                    capabilities: request.capabilities,
-                                }
-                            )).await;
+                            if let Ok(client_desc) = crate::client_desc::ClientDesc::from(&request).await {
+                                let _ = orchestrator_sender.send(crate::orchestrator::OrchestratorRequest::AddNode(
+                                    request.node_id.clone(),
+                                    client_desc,
+                                    request.resource_providers
+                                )).await;
+                            }
                         }
 
                         // Push the dynamic data to the proxy.
