@@ -46,12 +46,13 @@ pub enum OrchestratorRequest {
     ),
     StopResource(edgeless_api::function_instance::DomainManagedInstanceId),
     Patch(edgeless_api::common::PatchRequest),
-    AddNode(NewNodeData),
+    AddNode(
+        uuid::Uuid,
+        crate::client_desc::ClientDesc,
+        Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
+    ),
     DelNode(uuid::Uuid),
-}
-
-pub(crate) enum InternalRequest {
-    Poll(),
+    Refresh(),
 }
 
 pub struct OrchestratorClient {
@@ -95,11 +96,9 @@ impl Orchestrator {
         std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
     ) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
-        let (internal_sender, internal_receiver) = futures::channel::mpsc::unbounded();
         let main_task = Box::pin(async move {
             let mut orchestrator_task = super::orchestrator_task::OrchestratorTask::new(
                 receiver,
-                internal_receiver,
                 settings,
                 std::collections::HashMap::new(),
                 std::collections::HashMap::new(),
@@ -110,42 +109,17 @@ impl Orchestrator {
             orchestrator_task.run().await;
         });
 
+        let refresh_sender = sender.clone();
         let refresh_task = Box::pin(async move {
-            let mut sender = internal_sender;
+            let mut refresh_sender = refresh_sender;
             let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
             loop {
                 interval.tick().await;
-                let _ = sender.send(InternalRequest::Poll()).await;
+                let _ = refresh_sender.send(OrchestratorRequest::Refresh()).await;
             }
         });
 
         (Orchestrator { sender }, main_task, refresh_task)
-    }
-
-    #[cfg(test)]
-    pub async fn new_with_clients(
-        settings: crate::EdgelessOrcBaselineSettings,
-        clients: std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>,
-        resource_providers: std::collections::HashMap<String, crate::resource_provider::ResourceProvider>,
-        subscriber_sender: futures::channel::mpsc::UnboundedSender<super::domain_subscriber::DomainSubscriberRequest>,
-    ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
-        let (sender, receiver) = futures::channel::mpsc::unbounded();
-        let (_internal_sender, internal_receiver) = futures::channel::mpsc::unbounded();
-        let main_task = Box::pin(async move {
-            let mut orchestrator_task = crate::orchestrator_task::OrchestratorTask::new(
-                receiver,
-                internal_receiver,
-                settings,
-                clients,
-                resource_providers,
-                std::sync::Arc::new(tokio::sync::Mutex::new(super::proxy_none::ProxyNone {})),
-                subscriber_sender,
-            )
-            .await;
-            orchestrator_task.run().await;
-        });
-
-        (Orchestrator { sender }, main_task)
     }
 
     pub fn get_sender(&mut self) -> futures::channel::mpsc::UnboundedSender<OrchestratorRequest> {

@@ -25,7 +25,6 @@ impl Pid {
 
 pub(crate) struct OrchestratorTask {
     receiver: futures::channel::mpsc::UnboundedReceiver<crate::orchestrator::OrchestratorRequest>,
-    internal_receiver: futures::channel::mpsc::UnboundedReceiver<crate::orchestrator::InternalRequest>,
     nodes: std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>,
     // known resources providers as advertised by the nodes upon registration
     // key: provider_id
@@ -51,7 +50,6 @@ pub(crate) struct OrchestratorTask {
 impl OrchestratorTask {
     pub async fn new(
         receiver: futures::channel::mpsc::UnboundedReceiver<crate::orchestrator::OrchestratorRequest>,
-        internal_receiver: futures::channel::mpsc::UnboundedReceiver<crate::orchestrator::InternalRequest>,
         orchestrator_settings: crate::EdgelessOrcBaselineSettings,
         nodes: std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>,
         resource_providers: std::collections::HashMap<String, crate::resource_provider::ResourceProvider>,
@@ -73,7 +71,6 @@ impl OrchestratorTask {
 
         Self {
             receiver,
-            internal_receiver,
             nodes,
             resource_providers,
             proxy,
@@ -91,56 +88,47 @@ impl OrchestratorTask {
     // Main orchestration loop.
     pub async fn run(&mut self) {
         self.update_domain().await;
-        loop {
-            tokio::select! {
-                Some(req) = self.receiver.next() => {
-                    match req {
-                        crate::orchestrator::OrchestratorRequest::StartFunction(spawn_req, reply_channel) => {
-                            log::debug!("Orchestrator StartFunction {}", spawn_req.code.to_short_string());
-                            let res = self.start_function(&spawn_req).await;
-                            if let Err(err) = reply_channel.send(res) {
-                                log::error!("Orchestrator channel error in SPAWN: {:?}", err);
-                            }
-                        }
-                        crate::orchestrator::OrchestratorRequest::StopFunction(lid) => {
-                            log::debug!("Orchestrator StopFunction {:?}", lid);
-                            self.stop_function_lid(lid).await;
-                        }
-                        crate::orchestrator::OrchestratorRequest::StartResource(start_req, reply_channel) => {
-                            log::debug!("Orchestrator StartResource {:?}", &start_req);
-                            let res = self.start_resource(start_req.clone(), uuid::Uuid::new_v4()).await;
-                            if let Err(err) = reply_channel.send(res) {
-                                log::error!("Orchestrator channel error in STARTRESOURCE: {:?}", err);
-                            }
-                        }
-                        crate::orchestrator::OrchestratorRequest::StopResource(lid) => {
-                            log::debug!("Orchestrator StopResource {:?}", lid);
-                            self.stop_resource_lid(lid).await;
-                        }
-                        crate::orchestrator::OrchestratorRequest::Patch(update) => {
-                            log::debug!("Orchestrator Patch {:?}", update);
-                            self.patch(update).await;
-                        }
-                        crate::orchestrator::OrchestratorRequest::AddNode(new_node_data) => {
-                            log::debug!("Orchestrator AddNode {:?}", new_node_data);
-                            self.add_node(new_node_data).await;
-                            self.update_domain().await;
-                        }
-                        crate::orchestrator::OrchestratorRequest::DelNode(node_id) => {
-                            log::debug!("Orchestrator DelNode {:?}", node_id);
-                            self.del_node(node_id).await;
-                            self.update_domain().await;
-                        }
+        while let Some(req) = self.receiver.next().await {
+            match req {
+                crate::orchestrator::OrchestratorRequest::StartFunction(spawn_req, reply_channel) => {
+                    log::debug!("Orchestrator StartFunction {}", spawn_req.code.to_short_string());
+                    let res = self.start_function(&spawn_req).await;
+                    if let Err(err) = reply_channel.send(res) {
+                        log::error!("Orchestrator channel error in SPAWN: {:?}", err);
                     }
                 }
-                Some(req) = self.internal_receiver.next() => {
-                    match req {
-                        crate::orchestrator::InternalRequest::Poll() => {
-                            self.check_status().await;
-                        }
+                crate::orchestrator::OrchestratorRequest::StopFunction(lid) => {
+                    log::debug!("Orchestrator StopFunction {:?}", lid);
+                    self.stop_function_lid(lid).await;
+                }
+                crate::orchestrator::OrchestratorRequest::StartResource(start_req, reply_channel) => {
+                    log::debug!("Orchestrator StartResource {:?}", &start_req);
+                    let res = self.start_resource(start_req.clone(), uuid::Uuid::new_v4()).await;
+                    if let Err(err) = reply_channel.send(res) {
+                        log::error!("Orchestrator channel error in STARTRESOURCE: {:?}", err);
                     }
                 }
-
+                crate::orchestrator::OrchestratorRequest::StopResource(lid) => {
+                    log::debug!("Orchestrator StopResource {:?}", lid);
+                    self.stop_resource_lid(lid).await;
+                }
+                crate::orchestrator::OrchestratorRequest::Patch(update) => {
+                    log::debug!("Orchestrator Patch {:?}", update);
+                    self.patch(update).await;
+                }
+                crate::orchestrator::OrchestratorRequest::AddNode(node_id, client_desc, resource_providers) => {
+                    log::debug!("Orchestrator AddNode {}", client_desc.to_string_short());
+                    self.add_node(node_id, client_desc, resource_providers).await;
+                    self.update_domain().await;
+                }
+                crate::orchestrator::OrchestratorRequest::DelNode(node_id) => {
+                    log::debug!("Orchestrator DelNode {:?}", node_id);
+                    self.del_node(node_id).await;
+                    self.update_domain().await;
+                }
+                crate::orchestrator::OrchestratorRequest::Refresh() => {
+                    self.refresh().await;
+                }
             }
         }
     }
@@ -655,24 +643,15 @@ impl OrchestratorTask {
         ret
     }
 
-    async fn add_node(&mut self, new_node_data: crate::orchestrator::NewNodeData) {
-        // Return immediately if the node has an invalid agent URL.
-        let (proto, host, port) = match edgeless_api::util::parse_http_host(&new_node_data.agent_url) {
-            Ok((proto, host, url)) => (proto, host, url),
-            Err(err) => {
-                log::error!(
-                    "Invalid agent URL '{}' for node '{}': {}",
-                    new_node_data.agent_url,
-                    new_node_data.node_id,
-                    err
-                );
-                return;
-            }
-        };
-
+    async fn add_node(
+        &mut self,
+        node_id: uuid::Uuid,
+        client_desc: crate::client_desc::ClientDesc,
+        resource_providers: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
+    ) {
         // Create the resource configuration APIs.
-        for resource in &new_node_data.resource_providers {
-            log::info!("New resource advertised by node {}: {}", new_node_data.node_id, resource);
+        for resource in resource_providers {
+            log::info!("New resource advertised by node {}: {}", node_id, resource);
 
             if self.resource_providers.contains_key(&resource.provider_id) {
                 log::warn!(
@@ -684,7 +663,7 @@ impl OrchestratorTask {
                     resource.provider_id.clone(),
                     crate::resource_provider::ResourceProvider {
                         class_type: resource.class_type.clone(),
-                        node_id: new_node_data.node_id,
+                        node_id: node_id.clone(),
                         outputs: resource.outputs.clone(),
                     },
                 );
@@ -692,23 +671,10 @@ impl OrchestratorTask {
         }
 
         // Create the node's descriptor, with associated client.
-        log::info!("New node {}", new_node_data.to_string_short());
+        log::info!("New node ID {} {}", node_id, client_desc.to_string_short());
 
-        self.nodes.insert(
-            new_node_data.node_id,
-            crate::client_desc::ClientDesc {
-                agent_url: new_node_data.agent_url.clone(),
-                invocation_url: new_node_data.invocation_url.clone(),
-                api: match proto {
-                    edgeless_api::util::Proto::COAP => {
-                        let addr = std::net::SocketAddrV4::new(host.parse().unwrap(), port);
-                        Box::new(edgeless_api::coap_impl::CoapClient::new(addr).await)
-                    }
-                    _ => Box::new(edgeless_api::grpc_impl::outer::agent::AgentAPIClient::new(&new_node_data.agent_url)),
-                },
-                capabilities: new_node_data.capabilities,
-            },
-        );
+        let invocation_url = client_desc.invocation_url.clone();
+        self.nodes.insert(node_id, client_desc);
 
         // Update all the peers, including the new node.
         let mut num_failures: u32 = 0;
@@ -716,10 +682,7 @@ impl OrchestratorTask {
             if client
                 .api
                 .node_management_api()
-                .update_peers(edgeless_api::node_management::UpdatePeersRequest::Add(
-                    new_node_data.node_id,
-                    new_node_data.invocation_url.clone(),
-                ))
+                .update_peers(edgeless_api::node_management::UpdatePeersRequest::Add(node_id, invocation_url.clone()))
                 .await
                 .is_err()
             {
@@ -730,12 +693,12 @@ impl OrchestratorTask {
         // Update the new node by adding as peers all the existing nodes.
         let mut new_node_client = self
             .nodes
-            .get_mut(&new_node_data.node_id)
+            .get_mut(&node_id)
             .expect("New node added just vanished")
             .api
             .node_management_api();
         for (other_node_id, client_desc) in self.nodes.iter_mut() {
-            if other_node_id.eq(&new_node_data.node_id) {
+            if other_node_id.eq(&node_id) {
                 continue;
             }
             if new_node_client
@@ -754,7 +717,7 @@ impl OrchestratorTask {
             log::error!(
                 "There have been failures ({}) when updating the peers following the addition of node '{}', the data plane may not work properly",
                 num_failures,
-                new_node_data.node_id
+                node_id
             );
         }
     }
@@ -809,7 +772,7 @@ impl OrchestratorTask {
         proxy.update_resource_providers(&self.resource_providers);
     }
 
-    async fn check_status(&mut self) {
+    async fn refresh(&mut self) {
         //
         // Make sure that all active logical functions are assigned
         // to one instance: for all the function instances that
