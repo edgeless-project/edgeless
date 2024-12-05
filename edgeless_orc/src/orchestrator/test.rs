@@ -1315,7 +1315,7 @@ async fn test_update_domain_capabilities() {
         match event {
             Some(event) => match event {
                 DomainSubscriberRequest::Update(actual_caps) => {
-                    assert_eq!(expected_caps, actual_caps);
+                    assert_eq!(expected_caps, *actual_caps);
                     num_events += 1;
                 }
                 DomainSubscriberRequest::Refresh() => {

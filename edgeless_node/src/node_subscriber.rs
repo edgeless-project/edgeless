@@ -17,13 +17,9 @@ pub enum NodeSubscriberRequest {
 
 impl NodeSubscriber {
     pub async fn new(
-        node_register_url: String,
-        node_id: uuid::Uuid,
-        agent_url: String,
-        invocation_url: String,
+        settings: crate::EdgelessNodeGeneralSettings,
         resource_providers: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
         capabilities: edgeless_api::node_registration::NodeCapabilities,
-        subscription_refresh_interval_sec: u64,
         telemetry_performance_target: edgeless_telemetry::performance_target::PerformanceTargetInner,
     ) -> (
         Self,
@@ -35,15 +31,12 @@ impl NodeSubscriber {
         let mut rng = rand::thread_rng();
         let counter = rand::distributions::Uniform::from(0..u64::MAX).sample(&mut rng);
 
+        let subscription_refresh_interval_sec = settings.subscription_refresh_interval_sec;
         let main_task = Box::pin(async move {
             Self::main_task(
-                node_register_url,
-                node_id,
-                agent_url,
-                invocation_url,
+                settings,
                 resource_providers,
                 capabilities,
-                subscription_refresh_interval_sec,
                 counter,
                 receiver,
                 telemetry_performance_target,
@@ -68,17 +61,25 @@ impl NodeSubscriber {
     }
 
     async fn main_task(
-        node_register_url: String,
-        node_id: uuid::Uuid,
-        agent_url: String,
-        invocation_url: String,
+        settings: crate::EdgelessNodeGeneralSettings,
         resource_providers: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
         capabilities: edgeless_api::node_registration::NodeCapabilities,
-        subscription_refresh_interval_sec: u64,
         counter: u64,
         receiver: futures::channel::mpsc::UnboundedReceiver<NodeSubscriberRequest>,
         telemetry_performance_target: edgeless_telemetry::performance_target::PerformanceTargetInner,
     ) {
+        let node_register_url = settings.node_register_url;
+        let node_id = settings.node_id;
+        let agent_url = match settings.agent_url_announced.is_empty() {
+            true => settings.agent_url.clone(),
+            false => settings.agent_url_announced.clone(),
+        };
+        let invocation_url = match settings.invocation_url_announced.is_empty() {
+            true => settings.invocation_url.clone(),
+            false => settings.invocation_url_announced.clone(),
+        };
+        let subscription_refresh_interval_sec = settings.subscription_refresh_interval_sec;
+
         let mut receiver = receiver;
         let mut client = edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIClient::new(node_register_url).await;
         let mut telemetry_performance_target = telemetry_performance_target;
@@ -103,7 +104,7 @@ impl NodeSubscriber {
                     // to reduce the likelihood of a race condition on the
                     // register side.
                     let update_node_request = edgeless_api::node_registration::UpdateNodeRequest {
-                        node_id: node_id.clone(),
+                        node_id,
                         invocation_url: invocation_url.clone(),
                         agent_url: agent_url.clone(),
                         resource_providers: resource_providers.clone(),

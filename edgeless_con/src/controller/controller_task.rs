@@ -177,7 +177,7 @@ impl ControllerTask {
                 break;
             }
 
-            res = self.start_workflow_function_in_domain(&wf_id, function, &target_domain).await;
+            res = self.start_workflow_function_in_domain(&wf_id, function, target_domain).await;
         }
 
         // Start the resources on the orchestration domain.
@@ -187,7 +187,7 @@ impl ControllerTask {
                 break;
             }
 
-            res = self.start_workflow_resource_in_domain(&wf_id, resource, &target_domain).await;
+            res = self.start_workflow_resource_in_domain(&wf_id, resource, target_domain).await;
         }
 
         //
@@ -214,7 +214,7 @@ impl ControllerTask {
 
                 let component_type = self.active_workflows.get_mut(&wf_id).unwrap().component_type(component_name).unwrap();
                 res = self
-                    .patch_outputs(&target_domain, origin_fid, component_type, output_mapping, component_name)
+                    .patch_outputs(target_domain, origin_fid, component_type, output_mapping, component_name)
                     .await;
             }
         }
@@ -434,8 +434,8 @@ impl ControllerTask {
             log::info!("Removing domain '{}' because it is stale", stale_domain);
             self.orchestrators.remove(&stale_domain);
 
-            for (_wf_id, workflow) in &mut self.active_workflows {
-                for (_name, component) in &mut workflow.domain_mapping {
+            for workflow in &mut self.active_workflows.values_mut() {
+                for component in workflow.domain_mapping.values_mut() {
                     if component.domain_id == stale_domain {
                         component.domain_id.clear();
                     }
@@ -477,7 +477,7 @@ impl ControllerTask {
     ) -> Vec<String> {
         let mut ret = vec![];
         for (domain_id, desc) in orchestrators {
-            if Self::is_compatible(&desc, workflow_request) {
+            if Self::is_compatible(desc, workflow_request) {
                 ret.push(domain_id.clone());
             }
         }

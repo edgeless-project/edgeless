@@ -192,7 +192,7 @@ impl OrchestratorTask {
         };
 
         // Stop all the function instances associated with this LID.
-        self.stop_function_lid(lid.clone()).await;
+        self.stop_function_lid(*lid).await;
 
         // Filter out the unfeasible targets.
         let targets = self.orchestration_logic.feasible_nodes(&spawn_req, targets);
@@ -415,11 +415,10 @@ impl OrchestratorTask {
         let lid = uuid::Uuid::new_v4();
 
         // Select the target node.
-        match self.select_node(&spawn_req) {
+        match self.select_node(spawn_req) {
             Ok(node_id) => {
                 // Start the function instance.
-                let res = self.start_function_in_node(&spawn_req, &lid, &node_id).await;
-                res
+                self.start_function_in_node(spawn_req, &lid, &node_id).await
             }
             Err(err) => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                 edgeless_api::common::ResponseError {
@@ -685,7 +684,7 @@ impl OrchestratorTask {
                     resource.provider_id.clone(),
                     crate::resource_provider::ResourceProvider {
                         class_type: resource.class_type.clone(),
-                        node_id: new_node_data.node_id.clone(),
+                        node_id: new_node_data.node_id,
                         outputs: resource.outputs.clone(),
                     },
                 );
@@ -796,7 +795,9 @@ impl OrchestratorTask {
         // Notify the domain register of the updated capabilities.
         let _ = self
             .subscriber_sender
-            .send(super::domain_subscriber::DomainSubscriberRequest::Update(new_domain_capabilities))
+            .send(super::domain_subscriber::DomainSubscriberRequest::Update(Box::new(
+                new_domain_capabilities,
+            )))
             .await;
 
         // Update the orchestration logic.
