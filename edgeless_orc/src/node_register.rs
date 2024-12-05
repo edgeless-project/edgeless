@@ -77,7 +77,7 @@ impl NodeRegister {
                         let mut stale_nodes = vec![];
                         for (uuid, entry) in &registered {
                             if std::time::SystemTime::now() > entry.refresh_deadline {
-                                stale_nodes.push(uuid.clone());
+                                stale_nodes.push(*uuid);
                             }
                         }
 
