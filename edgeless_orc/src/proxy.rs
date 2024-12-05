@@ -1,8 +1,6 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
-use crate::orchestrator;
-
 #[derive(Clone)]
 pub enum Instance {
     Function(edgeless_api::function_instance::ComponentId),
@@ -12,13 +10,13 @@ pub enum Instance {
 #[async_trait::async_trait]
 pub trait Proxy: Sync + Send {
     /// Update the info on the currently actives nodes as given.
-    fn update_nodes(&mut self, nodes: &std::collections::HashMap<uuid::Uuid, super::orchestrator::ClientDesc>);
+    fn update_nodes(&mut self, nodes: &std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>);
 
     /// Update the info on the resource providers.
-    fn update_resource_providers(&mut self, resource_providers: &std::collections::HashMap<String, super::orchestrator::ResourceProvider>);
+    fn update_resource_providers(&mut self, resource_providers: &std::collections::HashMap<String, crate::resource_provider::ResourceProvider>);
 
     /// Update the active instances (functions and resources).
-    fn update_active_instances(&mut self, active_instances: &std::collections::HashMap<uuid::Uuid, super::orchestrator::ActiveInstance>);
+    fn update_active_instances(&mut self, active_instances: &std::collections::HashMap<uuid::Uuid, crate::active_instance::ActiveInstance>);
 
     /// Update the dependency graph.
     fn update_dependency_graph(&mut self, dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>);
@@ -30,10 +28,10 @@ pub trait Proxy: Sync + Send {
     fn push_performance_samples(&mut self, node_id: &uuid::Uuid, performance_samples: edgeless_api::node_registration::NodePerformanceSamples);
 
     /// Add deployment intents.
-    fn add_deploy_intents(&mut self, intents: Vec<orchestrator::DeployIntent>);
+    fn add_deploy_intents(&mut self, intents: Vec<crate::deploy_intent::DeployIntent>);
 
     /// Retrieve the pending deploy intents. Consume the intents retrieved.
-    fn retrieve_deploy_intents(&mut self) -> Vec<super::orchestrator::DeployIntent>;
+    fn retrieve_deploy_intents(&mut self) -> Vec<crate::deploy_intent::DeployIntent>;
 
     /// Fetch the nodes' capabilities.
     fn fetch_node_capabilities(
