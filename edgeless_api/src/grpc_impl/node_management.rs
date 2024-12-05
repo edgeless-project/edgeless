@@ -2,11 +2,13 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
+
 use std::str::FromStr;
 
 #[derive(Clone)]
 pub struct NodeManagementClient {
-    client: crate::grpc_impl::api::node_management_client::NodeManagementClient<tonic::transport::Channel>,
+    client: Option<crate::grpc_impl::api::node_management_client::NodeManagementClient<tonic::transport::Channel>>,
+    server_addr: String,
 }
 
 pub struct NodeManagementAPIService {
@@ -14,34 +16,52 @@ pub struct NodeManagementAPIService {
 }
 
 impl NodeManagementClient {
-    pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
-        loop {
-            match crate::grpc_impl::api::node_management_client::NodeManagementClient::connect(server_addr.to_string()).await {
+    pub fn new(server_addr: String) -> Self {
+        Self { client: None, server_addr }
+    }
+
+    /// Try connecting, if not already connected.
+    ///
+    /// If an error is returned, then the client is set to None (disconnected).
+    /// Otherwise, the client is set to some value (connected).
+    async fn try_connect(&mut self) -> anyhow::Result<()> {
+        if self.client.is_none() {
+            self.client = match crate::grpc_impl::api::node_management_client::NodeManagementClient::connect(self.server_addr.clone()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    return Ok(Self { client });
+                    Some(client)
                 }
-                Err(err) => match retry_interval {
-                    Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
-                    None => {
-                        return Err(anyhow::anyhow!("Error when connecting to {}: {}", server_addr, err));
-                    }
-                },
+                Err(err) => anyhow::bail!(err),
             }
         }
+        Ok(())
+    }
+
+    /// Disconnect the client.
+    fn disconnect(&mut self) {
+        self.client = None;
     }
 }
 
 #[async_trait::async_trait]
 impl crate::node_management::NodeManagementAPI for NodeManagementClient {
     async fn update_peers(&mut self, request: crate::node_management::UpdatePeersRequest) -> anyhow::Result<()> {
-        match self
-            .client
-            .update_peers(tonic::Request::new(serialize_update_peers_request(&request)))
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while updating peers: {}", err.to_string())),
+        match self.try_connect().await {
+            Ok(_) => {
+                if let Some(client) = &mut self.client {
+                    if let Err(err) = client.update_peers(tonic::Request::new(serialize_update_peers_request(&request))).await {
+                        self.disconnect();
+                        anyhow::bail!("Error when updating peers at {}: {}", self.server_addr, err.to_string());
+                    } else {
+                        Ok(())
+                    }
+                } else {
+                    panic!("The impossible happened");
+                }
+            }
+            Err(err) => {
+                anyhow::bail!("Error when connecting to {}: {}", self.server_addr, err);
+            }
         }
     }
 }
