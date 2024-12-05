@@ -3,8 +3,6 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::outer::orc::OrchestratorAPI;
-use futures::Future;
 use resources::resource_provider_specs::ResourceProviderSpecs;
 
 pub mod agent;
@@ -261,50 +259,6 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
             .unwrap_or((crate::gpu_info::get_mem_size_gpu() / (1024)) as u32),
     }
 }
-
-// XXX
-// pub async fn register_node(
-//     settings: EdgelessNodeGeneralSettings,
-//     capabilities: edgeless_api::node_registration::NodeCapabilities,
-//     resource_provider_specifications: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
-// ) {
-//     log::info!(
-//         "Registering this node '{}' on e-ORC {}, capabilities: {}",
-//         &settings.node_id,
-//         &settings.node_register_url,
-//         capabilities
-//     );
-//     match edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&settings.node_register_url).await {
-//         Ok(mut orc_client) => match orc_client
-//             .node_registration_api()
-//             .update_node(edgeless_api::node_registration::UpdateNodeRequest::Registration(
-//                 settings.node_id,
-//                 match settings.agent_url_announced.is_empty() {
-//                     true => settings.agent_url.clone(),
-//                     false => settings.agent_url_announced.clone(),
-//                 },
-//                 match settings.invocation_url_announced.is_empty() {
-//                     true => settings.invocation_url.clone(),
-//                     false => settings.invocation_url_announced.clone(),
-//                 },
-//                 resource_provider_specifications,
-//                 capabilities,
-//             ))
-//             .await
-//         {
-//             Ok(res) => match res {
-//                 edgeless_api::node_registration::UpdateNodeResponse::ResponseError(err) => {
-//                     panic!("could not register to e-ORC {}: {}", &settings.node_register_url, err)
-//                 }
-//                 edgeless_api::node_registration::UpdateNodeResponse::Accepted => {
-//                     log::info!("this node '{}' registered to e-ORC '{}'", &settings.node_id, &settings.node_register_url)
-//                 }
-//             },
-//             Err(err) => panic!("channel error when registering to e-ORC {}: {}", &settings.node_register_url, err),
-//         },
-//         Err(err) => panic!("could not connect to e-ORC {}: {}", &settings.node_register_url, err),
-//     }
-// }
 
 async fn fill_resources(
     data_plane: edgeless_dataplane::handle::DataplaneProvider,
@@ -695,14 +649,28 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     // Create the agent.
     let runtimes = runners.keys().map(|x| x.to_string()).collect::<Vec<String>>();
-    let (mut agent, agent_task) = agent::Agent::new(
-        runners,
-        resources,
-        settings.general.node_id,
-        data_plane.clone(),
-        telemetry_performance_target,
-    );
+    let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.general.node_id, data_plane.clone());
     let agent_api_server = edgeless_api::grpc_impl::outer::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
+
+    // Create the component that subscribes to the node register to
+    // notify updates (periodically refreshed).
+    let (_subscriber, subscriber_task, refresh_task) = node_subscriber::NodeSubscriber::new(
+        settings.general.node_register_url.clone(),
+        settings.general.node_id.clone(),
+        match settings.general.agent_url_announced.is_empty() {
+            true => settings.general.agent_url.clone(),
+            false => settings.general.agent_url_announced.clone(),
+        },
+        match settings.general.invocation_url_announced.is_empty() {
+            true => settings.general.invocation_url.clone(),
+            false => settings.general.invocation_url_announced.clone(),
+        },
+        resource_provider_specifications.clone(),
+        get_capabilities(runtimes, settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
+        settings.general.subscription_refresh_interval_sec,
+        telemetry_performance_target,
+    )
+    .await;
 
     // Wait for all the tasks to complete.
     let _ = futures::join!(
@@ -710,12 +678,8 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         container_runtime_task,
         agent_task,
         agent_api_server,
-        // XXX
-        // register_node(
-        //     settings.general,
-        //     get_capabilities(runtimes, settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
-        //     resource_provider_specifications
-        // )
+        subscriber_task,
+        refresh_task,
     );
 }
 
@@ -725,14 +689,13 @@ pub fn edgeless_node_default_conf() -> String {
     format!(
         "[general]\nnode_id = \"{}\"\n{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}disk_tot_space = {}\nnum_gpus = {}\nmodel_name_gpu = \"{}\"\nmem_size_gpu = {}{}",
         uuid::Uuid::new_v4(),
-        r##"
-agent_url = "http://0.0.0.0:7021"
+        r##"agent_url = "http://0.0.0.0:7021"
 agent_url_announced = "http://127.0.0.1:7021"
 invocation_url = "http://0.0.0.0:7002"
 invocation_url_announced = "http://127.0.0.1:7002"
 invocation_url_coap = "coap://127.0.0.1:7002"
 invocation_url_announced_coap = ""
-node_register_url = "http://127.0.0.1:7011"
+node_register_url = "http://127.0.0.1:7012"
 subscription_refresh_interval_sec = 10
 
 [telemetry]

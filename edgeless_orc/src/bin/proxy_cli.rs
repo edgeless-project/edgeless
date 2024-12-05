@@ -133,7 +133,7 @@ fn main() -> anyhow::Result<()> {
                     Ok(node_id) => node_id,
                     Err(err) => anyhow::bail!("invalid instance id {}: {}", node, err),
                 };
-                proxy.add_deploy_intents(vec![edgeless_orc::orchestrator::DeployIntent::Migrate(instance_id, vec![node_id])]);
+                proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Migrate(instance_id, vec![node_id])]);
             }
         },
         Commands::Dump { dump_command } => match dump_command {

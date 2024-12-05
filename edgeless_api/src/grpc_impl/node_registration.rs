@@ -56,7 +56,7 @@ impl crate::node_registration::NodeRegistrationAPI for NodeRegistrationClient {
                         Ok(res) => parse_update_node_response(&res.into_inner()),
                         Err(err) => {
                             self.disconnect();
-                            Err(anyhow::anyhow!("Error when updating a note at {}: {}", self.server_addr, err.to_string()))
+                            Err(anyhow::anyhow!("Error when updating a node at {}: {}", self.server_addr, err.to_string()))
                         }
                     }
                 } else {

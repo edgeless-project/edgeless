@@ -27,7 +27,7 @@ impl Default for StateSpecification {
     }
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Default)]
 pub struct FunctionClassSpecification {
     /// Function class identifier.
     pub function_class_id: String,
@@ -42,15 +42,12 @@ pub struct FunctionClassSpecification {
     pub function_class_outputs: Vec<String>,
 }
 
-impl Default for FunctionClassSpecification {
-    fn default() -> Self {
-        Self {
-            function_class_id: "".to_string(),
-            function_class_type: "".to_string(),
-            function_class_version: "".to_string(),
-            function_class_code: vec![],
-            function_class_outputs: vec![],
-        }
+impl FunctionClassSpecification {
+    pub fn to_short_string(&self) -> String {
+        format!(
+            "run-time {} class {} version {}",
+            self.function_class_type, self.function_class_id, self.function_class_version
+        )
     }
 }
 
