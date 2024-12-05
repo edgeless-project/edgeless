@@ -45,8 +45,8 @@ impl OrchestrationLogic {
 
     pub fn update_nodes(
         &mut self,
-        clients: &std::collections::HashMap<uuid::Uuid, crate::orchestrator::ClientDesc>,
-        resource_providers: &std::collections::HashMap<String, crate::orchestrator::ResourceProvider>,
+        clients: &std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>,
+        resource_providers: &std::collections::HashMap<String, crate::resource_provider::ResourceProvider>,
     ) {
         // Refresh the nodes and weights data structures with the current set of nodes and their capabilities.
         self.nodes.clear();
@@ -88,7 +88,7 @@ impl OrchestrationLogic {
             if let Some(ndx) = self.nodes.iter().position(|&x| x == *candidate) {
                 if OrchestrationLogic::is_node_feasible(
                     &spawn_req.code.function_class_type,
-                    &crate::orchestrator::DeploymentRequirements::from_annotations(&spawn_req.annotations),
+                    &crate::deployment_requirements::DeploymentRequirements::from_annotations(&spawn_req.annotations),
                     &self.nodes[ndx],
                     &self.capabilities[ndx],
                     &self.resource_providers[ndx],
@@ -106,7 +106,7 @@ impl OrchestrationLogic {
     /// given UUID and capabilities.
     pub fn is_node_feasible(
         runtime: &str,
-        reqs: &crate::orchestrator::DeploymentRequirements,
+        reqs: &crate::deployment_requirements::DeploymentRequirements,
         node_id: &uuid::Uuid,
         capabilities: &edgeless_api::node_registration::NodeCapabilities,
         resource_providers: &std::collections::HashSet<String>,
@@ -128,20 +128,20 @@ impl OrchestrationLogic {
             }
         }
         match reqs.tee {
-            crate::orchestrator::AffinityLevel::Required => {
+            crate::affinity_level::AffinityLevel::Required => {
                 if !capabilities.is_tee_running {
                     return false;
                 }
             }
-            crate::orchestrator::AffinityLevel::NotRequired => {}
+            crate::affinity_level::AffinityLevel::NotRequired => {}
         }
         match reqs.tpm {
-            crate::orchestrator::AffinityLevel::Required => {
+            crate::affinity_level::AffinityLevel::Required => {
                 if !capabilities.has_tpm {
                     return false;
                 }
             }
-            crate::orchestrator::AffinityLevel::NotRequired => {}
+            crate::affinity_level::AffinityLevel::NotRequired => {}
         }
         true
     }
@@ -154,7 +154,7 @@ impl OrchestrationLogic {
         if self.nodes.is_empty() {
             return None;
         }
-        let reqs = crate::orchestrator::DeploymentRequirements::from_annotations(&spawn_req.annotations);
+        let reqs = crate::deployment_requirements::DeploymentRequirements::from_annotations(&spawn_req.annotations);
         match self.orchestration_strategy {
             crate::OrchestrationStrategy::Random => {
                 // Select only the nodes that are feasible.

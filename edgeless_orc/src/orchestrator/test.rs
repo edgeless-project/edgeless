@@ -3,12 +3,14 @@
 
 #![allow(clippy::all)]
 
+use crate::affinity_level::AffinityLevel;
+use crate::deployment_requirements::DeploymentRequirements;
+use crate::domain_subscriber::DomainSubscriberRequest;
 use edgeless_api::function_instance::{FunctionClassSpecification, StatePolicy, StateSpecification};
 use futures::channel::mpsc::UnboundedReceiver;
 
-use crate::domain_subscriber::DomainSubscriberRequest;
-
 use super::*;
+
 enum MockAgentEvent {
     StartFunction(
         (
@@ -138,8 +140,8 @@ fn test_create_clients_resources(
     num_resources_per_node: u32,
 ) -> (
     std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>,
-    std::collections::HashMap<uuid::Uuid, ClientDesc>,
-    std::collections::HashMap<String, ResourceProvider>,
+    std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>,
+    std::collections::HashMap<String, crate::resource_provider::ResourceProvider>,
     uuid::Uuid,
 ) {
     assert!(num_nodes > 0);
@@ -161,7 +163,7 @@ fn test_create_clients_resources(
         nodes.insert(node_id, mock_node_receiver);
         clients.insert(
             node_id,
-            ClientDesc {
+            crate::client_desc::ClientDesc {
                 agent_url: "".to_string(),
                 invocation_url: "".to_string(),
                 api: Box::new(MockNode {
@@ -174,7 +176,7 @@ fn test_create_clients_resources(
         for provider_i in 0..num_resources_per_node {
             resource_providers.insert(
                 format!("node-{}-resource-{}-provider", node_i, provider_i),
-                ResourceProvider {
+                crate::resource_provider::ResourceProvider {
                     class_type: "rc-1".to_string(),
                     node_id,
                     outputs: vec![],

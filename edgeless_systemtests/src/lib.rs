@@ -583,7 +583,7 @@ mod system_tests {
         let mut intents = vec![];
         for (logical_fid, nodes) in &instances {
             assert!(nodes.len() == 1);
-            intents.push(edgeless_orc::orchestrator::DeployIntent::Migrate(
+            intents.push(edgeless_orc::deploy_intent::DeployIntent::Migrate(
                 *logical_fid,
                 vec![other(nodes.first().unwrap())],
             ));

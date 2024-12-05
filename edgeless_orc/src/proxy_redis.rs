@@ -207,7 +207,7 @@ impl ProxyRedis {
 }
 
 impl super::proxy::Proxy for ProxyRedis {
-    fn update_nodes(&mut self, nodes: &std::collections::HashMap<uuid::Uuid, super::orchestrator::ClientDesc>) {
+    fn update_nodes(&mut self, nodes: &std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>) {
         let timestamp = ProxyRedis::timestamp_now();
 
         // serialize the nodes' capabilities and health status to Redis
@@ -247,7 +247,7 @@ impl super::proxy::Proxy for ProxyRedis {
         self.active_instance_uuids = new_active_instance_uuids;
     }
 
-    fn update_resource_providers(&mut self, resource_providers: &std::collections::HashMap<String, super::orchestrator::ResourceProvider>) {
+    fn update_resource_providers(&mut self, resource_providers: &std::collections::HashMap<String, crate::resource_provider::ResourceProvider>) {
         // serialize the resource providers
         for (provider_id, resource_provider) in resource_providers {
             let _ = self.connection.set::<&str, &str, usize>(
@@ -266,7 +266,7 @@ impl super::proxy::Proxy for ProxyRedis {
         self.resource_provider_ids = new_resource_provider_ids;
     }
 
-    fn update_active_instances(&mut self, active_instances: &std::collections::HashMap<uuid::Uuid, super::orchestrator::ActiveInstance>) {
+    fn update_active_instances(&mut self, active_instances: &std::collections::HashMap<uuid::Uuid, crate::active_instance::ActiveInstance>) {
         let timestamp = ProxyRedis::timestamp_now();
 
         // serialize the active instances
@@ -379,10 +379,10 @@ impl super::proxy::Proxy for ProxyRedis {
         }
     }
 
-    fn add_deploy_intents(&mut self, intents: Vec<super::orchestrator::DeployIntent>) {
+    fn add_deploy_intents(&mut self, intents: Vec<crate::deploy_intent::DeployIntent>) {
         for intent in intents {
             match intent {
-                super::orchestrator::DeployIntent::Migrate(instance, nodes) => {
+                crate::deploy_intent::DeployIntent::Migrate(instance, nodes) => {
                     let key = format!("intent:migrate:{}", instance);
                     let _ = self
                         .connection
@@ -393,7 +393,7 @@ impl super::proxy::Proxy for ProxyRedis {
         }
     }
 
-    fn retrieve_deploy_intents(&mut self) -> Vec<super::orchestrator::DeployIntent> {
+    fn retrieve_deploy_intents(&mut self) -> Vec<crate::deploy_intent::DeployIntent> {
         let mut intents = vec![];
         loop {
             let lpop_res = self.connection.lpop::<&str, Option<String>>("intents", None);
@@ -405,7 +405,7 @@ impl super::proxy::Proxy for ProxyRedis {
                         let _ = self.connection.del::<&str, usize>(&intent_key);
                         match get_res {
                             Ok(intent_value) => match intent_value {
-                                Some(intent_value) => match crate::orchestrator::DeployIntent::new(&intent_key, &intent_value) {
+                                Some(intent_value) => match crate::deploy_intent::DeployIntent::new(&intent_key, &intent_value) {
                                     Ok(intent) => intents.push(intent),
                                     Err(err) => log::warn!("invalid intent value '{}': {}", intent_value, err),
                                 },
@@ -575,7 +575,7 @@ impl super::proxy::Proxy for ProxyRedis {
 mod test {
     use edgeless_api::function_instance::SpawnFunctionRequest;
 
-    use crate::{orchestrator::DeployIntent, proxy::Proxy};
+    use crate::{deploy_intent::DeployIntent, proxy::Proxy};
 
     use super::*;
 
@@ -605,7 +605,7 @@ mod test {
             logical_physical_ids.push((uuid::Uuid::new_v4(), uuid::Uuid::new_v4()));
             active_instances.insert(
                 logical_physical_ids.last().unwrap().0,
-                crate::orchestrator::ActiveInstance::Function(
+                crate::active_instance::ActiveInstance::Function(
                     SpawnFunctionRequest {
                         instance_id: None,
                         code: edgeless_api::function_instance::FunctionClassSpecification {
@@ -633,7 +633,7 @@ mod test {
             logical_physical_ids.push((uuid::Uuid::new_v4(), uuid::Uuid::new_v4()));
             active_instances.insert(
                 logical_physical_ids.last().unwrap().0,
-                crate::orchestrator::ActiveInstance::Resource(
+                crate::active_instance::ActiveInstance::Resource(
                     edgeless_api::resource_configuration::ResourceInstanceSpecification {
                         class_type: "res".to_string(),
                         output_mapping: std::collections::HashMap::new(),

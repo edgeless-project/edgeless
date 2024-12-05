@@ -2,8 +2,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-use edgeless_api::node_management::UpdatePeersRequest;
-use edgeless_dataplane::core::EdgelessDataplanePeerSettings;
+
 use futures::{Future, SinkExt, StreamExt};
 
 #[cfg(test)]
@@ -41,7 +40,6 @@ impl Agent {
         resources: std::collections::HashMap<String, ResourceDesc>,
         node_id: uuid::Uuid,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
-        telemetry_performance_target: edgeless_telemetry::performance_target::PerformanceTargetInner,
     ) -> (Self, std::pin::Pin<Box<dyn Future<Output = ()> + Send>>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
@@ -50,7 +48,7 @@ impl Agent {
         }
 
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, runners, resources, data_plane_provider, telemetry_performance_target).await;
+            Self::main_task(receiver, runners, resources, data_plane_provider).await;
         });
 
         (Agent { sender, node_id }, main_task)
@@ -63,11 +61,9 @@ impl Agent {
         mut runners: std::collections::HashMap<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
         resources: std::collections::HashMap<String, ResourceDesc>,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
-        telemetry_performance_target: edgeless_telemetry::performance_target::PerformanceTargetInner,
     ) {
         let mut receiver = std::pin::pin!(receiver);
         let mut data_plane_provider = data_plane_provider;
-        let mut telemetry_performance_target = telemetry_performance_target;
 
         // key: provider_id
         // value: class_type
@@ -81,15 +77,6 @@ impl Agent {
         // When stopping, only the stop_function_id is provided which does not allow to know which runner it is
         // currently deployed on. Here, we implement a instance_id -> function_class HashMap
         let mut component_id_to_class_map = std::collections::HashMap::<edgeless_api::function_instance::ComponentId, String>::new();
-
-        // Internal data structures to query system/process information.
-        let mut sys = sysinfo::System::new();
-        if !sysinfo::IS_SUPPORTED_SYSTEM {
-            log::warn!("sysinfo does not support (yet) this OS");
-        }
-        let mut networks = sysinfo::Networks::new_with_refreshed_list();
-        let mut disks = sysinfo::Disks::new();
-        let my_pid = sysinfo::Pid::from_u32(std::process::id());
 
         log::info!("Starting Edgeless Agent");
         while let Some(req) = receiver.next().await {
@@ -191,13 +178,13 @@ impl Agent {
                 AgentRequest::UpdatePeers(request) => {
                     log::debug!("Agent UpdatePeers {:?}", request);
                     match request {
-                        UpdatePeersRequest::Add(node_id, invocation_url) => {
+                        edgeless_api::node_management::UpdatePeersRequest::Add(node_id, invocation_url) => {
                             data_plane_provider
-                                .add_peer(EdgelessDataplanePeerSettings { node_id, invocation_url })
+                                .add_peer(edgeless_dataplane::core::EdgelessDataplanePeerSettings { node_id, invocation_url })
                                 .await
                         }
-                        UpdatePeersRequest::Del(node_id) => data_plane_provider.del_peer(node_id).await,
-                        UpdatePeersRequest::Clear => panic!("UpdatePeersRequest::Clear not implemented"),
+                        edgeless_api::node_management::UpdatePeersRequest::Del(node_id) => data_plane_provider.del_peer(node_id).await,
+                        edgeless_api::node_management::UpdatePeersRequest::Clear => panic!("UpdatePeersRequest::Clear not implemented"),
                     };
                 }
                 AgentRequest::SpawnResource(instance_specification, responder) => {
@@ -295,74 +282,7 @@ impl Agent {
                             update.function_id
                         )))
                         .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                } // XXX
-                  // AgentRequest::KeepAlive(responder) => {
-                  //     // Refresh system/process information.
-                  //     sys.refresh_all();
-                  //     networks.refresh();
-                  //     disks.refresh_list();
-                  //     disks.refresh();
-
-                  //     let to_kb = |x| (x / 1024) as i32;
-                  //     let proc = sys.process(my_pid).unwrap();
-                  //     let load_avg = sysinfo::System::load_average();
-                  //     let mut tot_rx_bytes: i64 = 0;
-                  //     let mut tot_rx_pkts: i64 = 0;
-                  //     let mut tot_rx_errs: i64 = 0;
-                  //     let mut tot_tx_bytes: i64 = 0;
-                  //     let mut tot_tx_pkts: i64 = 0;
-                  //     let mut tot_tx_errs: i64 = 0;
-                  //     for (_interface_name, network) in &networks {
-                  //         tot_rx_bytes += network.total_received() as i64;
-                  //         tot_rx_pkts += network.total_packets_received() as i64;
-                  //         tot_rx_errs += network.total_errors_on_received() as i64;
-                  //         tot_tx_bytes += network.total_packets_transmitted() as i64;
-                  //         tot_tx_pkts += network.total_transmitted() as i64;
-                  //         tot_tx_errs += network.total_errors_on_transmitted() as i64;
-                  //     }
-                  //     let mut disk_tot_reads = 0;
-                  //     let mut disk_tot_writes = 0;
-                  //     for process in sys.processes().values() {
-                  //         let disk_usage = process.disk_usage();
-                  //         disk_tot_reads += disk_usage.total_read_bytes as i64;
-                  //         disk_tot_writes += disk_usage.total_written_bytes as i64;
-                  //     }
-                  //     let unique_available_space = disks
-                  //         .iter()
-                  //         .map(|x| (x.name().to_str().unwrap_or_default(), x.total_space()))
-                  //         .collect::<std::collections::BTreeMap<&str, u64>>();
-                  //     let health_status = edgeless_api::node_registration::NodeHealthStatus {
-                  //         mem_free: to_kb(sys.free_memory()),
-                  //         mem_used: to_kb(sys.used_memory()),
-                  //         mem_available: to_kb(sys.available_memory()),
-                  //         proc_cpu_usage: proc.cpu_usage() as i32,
-                  //         proc_memory: to_kb(proc.memory()),
-                  //         proc_vmemory: to_kb(proc.virtual_memory()),
-                  //         load_avg_1: (load_avg.one * 100_f64).round() as i32,
-                  //         load_avg_5: (load_avg.five * 100_f64).round() as i32,
-                  //         load_avg_15: (load_avg.fifteen * 100_f64).round() as i32,
-                  //         tot_rx_bytes,
-                  //         tot_rx_pkts,
-                  //         tot_rx_errs,
-                  //         tot_tx_bytes,
-                  //         tot_tx_pkts,
-                  //         tot_tx_errs,
-                  //         disk_free_space: unique_available_space.values().sum::<u64>() as i64,
-                  //         disk_tot_reads,
-                  //         disk_tot_writes,
-                  //         gpu_load_perc: crate::gpu_info::get_gpu_load(),
-                  //         gpu_temp_cels: (crate::gpu_info::get_gpu_temp() * 1000.0) as i32,
-                  //     };
-                  //     let performance_samples = edgeless_api::node_registration::NodePerformanceSamples {
-                  //         function_execution_times: telemetry_performance_target.get_metrics().function_execution_times,
-                  //     };
-                  //     responder
-                  //         .send(Ok(edgeless_api::node_management::KeepAliveResponse {
-                  //             health_status,
-                  //             performance_samples,
-                  //         }))
-                  //         .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                  // }
+                }
             }
         }
     }

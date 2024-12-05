@@ -9,16 +9,12 @@ pub struct AgentAPIClient {
 }
 
 impl AgentAPIClient {
-    pub async fn new(api_addr: &str) -> Self {
+    pub fn new(api_addr: &str) -> Self {
         Self {
             function_instance_client: Box::new(crate::grpc_impl::function_instance::FunctionInstanceAPIClient::<
                 edgeless_api_core::instance_id::InstanceId,
             >::new(api_addr.to_string())),
-            node_management_client: Box::new(
-                crate::grpc_impl::node_management::NodeManagementClient::new(api_addr, Some(1))
-                    .await
-                    .unwrap(),
-            ),
+            node_management_client: Box::new(crate::grpc_impl::node_management::NodeManagementClient::new(api_addr.to_string())),
             resource_management_client: Box::new(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(
                 api_addr.to_string(),
             )),
