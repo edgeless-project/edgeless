@@ -124,8 +124,8 @@ mod system_tests {
         (handles, con_client.workflow_instance_api())
     }
 
-    async fn wf_list(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> Vec<edgeless_api::workflow_instance::WorkflowInstance> {
-        (client.list(edgeless_api::workflow_instance::WorkflowId::none()).await).unwrap_or_default()
+    async fn wf_list(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> Vec<edgeless_api::workflow_instance::WorkflowId> {
+        (client.list().await).unwrap_or_default()
     }
 
     async fn nodes_in_domain(domain_id: &str, client: &mut Box<(dyn WorkflowInstanceAPI)>) -> u32 {

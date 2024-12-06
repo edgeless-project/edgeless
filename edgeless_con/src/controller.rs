@@ -25,9 +25,13 @@ pub(crate) enum ControllerRequest {
     ),
     Stop(edgeless_api::workflow_instance::WorkflowId),
     List(
+        // Reply Channel
+        tokio::sync::oneshot::Sender<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowId>>>,
+    ),
+    Inspect(
         edgeless_api::workflow_instance::WorkflowId,
         // Reply Channel
-        tokio::sync::oneshot::Sender<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>,
+        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::workflow_instance::WorkflowInfo>>,
     ),
     Domains(
         String,

@@ -316,9 +316,17 @@ message WorkflowId {
     string workflow_id = 1;
 }
 
-// List of workflow instances.
-message WorkflowInstanceList {
-    repeated WorkflowInstanceStatus workflow_statuses = 1;
+// List of workflow identifiers.
+message WorkflowIdList {
+    repeated string identifiers = 1;
+}
+
+// Info about a workflow.
+message WorkflowInstanceInfo {
+    // The workflow spawn request.
+    SpawnWorkflowRequest   request = 1;
+    // The workflow status.
+    WorkflowInstanceStatus status  = 2;   
 }
 
 // Identifier of a domain.

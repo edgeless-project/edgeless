@@ -22,6 +22,7 @@ enum WorkflowCommands {
     Start { spec_file: String },
     Stop { id: String },
     List {},
+    Inspect { id: String },
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -199,26 +200,64 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                     WorkflowCommands::Stop { id } => {
-                        let parsed_id = uuid::Uuid::parse_str(&id)?;
                         match wf_client
-                            .stop(edgeless_api::workflow_instance::WorkflowId { workflow_id: parsed_id })
+                            .stop(edgeless_api::workflow_instance::WorkflowId {
+                                workflow_id: uuid::Uuid::parse_str(&id)?,
+                            })
                             .await
                         {
                             Ok(_) => println!("Workflow Stopped"),
                             Err(err) => println!("{}", err),
                         }
                     }
-                    WorkflowCommands::List {} => match wf_client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
-                        Ok(instances) => {
-                            for instance in instances.iter() {
-                                println!("workflow: {}", instance.workflow_id);
-                                for function in instance.domain_mapping.iter() {
-                                    println!("\t{:?}", function);
-                                }
+                    WorkflowCommands::List {} => match wf_client.list().await {
+                        Ok(identifiers) => {
+                            for wf_id in identifiers {
+                                println!("{}", wf_id);
                             }
                         }
                         Err(err) => println!("{}", err),
                     },
+                    WorkflowCommands::Inspect { id } => {
+                        match wf_client
+                            .inspect(edgeless_api::workflow_instance::WorkflowId {
+                                workflow_id: uuid::Uuid::parse_str(&id)?,
+                            })
+                            .await
+                        {
+                            Ok(info) => {
+                                assert_eq!(id, info.status.workflow_id.to_string());
+                                for fun in info.request.workflow_functions {
+                                    println!("* function {}", fun.name);
+                                    println!("{}", fun.function_class_specification.to_short_string());
+                                    for (out, next) in fun.output_mapping {
+                                        println!("OUT {} -> {}", out, next);
+                                    }
+                                    for (name, annotation) in fun.annotations {
+                                        println!("F_ANN {} -> {}", name, annotation);
+                                    }
+                                }
+                                for res in info.request.workflow_resources {
+                                    println!("* resource {}", res.name);
+                                    println!("{}", res.class_type);
+                                    for (out, next) in res.output_mapping {
+                                        println!("OUT {} -> {}", out, next);
+                                    }
+                                    for (name, annotation) in res.configurations {
+                                        println!("CONF{} -> {}", name, annotation);
+                                    }
+                                }
+                                println!("* mapping");
+                                for (name, annotation) in info.request.annotations {
+                                    println!("W_ANN {} -> {}", name, annotation);
+                                }
+                                for mapping in info.status.domain_mapping {
+                                    println!("MAP {} -> {} [logical ID {}]", mapping.name, mapping.domain_id, mapping.function_id);
+                                }
+                            }
+                            Err(err) => println!("{}", err),
+                        }
+                    }
                 }
             }
             Commands::Function { function_command } => match function_command {

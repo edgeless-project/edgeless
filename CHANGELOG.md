@@ -25,6 +25,8 @@ API changes:
 - Update service NodeRegistration.
 - Move node health status and performance samples from NodeManagement to
   NodeManagement.
+- WorkflowInstance: return the list of workflow identifiers in list(); add new
+  method inspect() to retrieve the workflow details.
 
 ## [1.0.0] - 2024-11-12
 
