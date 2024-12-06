@@ -118,7 +118,7 @@ impl NodeRegister {
                         if add_node {
                             if let Ok(client_desc) = crate::client_desc::ClientDesc::from(&request).await {
                                 let _ = orchestrator_sender.send(crate::orchestrator::OrchestratorRequest::AddNode(
-                                    request.node_id.clone(),
+                                    request.node_id,
                                     client_desc,
                                     request.resource_providers
                                 )).await;

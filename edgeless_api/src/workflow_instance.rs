@@ -6,7 +6,7 @@ use std::str::FromStr;
 
 const WORKFLOW_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, PartialOrd, Ord)]
 pub struct WorkflowId {
     pub workflow_id: uuid::Uuid,
 }

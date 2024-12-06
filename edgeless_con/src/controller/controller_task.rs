@@ -20,7 +20,7 @@ pub struct ControllerTask {
     internal_receiver: futures::channel::mpsc::UnboundedReceiver<super::InternalRequest>,
     orchestrators: std::collections::HashMap<String, OrchestratorDesc>,
     active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::deployment_state::ActiveWorkflow>,
-    orphan_workflows: Vec<edgeless_api::workflow_instance::SpawnWorkflowRequest>,
+    orphan_workflows: std::collections::BTreeMap<edgeless_api::workflow_instance::WorkflowId, edgeless_api::workflow_instance::SpawnWorkflowRequest>,
     rng: rand::rngs::StdRng,
 }
 
@@ -36,7 +36,7 @@ impl ControllerTask {
             internal_receiver,
             orchestrators: std::collections::HashMap::new(),
             active_workflows: std::collections::HashMap::new(),
-            orphan_workflows: vec![],
+            orphan_workflows: std::collections::BTreeMap::new(),
             rng: rand::rngs::StdRng::from_entropy(),
         }
     }
@@ -54,7 +54,7 @@ impl ControllerTask {
             internal_receiver,
             orchestrators,
             active_workflows: std::collections::HashMap::new(),
-            orphan_workflows: vec![],
+            orphan_workflows: std::collections::BTreeMap::new(),
             rng: rand::rngs::StdRng::from_entropy(),
         }
     }
@@ -515,18 +515,22 @@ impl ControllerTask {
                             continue;
                         }
                     }
-                    Err(workflow_request) => self.orphan_workflows.push(workflow_request),
+                    Err(workflow_request) => {
+                        self.orphan_workflows.insert(wf_id, workflow_request);
+                    }
                 }
             }
         }
 
         // Do the same for the workflow requests in the orphan list.
         let mut workflow_requests_fixable = vec![];
-        let mut workflow_requests_unfixable = vec![];
-        while let Some(workflow_request) = self.orphan_workflows.pop() {
+        let mut workflow_requests_unfixable = std::collections::BTreeMap::new();
+        while let Some((wf_id, workflow_request)) = self.orphan_workflows.pop_first() {
             match Self::compatible_domains(&self.orchestrators, &workflow_request).choose(&mut self.rng) {
-                None => workflow_requests_unfixable.push(workflow_request),
-                Some(new_domain) => workflow_requests_fixable.push((new_domain.clone(), workflow_request)),
+                None => {
+                    workflow_requests_unfixable.insert(wf_id, workflow_request);
+                }
+                Some(new_domain) => workflow_requests_fixable.push((new_domain.clone(), wf_id, workflow_request)),
             };
         }
         assert!(self.orphan_workflows.is_empty());
@@ -536,7 +540,7 @@ impl ControllerTask {
         // Try to deploy the orphan workflows to the assigned orchestration
         // domains. If this fails for some workflows, they go back to the
         // orphan list.
-        for (new_domain, workflow_request) in workflow_requests_fixable {
+        for (new_domain, wf_id, workflow_request) in workflow_requests_fixable {
             assert!(!new_domain.is_empty());
             match self.start_workflow(workflow_request).await {
                 Ok(response) => {
@@ -545,7 +549,9 @@ impl ControllerTask {
                         continue;
                     }
                 }
-                Err(workflow_request) => self.orphan_workflows.push(workflow_request),
+                Err(workflow_request) => {
+                    self.orphan_workflows.insert(wf_id, workflow_request);
+                }
             }
         }
     }
