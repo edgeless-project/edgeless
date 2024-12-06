@@ -1251,7 +1251,10 @@ async fn test_recreate_fun_after_disconnect() {
     assert_eq!(Some(&1), num_events.get("patch-function"));
 
     for _ in 0..5 {
-        let _ = orc_sender.send(OrchestratorRequest::Refresh()).await;
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
+        let _ = orc_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
+        let _ = reply_receiver.await;
+
         let mut num_events = std::collections::HashMap::new();
         loop {
             if let Some((_node_id, event)) = wait_for_events_if_any(&mut nodes).await {
