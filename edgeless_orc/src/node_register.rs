@@ -18,7 +18,10 @@ pub enum NodeRegisterRequest {
 }
 
 pub(crate) enum InternalRequest {
-    Poll(),
+    Refresh(
+        // Reply Channel
+        tokio::sync::oneshot::Sender<()>,
+    ),
 }
 
 struct NodeRegisterEntry {
@@ -44,10 +47,11 @@ impl NodeRegister {
 
         let refresh_task = Box::pin(async move {
             let mut sender = internal_sender;
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
             loop {
-                interval.tick().await;
-                let _ = sender.send(InternalRequest::Poll()).await;
+                let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
+                let _ = sender.send(InternalRequest::Refresh(reply_sender)).await;
+                let _ = reply_receiver.await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             }
         });
 
@@ -71,7 +75,7 @@ impl NodeRegister {
             tokio::select! {
             Some(req) = internal_receiver.next() => {
                 match req {
-                    InternalRequest::Poll() => {
+                    InternalRequest::Refresh(reply_sender) => {
                         // Find all nodes that are stale, i.e., which have not been
                         // refreshed by their own indicated deadline.
                         let mut stale_nodes = vec![];
@@ -88,6 +92,8 @@ impl NodeRegister {
 
                             let _ = orchestrator_sender.send(super::orchestrator::OrchestratorRequest::DelNode(stale_node)).await;
                         }
+
+                        let _ = reply_sender.send(());
                     }
                 }
             },

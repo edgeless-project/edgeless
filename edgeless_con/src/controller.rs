@@ -49,7 +49,10 @@ pub(crate) enum DomainRegisterRequest {
 }
 
 pub(crate) enum InternalRequest {
-    Poll(),
+    Refresh(
+        // Reply Channel
+        tokio::sync::oneshot::Sender<()>,
+    ),
 }
 
 #[derive(Clone)]
@@ -73,10 +76,11 @@ impl Controller {
 
         let refresh_task = Box::pin(async move {
             let mut sender = internal_sender;
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
             loop {
-                interval.tick().await;
-                let _ = sender.send(InternalRequest::Poll()).await;
+                let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
+                let _ = sender.send(InternalRequest::Refresh(reply_sender)).await;
+                let _ = reply_receiver.await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             }
         });
 

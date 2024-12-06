@@ -113,8 +113,9 @@ impl ControllerTask {
                 }
                 Some(req) = self.internal_receiver.next() => {
                     match req {
-                        super::InternalRequest::Poll() => {
+                        super::InternalRequest::Refresh(reply_sender) => {
                             self.check_domains().await;
+                            let _ = reply_sender.send(());
                         }
                     }
                 }
