@@ -69,42 +69,41 @@ mod system_tests {
 
             // The first node in each domain is also assigned a file-log resource.
             for node_i in 0..num_nodes_per_domain {
-                let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(match node_i {
-                    0 => edgeless_node::EdgelessNodeSettings {
-                        general: edgeless_node::EdgelessNodeGeneralSettings {
-                            node_id: uuid::Uuid::new_v4(),
-                            agent_url: format!("http://{}:{}", address, next_port()),
-                            agent_url_announced: "".to_string(),
-                            invocation_url: format!("http://{}:{}", address, next_port()),
-                            invocation_url_announced: "".to_string(),
-                            invocation_url_coap: None,
-                            invocation_url_announced_coap: None,
-                            node_register_url: node_register_url.clone(),
-                            subscription_refresh_interval_sec: 2,
-                        },
-                        telemetry: edgeless_node::EdgelessNodeTelemetrySettings {
-                            metrics_url: format!("http://{}:{}", address, next_port()),
-                            log_level: None,
-                            performance_samples: false,
-                        },
-                        wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
-                        container_runtime: None,
-                        resources: Some(edgeless_node::EdgelessNodeResourceSettings {
-                            http_ingress_url: None,
-                            http_ingress_provider: None,
-                            http_egress_provider: None,
-                            file_log_provider: Some("file-log-1".to_string()),
-                            redis_provider: None,
-                            dda_provider: None,
-                            ollama_provider: None,
-                            kafka_egress_provider: None,
-                            metrics_collector_provider: None,
-                        }),
-                        user_node_capabilities: None,
+                let file_log_provider = match node_i {
+                    0 => Some("file-log-1".to_string()),
+                    _ => None,
+                };
+                let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(edgeless_node::EdgelessNodeSettings {
+                    general: edgeless_node::EdgelessNodeGeneralSettings {
+                        node_id: uuid::Uuid::new_v4(),
+                        agent_url: format!("http://{}:{}", address, next_port()),
+                        agent_url_announced: "".to_string(),
+                        invocation_url: format!("http://{}:{}", address, next_port()),
+                        invocation_url_announced: "".to_string(),
+                        invocation_url_coap: None,
+                        invocation_url_announced_coap: None,
+                        node_register_url: node_register_url.clone(),
+                        subscription_refresh_interval_sec: 2,
                     },
-                    _ => {
-                        edgeless_node::EdgelessNodeSettings::new_without_resources(&orchestrator_url, address, next_port(), next_port(), next_port())
-                    }
+                    telemetry: edgeless_node::EdgelessNodeTelemetrySettings {
+                        metrics_url: format!("http://{}:{}", address, next_port()),
+                        log_level: None,
+                        performance_samples: false,
+                    },
+                    wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
+                    container_runtime: None,
+                    resources: Some(edgeless_node::EdgelessNodeResourceSettings {
+                        http_ingress_url: None,
+                        http_ingress_provider: None,
+                        http_egress_provider: None,
+                        file_log_provider,
+                        redis_provider: None,
+                        dda_provider: None,
+                        ollama_provider: None,
+                        kafka_egress_provider: None,
+                        metrics_collector_provider: None,
+                    }),
+                    user_node_capabilities: None,
                 }));
                 tokio::spawn(task);
                 handles.push(handle);
@@ -370,7 +369,7 @@ mod system_tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn system_test_three_domains_simple() -> anyhow::Result<()> {
-        let _ = env_logger::try_init();
+        // let _ = env_logger::try_init();
 
         // Create the EDGELESS system.
         let (handles, mut client) = setup(3, 1, None).await;

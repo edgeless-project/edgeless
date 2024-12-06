@@ -7,7 +7,7 @@ use crate::affinity_level::AffinityLevel;
 use crate::deployment_requirements::DeploymentRequirements;
 use crate::domain_subscriber::DomainSubscriberRequest;
 use edgeless_api::function_instance::{FunctionClassSpecification, StatePolicy, StateSpecification};
-use futures::channel::mpsc::UnboundedReceiver;
+use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use super::*;
 
@@ -31,8 +31,6 @@ enum MockAgentEvent {
     StopResource(edgeless_api::function_instance::InstanceId),
     PatchResource(edgeless_api::common::PatchRequest),
 }
-
-static FAILING_NODES: std::sync::OnceLock<std::sync::Mutex<std::collections::HashSet<uuid::Uuid>>> = std::sync::OnceLock::new();
 
 struct MockNode {
     node_id: uuid::Uuid,
@@ -99,16 +97,6 @@ impl edgeless_api::node_management::NodeManagementAPI for MockAgentAPI {
         self.sender.send(MockAgentEvent::UpdatePeers(request)).await.unwrap();
         Ok(())
     }
-    // XXX
-    // async fn keep_alive(&mut self) -> anyhow::Result<edgeless_api::node_management::KeepAliveResponse> {
-    //     self.sender.send(MockAgentEvent::KeepAlive()).await.unwrap();
-
-    //     if FAILING_NODES.get().unwrap().lock().unwrap().contains(&self.node_id) {
-    //         Err(anyhow::anyhow!("node {} failed", self.node_id))
-    //     } else {
-    //         Ok(edgeless_api::node_management::KeepAliveResponse::empty())
-    //     }
-    // }
 }
 
 #[async_trait::async_trait]
@@ -202,8 +190,9 @@ async fn test_setup(
     std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>,
     uuid::Uuid,
     UnboundedReceiver<DomainSubscriberRequest>,
+    UnboundedSender<OrchestratorRequest>,
 ) {
-    let (nodes, client_descs_resources, stable_node_id) = test_create_clients_resources(num_nodes, num_resources_per_node);
+    let (mut nodes, client_descs_resources, stable_node_id) = test_create_clients_resources(num_nodes, num_resources_per_node);
     let (subscriber_sender, subscriber_receiver) = futures::channel::mpsc::unbounded();
 
     let (mut orchestrator, orchestrator_task, _refresh_task) = Orchestrator::new(
@@ -223,12 +212,15 @@ async fn test_setup(
             .await;
     }
 
+    clear_events(&mut nodes).await;
+
     (
         orchestrator.get_api_client().function_instance_api(),
         orchestrator.get_api_client().resource_configuration_api(),
         nodes,
         stable_node_id,
         subscriber_receiver,
+        orchestrator.get_sender(),
     )
 }
 
@@ -280,6 +272,16 @@ async fn wait_for_event_multiple(
     panic!("timeout while waiting for an event");
 }
 
+async fn wait_for_event_at_node(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>) -> MockAgentEvent {
+    for _ in 0..100 {
+        if let Ok(Some(event)) = receiver.try_next() {
+            return event;
+        }
+        tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+    }
+    panic!("timeout while waiting for an event");
+}
+
 async fn wait_for_events_if_any(
     receivers: &mut std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>,
 ) -> Option<(uuid::Uuid, MockAgentEvent)> {
@@ -300,6 +302,23 @@ async fn no_function_event(receivers: &mut std::collections::HashMap<uuid::Uuid,
         if let Ok(Some(event)) = receiver.try_next() {
             panic!("expecting no event, but received one on node {}: {}", node_id, event_to_string(&event));
         }
+    }
+}
+
+#[allow(dead_code)]
+async fn print_events(receivers: &mut std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>) {
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    for (node_id, receiver) in receivers.iter_mut() {
+        if let Ok(Some(event)) = receiver.try_next() {
+            println!("node_id {} event {}", node_id, event_to_string(&event));
+        }
+    }
+}
+
+async fn clear_events(receivers: &mut std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>) {
+    tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    for (_node_id, receiver) in receivers.iter_mut() {
+        while let Ok(Some(_event)) = receiver.try_next() {}
     }
 }
 
@@ -331,7 +350,7 @@ fn make_start_resource_request(class_type: &str) -> edgeless_api::resource_confi
 
 #[tokio::test]
 async fn test_orc_single_node_function_start_stop() {
-    let (mut fun_client, mut _res_client, mut nodes, _, _) = test_setup(1, 0).await;
+    let (mut fun_client, mut _res_client, mut nodes, _, _, _orc_sender) = test_setup(1, 0).await;
     assert_eq!(1, nodes.len());
     let (node_id, mock_node_receiver) = nodes.iter_mut().next().unwrap();
     assert!(!node_id.is_nil());
@@ -383,7 +402,7 @@ async fn test_orc_single_node_function_start_stop() {
 
 #[tokio::test]
 async fn test_orc_multiple_nodes_function_start_stop() {
-    let (mut fun_client, mut _res_client, mut nodes, _, _) = test_setup(3, 0).await;
+    let (mut fun_client, mut _res_client, mut nodes, _, _, _orc_sender) = test_setup(3, 0).await;
     assert_eq!(3, nodes.len());
 
     // Start 100 functions.
@@ -439,7 +458,7 @@ async fn test_orc_multiple_nodes_function_start_stop() {
 
 #[tokio::test]
 async fn test_orc_multiple_resources_start_stop() {
-    let (mut _fun_client, mut res_client, mut nodes, _, _) = test_setup(3, 3).await;
+    let (mut _fun_client, mut res_client, mut nodes, _, _, _orc_sender) = test_setup(3, 3).await;
     assert_eq!(3, nodes.len());
 
     // Start 100 resources.
@@ -507,7 +526,7 @@ async fn test_orc_multiple_resources_start_stop() {
 
 #[tokio::test]
 async fn test_orc_patch() {
-    let (mut fun_client, mut res_client, mut nodes, _, _) = test_setup(1, 1).await;
+    let (mut fun_client, mut res_client, mut nodes, _, _, _orc_sender) = test_setup(1, 1).await;
     assert_eq!(1, nodes.len());
     let client_node_id = *nodes.keys().next().unwrap();
 
@@ -615,7 +634,7 @@ async fn test_orc_patch() {
 #[tokio::test]
 #[serial_test::serial]
 async fn test_orc_node_with_fun_disconnects() {
-    let (mut fun_client, mut _res_client, mut nodes, stable_node_id, _) = test_setup(10, 0).await;
+    let (mut fun_client, mut _res_client, mut nodes, stable_node_id, _, mut orc_sender) = test_setup(10, 0).await;
     assert_eq!(10, nodes.len());
 
     // Start this workflow
@@ -760,14 +779,7 @@ async fn test_orc_node_with_fun_disconnects() {
     no_function_event(&mut nodes).await;
 
     // Disconnect the unstable node
-    {
-        let _ = FAILING_NODES.set(std::sync::Mutex::new(std::collections::HashSet::new()));
-
-        let mut failing_nodes = FAILING_NODES.get().unwrap().lock().unwrap();
-        failing_nodes.clear();
-        failing_nodes.insert(unstable_node_id);
-    }
-    // let _ = mgt_client.keep_alive().await; // XXX
+    let _ = orc_sender.send(OrchestratorRequest::DelNode(unstable_node_id)).await;
 
     let mut num_events = std::collections::HashMap::new();
     let mut new_node_id = uuid::Uuid::nil();
@@ -813,7 +825,6 @@ async fn test_orc_node_with_fun_disconnects() {
             break;
         }
     }
-    assert_eq!(Some(&10), num_events.get("keep-alive"));
     assert_eq!(Some(&9), num_events.get("update-peers"));
     assert_eq!(Some(&2), num_events.get("patch-function"));
     assert_eq!(Some(&1), num_events.get("start-function"));
@@ -830,7 +841,7 @@ async fn test_orc_node_with_fun_disconnects() {
 
 #[tokio::test]
 async fn orc_node_with_res_disconnects() {
-    let (mut fun_client, mut res_client, mut nodes, stable_node_id, _) = test_setup(10, 1).await;
+    let (mut fun_client, mut res_client, mut nodes, stable_node_id, _, mut orc_sender) = test_setup(10, 1).await;
     assert_eq!(10, nodes.len());
 
     // Start this workflow
@@ -926,14 +937,7 @@ async fn orc_node_with_res_disconnects() {
     no_function_event(&mut nodes).await;
 
     // Disconnect the unstable node
-    {
-        let _ = FAILING_NODES.set(std::sync::Mutex::new(std::collections::HashSet::new()));
-
-        let mut failing_nodes = FAILING_NODES.get().unwrap().lock().unwrap();
-        failing_nodes.clear();
-        failing_nodes.insert(unstable_node_id);
-    }
-    // let _ = mgt_client.keep_alive().await; // XXX
+    let _ = orc_sender.send(OrchestratorRequest::DelNode(unstable_node_id)).await;
 
     let mut num_events = std::collections::HashMap::new();
     let mut new_node_id = uuid::Uuid::nil();
@@ -973,7 +977,6 @@ async fn orc_node_with_res_disconnects() {
             break;
         }
     }
-    assert_eq!(Some(&10), num_events.get("keep-alive"));
     assert_eq!(Some(&9), num_events.get("update-peers"));
     assert_eq!(Some(&1), num_events.get("patch-function"));
     assert_eq!(Some(&1), num_events.get("start-resource"));
@@ -988,7 +991,7 @@ async fn orc_node_with_res_disconnects() {
 
 #[tokio::test]
 async fn test_patch_after_fun_stop() {
-    let (mut fun_client, mut _res_client, mut nodes, _stable_node_id, _) = test_setup(10, 0).await;
+    let (mut fun_client, mut _res_client, mut nodes, _stable_node_id, _, _orc_sender) = test_setup(10, 0).await;
     assert_eq!(10, nodes.len());
 
     // Start this workflow
@@ -1112,7 +1115,7 @@ async fn test_patch_after_fun_stop() {
 #[tokio::test]
 #[serial_test::serial]
 async fn test_recreate_fun_after_disconnect() {
-    let (mut fun_client, mut _res_client, mut nodes, stable_node_id, _) = test_setup(2, 0).await;
+    let (mut fun_client, mut _res_client, mut nodes, stable_node_id, _, mut orc_sender) = test_setup(2, 0).await;
     assert_eq!(2, nodes.len());
 
     // Start this workflow
@@ -1213,14 +1216,7 @@ async fn test_recreate_fun_after_disconnect() {
     no_function_event(&mut nodes).await;
 
     // Disconnect the unstable node
-    {
-        let _ = FAILING_NODES.set(std::sync::Mutex::new(std::collections::HashSet::new()));
-
-        let mut failing_nodes = FAILING_NODES.get().unwrap().lock().unwrap();
-        failing_nodes.clear();
-        failing_nodes.insert(unstable_node_id);
-    }
-    // let _ = mgt_client.keep_alive().await; // XXX
+    let _ = orc_sender.send(OrchestratorRequest::DelNode(unstable_node_id)).await;
 
     let mut num_events = std::collections::HashMap::new();
     loop {
@@ -1251,14 +1247,11 @@ async fn test_recreate_fun_after_disconnect() {
             break;
         }
     }
-    assert_eq!(Some(&2), num_events.get("keep-alive"));
     assert_eq!(Some(&1), num_events.get("update-peers"));
     assert_eq!(Some(&1), num_events.get("patch-function"));
 
-    // Keep alive again.
     for _ in 0..5 {
-        // let _ = mgt_client.keep_alive().await; // XXX
-
+        let _ = orc_sender.send(OrchestratorRequest::Refresh()).await;
         let mut num_events = std::collections::HashMap::new();
         loop {
             if let Some((_node_id, event)) = wait_for_events_if_any(&mut nodes).await {
@@ -1269,7 +1262,6 @@ async fn test_recreate_fun_after_disconnect() {
                 }
                 match event {
                     MockAgentEvent::PatchFunction(patch_request) => {
-                        log::info!("patch-function");
                         assert_eq!(int_fid_1, patch_request.function_id);
                         assert!(patch_request.output_mapping.is_empty());
                     }
@@ -1279,30 +1271,80 @@ async fn test_recreate_fun_after_disconnect() {
                 break;
             }
         }
-        assert_eq!(Some(&1), num_events.get("keep-alive"));
         assert_eq!(Some(&1), num_events.get("patch-function"));
     }
 
-    //
-    // Test incomplete: it is not possible to (easily) restore the failed node.
-    //
-
     // Make sure there are no pending events.
+    no_function_event(&mut nodes).await;
+
+    // Re-create the unstable node.
+
+    let (mock_node_sender, mock_node_receiver) = futures::channel::mpsc::unbounded::<MockAgentEvent>();
+    let mut capabilities = edgeless_api::node_registration::NodeCapabilities::minimum();
+    capabilities.labels.push("unstable".to_string());
+
+    if let Some(val) = nodes.get_mut(&unstable_node_id) {
+        *val = mock_node_receiver;
+    }
+
+    let _ = orc_sender
+        .send(crate::orchestrator::OrchestratorRequest::AddNode(
+            unstable_node_id,
+            crate::client_desc::ClientDesc {
+                agent_url: "".to_string(),
+                invocation_url: "".to_string(),
+                api: Box::new(MockNode {
+                    node_id: unstable_node_id,
+                    sender: mock_node_sender,
+                }) as Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
+                capabilities,
+            },
+            vec![],
+        ))
+        .await;
+
+    if let Some(entry) = nodes.get_mut(&stable_node_id) {
+        let mut num_update_peers = 0;
+        for _ in 0..2 {
+            let event = wait_for_event_at_node(entry).await;
+            match event {
+                MockAgentEvent::PatchFunction(patch_request) => assert!(patch_request.output_mapping.contains_key("out")),
+                MockAgentEvent::UpdatePeers(_update) => {
+                    num_update_peers += 1;
+                }
+                _ => panic!("unexpected event"),
+            }
+        }
+        assert_eq!(1, num_update_peers);
+    }
+    if let Some(entry) = nodes.get_mut(&unstable_node_id) {
+        let mut num_update_peers = 0;
+        for _ in 0..4 {
+            let event = wait_for_event_at_node(entry).await;
+            match event {
+                MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd)) => {
+                    log::info!("{:?}", spawn_req_rcvd);
+                    assert_eq!("f2", spawn_req_rcvd.code.function_class_id);
+                }
+                MockAgentEvent::PatchFunction(patch_request) => assert!(patch_request.output_mapping.contains_key("out")),
+                MockAgentEvent::UpdatePeers(_update) => {
+                    num_update_peers += 1;
+                }
+                _ => panic!("unexpected event"),
+            }
+        }
+        assert_eq!(2, num_update_peers);
+    }
+
     no_function_event(&mut nodes).await;
 }
 
 #[tokio::test]
 #[serial_test::serial]
 async fn test_update_domain_capabilities() {
-    {
-        let _ = FAILING_NODES.set(std::sync::Mutex::new(std::collections::HashSet::new()));
-    }
-
     let num_nodes = 10;
     let num_resources = 5;
-    let (_fun_client, mut _res_client, _nodes, _stable_node_id, mut subscriber_receiver) = test_setup(num_nodes, num_resources).await;
-
-    // let _ = mgt_client.keep_alive().await; // XXX
+    let (_fun_client, mut _res_client, _nodes, _stable_node_id, mut subscriber_receiver, _orc_sender) = test_setup(num_nodes, num_resources).await;
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
@@ -1322,11 +1364,12 @@ async fn test_update_domain_capabilities() {
         }
     }
     expected_caps.resource_classes.insert("rc-1".to_string());
+    let mut last_caps = edgeless_api::domain_registration::DomainCapabilities::default();
     while let Ok(event) = subscriber_receiver.try_next() {
         match event {
             Some(event) => match event {
                 DomainSubscriberRequest::Update(actual_caps) => {
-                    assert_eq!(expected_caps, *actual_caps);
+                    last_caps = *actual_caps;
                     num_events += 1;
                 }
                 DomainSubscriberRequest::Refresh() => {
@@ -1336,7 +1379,9 @@ async fn test_update_domain_capabilities() {
             None => break,
         }
     }
-    assert_eq!(1, num_events);
+    assert_eq!(expected_caps, last_caps);
+
+    assert_eq!(10, num_events);
 }
 
 #[test]
@@ -1496,20 +1541,27 @@ fn test_orchestration_feasible_nodes() {
         .is_empty());
 
     // Add nodes
-    let (_nodes, client_descs_resources, _stable_node_id) = test_create_clients_resources(5, 0);
-    // logic.update_nodes(&clients, &resource_providers);
-    // let all_nodes = clients.keys().cloned().collect::<Vec<uuid::Uuid>>();
-    // assert!(clients.len() == 5);
+    let (nodes, mut client_descs_resources, _stable_node_id) = test_create_clients_resources(5, 0);
 
-    // // No annotations, all nodes are good
-    // assert_eq!(5, logic.feasible_nodes(&fun1_req, &all_nodes).len());
+    let mut client_descs = std::collections::HashMap::new();
+    for node_id in nodes.keys() {
+        let client_desc = client_descs_resources.remove(&node_id).unwrap().0;
+        client_descs.insert(*node_id, client_desc);
+    }
 
-    // // Pin-point to a node.
-    // fun1_req
-    //     .annotations
-    //     .insert("node_id_match_any".to_string(), all_nodes.first().unwrap().to_string());
+    logic.update_nodes(&client_descs, &std::collections::HashMap::new());
+    let all_nodes = client_descs.keys().cloned().collect::<Vec<uuid::Uuid>>();
+    assert!(client_descs.len() == 5);
 
-    // // Wrong run-time
-    // fun1_req.code.function_class_type = "non-existing-runtime".to_string();
-    // assert!(logic.feasible_nodes(&fun1_req, &all_nodes).is_empty());
+    // No annotations, all nodes are good
+    assert_eq!(5, logic.feasible_nodes(&fun1_req, &all_nodes).len());
+
+    // Pin-point to a node.
+    fun1_req
+        .annotations
+        .insert("node_id_match_any".to_string(), all_nodes.first().unwrap().to_string());
+
+    // Wrong run-time
+    fun1_req.code.function_class_type = "non-existing-runtime".to_string();
+    assert!(logic.feasible_nodes(&fun1_req, &all_nodes).is_empty());
 }

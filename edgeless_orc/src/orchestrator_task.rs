@@ -120,11 +120,13 @@ impl OrchestratorTask {
                     log::debug!("Orchestrator AddNode {}", client_desc.to_string_short());
                     self.add_node(node_id, client_desc, resource_providers).await;
                     self.update_domain().await;
+                    self.refresh().await;
                 }
                 crate::orchestrator::OrchestratorRequest::DelNode(node_id) => {
                     log::debug!("Orchestrator DelNode {:?}", node_id);
                     self.del_node(node_id).await;
                     self.update_domain().await;
+                    self.refresh().await;
                 }
                 crate::orchestrator::OrchestratorRequest::Refresh() => {
                     self.refresh().await;

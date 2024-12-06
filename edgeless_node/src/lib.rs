@@ -170,38 +170,6 @@ impl NodeCapabilitiesUser {
     }
 }
 
-impl EdgelessNodeSettings {
-    /// Create settings for a node with WASM run-time and no resources
-    /// binding the given ports on the same address.
-    pub fn new_without_resources(node_register_url: &str, node_address: &str, agent_port: u16, invocation_port: u16, metrics_port: u16) -> Self {
-        let agent_url = format!("http://{}:{}", node_address, agent_port);
-        let invocation_url = format!("http://{}:{}", node_address, invocation_port);
-        let invocation_url_coap = Some(format!("coap://{}:{}", node_address, invocation_port));
-        Self {
-            general: EdgelessNodeGeneralSettings {
-                node_id: uuid::Uuid::new_v4(),
-                agent_url: agent_url.clone(),
-                agent_url_announced: agent_url,
-                invocation_url: invocation_url.clone(),
-                invocation_url_announced: invocation_url,
-                invocation_url_coap: invocation_url_coap.clone(),
-                invocation_url_announced_coap: invocation_url_coap,
-                node_register_url: node_register_url.to_string(),
-                subscription_refresh_interval_sec: 10,
-            },
-            telemetry: EdgelessNodeTelemetrySettings {
-                metrics_url: format!("http://{}:{}", node_address, metrics_port),
-                log_level: None,
-                performance_samples: false,
-            },
-            wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
-            container_runtime: None,
-            resources: None,
-            user_node_capabilities: None,
-        }
-    }
-}
-
 fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilitiesUser) -> edgeless_api::node_registration::NodeCapabilities {
     if !sysinfo::IS_SUPPORTED_SYSTEM {
         log::warn!("sysinfo does not support (yet) this OS");
