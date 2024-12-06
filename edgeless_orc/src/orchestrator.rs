@@ -52,7 +52,10 @@ pub enum OrchestratorRequest {
         Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
     ),
     DelNode(uuid::Uuid),
-    Refresh(),
+    Refresh(
+        // Reply Channel
+        tokio::sync::oneshot::Sender<()>,
+    ),
 }
 
 pub struct OrchestratorClient {
@@ -112,10 +115,11 @@ impl Orchestrator {
         let refresh_sender = sender.clone();
         let refresh_task = Box::pin(async move {
             let mut refresh_sender = refresh_sender;
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
             loop {
-                interval.tick().await;
-                let _ = refresh_sender.send(OrchestratorRequest::Refresh()).await;
+                let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
+                let _ = refresh_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
+                let _ = reply_receiver.await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
             }
         });
 

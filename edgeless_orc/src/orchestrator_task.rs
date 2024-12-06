@@ -128,8 +128,9 @@ impl OrchestratorTask {
                     self.update_domain().await;
                     self.refresh().await;
                 }
-                crate::orchestrator::OrchestratorRequest::Refresh() => {
+                crate::orchestrator::OrchestratorRequest::Refresh(reply_sender) => {
                     self.refresh().await;
+                    let _ = reply_sender.send(());
                 }
             }
         }
