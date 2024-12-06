@@ -665,7 +665,7 @@ impl OrchestratorTask {
                     resource.provider_id.clone(),
                     crate::resource_provider::ResourceProvider {
                         class_type: resource.class_type.clone(),
-                        node_id: node_id.clone(),
+                        node_id,
                         outputs: resource.outputs.clone(),
                     },
                 );
