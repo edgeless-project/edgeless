@@ -17,12 +17,6 @@ struct Args {
     /// URL of the controller
     #[arg(short, long, default_value_t = String::from("http://127.0.0.1:7001"))]
     controller_url: String,
-    /// URL of the orchestrator
-    #[arg(short, long, default_value_t = String::from("http://127.0.0.1:7011"))]
-    orchestrator_url: String,
-    /// Address to use to bind servers
-    #[arg(short, long, default_value_t = String::from("127.0.0.1"))]
-    bind_address: String,
     /// Arrival model, one of {poisson, incremental, incr-and-keep, single}
     #[arg(long, default_value_t = String::from("poisson"))]
     arrival_model: String,
