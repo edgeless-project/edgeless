@@ -78,14 +78,20 @@ impl ControllerTask {
                         super::ControllerRequest::Stop(wf_id) => {
                             self.stop_workflow(&wf_id).await;
                         }
-                        super::ControllerRequest::List(workflow_id, reply_sender) => {
-                            let reply = self.list_workflows(&workflow_id).await;
+                        super::ControllerRequest::List(reply_sender) => {
+                            let reply = self.list();
+                            if let Err(err) =  reply_sender.send(Ok(reply)) {
+                                log::error!("Unhandled: {:?}", err);
+                            }
+                        }
+                        super::ControllerRequest::Inspect(wf_id, reply_sender) => {
+                            let reply = self.inspect(wf_id);
                             if let Err(err) =  reply_sender.send(reply) {
                                 log::error!("Unhandled: {:?}", err);
                             }
                         }
                         super::ControllerRequest::Domains(domain_id, reply_sender) => {
-                            let reply = self.domains(&domain_id).await;
+                            let reply = self.domains(&domain_id);
                             if let Err(err) = reply_sender.send(reply) {
                                 log::error!("Unhandled: {:?}", err);
                             }
@@ -298,51 +304,48 @@ impl ControllerTask {
         Some(remove_res.unwrap().desired_state)
     }
 
-    async fn list_workflows(
-        &mut self,
-        workflow_id: &edgeless_api::workflow_instance::WorkflowId,
-    ) -> anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>> {
-        let mut ret: Vec<edgeless_api::workflow_instance::WorkflowInstance> = vec![];
-        if let Some(w_id) = workflow_id.is_valid() {
-            if let Some(wf) = self.active_workflows.get(w_id) {
-                ret = vec![edgeless_api::workflow_instance::WorkflowInstance {
-                    workflow_id: w_id.clone(),
-                    domain_mapping: wf
-                        .domain_mapping
-                        .values()
-                        .map(|component| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                            name: component.name.to_string(),
-                            function_id: component.lid,
-                            domain_id: component.domain_id.clone(),
-                        })
-                        .collect(),
-                }];
-            }
-        } else {
-            ret = self
-                .active_workflows
-                .iter()
-                .map(|(w_id, wf)| edgeless_api::workflow_instance::WorkflowInstance {
-                    workflow_id: w_id.clone(),
-                    domain_mapping: wf
-                        .domain_mapping
-                        .values()
-                        .map(|component| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                            name: component.name.to_string(),
-                            function_id: component.lid,
-                            domain_id: component.domain_id.clone(),
-                        })
-                        .collect(),
-                })
-                .collect();
+    fn list(&self) -> Vec<edgeless_api::workflow_instance::WorkflowId> {
+        let mut ret: Vec<edgeless_api::workflow_instance::WorkflowId> = vec![];
+        for wf_id in self.active_workflows.keys() {
+            ret.push(wf_id.clone());
         }
-        Ok(ret)
+        for wf_id in self.orphan_workflows.keys() {
+            ret.push(wf_id.clone());
+        }
+        ret
     }
 
-    async fn domains(
-        &mut self,
-        domain_id: &str,
-    ) -> anyhow::Result<std::collections::HashMap<String, edgeless_api::domain_registration::DomainCapabilities>> {
+    fn inspect(&self, wf_id: edgeless_api::workflow_instance::WorkflowId) -> anyhow::Result<edgeless_api::workflow_instance::WorkflowInfo> {
+        if let Some(workflow) = self.active_workflows.get(&wf_id) {
+            Ok(edgeless_api::workflow_instance::WorkflowInfo {
+                request: workflow.desired_state.clone(),
+                status: edgeless_api::workflow_instance::WorkflowInstance {
+                    workflow_id: wf_id.clone(),
+                    domain_mapping: workflow
+                        .domain_mapping
+                        .values()
+                        .map(|elem| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                            name: elem.name.clone(),
+                            function_id: elem.lid,
+                            domain_id: elem.domain_id.clone(),
+                        })
+                        .collect(),
+                },
+            })
+        } else if let Some(request) = self.orphan_workflows.get(&wf_id) {
+            Ok(edgeless_api::workflow_instance::WorkflowInfo {
+                request: request.clone(),
+                status: edgeless_api::workflow_instance::WorkflowInstance {
+                    workflow_id: wf_id.clone(),
+                    domain_mapping: vec![],
+                },
+            })
+        } else {
+            anyhow::bail!("Unknown workflow identifier '{}", wf_id);
+        }
+    }
+
+    fn domains(&self, domain_id: &str) -> anyhow::Result<std::collections::HashMap<String, edgeless_api::domain_registration::DomainCapabilities>> {
         let mut ret = std::collections::HashMap::new();
 
         for (id, desc) in &self.orchestrators {

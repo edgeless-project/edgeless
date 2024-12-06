@@ -69,10 +69,15 @@ service WorkflowInstance {
     // Output: none.
     rpc Stop (WorkflowId) returns (google.protobuf.Empty);
 
-    // List the active workflows or shows the status of a given active workflow.
-    // Input: the identifier of the active workflow or a special value indicating all workflows.
-    // Output: the list of status of the active workflow instances.
-    rpc List (WorkflowId) returns (WorkflowInstanceList);
+    // List the known workflow identifiers.
+    // Input: none.
+    // Output: the list of workflow identifiers..
+    rpc List (google.protobuf.Empty) returns (WorkflowIdList);
+
+    // Inspect a given workflow.
+    // Input: the identifier of the workflow to inspect.
+    // Output: information about the workflow identifiers.
+    rpc Inspect(WorkflowId) returns (WorkflowInstanceInfo);
 
     // List the domain capabilities.
     // Input: the identifier of the domain or an empty value to query all.

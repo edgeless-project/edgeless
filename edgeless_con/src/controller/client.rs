@@ -52,13 +52,19 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
             Err(err) => Err(anyhow::anyhow!("Controller Channel Error: {}", err)),
         }
     }
-    async fn list(
-        &mut self,
-        id: edgeless_api::workflow_instance::WorkflowId,
-    ) -> anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>> {
-        let (reply_sender, reply_receiver) =
-            tokio::sync::oneshot::channel::<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowInstance>>>();
-        if let Err(err) = self.sender.send(super::ControllerRequest::List(id.clone(), reply_sender)).await {
+    async fn list(&mut self) -> anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowId>> {
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowId>>>();
+        if let Err(err) = self.sender.send(super::ControllerRequest::List(reply_sender)).await {
+            anyhow::bail!("Controller Channel Error: {}", err);
+        }
+        match reply_receiver.await {
+            Ok(ret) => ret,
+            Err(err) => Err(anyhow::anyhow!("Controller Channel Error: {}", err)),
+        }
+    }
+    async fn inspect(&mut self, id: edgeless_api::workflow_instance::WorkflowId) -> anyhow::Result<edgeless_api::workflow_instance::WorkflowInfo> {
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::workflow_instance::WorkflowInfo>>();
+        if let Err(err) = self.sender.send(super::ControllerRequest::Inspect(id.clone(), reply_sender)).await {
             anyhow::bail!("Controller Channel Error: {}", err);
         }
         match reply_receiver.await {
