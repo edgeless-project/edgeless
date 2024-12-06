@@ -74,6 +74,12 @@ pub struct SpawnWorkflowRequest {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize)]
+pub struct WorkflowInfo {
+    pub request: SpawnWorkflowRequest,
+    pub status: WorkflowInstance,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub enum SpawnWorkflowResponse {
     ResponseError(crate::common::ResponseError),
     WorkflowInstance(WorkflowInstance),
@@ -83,7 +89,8 @@ pub enum SpawnWorkflowResponse {
 pub trait WorkflowInstanceAPI: WorkflowInstanceAPIClone + Send + Sync {
     async fn start(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<SpawnWorkflowResponse>;
     async fn stop(&mut self, id: WorkflowId) -> anyhow::Result<()>;
-    async fn list(&mut self, id: WorkflowId) -> anyhow::Result<Vec<WorkflowInstance>>;
+    async fn list(&mut self) -> anyhow::Result<Vec<WorkflowId>>;
+    async fn inspect(&mut self, id: WorkflowId) -> anyhow::Result<WorkflowInfo>;
     async fn domains(
         &mut self,
         domain_id: String,
