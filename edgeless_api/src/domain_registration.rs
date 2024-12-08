@@ -72,6 +72,7 @@ pub struct UpdateDomainRequest {
 pub enum UpdateDomainResponse {
     ResponseError(crate::common::ResponseError),
     Accepted,
+    Reset,
 }
 
 #[async_trait::async_trait]
