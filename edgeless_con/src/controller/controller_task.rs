@@ -64,6 +64,20 @@ impl ControllerTask {
     pub async fn run(&mut self) {
         loop {
             tokio::select! {
+                biased;
+                Some(req) = self.domain_registration_receiver.next() => {
+                    match req {
+                        super::DomainRegisterRequest::Update(update_domain_request, reply_sender) => {
+                            let reply = self.update_domain(&update_domain_request).await;
+                            match reply_sender.send(reply) {
+                                Ok(_) => {}
+                                Err(err) => {
+                                    log::error!("Unhandled: {:?}", err);
+                                }
+                            }
+                        }
+                    }
+                }
                 Some(req) = self.workflow_instance_receiver.next() => {
                     match req {
                         super::ControllerRequest::Start(spawn_workflow_request, reply_sender) => {
@@ -98,19 +112,6 @@ impl ControllerTask {
                         }
                     }
                 },
-                Some(req) = self.domain_registration_receiver.next() => {
-                    match req {
-                        super::DomainRegisterRequest::Update(update_domain_request, reply_sender) => {
-                            let reply = self.update_domain(&update_domain_request).await;
-                            match reply_sender.send(reply) {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    log::error!("Unhandled: {:?}", err);
-                                }
-                            }
-                        }
-                    }
-                }
                 Some(req) = self.internal_receiver.next() => {
                     match req {
                         super::InternalRequest::Refresh(reply_sender) => {
@@ -160,6 +161,15 @@ impl ControllerTask {
             workflow_id: uuid::Uuid::new_v4(),
         };
 
+        self.relocate_workflow(&wf_id, spawn_workflow_request, target_domain).await
+    }
+
+    async fn relocate_workflow(
+        &mut self,
+        wf_id: &edgeless_api::workflow_instance::WorkflowId,
+        spawn_workflow_request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
+        target_domain: &str,
+    ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse, edgeless_api::workflow_instance::SpawnWorkflowRequest> {
         self.active_workflows.insert(
             wf_id.clone(),
             super::deployment_state::ActiveWorkflow {
@@ -512,7 +522,7 @@ impl ControllerTask {
         for (wf_id, new_domain) in workflows_to_fix {
             assert!(!new_domain.is_empty());
             if let Some(workflow_request) = self.stop_workflow(&wf_id).await {
-                match self.start_workflow(workflow_request).await {
+                match self.relocate_workflow(&wf_id, workflow_request, &new_domain).await {
                     Ok(response) => {
                         if let edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_) = response {
                             log::info!("orphan workflow '{}' relocated to domain '{}'", wf_id, new_domain);
@@ -546,7 +556,7 @@ impl ControllerTask {
         // orphan list.
         for (new_domain, wf_id, workflow_request) in workflow_requests_fixable {
             assert!(!new_domain.is_empty());
-            match self.start_workflow(workflow_request).await {
+            match self.relocate_workflow(&wf_id, workflow_request, &new_domain).await {
                 Ok(response) => {
                     if let edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_) = response {
                         log::info!("orphan workflow assigned to domain '{}'", new_domain);
