@@ -397,6 +397,10 @@ message UpdateDomainResponse {
     // If present it means that the request has been rejected.
     // In this case, other fields may not be present or contain meaningful data.
     optional ResponseError response_error = 1;
+
+    // If the flag is true then the orchestration domain should be reset to
+    // an empty state.
+    bool reset = 2;
 }
 
 // message Domain

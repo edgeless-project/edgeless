@@ -115,7 +115,7 @@ impl ControllerTask {
                 Some(req) = self.internal_receiver.next() => {
                     match req {
                         super::InternalRequest::Refresh(reply_sender) => {
-                            self.check_domains().await;
+                            self.refresh().await;
                             let _ = reply_sender.send(());
                         }
                     }
@@ -383,8 +383,7 @@ impl ControllerTask {
             ));
         }
 
-        let desc = &mut self.orchestrators.get_mut(&update_domain_request.domain_id);
-        let try_fix_orphans = match desc {
+        match self.orchestrators.get_mut(&update_domain_request.domain_id) {
             None => {
                 self.orchestrators.insert(
                     update_domain_request.domain_id.clone(),
@@ -398,7 +397,10 @@ impl ControllerTask {
                         counter: update_domain_request.counter,
                     },
                 );
-                true
+
+                // It is a new orchestration domain. Therefore, we ask the
+                // orchestrator to reset to a clean state.
+                Ok(edgeless_api::domain_registration::UpdateDomainResponse::Reset)
             }
             Some(desc) => {
                 // If the counter has not been incremented, then update only
@@ -415,21 +417,13 @@ impl ControllerTask {
                         desc.client =
                             Box::new(edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&update_domain_request.orchestrator_url).await?);
                     }
-                    true
-                } else {
-                    false
                 }
+                Ok(edgeless_api::domain_registration::UpdateDomainResponse::Accepted)
             }
-        };
-
-        if try_fix_orphans {
-            self.try_fix_orphans().await;
         }
-
-        Ok(edgeless_api::domain_registration::UpdateDomainResponse::Accepted)
     }
 
-    async fn check_domains(&mut self) {
+    async fn refresh(&mut self) {
         log::debug!("Checking domains");
 
         // Find all domains that are stale, i.e., which have not been
@@ -443,7 +437,7 @@ impl ControllerTask {
 
         // Delete all stale domains, also invalidating all mapping of functions
         // and resources of active flows.
-        let try_fix_orphans = !stale_domains.is_empty();
+        let domains_removed = !stale_domains.is_empty();
         for stale_domain in stale_domains {
             log::info!("Removing domain '{}' because it is stale", stale_domain);
             self.orchestrators.remove(&stale_domain);
@@ -457,10 +451,13 @@ impl ControllerTask {
             }
         }
 
-        // If some domains were removed, try to fix the situation.
-        if !try_fix_orphans {
-            self.try_fix_orphans().await;
+        // If some domains were removed there might be new orphans.
+        if domains_removed {
+            self.find_new_orphans().await;
         }
+
+        // Try to fix orphans.
+        self.try_fix_orphans().await;
     }
 
     /// Return true if the given orchestration domain is compatible with the
@@ -500,43 +497,28 @@ impl ControllerTask {
 
     /// Check all active workflows.
     /// If a workflow has at least one resource or function that is not assigned
-    /// to a domain, then it is called an orphan.
-    /// This method tries to fix all orphan workflows by stopping it on their
-    /// current domain and starting it again on another that compatible with it.
-    async fn try_fix_orphans(&mut self) {
-        // Find the workflows that can be fixed, i.e., those for which there is
-        // at least one orchestration domain that can host them.
-        let mut workflows_to_fix = vec![];
-        for (wf_id, workflow) in &mut self.active_workflows {
+    /// to a domain, then it is marked as orphan.
+    async fn find_new_orphans(&mut self) {
+        let mut new_orphans = vec![];
+        for (wf_id, workflow) in &self.active_workflows {
             if workflow.is_orphan() {
-                match Self::compatible_domains(&self.orchestrators, &workflow.desired_state).choose(&mut self.rng) {
-                    None => {}
-                    Some(new_domain) => workflows_to_fix.push((wf_id.clone(), new_domain.clone())),
-                };
+                new_orphans.push(wf_id.clone());
             }
         }
-
-        // For the fixable workflows, try to deploy them to the assigned new
-        // orchestration domains. If this fails for some workflows, they go
-        // into the orphan list.
-        for (wf_id, new_domain) in workflows_to_fix {
-            assert!(!new_domain.is_empty());
-            if let Some(workflow_request) = self.stop_workflow(&wf_id).await {
-                match self.relocate_workflow(&wf_id, workflow_request, &new_domain).await {
-                    Ok(response) => {
-                        if let edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_) = response {
-                            log::info!("orphan workflow '{}' relocated to domain '{}'", wf_id, new_domain);
-                            continue;
-                        }
-                    }
-                    Err(workflow_request) => {
-                        self.orphan_workflows.insert(wf_id, workflow_request);
-                    }
-                }
-            }
+        for wf_id in new_orphans {
+            let active_workflow = self
+                .active_workflows
+                .remove(&wf_id)
+                .expect("Could not find a workflow that must be there");
+            let res = self.orphan_workflows.insert(wf_id, active_workflow.desired_state);
+            assert!(res.is_none(), "Trying to mark as orphan a workflow that already so");
         }
+    }
 
-        // Do the same for the workflow requests in the orphan list.
+    /// Try to fix all orphan workflows by stopping it on their current domain
+    /// and starting it again on another that compatible with it.
+    async fn try_fix_orphans(&mut self) {
+        // Find workflows that can be fixed, i.e., assigned to a compatible domain.
         let mut workflow_requests_fixable = vec![];
         let mut workflow_requests_unfixable = std::collections::BTreeMap::new();
         while let Some((wf_id, workflow_request)) = self.orphan_workflows.pop_first() {

@@ -161,8 +161,16 @@ fn serialize_update_domain_response(req: &crate::domain_registration::UpdateDoma
                 summary: err.summary.clone(),
                 detail: err.detail.clone(),
             }),
+            reset: false,
         },
-        crate::domain_registration::UpdateDomainResponse::Accepted => crate::grpc_impl::api::UpdateDomainResponse { response_error: None },
+        crate::domain_registration::UpdateDomainResponse::Accepted => crate::grpc_impl::api::UpdateDomainResponse {
+            response_error: None,
+            reset: false,
+        },
+        crate::domain_registration::UpdateDomainResponse::Reset => crate::grpc_impl::api::UpdateDomainResponse {
+            response_error: None,
+            reset: true,
+        },
     }
 }
 
@@ -176,7 +184,10 @@ fn parse_update_domain_response(
                 detail: err.detail.clone(),
             },
         )),
-        None => Ok(crate::domain_registration::UpdateDomainResponse::Accepted),
+        None => match api_instance.reset {
+            false => Ok(crate::domain_registration::UpdateDomainResponse::Accepted),
+            true => Ok(crate::domain_registration::UpdateDomainResponse::Reset),
+        },
     }
 }
 
