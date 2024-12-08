@@ -11,15 +11,15 @@ mod system_tests {
     use edgeless_api::workflow_instance::WorkflowInstanceAPI;
     use edgeless_orc::proxy::Proxy;
 
-    async fn setup(
-        num_domains: u32,
-        num_nodes_per_domain: u32,
-        redis_url: Option<&str>,
-    ) -> (Vec<futures::future::AbortHandle>, Box<(dyn WorkflowInstanceAPI)>) {
+    struct AbortHandles {
+        abort_handles_nodes: std::collections::HashMap<uuid::Uuid, futures::future::AbortHandle>,
+        abort_handles_orchestrators: std::collections::HashMap<String, futures::future::AbortHandle>,
+        abort_handle_controller: futures::future::AbortHandle,
+    }
+
+    async fn setup(num_domains: u32, num_nodes_per_domain: u32, redis_url: Option<&str>) -> (AbortHandles, Box<(dyn WorkflowInstanceAPI)>) {
         assert!(num_domains > 0);
         assert!(num_nodes_per_domain > 0);
-
-        let mut handles = vec![];
 
         let address = "127.0.0.1";
         let mut port = 7001;
@@ -33,6 +33,8 @@ mod system_tests {
 
         let domain_register_url = format!("http://{}:{}", address, next_port());
 
+        let mut abort_handles_orchestrators = std::collections::HashMap::new();
+        let mut abort_handles_nodes = std::collections::HashMap::new();
         for domain_i in 0..num_domains {
             let orchestrator_url = format!("http://{}:{}", address, next_port());
             let node_register_url = format!("http://{}:{}", address, next_port());
@@ -42,7 +44,7 @@ mod system_tests {
                 general: edgeless_orc::EdgelessOrcGeneralSettings {
                     domain_register_url: domain_register_url.clone(),
                     subscription_refresh_interval_sec: 1,
-                    domain_id: domain_id.to_string(),
+                    domain_id: domain_id.clone(),
                     orchestrator_url: orchestrator_url.to_string(),
                     orchestrator_url_announced: "".to_string(),
                     node_register_url: node_register_url.clone(),
@@ -65,7 +67,7 @@ mod system_tests {
                 },
             }));
             tokio::spawn(task);
-            handles.push(handle);
+            abort_handles_orchestrators.insert(domain_id, handle);
 
             // The first node in each domain is also assigned a file-log resource.
             for node_i in 0..num_nodes_per_domain {
@@ -73,9 +75,10 @@ mod system_tests {
                     0 => Some("file-log-1".to_string()),
                     _ => None,
                 };
+                let node_id = uuid::Uuid::new_v4();
                 let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(edgeless_node::EdgelessNodeSettings {
                     general: edgeless_node::EdgelessNodeGeneralSettings {
-                        node_id: uuid::Uuid::new_v4(),
+                        node_id: node_id.clone(),
                         agent_url: format!("http://{}:{}", address, next_port()),
                         agent_url_announced: "".to_string(),
                         invocation_url: format!("http://{}:{}", address, next_port()),
@@ -106,26 +109,43 @@ mod system_tests {
                     user_node_capabilities: None,
                 }));
                 tokio::spawn(task);
-                handles.push(handle);
+                abort_handles_nodes.insert(node_id, handle);
             }
         }
 
-        let (task, handle) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
+        let (task, abort_handle_controller) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
             controller_url: controller_url.clone(),
             domain_register_url: domain_register_url.clone(),
         }));
         tokio::spawn(task);
-        handles.push(handle);
 
         let mut con_client = edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(controller_url.as_str()).await;
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        (handles, con_client.workflow_instance_api())
+        (
+            AbortHandles {
+                abort_handles_nodes,
+                abort_handles_orchestrators,
+                abort_handle_controller,
+            },
+            con_client.workflow_instance_api(),
+        )
     }
 
     async fn wf_list(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> Vec<edgeless_api::workflow_instance::WorkflowId> {
         (client.list().await).unwrap_or_default()
+    }
+
+    async fn domains_used(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> std::collections::HashSet<String> {
+        let mut ret = std::collections::HashSet::new();
+        for wf_id in wf_list(client).await {
+            let wf_info = client.inspect(wf_id).await.expect("Could not find a workflow just listed");
+            for mapping in wf_info.status.domain_mapping {
+                ret.insert(mapping.domain_id);
+            }
+        }
+        ret
     }
 
     async fn nodes_in_domain(domain_id: &str, client: &mut Box<(dyn WorkflowInstanceAPI)>) -> u32 {
@@ -140,6 +160,14 @@ mod system_tests {
         }
     }
 
+    async fn nodes_in_cluster(num_domains: u32, client: &mut Box<(dyn WorkflowInstanceAPI)>) -> u32 {
+        let mut num_nodes_founds = 0;
+        for domain_id in 0..num_domains {
+            num_nodes_founds += nodes_in_domain(format!("domain-{}", domain_id).as_str(), client).await;
+        }
+        num_nodes_founds
+    }
+
     fn fixture_spec() -> edgeless_api::function_instance::FunctionClassSpecification {
         edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "system_test".to_string(),
@@ -150,11 +178,22 @@ mod system_tests {
         }
     }
 
-    fn terminate(handles: Vec<futures::future::AbortHandle>) -> anyhow::Result<()> {
-        for handle in handles {
+    fn terminate(handles: AbortHandles) -> anyhow::Result<()> {
+        for handle in handles.abort_handles_nodes.values() {
             handle.abort();
         }
+        for handle in handles.abort_handles_orchestrators.values() {
+            handle.abort();
+        }
+        handles.abort_handle_controller.abort();
         Ok(())
+    }
+
+    fn tear_down_domain(domain_id: &str, handles: &mut AbortHandles) {
+        match handles.abort_handles_orchestrators.remove(domain_id) {
+            Some(handle) => handle.abort(),
+            None => panic!("domain {} not found", domain_id),
+        }
     }
 
     #[tokio::test]
@@ -372,28 +411,24 @@ mod system_tests {
         // let _ = env_logger::try_init();
 
         // Create the EDGELESS system.
-        let (handles, mut client) = setup(3, 1, None).await;
+        let (mut handles, mut client) = setup(3, 1, None).await;
 
         assert!(wf_list(&mut client).await.is_empty());
 
         // Wait for all the nodes to be visible.
-        let mut num_nodes_founds = 0;
         for _ in 0..100 {
-            num_nodes_founds = 0;
-            for domain_id in 0..3 {
-                num_nodes_founds += nodes_in_domain(format!("domain-{}", domain_id).as_str(), &mut client).await;
-            }
-            if num_nodes_founds == 3 {
+            if nodes_in_cluster(3, &mut client).await == 3 {
                 break;
             }
             tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         }
-        assert_eq!(3, num_nodes_founds);
+        assert_eq!(3, nodes_in_cluster(3, &mut client).await);
 
         // Create 100 workflows
         let mut workflow_ids = vec![];
         let mut domains = std::collections::HashSet::new();
-        for _ in 0..100 {
+        for wf_i in 0..100 {
+            let err_str = format!("wf#{}, nodes in cluster {}", wf_i, nodes_in_cluster(3, &mut client).await);
             let res = client
                 .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
                     workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
@@ -409,7 +444,7 @@ mod system_tests {
             workflow_ids.push(match res {
                 Ok(response) => match &response {
                     edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => {
-                        panic!("workflow rejected: {}", err)
+                        panic!("workflow rejected [{}]: {}", err_str, err)
                     }
                     edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val) => {
                         assert_eq!(1, val.domain_mapping.len());
@@ -418,15 +453,28 @@ mod system_tests {
                         val.workflow_id.clone()
                     }
                 },
-                Err(err) => panic!("could not start the workflow: {}", err),
+                Err(err) => panic!("could not start the workflow [{}]: {}", err_str, err),
             });
         }
         assert_eq!(100, wf_list(&mut client).await.len());
 
-        assert_eq!(
-            std::collections::HashSet::from([String::from("domain-0"), String::from("domain-1"), String::from("domain-2"),]),
-            domains
-        );
+        let mut all_domains = std::collections::HashSet::new();
+        for i in 0..3 {
+            all_domains.insert(format!("domain-{}", i));
+        }
+        assert_eq!(all_domains, domains);
+        assert_eq!(all_domains, domains_used(&mut client).await);
+
+        // Tear down one orchestration domain.
+        tear_down_domain("domain-1", &mut handles);
+        all_domains.remove("domain-1");
+        for _ in 0..100 {
+            if domains_used(&mut client).await == all_domains {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(all_domains, domains_used(&mut client).await);
 
         // Stop the workflows
         for workflow_id in workflow_ids {
