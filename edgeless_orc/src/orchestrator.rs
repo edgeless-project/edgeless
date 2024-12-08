@@ -56,6 +56,7 @@ pub enum OrchestratorRequest {
         // Reply Channel
         tokio::sync::oneshot::Sender<()>,
     ),
+    Reset(),
 }
 
 pub struct OrchestratorClient {

@@ -12,6 +12,7 @@ pub struct DomainSubscriber {
 #[derive(Clone)]
 pub enum DomainSubscriberRequest {
     Update(Box<edgeless_api::domain_registration::DomainCapabilities>),
+    RegisterOrcSender(futures::channel::mpsc::UnboundedSender<crate::orchestrator::OrchestratorRequest>),
     Refresh(),
 }
 
@@ -57,9 +58,11 @@ impl DomainSubscriber {
     ) {
         let mut receiver = receiver;
 
-        let mut client = edgeless_api::grpc_impl::outer::domain_register::DomainRegisterAPIClient::new(controller_url).await;
+        let mut client: edgeless_api::grpc_impl::outer::domain_register::DomainRegisterAPIClient =
+            edgeless_api::grpc_impl::outer::domain_register::DomainRegisterAPIClient::new(controller_url).await;
         let mut last_caps = edgeless_api::domain_registration::DomainCapabilities::default();
         let mut counter = 0;
+        let mut orc_sender = None;
 
         while let Some(req) = receiver.next().await {
             match req {
@@ -68,11 +71,14 @@ impl DomainSubscriber {
                     counter += 1;
                     last_caps = *new_caps;
                 }
+                DomainSubscriberRequest::RegisterOrcSender(new_orc_sender) => {
+                    orc_sender = Some(new_orc_sender);
+                }
                 DomainSubscriberRequest::Refresh() => {
                     log::debug!("Subscriber Refresh");
                     // The refresh deadline is set to twice the refresh period
-                    // to reduce the likelihood of a race condition on the domai
-                    // register side.
+                    // to reduce the likelihood of a race condition on the
+                    // domain register side.
                     let update_domain_request = edgeless_api::domain_registration::UpdateDomainRequest {
                         domain_id: domain_id.clone(),
                         orchestrator_url: orchestrator_url.clone(),
@@ -82,9 +88,17 @@ impl DomainSubscriber {
                     };
                     match client.domain_registration_api().update_domain(update_domain_request).await {
                         Ok(response) => {
-                            if let edgeless_api::domain_registration::UpdateDomainResponse::ResponseError(err) = response {
-                                log::error!("Update of domain '{}' rejected by controller: {}", domain_id, err);
-                            }
+                            match response {
+                                edgeless_api::domain_registration::UpdateDomainResponse::ResponseError(err) => {
+                                    log::error!("Update of domain '{}' rejected by controller: {}", domain_id, err)
+                                }
+                                edgeless_api::domain_registration::UpdateDomainResponse::Accepted => {}
+                                edgeless_api::domain_registration::UpdateDomainResponse::Reset => {
+                                    if let Some(orc_sender) = &mut orc_sender {
+                                        let _ = orc_sender.send(crate::orchestrator::OrchestratorRequest::Reset()).await;
+                                    }
+                                }
+                            };
                         }
                         Err(err) => log::error!("Update of domain '{}' failed: {}", domain_id, err),
                     };

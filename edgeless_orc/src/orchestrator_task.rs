@@ -7,6 +7,9 @@ use futures::{SinkExt, StreamExt};
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
+use crate::active_instance::ActiveInstance;
+
+#[derive(Debug)]
 enum Pid {
     // 0: node_id, pid
     Function(edgeless_api::function_instance::InstanceId),
@@ -129,8 +132,13 @@ impl OrchestratorTask {
                     self.refresh().await;
                 }
                 crate::orchestrator::OrchestratorRequest::Refresh(reply_sender) => {
+                    log::debug!("Orchestrator Refresh");
                     self.refresh().await;
                     let _ = reply_sender.send(());
+                }
+                crate::orchestrator::OrchestratorRequest::Reset() => {
+                    log::debug!("Orchestrator Reset");
+                    self.reset().await;
                 }
             }
         }
@@ -217,15 +225,15 @@ impl OrchestratorTask {
     ///    must be applied.
     async fn apply_patches(&mut self, origin_lids: Vec<edgeless_api::function_instance::ComponentId>) {
         for origin_lid in origin_lids.iter() {
-            let ext_output_mapping = match self.dependency_graph.get(origin_lid) {
+            let logical_output_mapping = match self.dependency_graph.get(origin_lid) {
                 Some(x) => x,
                 None => continue,
             };
 
             // Transform logical identifiers (LIDs) into internal ones (PIDs).
             for source in self.lid_to_pid(origin_lid) {
-                let mut int_output_mapping = std::collections::HashMap::new();
-                for (channel, target_lid) in ext_output_mapping {
+                let mut physical_output_mapping = std::collections::HashMap::new();
+                for (channel, target_lid) in logical_output_mapping {
                     for target in self.lid_to_pid(target_lid) {
                         // [TODO] Issue#96 The output_mapping structure
                         // should be changed so that multiple
@@ -233,7 +241,7 @@ impl OrchestratorTask {
                         // this change must be applied to runners,
                         // as well. For now, we just keep
                         // overwriting the same entry.
-                        int_output_mapping.insert(channel.clone(), target.instance_id());
+                        physical_output_mapping.insert(channel.clone(), target.instance_id());
                     }
                 }
 
@@ -245,7 +253,7 @@ impl OrchestratorTask {
                             .function_instance_api()
                             .patch(edgeless_api::common::PatchRequest {
                                 function_id: instance_id.function_id,
-                                output_mapping: int_output_mapping,
+                                output_mapping: physical_output_mapping,
                             })
                             .await
                         {
@@ -271,7 +279,7 @@ impl OrchestratorTask {
                             .resource_configuration_api()
                             .patch(edgeless_api::common::PatchRequest {
                                 function_id: instance_id.function_id,
-                                output_mapping: int_output_mapping,
+                                output_mapping: physical_output_mapping,
                             })
                             .await
                         {
@@ -941,6 +949,24 @@ impl OrchestratorTask {
         if self.dependency_graph_changed {
             proxy.update_dependency_graph(&self.dependency_graph);
             self.dependency_graph_changed = false;
+        }
+    }
+
+    async fn reset(&mut self) {
+        log::info!("Resetting the orchestration domain to a clean state");
+        let mut function_lids = vec![];
+        let mut resource_lids = vec![];
+        for (lid, active_instance) in &self.active_instances {
+            match active_instance {
+                ActiveInstance::Function(_, _) => function_lids.push(lid.clone()),
+                ActiveInstance::Resource(_, _) => resource_lids.push(lid.clone()),
+            }
+        }
+        for lid in function_lids {
+            self.stop_function_lid(lid).await;
+        }
+        for lid in resource_lids {
+            self.stop_resource_lid(lid).await;
         }
     }
 }

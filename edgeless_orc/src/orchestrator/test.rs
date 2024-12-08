@@ -1343,6 +1343,97 @@ async fn test_recreate_fun_after_disconnect() {
 }
 
 #[tokio::test]
+async fn orc_reset() {
+    let num_nodes = 3;
+    let num_workflows = 100;
+    let (mut fun_client, mut res_client, mut nodes, _stable_node_id, _, mut orc_sender) = test_setup(num_nodes, 1).await;
+    assert_eq!(num_nodes, nodes.len() as u32);
+
+    // Start 10 workflows:
+    //
+    // f1 -> f2 -> res
+
+    for _wf_id in 0..num_workflows {
+        // Start f1
+        let spawn_req = make_spawn_function_request("f1");
+        let ext_fid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+            edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+            edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        };
+
+        // Start f2
+        let spawn_req = make_spawn_function_request("f2");
+        let ext_fid_2 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+            edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+            edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        };
+
+        // Start r1
+        let start_req = make_start_resource_request("rc-1");
+        let ext_fid_res = match res_client.start(start_req.clone()).await.unwrap() {
+            edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+            edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        };
+
+        // Patch f1->f2
+        let mut output_mapping = std::collections::HashMap::new();
+        output_mapping.insert(
+            "out".to_string(),
+            edgeless_api::function_instance::InstanceId {
+                node_id: uuid::Uuid::nil(),
+                function_id: ext_fid_2,
+            },
+        );
+        fun_client
+            .patch(edgeless_api::common::PatchRequest {
+                function_id: ext_fid_1,
+                output_mapping,
+            })
+            .await
+            .expect("Could not patch");
+
+        // Patch f2->res
+        let mut output_mapping = std::collections::HashMap::new();
+        output_mapping.insert(
+            "out".to_string(),
+            edgeless_api::function_instance::InstanceId {
+                node_id: uuid::Uuid::nil(),
+                function_id: ext_fid_res,
+            },
+        );
+        fun_client
+            .patch(edgeless_api::common::PatchRequest {
+                function_id: ext_fid_2,
+                output_mapping,
+            })
+            .await
+            .expect("Could not patch");
+    }
+
+    // Make sure there are no pending events around.
+    clear_events(&mut nodes).await;
+
+    // Send a Reset to the orchestrator.
+    let _ = orc_sender.send(OrchestratorRequest::Reset()).await;
+
+    // Disconnect the unstable
+    let mut num_events = std::collections::HashMap::new();
+    while let Some((_node_id, event)) = wait_for_events_if_any(&mut nodes).await {
+        *num_events.entry(event_to_string(&event)).or_insert(0) += 1;
+    }
+
+    assert!(num_events.remove("patch-function").expect("No patch event found, that's very unlikely") <= num_workflows);
+
+    let mut expected_events = std::collections::HashMap::new();
+    expected_events.insert("stop-function", 2 * num_workflows);
+    expected_events.insert("stop-resource", num_workflows);
+    assert_eq!(expected_events, num_events);
+
+    // Ensure that there's no pending event.
+    no_function_event(&mut nodes).await;
+}
+
+#[tokio::test]
 #[serial_test::serial]
 async fn test_update_domain_capabilities() {
     let num_nodes = 10;
@@ -1375,6 +1466,7 @@ async fn test_update_domain_capabilities() {
                     last_caps = *actual_caps;
                     num_events += 1;
                 }
+                DomainSubscriberRequest::RegisterOrcSender(_) => {}
                 DomainSubscriberRequest::Refresh() => {
                     panic!("unexpected refresh event received");
                 }
