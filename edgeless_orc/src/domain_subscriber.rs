@@ -72,6 +72,7 @@ impl DomainSubscriber {
                     last_caps = *new_caps;
                 }
                 DomainSubscriberRequest::RegisterOrcSender(new_orc_sender) => {
+                    log::info!("Orchestrator registered with domain subscriber");
                     orc_sender = Some(new_orc_sender);
                 }
                 DomainSubscriberRequest::Refresh() => {

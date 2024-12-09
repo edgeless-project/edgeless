@@ -100,6 +100,13 @@ impl Orchestrator {
         std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
     ) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
+
+        // Enable the domain subscriber to send requests to this orchestrator.
+        let mut subscriber_sender = subscriber_sender;
+        let _ = subscriber_sender
+            .send(crate::domain_subscriber::DomainSubscriberRequest::RegisterOrcSender(sender.clone()))
+            .await;
+
         let main_task = Box::pin(async move {
             let mut orchestrator_task = super::orchestrator_task::OrchestratorTask::new(
                 receiver,
