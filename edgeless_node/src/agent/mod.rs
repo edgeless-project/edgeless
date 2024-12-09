@@ -9,19 +9,25 @@ use futures::{Future, SinkExt, StreamExt};
 pub mod test;
 
 enum AgentRequest {
-    Spawn(edgeless_api::function_instance::SpawnFunctionRequest),
+    // Function lifecycle management API.
+    SpawnFunction(edgeless_api::function_instance::SpawnFunctionRequest),
+    StopFunction(edgeless_api::function_instance::InstanceId),
+    PatchFunction(edgeless_api::common::PatchRequest),
+
+    // Resource  lifecycle management API.
     SpawnResource(
         edgeless_api::resource_configuration::ResourceInstanceSpecification,
         futures::channel::oneshot::Sender<anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>>>,
     ),
-    Stop(edgeless_api::function_instance::InstanceId),
     StopResource(
         edgeless_api::function_instance::InstanceId,
         futures::channel::oneshot::Sender<anyhow::Result<()>>,
     ),
-    Patch(edgeless_api::common::PatchRequest),
     PatchResource(edgeless_api::common::PatchRequest, futures::channel::oneshot::Sender<anyhow::Result<()>>),
+
+    // Node management API.
     UpdatePeers(edgeless_api::node_management::UpdatePeersRequest),
+    Reset(),
 }
 
 pub struct Agent {
@@ -48,40 +54,45 @@ impl Agent {
         }
 
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, runners, resources, data_plane_provider).await;
+            Self::main_task(node_id.clone(), receiver, runners, resources, data_plane_provider).await;
         });
 
         (Agent { sender, node_id }, main_task)
     }
 
     async fn main_task(
+        node_id: uuid::Uuid,
         receiver: futures::channel::mpsc::UnboundedReceiver<AgentRequest>,
-        // runners-key: class_type
-        // runners-value: RuntimeBox
-        mut runners: std::collections::HashMap<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
+        function_runtimes: std::collections::HashMap<String, Box<dyn crate::base_runtime::RuntimeAPI + Send>>,
         resources: std::collections::HashMap<String, ResourceDesc>,
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     ) {
         let mut receiver = std::pin::pin!(receiver);
         let mut data_plane_provider = data_plane_provider;
 
+        // key:   function class
+        // value: function run-time API
+        let mut function_runtimes = function_runtimes;
+
         // key: provider_id
         // value: class_type
-        //        client (resource configuration API)
+        //        resource configuration API
         let mut resource_providers = resources;
-        // key: fid
+
+        // Active function instances.
+        // key:   physical function identifier
+        // value: function class
+        let mut function_instances = std::collections::HashMap::<edgeless_api::function_instance::ComponentId, String>::new();
+
+        // Active resource instances.
+        // key:   physical resource identifier
         // value: provider_id
         let mut resource_instances = std::collections::HashMap::<edgeless_api::function_instance::ComponentId, String>::new();
-
-        // After spawning a new function, the function´s class is only used to determine which runner to start it on.
-        // When stopping, only the stop_function_id is provided which does not allow to know which runner it is
-        // currently deployed on. Here, we implement a instance_id -> function_class HashMap
-        let mut component_id_to_class_map = std::collections::HashMap::<edgeless_api::function_instance::ComponentId, String>::new();
 
         log::info!("Starting Edgeless Agent");
         while let Some(req) = receiver.next().await {
             match req {
-                AgentRequest::Spawn(spawn_req) => {
+                AgentRequest::SpawnFunction(spawn_req) => {
                     log::debug!("Agent Spawn {:?}", spawn_req);
 
                     // Save function_class for further interaction.
@@ -90,13 +101,13 @@ impl Agent {
                         log::error!("No instance_id provided for SpawnFunctionRequest!");
                         continue;
                     }
-                    component_id_to_class_map.insert(spawn_req.instance_id.unwrap().function_id, spawn_req.code.function_class_type.clone());
+                    function_instances.insert(spawn_req.instance_id.unwrap().function_id, spawn_req.code.function_class_type.clone());
 
                     // Get runner for function_class of spawn_req
-                    match runners.get_mut(&spawn_req.code.function_class_type) {
-                        Some(r) => {
+                    match function_runtimes.get_mut(&spawn_req.code.function_class_type) {
+                        Some(runner) => {
                             // Forward the start request to the correct runner
-                            match r.start(spawn_req).await {
+                            match runner.start(spawn_req).await {
                                 Ok(_) => {}
                                 Err(err) => {
                                     log::error!("Unhandled Start Error: {}", err);
@@ -110,47 +121,18 @@ impl Agent {
                         }
                     }
                 }
-                AgentRequest::Stop(stop_function_id) => {
+                AgentRequest::StopFunction(stop_function_id) => {
                     log::debug!("Agent Stop {:?}", stop_function_id);
 
-                    // Get function class by looking it up in the instanceId->functionClass map
-                    let function_class: String = match component_id_to_class_map.get(&stop_function_id.function_id) {
-                        Some(v) => v.clone(),
-                        None => {
-                            log::error!("Could not find function_class for instanceId {}", stop_function_id);
-                            continue;
-                        }
-                    };
-
-                    // Get runner for function_class
-                    match runners.get_mut(&function_class) {
-                        Some(r) => {
-                            // Forward the stop request to the correct runner
-                            match r.stop(stop_function_id).await {
-                                Ok(_) => {
-                                    // Successfully stopped - now delete the component_id -> function_class mapping
-                                    component_id_to_class_map.remove(&stop_function_id.function_id);
-                                    log::info!("Stopped function {} and cleared memory.", stop_function_id);
-                                }
-                                Err(err) => {
-                                    log::error!("Unhandled Stop Error: {}", err);
-                                    continue;
-                                }
-                            }
-                        }
-                        None => {
-                            log::error!("Could not find runner for {}", function_class);
-                            continue;
-                        }
-                    }
+                    Self::stop_function(&mut function_runtimes, &mut function_instances, stop_function_id).await;
                 }
 
                 // PatchRequest contains function_id: ComponentId
-                AgentRequest::Patch(update) => {
+                AgentRequest::PatchFunction(update) => {
                     log::debug!("Agent UpdatePeers {:?}", update);
 
                     // Get function class by looking it up in the instanceId->functionClass map
-                    let function_class: String = match component_id_to_class_map.get(&update.function_id) {
+                    let function_class: String = match function_instances.get(&update.function_id) {
                         Some(v) => v.clone(),
                         None => {
                             log::error!("Could not find function_class for instanceId {}", update.function_id);
@@ -159,10 +141,10 @@ impl Agent {
                     };
 
                     // Get runner for function_class
-                    match runners.get_mut(&function_class) {
-                        Some(r) => {
+                    match function_runtimes.get_mut(&function_class) {
+                        Some(runner) => {
                             // Forward the patch request to the correct runner
-                            match r.patch(update).await {
+                            match runner.patch(update).await {
                                 Ok(_) => {}
                                 Err(err) => {
                                     log::error!("Unhandled Patch Error: {}", err);
@@ -228,34 +210,8 @@ impl Agent {
                     }
                 }
                 AgentRequest::StopResource(resource_id, responder) => {
-                    if let Some(provider_id) = resource_instances.get(&resource_id.function_id) {
-                        if let Some(resource_desc) = resource_providers.get_mut(provider_id) {
-                            log::info!(
-                                "Stopped resource class_type {}, provider_id {} node_id {}, fid {}",
-                                resource_desc.class_type,
-                                provider_id,
-                                resource_id.node_id,
-                                resource_id.function_id
-                            );
-                            responder
-                                .send(resource_desc.client.stop(resource_id).await)
-                                .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                            continue;
-                        } else {
-                            responder
-                                .send(Err(anyhow::anyhow!(
-                                    "Cannot stop a resource, provider not found with provider_id: {}",
-                                    provider_id
-                                )))
-                                .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                            continue;
-                        }
-                    }
                     responder
-                        .send(Err(anyhow::anyhow!(
-                            "Cannot stop a resource, not found with fid: {}",
-                            resource_id.function_id
-                        )))
+                        .send(Self::stop_resource(&mut resource_providers, &mut resource_instances, resource_id).await)
                         .unwrap_or_else(|_| log::warn!("Responder Send Error"));
                 }
                 AgentRequest::PatchResource(update, responder) => {
@@ -283,7 +239,107 @@ impl Agent {
                         )))
                         .unwrap_or_else(|_| log::warn!("Responder Send Error"));
                 }
+                AgentRequest::Reset() => {
+                    log::info!("Resetting the node to a clean state");
+
+                    // Stop all the function instances.
+                    let function_ids = function_instances
+                        .keys()
+                        .cloned()
+                        .collect::<Vec<edgeless_api::function_instance::ComponentId>>();
+                    for function_id in function_ids {
+                        Self::stop_function(
+                            &mut function_runtimes,
+                            &mut function_instances,
+                            edgeless_api::function_instance::InstanceId {
+                                node_id: node_id.clone(),
+                                function_id,
+                            },
+                        )
+                        .await;
+                    }
+                    function_instances.clear();
+
+                    // Stop all the resource instances.
+                    let resource_ids = resource_instances
+                        .keys()
+                        .cloned()
+                        .collect::<Vec<edgeless_api::function_instance::ComponentId>>();
+                    for resource_id in resource_ids {
+                        if let Err(err) = Self::stop_resource(
+                            &mut resource_providers,
+                            &mut resource_instances,
+                            edgeless_api::function_instance::InstanceId {
+                                node_id: node_id.clone(),
+                                function_id: resource_id,
+                            },
+                        )
+                        .await
+                        {
+                            log::warn!("Error stopping the resource with ID '{}': {}", resource_id, err);
+                        }
+                    }
+                    resource_instances.clear();
+                }
             }
+        }
+    }
+
+    async fn stop_function(
+        function_runtimes: &mut std::collections::HashMap<std::string::String, Box<dyn crate::base_runtime::RuntimeAPI + std::marker::Send>>,
+        function_instances: &mut std::collections::HashMap<edgeless_api::function_instance::ComponentId, String>,
+        function_id: edgeless_api::function_instance::InstanceId,
+    ) {
+        // Get function class by looking it up in the instanceId->functionClass map
+        let function_class: String = match function_instances.get(&function_id.function_id) {
+            Some(v) => v.clone(),
+            None => {
+                log::error!("Could not find function_class for instanceId {}", function_id);
+                return;
+            }
+        };
+
+        // Get runner for function_class
+        match function_runtimes.get_mut(&function_class) {
+            Some(runner) => {
+                // Forward the stop request to the correct runner
+                match runner.stop(function_id).await {
+                    Ok(_) => {
+                        // Successfully stopped - now delete the component_id -> function_class mapping
+                        function_instances.remove(&function_id.function_id);
+                        log::info!("Stopped function {} and cleared memory.", function_id);
+                    }
+                    Err(err) => {
+                        log::error!("Unhandled Stop Error: {}", err);
+                    }
+                }
+            }
+            None => {
+                log::error!("Could not find runner for {}", function_class);
+            }
+        }
+    }
+
+    async fn stop_resource(
+        resource_providers: &mut std::collections::HashMap<String, ResourceDesc>,
+        resource_instances: &mut std::collections::HashMap<edgeless_api::function_instance::ComponentId, String>,
+        resource_id: edgeless_api::function_instance::InstanceId,
+    ) -> anyhow::Result<()> {
+        if let Some(provider_id) = resource_instances.get(&resource_id.function_id) {
+            if let Some(resource_desc) = resource_providers.get_mut(provider_id) {
+                log::info!(
+                    "Stopped resource class_type {}, provider_id {} node_id {}, fid {}",
+                    resource_desc.class_type,
+                    provider_id,
+                    resource_id.node_id,
+                    resource_id.function_id
+                );
+                resource_desc.client.stop(resource_id).await
+            } else {
+                anyhow::bail!("Cannot stop a resource, provider not found with provider_id: {}", provider_id);
+            }
+        } else {
+            anyhow::bail!("Cannot stop a resource, not found with fid: {}", resource_id.function_id);
         }
     }
 
@@ -338,7 +394,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
                 new_id
             }
         };
-        match self.sender.send(AgentRequest::Spawn(request)).await {
+        match self.sender.send(AgentRequest::SpawnFunction(request)).await {
             Ok(_) => Ok(edgeless_api::common::StartComponentResponse::InstanceId(f_id)),
             Err(err) => Err(anyhow::anyhow!(
                 "Agent channel error when creating a function instance: {}",
@@ -347,7 +403,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
         }
     }
     async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-        match self.sender.send(AgentRequest::Stop(id)).await {
+        match self.sender.send(AgentRequest::StopFunction(id)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Agent channel error when stopping a function instance: {}",
@@ -357,7 +413,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
     }
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
-        match self.sender.send(AgentRequest::Patch(update)).await {
+        match self.sender.send(AgentRequest::PatchFunction(update)).await {
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Agent channel error when updating the links of a function instance: {}",
@@ -376,6 +432,12 @@ impl edgeless_api::node_management::NodeManagementAPI for NodeManagementClient {
                 "Agent channel error when updating the peers of a node: {}",
                 err.to_string()
             )),
+        }
+    }
+    async fn reset(&mut self) -> anyhow::Result<()> {
+        match self.sender.send(AgentRequest::Reset()).await {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!("Agent channel error when resetting a node: {}", err.to_string())),
         }
     }
 }
