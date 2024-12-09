@@ -30,6 +30,7 @@ enum MockAgentEvent {
     ),
     StopResource(edgeless_api::function_instance::InstanceId),
     PatchResource(edgeless_api::common::PatchRequest),
+    Reset(),
 }
 
 struct MockNode {
@@ -95,6 +96,10 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
 impl edgeless_api::node_management::NodeManagementAPI for MockAgentAPI {
     async fn update_peers(&mut self, request: edgeless_api::node_management::UpdatePeersRequest) -> anyhow::Result<()> {
         self.sender.send(MockAgentEvent::UpdatePeers(request)).await.unwrap();
+        Ok(())
+    }
+    async fn reset(&mut self) -> anyhow::Result<()> {
+        self.sender.send(MockAgentEvent::Reset()).await.unwrap();
         Ok(())
     }
 }
@@ -234,6 +239,7 @@ fn event_to_string(event: &MockAgentEvent) -> &'static str {
         MockAgentEvent::StopResource(_) => "stop-resource",
         MockAgentEvent::PatchResource(_) => "patch-resource",
         MockAgentEvent::UpdatePeers(_) => "update-peers",
+        MockAgentEvent::Reset() => "reset",
     }
 }
 
@@ -1322,7 +1328,8 @@ async fn test_recreate_fun_after_disconnect() {
     }
     if let Some(entry) = nodes.get_mut(&unstable_node_id) {
         let mut num_update_peers = 0;
-        for _ in 0..4 {
+        let mut num_reset = 0;
+        for _ in 0..5 {
             let event = wait_for_event_at_node(entry).await;
             match event {
                 MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd)) => {
@@ -1333,10 +1340,14 @@ async fn test_recreate_fun_after_disconnect() {
                 MockAgentEvent::UpdatePeers(_update) => {
                     num_update_peers += 1;
                 }
+                MockAgentEvent::Reset() => {
+                    num_reset += 1;
+                }
                 _ => panic!("unexpected event"),
             }
         }
         assert_eq!(2, num_update_peers);
+        assert_eq!(1, num_reset);
     }
 
     no_function_event(&mut nodes).await;
