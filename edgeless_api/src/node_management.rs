@@ -13,6 +13,7 @@ pub enum UpdatePeersRequest {
 #[async_trait::async_trait]
 pub trait NodeManagementAPI: NodeManagementAPIClone + Sync + Send {
     async fn update_peers(&mut self, request: UpdatePeersRequest) -> anyhow::Result<()>;
+    async fn reset(&mut self) -> anyhow::Result<()>;
 }
 
 // https://stackoverflow.com/a/30353928

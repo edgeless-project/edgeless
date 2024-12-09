@@ -119,8 +119,9 @@ impl OrchestratorTask {
                     log::debug!("Orchestrator Patch {:?}", update);
                     self.patch(update).await;
                 }
-                crate::orchestrator::OrchestratorRequest::AddNode(node_id, client_desc, resource_providers) => {
+                crate::orchestrator::OrchestratorRequest::AddNode(node_id, mut client_desc, resource_providers) => {
                     log::debug!("Orchestrator AddNode {}", client_desc.to_string_short());
+                    let _ = client_desc.api.node_management_api().reset().await;
                     self.add_node(node_id, client_desc, resource_providers).await;
                     self.update_domain().await;
                     self.refresh().await;
@@ -736,24 +737,39 @@ impl OrchestratorTask {
     async fn del_node(&mut self, node_id: uuid::Uuid) {
         // Remove the node from the map of clients.
         log::info!("Removing node '{}'", node_id);
-        if let Some(_client_desc) = self.nodes.remove(&node_id) {
-            // Remove all the resource providers associated with it.
-            self.resource_providers.retain(|_k, v| v.node_id != node_id);
+        if self.nodes.remove(&node_id).is_none() {
+            log::error!("Cannot delete non-existing node '{}'", node_id);
+            return;
+        }
 
-            // Update the peers of (still alive) nodes by
-            // deleting the missing-in-action peer.
-            for (_, client_desc) in self.nodes.iter_mut() {
-                if let Err(err) = client_desc
-                    .api
-                    .node_management_api()
-                    .update_peers(edgeless_api::node_management::UpdatePeersRequest::Del(node_id))
-                    .await
-                {
-                    log::error!("Unhandled: {}", err);
+        // Remove all the resource providers associated with the node removed.
+        self.resource_providers.retain(|_k, v| v.node_id != node_id);
+
+        // Update the peers of (still alive) nodes by
+        // deleting the missing-in-action peer.
+        for (_, client_desc) in self.nodes.iter_mut() {
+            if let Err(err) = client_desc
+                .api
+                .node_management_api()
+                .update_peers(edgeless_api::node_management::UpdatePeersRequest::Del(node_id))
+                .await
+            {
+                log::error!("Unhandled: {}", err);
+            }
+        }
+
+        // Remove the node from all the active instances.
+        for (_origin_lid, instance) in self.active_instances.iter_mut() {
+            match instance {
+                crate::active_instance::ActiveInstance::Function(_start_req, ref mut instances) => {
+                    instances.retain(|cur_node_id| node_id != cur_node_id.node_id);
+                }
+                crate::active_instance::ActiveInstance::Resource(_start_req, ref mut instance) => {
+                    if instance.node_id == node_id {
+                        *instance = edgeless_api::function_instance::InstanceId::none();
+                    }
                 }
             }
-        } else {
-            log::error!("Cannot delete non-existing node '{}'", node_id);
         }
     }
 

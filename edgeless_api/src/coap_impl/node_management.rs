@@ -48,4 +48,13 @@ impl crate::node_management::NodeManagementAPI for super::CoapClient {
             }
         }
     }
+    async fn reset(&mut self) -> anyhow::Result<()> {
+        match self
+            .call_with_reply(|token, addr, buffer| edgeless_api_core::coap_mapping::COAPEncoder::encode_reset(addr, token, buffer))
+            .await
+        {
+            Ok(_) => Ok(()),
+            Err(err) => Err(anyhow::anyhow!(String::from_utf8(err).unwrap())),
+        }
+    }
 }

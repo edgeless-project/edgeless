@@ -35,6 +35,10 @@ service NodeManagement {
     // Input: the node identifier and invocation URL (only for add operations).
     // Output: none.
     rpc UpdatePeers (UpdatePeersRequest) returns (google.protobuf.Empty);
+    // Reset the node to a clean state.
+    // Input: none.
+    // Output: none.
+    rpc Reset (google.protobuf.Empty) returns (google.protobuf.Empty);
 }
 
 // API that allows nodes to register themselves with the orchestrator.

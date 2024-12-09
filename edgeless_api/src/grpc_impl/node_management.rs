@@ -64,6 +64,25 @@ impl crate::node_management::NodeManagementAPI for NodeManagementClient {
             }
         }
     }
+    async fn reset(&mut self) -> anyhow::Result<()> {
+        match self.try_connect().await {
+            Ok(_) => {
+                if let Some(client) = &mut self.client {
+                    if let Err(err) = client.reset(tonic::Request::new(())).await {
+                        self.disconnect();
+                        anyhow::bail!("Error when resetting at {}: {}", self.server_addr, err.to_string());
+                    } else {
+                        Ok(())
+                    }
+                } else {
+                    panic!("The impossible happened");
+                }
+            }
+            Err(err) => {
+                anyhow::bail!("Error when resetting to {}: {}", self.server_addr, err);
+            }
+        }
+    }
 }
 
 #[async_trait::async_trait]
@@ -82,6 +101,12 @@ impl crate::grpc_impl::api::node_management_server::NodeManagement for NodeManag
         match self.node_management_api.lock().await.update_peers(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
             Err(err) => Err(tonic::Status::internal(format!("Error when updating peers: {}", err))),
+        }
+    }
+    async fn reset(&self, _request: tonic::Request<()>) -> Result<tonic::Response<()>, tonic::Status> {
+        match self.node_management_api.lock().await.reset().await {
+            Ok(_) => Ok(tonic::Response::new(())),
+            Err(err) => Err(tonic::Status::internal(format!("Error when resetting: {}", err))),
         }
     }
 }
