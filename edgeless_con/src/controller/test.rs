@@ -127,6 +127,7 @@ async fn test_setup() -> (
             capabilities,
             refresh_deadline: std::time::SystemTime::now(),
             counter: 0,
+            nonce: 42,
         },
     )]);
 

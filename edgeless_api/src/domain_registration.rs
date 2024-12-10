@@ -66,6 +66,10 @@ pub struct UpdateDomainRequest {
     pub refresh_deadline: std::time::SystemTime,
     // Incremental counter updated every time the capabilities change.
     pub counter: u64,
+    // Number that identifies the specific instance of this orchestrator, which
+    // allows the domain register to detect service restarts.
+    // It is drawn randomly when the node starts and never changes.
+    pub nonce: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]
