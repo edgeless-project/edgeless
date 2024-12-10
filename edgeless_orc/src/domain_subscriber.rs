@@ -3,6 +3,7 @@
 
 use edgeless_api::outer::domain_register::DomainRegisterAPI;
 use futures::{Future, SinkExt, StreamExt};
+use rand::distributions::Distribution;
 
 #[derive(Clone)]
 pub struct DomainSubscriber {
@@ -29,8 +30,19 @@ impl DomainSubscriber {
     ) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let sender_cloned = sender.clone();
+        let mut rng = rand::thread_rng();
+        let nonce = rand::distributions::Uniform::from(0..u64::MAX).sample(&mut rng);
+
         let main_task = Box::pin(async move {
-            Self::main_task(domain_id, orchestrator_url, controller_url, subscription_refresh_interval_sec, receiver).await;
+            Self::main_task(
+                domain_id,
+                orchestrator_url,
+                controller_url,
+                subscription_refresh_interval_sec,
+                nonce,
+                receiver,
+            )
+            .await;
         });
 
         let refresh_task = Box::pin(async move {
@@ -54,6 +66,7 @@ impl DomainSubscriber {
         orchestrator_url: String,
         controller_url: String,
         subscription_refresh_interval_sec: u64,
+        nonce: u64,
         receiver: futures::channel::mpsc::UnboundedReceiver<DomainSubscriberRequest>,
     ) {
         let mut receiver = receiver;
@@ -86,6 +99,7 @@ impl DomainSubscriber {
                         capabilities: last_caps.clone(),
                         refresh_deadline: std::time::SystemTime::now() + std::time::Duration::from_secs(subscription_refresh_interval_sec * 2),
                         counter,
+                        nonce,
                     };
                     match client.domain_registration_api().update_domain(update_domain_request).await {
                         Ok(response) => {

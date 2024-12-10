@@ -248,8 +248,10 @@ pub struct UpdateNodeRequest {
     // Deadline for refreshing the node request, in seconds since Unix epoch.
     // After this time the node can be considered to be offline.
     pub refresh_deadline: std::time::SystemTime,
-    // Incremental counter updated every time the capabilities change.
-    pub counter: u64,
+    // Number that identifies the specific instance of this node, which allows
+    // the node register to detect service restarts.
+    // It is drawn randomly when the node starts and never changes.
+    pub nonce: u64,
     // Node health status.
     pub health_status: NodeHealthStatus,
     // Node performance info.
