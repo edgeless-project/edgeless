@@ -121,12 +121,10 @@ Currently there are several known limitations, including the following ones:
 - the dataplane is limited within a single orchestration domain and realized
   through a full-mesh interconnection between all the nodes;
 - the ε-BAL is a mere skeleton with no logic;
-- the ε-CON only supports a single orchestration domain and does not perform
-  any kind of admission control;
+- the ε-CON allocates all the functions/resources of a workflow together to
+  the same domain; 
 - no workflow-level annotations are supported; 
 - the payload of events is not encrypted;
-- the configuration of the ε-CON is read from a file and cannot be modified
-  (e.g., it is not possible to add an orchestration domain);
 - there is no persistence of the soft states of the various components.
 
 The full list of issues is tracked on
@@ -141,14 +139,14 @@ to remain up to date on future developments.
 | ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | deployment                                       | Docker and Docker Compose scripts                                                                                                                                                                                                                     |
 | documentation                                    | Repository documentation.                                                                                                                                                                                                                             |
-| edgeless_api                                     | gRPC API definitions, both services and messages. This directory must be imported by other projects wishing to interact with EDGELESS components through its interfaces. The following interfaces are currently implemented: s01, s04, s06, s07.      |
+| edgeless_api                                     | gRPC API definitions, both services and messages. This directory must be imported by other projects wishing to interact with EDGELESS components through its interfaces.                                                                              |
 | edgeless_api_core                                | API definitions with minimal functions for embedded devices using CoAP.                                                                                                                                                                               |
 | edgeless_bal                                     | Reference implementation of the ε-BAL, currently a mere skeleton. The concrete implementation will be done in the next project phase when inter-domain workflows will be supported.                                                                   |
 | [edgeless_benchmark](documentation/benchmark.md) | Suite to benchmark an EDGELESS system in controlled and repeatable conditions using artificial workloads.                                                                                                                                             |
-| edgeless_cli                                     | EDGELESS command-line interface. This is used currently to locally build function instances and to interact with the ε-CON via the s04 interface to create/terminate/list workflows.                                                                  |
+| edgeless_cli                                     | EDGELESS command-line interface. This is used currently to locally build function instances and to interact with the ε-CON to create/terminate/list workflows.                                                                                        |
 | edgeless_con                                     | Reference implementation of the ε-CON, currently only supporting a single orchestration domain and ignoring workflow annotations.                                                                                                                     |
 | edgeless_container_function                      | Skeleton of a function to be deployed in a container.                                                                                                                                                                                                 |
-| edgeless_dataplane                               | EDGELESS intra-domain dataplane, which is realised through the full-mesh interconnection of gRPC services implementing the s01 API.                                                                                                                   |
+| edgeless_dataplane                               | EDGELESS intra-domain dataplane, which is realised through the full-mesh interconnection of gRPC services.                                                                                                                                            |
 | edgeless_dda                                     | EDGELESS Data Distribution Agent.                                                                                                                                                                                                                     |
 | edgeless_embedded                                | Work-in-progress implementation of special features for embedded devices.                                                                                                                                                                             |
 | edgeless_embedded_emu                            | Embedded device emulator.                                                                                                                                                                                                                             |
