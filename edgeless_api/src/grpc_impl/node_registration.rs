@@ -151,7 +151,7 @@ fn parse_update_node_request(api_instance: &crate::grpc_impl::api::UpdateNodeReq
             Some(val) => parse_node_capabilities(val),
             None => crate::node_registration::NodeCapabilities::default(),
         },
-        counter: api_instance.counter,
+        nonce: api_instance.nonce,
         health_status: match &api_instance.health_status {
             Some(val) => parse_node_health_status(val),
             None => crate::node_registration::NodeHealthStatus::default(),
@@ -197,7 +197,7 @@ fn serialize_update_node_request(req: &crate::node_registration::UpdateNodeReque
         resource_providers: req.resource_providers.iter().map(serialize_resource_provider_specification).collect(),
         capabilities: Some(serialize_node_capabilities(&req.capabilities)),
         refresh_deadline: req.refresh_deadline.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
-        counter: req.counter,
+        nonce: req.nonce,
         health_status: Some(serialize_node_health_status(&req.health_status)),
         performance_samples: Some(serialize_node_performance_samples(&req.performance_samples)),
     }
@@ -348,7 +348,7 @@ mod test {
                 mem_size_gpu: 80 * 1024,
             },
             refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(313714800),
-            counter: 1,
+            nonce: 1,
             health_status: NodeHealthStatus {
                 mem_free: 3,
                 mem_used: 4,

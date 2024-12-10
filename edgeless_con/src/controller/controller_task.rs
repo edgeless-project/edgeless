@@ -12,6 +12,7 @@ pub struct OrchestratorDesc {
     pub capabilities: edgeless_api::domain_registration::DomainCapabilities,
     pub refresh_deadline: std::time::SystemTime,
     pub counter: u64,
+    pub nonce: u64,
 }
 
 pub struct ControllerTask {
@@ -395,6 +396,7 @@ impl ControllerTask {
                         capabilities: update_domain_request.capabilities.clone(),
                         refresh_deadline: update_domain_request.refresh_deadline,
                         counter: update_domain_request.counter,
+                        nonce: update_domain_request.nonce,
                     },
                 );
 
@@ -403,22 +405,34 @@ impl ControllerTask {
                 Ok(edgeless_api::domain_registration::UpdateDomainResponse::Reset)
             }
             Some(desc) => {
-                // If the counter has not been incremented, then update only
-                // the refresh deadline, all the other fields are assumed
-                // to remain the same.
-                desc.refresh_deadline = update_domain_request.refresh_deadline;
-                if desc.counter != update_domain_request.counter {
-                    desc.counter = update_domain_request.counter;
-                    desc.capabilities = update_domain_request.capabilities.clone();
+                // If the nonce is differen: this is a new instance of an
+                // orchestration domain, which must be reset.
+                // Otherwise, if the counter has not been incremented, then
+                // update only the refresh deadline, all the other fields are
+                // assumed to remain the same.
 
-                    // Update the client if needed.
+                let response = if desc.nonce == update_domain_request.nonce && desc.counter == update_domain_request.counter {
+                    edgeless_api::domain_registration::UpdateDomainResponse::Accepted
+                } else {
+                    desc.capabilities = update_domain_request.capabilities.clone();
+                    desc.counter = update_domain_request.counter;
+
+                    // Re-create the client only if needed.
                     if desc.orchestrator_url != update_domain_request.orchestrator_url {
                         desc.orchestrator_url = update_domain_request.orchestrator_url.clone();
                         desc.client =
                             Box::new(edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&update_domain_request.orchestrator_url).await?);
                     }
-                }
-                Ok(edgeless_api::domain_registration::UpdateDomainResponse::Accepted)
+
+                    if desc.nonce == update_domain_request.nonce {
+                        edgeless_api::domain_registration::UpdateDomainResponse::Accepted
+                    } else {
+                        desc.nonce = update_domain_request.nonce;
+                        edgeless_api::domain_registration::UpdateDomainResponse::Reset
+                    }
+                };
+                desc.refresh_deadline = update_domain_request.refresh_deadline;
+                Ok(response)
             }
         }
     }
