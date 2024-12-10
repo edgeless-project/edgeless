@@ -106,13 +106,13 @@ impl NodeRegister {
                                     request.node_id,
                                     NodeRegisterEntry {
                                         refresh_deadline: request.refresh_deadline,
-                                        counter: request.counter,
+                                        counter: request.nonce,
                                     },
                                 );
                                 true
                         }
                             Some(existing_node) => {
-                                if existing_node.counter == request.counter {
+                                if existing_node.counter == request.nonce {
                                     existing_node.refresh_deadline = request.refresh_deadline;
                                     false
                                 } else {

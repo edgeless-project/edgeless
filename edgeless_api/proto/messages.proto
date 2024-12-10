@@ -97,8 +97,10 @@ message UpdateNodeRequest {
     // Deadline for refreshing the node request, in seconds since Unix epoch.
     // After this time the node can be considered to be offline.
     uint64 refresh_deadline                    = 10;
-    // Incremental counter updated every time the capabilities change.
-    uint64 counter                             = 11;
+    // Number that identifies the specific instance of this node, which allows
+    // the node register to detect service restarts.
+    // It is drawn randomly when the node starts and never changes.
+    uint64 nonce                               = 11;
     // Node health status.
     NodeHealthStatus health_status             = 20;
     // Node performance info.
@@ -360,6 +362,10 @@ message UpdateDomainRequest {
     uint64 refresh_deadline         = 40;
     // Incremental counter updated every time the capabilities change.
     uint64 counter                  = 50;
+    // Number that identifies the specific instance of this orchestrator, which
+    // allows the domain register to detect service restarts.
+    // It is drawn randomly when the node starts and never changes.
+    uint64 nonce                     = 51;
 }
 
 // Domain capabilities exposed from the orchestrator to the controller.

@@ -29,19 +29,11 @@ impl NodeSubscriber {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         let sender_cloned = sender.clone();
         let mut rng = rand::thread_rng();
-        let counter = rand::distributions::Uniform::from(0..u64::MAX).sample(&mut rng);
+        let nonce = rand::distributions::Uniform::from(0..u64::MAX).sample(&mut rng);
 
         let subscription_refresh_interval_sec = settings.subscription_refresh_interval_sec;
         let main_task = Box::pin(async move {
-            Self::main_task(
-                settings,
-                resource_providers,
-                capabilities,
-                counter,
-                receiver,
-                telemetry_performance_target,
-            )
-            .await;
+            Self::main_task(settings, resource_providers, capabilities, nonce, receiver, telemetry_performance_target).await;
         });
 
         let refresh_task = Box::pin(async move {
@@ -64,7 +56,7 @@ impl NodeSubscriber {
         settings: crate::EdgelessNodeGeneralSettings,
         resource_providers: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
         capabilities: edgeless_api::node_registration::NodeCapabilities,
-        counter: u64,
+        nonce: u64,
         receiver: futures::channel::mpsc::UnboundedReceiver<NodeSubscriberRequest>,
         telemetry_performance_target: edgeless_telemetry::performance_target::PerformanceTargetInner,
     ) {
@@ -110,7 +102,7 @@ impl NodeSubscriber {
                         resource_providers: resource_providers.clone(),
                         capabilities: capabilities.clone(),
                         refresh_deadline: std::time::SystemTime::now() + std::time::Duration::from_secs(subscription_refresh_interval_sec * 2),
-                        counter,
+                        nonce,
                         health_status: Self::get_health_status(&mut sys, &mut networks, &mut disks, own_pid),
                         performance_samples: edgeless_api::node_registration::NodePerformanceSamples {
                             function_execution_times: telemetry_performance_target.get_metrics().function_execution_times,

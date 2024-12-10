@@ -151,6 +151,7 @@ fn parse_update_domain_request(
         capabilities,
         refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(api_instance.refresh_deadline),
         counter: api_instance.counter,
+        nonce: api_instance.nonce,
     })
 }
 
@@ -198,11 +199,14 @@ fn serialize_update_domain_request(req: &crate::domain_registration::UpdateDomai
         capabilities: Some(serialize_domain_capabilities(&req.capabilities)),
         refresh_deadline: req.refresh_deadline.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
         counter: req.counter,
+        nonce: req.nonce,
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::u64;
+
     use super::*;
     use crate::domain_registration::DomainCapabilities;
     use crate::domain_registration::UpdateDomainRequest;
@@ -217,6 +221,7 @@ mod test {
                 capabilities: DomainCapabilities::default(),
                 refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(313714800),
                 counter: 1,
+                nonce: 2,
             },
             UpdateDomainRequest {
                 domain_id: "my-domain".to_string(),
@@ -238,6 +243,7 @@ mod test {
                 },
                 refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(313714800),
                 counter: 42,
+                nonce: u64::MAX,
             },
         ];
         for msg in messages {

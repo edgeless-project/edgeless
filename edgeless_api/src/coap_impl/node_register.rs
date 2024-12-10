@@ -66,7 +66,7 @@ impl CoapNodeRegisterServer {
                 .collect(),
             capabilities: crate::node_registration::NodeCapabilities::default(),
             refresh_deadline: std::time::SystemTime::now() + std::time::Duration::from_secs(86400),
-            counter: 0,
+            nonce: 0,
             health_status: crate::node_registration::NodeHealthStatus::default(),
             performance_samples: crate::node_registration::NodePerformanceSamples::default(),
         };
