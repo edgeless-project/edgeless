@@ -27,7 +27,7 @@ pub async fn setup_metrics_collector(engine: &mut Engine, single_trigger_wasm: &
             workflow_functions: vec![WorkflowFunction {
                 name: "single_trigger".to_string(),
                 function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                    function_class_id: "matrix_mul".to_string(),
+                    function_class_id: "single_trigger".to_string(),
                     function_class_type: "RUST_WASM".to_string(),
                     function_class_version: "0.1".to_string(),
                     function_class_code,
@@ -224,10 +224,10 @@ impl Engine {
                         i => format!("f{}", chain_size - i - 1),
                     };
 
-                    let output_mapping = std::collections::HashMap::from([
-                        ("metric".to_string(), "metrics-collector".to_string()),
-                        ("out".to_string(), next_func_name),
-                    ]);
+                    let mut output_mapping = std::collections::HashMap::from([("out".to_string(), next_func_name)]);
+                    if self.redis_client.is_some() {
+                        output_mapping.insert("metric".to_string(), "metrics-collector".to_string());
+                    }
 
                     let annotations = std::collections::HashMap::from([(
                         "init-payload".to_string(),
@@ -310,7 +310,7 @@ impl Engine {
                     let outputs: Vec<u32> = if last { vec![] } else { (0..breadth).collect() };
                     breadths.push(outputs.len());
                     let mut output_mapping = std::collections::HashMap::new();
-                    if first || last {
+                    if self.redis_client.is_some() && (first || last) {
                         output_mapping.insert("metric".to_string(), "metrics-collector".to_string());
                     }
                     for out in &outputs {
@@ -379,7 +379,7 @@ impl Engine {
             }
         };
 
-        if self.wf_type.metrics_collector() {
+        if self.redis_client.is_some() && self.wf_type.metrics_collector() {
             resources.push(edgeless_api::workflow_instance::WorkflowResource {
                 name: "metrics-collector".to_string(),
                 class_type: "metrics-collector".to_string(),
