@@ -45,7 +45,7 @@ struct Args {
     #[arg(long, default_value_t = String::from("functions/single_trigger/single_trigger.wasm"))]
     single_trigger_wasm: String,
     /// URL of the Redis server to use for metrics.
-    #[arg(short, long, default_value_t = String::from("redis://127.0.0.1:6379/"))]
+    #[arg(short, long, default_value_t = String::from(""))]
     redis_url: String,
     /// Path where to save the output CSV datasets. If empty, do not save them.
     #[arg(long, default_value_t = String::from(""))]
@@ -102,6 +102,14 @@ async fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
 
+    if args.warmup >= args.duration {
+        log::warn!(
+            "metrics will not be collected since warm-up period ({} s) >= experiment duration ({} s)",
+            args.warmup,
+            args.duration
+        );
+    }
+
     // Parse the worflow type from command line option.
     if args.wf_type.to_lowercase() == "help" {
         for wf_type in WorkflowType::all() {
@@ -143,12 +151,16 @@ async fn main() -> anyhow::Result<()> {
     additional_header.push("seed");
 
     // Start the Redis dumper
-    let redis_client = edgeless_benchmark::redis_dumper::RedisDumper::new(&args.redis_url, additional_fields.join(","), additional_header.join(","));
-    let redis_client = match redis_client {
-        Ok(val) => Some(val),
-        Err(err) => {
-            log::error!("could not connect to Redis at {}: {}", &args.redis_url, err);
-            None
+    let (metrics_collection, redis_client) = match args.redis_url.is_empty() {
+        true => (false, None),
+        false => {
+            match edgeless_benchmark::redis_dumper::RedisDumper::new(&args.redis_url, additional_fields.join(","), additional_header.join(",")) {
+                Ok(val) => (true, Some(val)),
+                Err(err) => {
+                    log::error!("could not connect to Redis at {}: {}", &args.redis_url, err);
+                    (true, None)
+                }
+            }
         }
     };
 
@@ -166,19 +178,14 @@ async fn main() -> anyhow::Result<()> {
     // add the end-of-experiment event
     events.push(Event::WfExperimentEnd(utils::to_microseconds(args.duration)));
 
-    // set up warm-up period configuration
-    if args.warmup >= args.duration {
-        log::warn!(
-            "metrics will not be collected since warm-up period ({} s) >= experiment duration ({} s)",
-            args.warmup,
-            args.duration
-        );
-    }
-    let single_trigger_workflow_id =
-        match edgeless_benchmark::engine::setup_metrics_collector(&mut engine, &args.single_trigger_wasm, args.warmup).await {
+    // if metrics collection is enabled, reset the metrics-collector resource
+    let single_trigger_workflow_id = match metrics_collection {
+        true => match edgeless_benchmark::engine::setup_metrics_collector(&mut engine, &args.single_trigger_wasm, args.warmup).await {
             Ok(workflow_id) => workflow_id,
             Err(err) => anyhow::bail!("error when setting up the metrics collector: {} ", err),
-        };
+        },
+        false => String::default(),
+    };
 
     // main experiment loop
     let mut wf_started = 0;
@@ -245,7 +252,9 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     }
-    let _ = engine.stop_workflow(&single_trigger_workflow_id).await;
+    if metrics_collection {
+        let _ = engine.stop_workflow(&single_trigger_workflow_id).await;
+    }
 
     // dump data collected in Redis
     if !args.dataset_path.is_empty() {
