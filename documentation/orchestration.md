@@ -33,12 +33,7 @@ The ε-ORC implements a basic orchestration policy that:
 
 If it is currently not possible to maintain in execution a function instance of
 a given logical function, the ε-ORC will continue trying to create the
-function instance every `keep_alive_interval_secs` (in the configuration file).
-
-The same period is also used to poll all the nodes in an orchestration domain:
-if a node does not respond, then it is immediately removed from the list of
-active nodes and its functions/resources are relocated to other nodes, if
-possible.
+function or resource instance.
 
 In all cases, the ε-ORC ensures that "patching", i.e., the interconnections
 among function instances and resources for the exchange of events, is kept
@@ -151,15 +146,17 @@ Where:
 
 ### Collection of application metrics
 
-This feature currently requires an external Redis in-memory database, which is used to store the metrics, and it is enabled by means of the following section in `orchestrator.toml`: 
+This feature currently requires an external Redis in-memory database, which is
+used to store the metrics, and it is enabled by adding one node to the
+orchestration domain that exposes a `metrics-collector` resource provider via
+the following section in `node.toml`: 
 
 ```ini
-[collector]
+[resources.metrics_collector_provider]
 collector_type = "Redis"
-redis_url = "redis://127.0.0.1:6379"
+redis_url = "redis://localhost:6379"
+provider = "metrics-collector-1"
 ```
-
-If enabled the ε-ORC also hosts a node, with no associated run-times, that exposes a resource provider called `metrics-collector`, which is in charge of receiving and processing application metrics.
 
 Currently two types of metrics are supported: `workflow` and `function`.
 For both types the developer is responsible for:
@@ -176,8 +173,10 @@ This can be done through the following invocations:
 | A workflow-related process uniquely identified by `id` began | `cast("metric", format!("workflow:begin:{}", id).as_bytes());` |
 | A workflow-related process uniquely identified by `id` ended | `cast("metric", format!("workflow:end:{}", id).as_bytes());`   |
 
-In the workflow composition, the application developer is responsible for mapping the output with name `"metric"` of the function to `metrics-collector`.
-The configuration of the latter includes a field `wf_name` which allows specifying an identifier of the workflow.
+In the workflow composition, the application developer is responsible for
+mapping the output with name `"metric"` of the function to `metrics-collector`.
+The configuration of the latter includes a field `wf_name` which allows
+specifying an identifier of the workflow.
 
 The content of the in-memory database is the following.
 
@@ -196,8 +195,10 @@ The current mapping logical and physical identifier(s) can be found in the proxy
 
 Prerequisites:
 
-- A local copy of the edgeless repository is built in debug mode according to the [building instructions](../BUILDING.md).
-- A Redis is reachable at 127.0.0.1:6379, see [online instructions](https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/).
+- A local copy of the edgeless repository is built in debug mode according to
+  the [building instructions](../BUILDING.md).
+- A Redis is reachable at 127.0.0.1:6379, see
+  [online instructions](https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/).
 - The current working directory is the root of the repository.
 - The command-line utility `redis-cli` is installed.
 - [optional] `RUST_LOG=info ; export RUST_LOG`
@@ -212,9 +213,18 @@ target/debug/edgeless_inabox -t
 target/debug/edgeless_cli -t cli.toml
 ```
 
-Modify the `node.toml` file so that `node_id` is `fda6ce79-46df-4f96-a0d2-456f720f606c`.
+Modify the `node.toml` file so that `node_id` is
+`fda6ce79-46df-4f96-a0d2-456f720f606c` and so that the metrics collector is
+enabled with the following section:
 
-Modify the `orchestrator.toml` file so that the `[proxy]` and `[collection]` sections are:
+```ini
+[resources.metrics_collector_provider]
+collector_type = "Redis"
+redis_url = "redis://localhost:6379"
+provider = "metrics-collector-1"
+```
+
+Modify the `orchestrator.toml` file so that the `[proxy]` section is:
 
 ```ini
 [proxy]
@@ -226,7 +236,8 @@ collector_type = "Redis"
 redis_url = "redis://127.0.0.1:6379"
 ```
 
-Create the configuration file `node-2.toml` for another node, with a Rust run-time, no resources associated, and default node's capabilities:
+Create the configuration file `node-2.toml` for another node, with a Rust
+run-time, no resources associated, and default node's capabilities:
 
 ```ini
 [general]
@@ -257,7 +268,8 @@ In another shell run:
 target/debug/edgeless_node_d -c node-2.toml
 ```
 
-Compile the WASM bytecode of the `vector_mul` function, which performs the multiplication of an internal random matrix by the vector received as input:
+Compile the WASM bytecode of the `vector_mul` function, which performs the
+multiplication of an internal random matrix by the vector received as input:
 
 ```bash
 target/debug/edgeless_cli function build functions/vector_mul/function.json
@@ -269,7 +281,9 @@ Start a workflow consisting of three `vector_mul` functions in a chain:
 target/debug/edgeless_cli workflow start examples/vector_mul/workflow-chain.json
 ```
 
-The full status of the in-memory database, including a mirror of the ε-ORC internal data structures of the application metrics sampled, can be dumped with a script provided:
+The full status of the in-memory database, including a mirror of the ε-ORC
+internal data structures of the application metrics sampled, can be dumped with
+a script provided:
 
 ```bash
 scripts/redis_dump.sh
@@ -345,13 +359,15 @@ by the ε-ORC in response to a keep-alive.
 Finally, since the `vector_mul` function supports application-related metrics,
 these are also saved in Redis.
 
-For instance, the average latency of the workflow can be queried with the `redis-cli` command-line utility:
+For instance, the average latency of the workflow can be queried with the
+`redis-cli` command-line utility:
 
 ```bash
 redis-cli get workflow:vector_mul_wf_chain:average
 ```
 
-Where `vector_mul_wf_chain` is the name assigned to the workflow in `workflow-chain.json`.
+Where `vector_mul_wf_chain` is the name assigned to the workflow in
+`workflow-chain.json`.
 
 Example of output:
 
@@ -378,19 +394,23 @@ Example of output:
 This completes the example on the collection of application metrics.
 We now move to the delegated orchestration.
 
-Compile the WASM bytecode of the `message_generator` function, which produces periodically a message with given given payload and a counter:
+Compile the WASM bytecode of the `message_generator` function, which produces
+periodically a message with given given payload and a counter:
 
 ```bash
 target/debug/edgeless_cli function build functions/message_generator/function.json
 ```
 
-Create a workflow consisting of a `message_generator` feeding a `file-log` resource, which saves to a local file the content of the messages received, optionally adding a timestamp, with the following command:
+Create a workflow consisting of a `message_generator` feeding a `file-log`
+resource, which saves to a local file the content of the messages received,
+optionally adding a timestamp, with the following command:
 
 ```bash
 target/debug/edgeless_cli workflow start examples/file_log/workflow.json
 ```
 
-In another shell you can see the content of `my-local-file.log` growing each second:
+In another shell you can see the content of `my-local-file.log` growing each
+second:
 
 ```bash
 tail -f my-local-file.log
@@ -404,8 +424,11 @@ Example of output:
 2024-09-05T18:04:23.185131+00:00 from node_id fda6ce79-46df-4f96-a0d2-456f720f606d function_id 1a5a0386-2115-4188-8e15-a8c8b8561770 [#2]: hello world
 ```
 
-This also tells us that the function instance of `message_generator` has been assigned to the node `fda6ce79-46df-4f96-a0d2-456f720f606d`.
-If we want to migrate the function instance to the other node, which has the same UUID except for the last digit (`c` instead of `d`) then we need to know what is the logical UUID of the function.
+This also tells us that the function instance of `message_generator` has been
+assigned to the node `fda6ce79-46df-4f96-a0d2-456f720f606d`.
+If we want to migrate the function instance to the other node, which has the
+same UUID except for the last digit (`c` instead of `d`) then we need to know
+what is the logical UUID of the function.
 This can be retrieved, for instance, with `proxy_cli`:
 
 ```bash

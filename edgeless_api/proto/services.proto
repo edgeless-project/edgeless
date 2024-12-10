@@ -9,7 +9,7 @@ import "messages.proto";
 
 package edgeless_api;
 
-// API exposed by the nodes / orchestrator to manage the lifecycle of function instances (s07).
+// API exposed by the nodes / orchestrator to manage the lifecycle of function instances.
 service FunctionInstance {
     // Start a new function instance.
     // Input: request containing the description of the function to create.
@@ -61,7 +61,7 @@ service DomainRegistration {
     rpc UpdateDomain (UpdateDomainRequest) returns (UpdateDomainResponse);
 }
 
-// API to manage the lifecycle of workflow instances (s04).
+// API to manage the lifecycle of workflow instances.
 service WorkflowInstance {
     // Start a new workflow.
     // Input: request containing the description of the workflow to create.
@@ -89,7 +89,7 @@ service WorkflowInstance {
     rpc Domains (DomainId) returns (DomainCapabilitiesList);
 }
 
-// API to handle events (s01).
+// API to handle events.
 service FunctionInvocation {
     // Handle an event.
     // Input: event to be handled.
@@ -97,7 +97,7 @@ service FunctionInvocation {
     rpc Handle (Event) returns (google.protobuf.Empty); 
 }
 
-// API to handle the lifecycle of resources (s06).
+// API to handle the lifecycle of resources.
 service ResourceConfiguration {
     // Create a new resource.
     // Input: specification of the resource to be created.
