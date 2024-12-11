@@ -26,6 +26,7 @@ enum DumpCommands {
 #[derive(Debug, clap::Subcommand)]
 enum NodeCommands {
     Capabilities {},
+    ResourceProviders {},
     Health {},
     Instances {},
 }
@@ -103,6 +104,11 @@ fn main() -> anyhow::Result<()> {
                 NodeCommands::Capabilities {} => {
                     for (node, capabilities) in proxy.fetch_node_capabilities().iter().sorted_by_key(|x| x.0.to_string()) {
                         println!("{} -> {}", node, capabilities);
+                    }
+                }
+                NodeCommands::ResourceProviders {} => {
+                    for (provider_id, resource_providers) in proxy.fetch_resource_providers().iter().sorted_by_key(|x| x.0.to_string()) {
+                        println!("{} -> {}", provider_id, resource_providers);
                     }
                 }
                 NodeCommands::Health {} => {
