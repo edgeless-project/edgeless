@@ -9,6 +9,7 @@ use edgeless_node::resources::http_egress::HttpEgressResourceSpec;
 use edgeless_node::resources::http_ingress::HttpIngressResourceSpec;
 #[cfg(feature = "rdkafka")]
 use edgeless_node::resources::kafka_egress::KafkaEgressResourceSpec;
+use edgeless_node::resources::metrics_collector::MetricsCollectorResourceSpec;
 use edgeless_node::resources::ollama::OllamasResourceSpec;
 use edgeless_node::resources::redis::RedisResourceSpec;
 use edgeless_node::resources::resource_provider_specs::ResourceProviderSpecOutput;
@@ -44,6 +45,7 @@ fn main() -> anyhow::Result<()> {
             Box::new(HttpIngressResourceSpec {}),
             Box::new(OllamasResourceSpec {}),
             Box::new(RedisResourceSpec {}),
+            Box::new(MetricsCollectorResourceSpec {}),
         ];
         #[cfg(feature = "rdkafka")]
         specs.push(Box::new(KafkaEgressResourceSpec {}));
