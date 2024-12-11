@@ -20,6 +20,9 @@ impl super::proxy::Proxy for ProxyNone {
     ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeCapabilities> {
         std::collections::HashMap::new()
     }
+    fn fetch_resource_providers(&mut self) -> std::collections::HashMap<String, crate::resource_provider::ResourceProvider> {
+        std::collections::HashMap::new()
+    }
     fn fetch_node_health(
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeHealthStatus> {

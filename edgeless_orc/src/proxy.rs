@@ -38,6 +38,9 @@ pub trait Proxy: Sync + Send {
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeCapabilities>;
 
+    /// Fetch the resource providers available.
+    fn fetch_resource_providers(&mut self) -> std::collections::HashMap<String, crate::resource_provider::ResourceProvider>;
+
     /// Fetch the nodes' health status.
     fn fetch_node_health(
         &mut self,
