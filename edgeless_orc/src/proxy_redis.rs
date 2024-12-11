@@ -441,6 +441,22 @@ impl super::proxy::Proxy for ProxyRedis {
         capabilities
     }
 
+    fn fetch_resource_providers(&mut self) -> std::collections::HashMap<String, crate::resource_provider::ResourceProvider> {
+        let mut resource_providers = std::collections::HashMap::new();
+        for node_key in self.connection.keys::<&str, Vec<String>>("provider:*").unwrap_or(vec![]) {
+            let tokens: Vec<&str> = node_key.split(':').collect();
+            assert_eq!(tokens.len(), 2);
+            assert_eq!("provider", tokens[0]);
+            let provider_id = tokens[1];
+            if let Ok(val) = self.connection.get::<&str, String>(&node_key) {
+                if let Ok(val) = serde_json::from_str::<crate::resource_provider::ResourceProvider>(&val) {
+                    resource_providers.insert(provider_id.to_string(), val);
+                }
+            }
+        }
+        resource_providers
+    }
+
     fn fetch_node_health(
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeHealthStatus> {
