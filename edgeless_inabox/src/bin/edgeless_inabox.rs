@@ -25,6 +25,9 @@ struct Args {
     /// This flag also automatically enables a Redis proxy at redis://127.0.0.1:6379.
     #[arg(long, default_value_t = false)]
     metrics_collector: bool,
+    /// Initial TCP port to be used for services.
+    #[arg(long, default_value_t = 7000)]
+    initial_port: u16,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -32,7 +35,9 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     if args.templates {
-        return generate_configs(args.config_path, args.num_of_nodes, args.metrics_collector);
+        let last_port = generate_configs(args.config_path, args.num_of_nodes, args.metrics_collector, args.initial_port)?;
+        log::info!("Templates written, last port used: {}", last_port);
+        return Ok(());
     }
 
     let async_runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(8).enable_all().build()?;
@@ -47,11 +52,11 @@ fn main() -> anyhow::Result<()> {
 /// Generates configs for a minimal in-a-box edgeless cluster with
 /// number_of_nodes nodes in the directory. If directory is non-empty, it
 /// fails.
-fn generate_configs(config_path: String, number_of_nodes: u32, metrics_collector: bool) -> anyhow::Result<()> {
+fn generate_configs(config_path: String, number_of_nodes: u32, metrics_collector: bool, initial_port: u16) -> anyhow::Result<u16> {
     log::info!("Generating configuration files for EDGELESS in-a-box with {} nodes", number_of_nodes);
 
     // Closure that returns a url with a new port on each call
-    let mut port = 7000;
+    let mut port = initial_port;
     let mut next_url = || {
         port += 1;
         format!("http://127.0.0.1:{}", port)
@@ -233,5 +238,5 @@ fn generate_configs(config_path: String, number_of_nodes: u32, metrics_collector
         }
     }
 
-    Ok(())
+    Ok(port)
 }
