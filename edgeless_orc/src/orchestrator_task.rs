@@ -173,9 +173,9 @@ impl OrchestratorTask {
     /// * `lid` - The LID of the function/resource to be migrated.
     /// * `targets` - The set of nodes to which the instance has to be migrated.
     async fn migrate(&mut self, lid: &edgeless_api::function_instance::ComponentId, targets: &Vec<edgeless_api::function_instance::NodeId>) {
-        let spawn_req = match self.active_instances.get(lid) {
+        let (spawn_req, instance_ids) = match self.active_instances.get(lid) {
             Some(active_instance) => match active_instance {
-                crate::active_instance::ActiveInstance::Function(spawn_req, _) => spawn_req.clone(),
+                crate::active_instance::ActiveInstance::Function(spawn_req, instance_ids) => (spawn_req.clone(), instance_ids.clone()),
                 crate::active_instance::ActiveInstance::Resource(_spec, origin) => {
                     log::warn!(
                         "Unsupported resource migration: ignoring request for LID {} to migrate from node_id {}",
@@ -192,7 +192,9 @@ impl OrchestratorTask {
         };
 
         // Stop all the function instances associated with this LID.
-        self.stop_function_lid(*lid).await;
+        for instance_id in &instance_ids {
+            self.stop_function(instance_id).await;
+        }
 
         // Filter out the unfeasible targets.
         let targets = self.orchestration_logic.feasible_nodes(&spawn_req, targets);
