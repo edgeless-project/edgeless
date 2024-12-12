@@ -386,6 +386,11 @@ impl ControllerTask {
 
         match self.orchestrators.get_mut(&update_domain_request.domain_id) {
             None => {
+                log::info!(
+                    "New domain '{}' with {} nodes",
+                    update_domain_request.domain_id,
+                    update_domain_request.capabilities.num_nodes
+                );
                 self.orchestrators.insert(
                     update_domain_request.domain_id.clone(),
                     OrchestratorDesc {
@@ -414,6 +419,12 @@ impl ControllerTask {
                 let response = if desc.nonce == update_domain_request.nonce && desc.counter == update_domain_request.counter {
                     edgeless_api::domain_registration::UpdateDomainResponse::Accepted
                 } else {
+                    log::info!(
+                        "Update domain '{}' with {} nodes",
+                        update_domain_request.domain_id,
+                        update_domain_request.capabilities.num_nodes
+                    );
+
                     desc.capabilities = update_domain_request.capabilities.clone();
                     desc.counter = update_domain_request.counter;
 
