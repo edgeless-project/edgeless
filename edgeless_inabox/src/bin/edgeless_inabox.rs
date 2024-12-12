@@ -55,15 +55,21 @@ fn main() -> anyhow::Result<()> {
 fn generate_configs(config_path: String, number_of_nodes: u32, metrics_collector: bool, initial_port: u16) -> anyhow::Result<u16> {
     log::info!("Generating configuration files for EDGELESS in-a-box with {} nodes", number_of_nodes);
 
-    // Closure that returns a url with a new port on each call
-    let mut port = initial_port;
+    let reserved_controller_port = 7001;
+    let reserved_domain_register_port = 7002;
+
+    // Closure that returns a URL with a new port on each call
+    let mut port = initial_port - 1;
     let mut next_url = || {
         port += 1;
+        while port == reserved_controller_port || port == reserved_domain_register_port {
+            port += 1;
+        }
         format!("http://127.0.0.1:{}", port)
     };
 
-    let controller_url = next_url();
-    let domain_register_url = next_url();
+    let controller_url = format!("http://127.0.0.1:{}", reserved_controller_port);
+    let domain_register_url = format!("http://127.0.0.1:{}", reserved_domain_register_port);
 
     // Balancer
     let bal_conf = edgeless_bal::EdgelessBalSettings {
@@ -75,8 +81,8 @@ fn generate_configs(config_path: String, number_of_nodes: u32, metrics_collector
     let orc_conf = edgeless_orc::EdgelessOrcSettings {
         general: edgeless_orc::EdgelessOrcGeneralSettings {
             domain_register_url: domain_register_url.clone(),
-            subscription_refresh_interval_sec: 1,
-            domain_id: "domain-1".to_string(),
+            subscription_refresh_interval_sec: 2,
+            domain_id: format!("domain-{}", initial_port),
             orchestrator_url: next_url(),
             orchestrator_url_announced: "".to_string(),
             node_register_url: next_url(),
@@ -119,7 +125,7 @@ fn generate_configs(config_path: String, number_of_nodes: u32, metrics_collector
                 invocation_url_coap: None,
                 invocation_url_announced_coap: None,
                 node_register_url: orc_conf.general.node_register_url.clone(),
-                subscription_refresh_interval_sec: 10,
+                subscription_refresh_interval_sec: 2,
             },
             telemetry: EdgelessNodeTelemetrySettings {
                 metrics_url: next_url(),
