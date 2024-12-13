@@ -976,8 +976,8 @@ impl OrchestratorTask {
         let mut resource_lids = vec![];
         for (lid, active_instance) in &self.active_instances {
             match active_instance {
-                ActiveInstance::Function(_, _) => function_lids.push(lid.clone()),
-                ActiveInstance::Resource(_, _) => resource_lids.push(lid.clone()),
+                ActiveInstance::Function(_, _) => function_lids.push(*lid),
+                ActiveInstance::Resource(_, _) => resource_lids.push(*lid),
             }
         }
         for lid in function_lids {

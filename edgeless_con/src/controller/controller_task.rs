@@ -179,7 +179,7 @@ impl ControllerTask {
             },
         );
 
-        let active_workflow = self.active_workflows.get(&wf_id).unwrap().clone();
+        let active_workflow = self.active_workflows.get(wf_id).unwrap().clone();
 
         // Keep the last error.
         let mut res: Result<(), String> = Ok(());
@@ -195,7 +195,7 @@ impl ControllerTask {
                 break;
             }
 
-            res = self.start_workflow_function_in_domain(&wf_id, function, target_domain).await;
+            res = self.start_workflow_function_in_domain(wf_id, function, target_domain).await;
         }
 
         // Start the resources on the orchestration domain.
@@ -205,7 +205,7 @@ impl ControllerTask {
                 break;
             }
 
-            res = self.start_workflow_resource_in_domain(&wf_id, resource, target_domain).await;
+            res = self.start_workflow_resource_in_domain(wf_id, resource, target_domain).await;
         }
 
         //
@@ -223,14 +223,14 @@ impl ControllerTask {
             // Loop on all the identifiers for this function/resource
             // (once for each orchestration domain to which the
             // function/resource was allocated).
-            for origin_fid in self.active_workflows.get_mut(&wf_id).unwrap().mapped_fids(component_name).unwrap() {
-                let output_mapping = self.output_mapping_for(&wf_id, component_name).await;
+            for origin_fid in self.active_workflows.get_mut(wf_id).unwrap().mapped_fids(component_name).unwrap() {
+                let output_mapping = self.output_mapping_for(wf_id, component_name).await;
 
                 if output_mapping.is_empty() {
                     continue;
                 }
 
-                let component_type = self.active_workflows.get_mut(&wf_id).unwrap().component_type(component_name).unwrap();
+                let component_type = self.active_workflows.get_mut(wf_id).unwrap().component_type(component_name).unwrap();
                 res = self
                     .patch_outputs(target_domain, origin_fid, component_type, output_mapping, component_name)
                     .await;
@@ -246,14 +246,14 @@ impl ControllerTask {
 
         if res.is_err() {
             log::error!("Workflow start failed, stopping");
-            self.stop_workflow(&wf_id).await;
+            self.stop_workflow(wf_id).await;
         }
 
         let reply = match res {
             Ok(_) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(
                 edgeless_api::workflow_instance::WorkflowInstance {
                     workflow_id: wf_id.clone(),
-                    domain_mapping: self.active_workflows.get(&wf_id).unwrap().domain_mapping(),
+                    domain_mapping: self.active_workflows.get(wf_id).unwrap().domain_mapping(),
                 },
             )),
             Err(err) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
