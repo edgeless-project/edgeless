@@ -1,29 +1,14 @@
-# EDGELESS orchestration
-
-Table of content:
-
-- [EDGELESS orchestration](#edgeless-orchestration)
-  - [Higher level orchestration (ε-CON)](#higher-level-orchestration-ε-con)
-  - [Lower level orchestration (ε-ORC)](#lower-level-orchestration-ε-orc)
-    - [Delegated orchestration through a proxy](#delegated-orchestration-through-a-proxy)
-    - [Node's telemetry](#nodes-telemetry)
+- [Local orchestration in EDGELESS](#local-orchestration-in-edgeless)
+  - [Delegated orchestration through a proxy](#delegated-orchestration-through-a-proxy)
+  - [Node's telemetry](#nodes-telemetry)
     - [Collection of application metrics](#collection-of-application-metrics)
-    - [Step-by-step example](#step-by-step-example)
+  - [Step-by-step examples](#step-by-step-examples)
+    - [Prerequisites](#prerequisites)
+    - [Preparation steps](#preparation-steps)
+    - [Example#1: telemetry and application metrics](#example1-telemetry-and-application-metrics)
+    - [Example#2: delegated orchestration](#example2-delegated-orchestration)
 
-Orchestration in EDGELESS happens at two levels:
-
-- _higher level orchestration_ is done by the ε-CON at cluster level (remember
-  that a cluster may include multiple non-overlapping orchestration domains)
-  and it maps (logical) function to orchestration domains;
-- _lower level orchestration_ is done by the ε-ORC within its orchestration
-  domain, and it maps every (logical) function to one or multiple workers
-  running on the orchestration domain nodes.
-
-## Higher level orchestration (ε-CON)
-
-Work in progress.
-
-## Lower level orchestration (ε-ORC)
+# Local orchestration in EDGELESS
 
 The ε-ORC implements a basic orchestration policy that:
 
@@ -64,7 +49,7 @@ The following diagram illustrates these mechanisms, which are described separate
 
 ![](orchestrator-delegated-orc.png)
 
-### Delegated orchestration through a proxy
+## Delegated orchestration through a proxy
 
 This feature currently requires an external Redis in-memory database, which is used to:
 
@@ -108,7 +93,7 @@ We provide a command-line interface, called `proxy_cli`, which can be used
 as a convenient alternative to manipulating directly the Redis database,
 as shown in the step-by-step example below.
 
-### Node's telemetry
+## Node's telemetry
 
 EDGELESS nodes embed a telemetry system that collects some events related to
 function lifecyle management, which is shown in the diagram below.
@@ -191,9 +176,9 @@ Note that the metrics-collector automatically adds the _physical_ identifier of 
 Multiple physical identifiers can be associated with a logical function during its lifetime.
 The current mapping logical and physical identifier(s) can be found in the proxy information (instance:UUID entries).
 
-### Step-by-step example
+## Step-by-step examples
 
-Prerequisites:
+### Prerequisites
 
 - A local copy of the edgeless repository is built in debug mode according to
   the [building instructions](../BUILDING.md).
@@ -203,76 +188,45 @@ Prerequisites:
 - The command-line utility `redis-cli` is installed.
 - [optional] `RUST_LOG=info ; export RUST_LOG`
 
-In the following we will be running a minimal system with two nodes in a single orchestration domain.
-The instructions follow.
+### Preparation steps
 
+In the following we will be running a minimal system with three nodes in a single
+orchestration domain.
 Create the default configuration files:
 
 ```bash
-target/debug/edgeless_inabox -t
 target/debug/edgeless_cli -t cli.toml
+target/debug/edgeless_inabox -t -n 2 --metrics-collector
 ```
 
-Modify the `node.toml` file so that `node_id` is
-`fda6ce79-46df-4f96-a0d2-456f720f606c` and so that the metrics collector is
-enabled with the following section:
+The latter will create the configuration files for the ε-CON, the ε-ORC, two
+nodes with WebAssembly run-times, and one node with no function run-time but
+a metrics-collector resource provider.
 
-```ini
-[resources.metrics_collector_provider]
-collector_type = "Redis"
-redis_url = "redis://localhost:6379"
-provider = "metrics-collector-1"
-```
+Modify the configuration of node0 and node1 so that performance samples are
+also shared with the ε-ORC (this is disabled by default when creating the
+templates):
 
-Modify the `orchestrator.toml` file so that the `[proxy]` section is:
-
-```ini
-[proxy]
-proxy_type = "Redis"
-redis_url = "redis://127.0.0.1:6379"
-
-[collector]
-collector_type = "Redis"
-redis_url = "redis://127.0.0.1:6379"
-```
-
-Create the configuration file `node-2.toml` for another node, with a Rust
-run-time, no resources associated, and default node's capabilities:
-
-```ini
-[general]
-node_id = "fda6ce79-46df-4f96-a0d2-456f720f606d"
-agent_url = "http://127.0.0.1:7221"
-agent_url_announced = ""
-invocation_url = "http://127.0.0.1:7202"
-invocation_url_announced = ""
-orchestrator_url = "http://127.0.0.1:7011"
-
-[telemetry]
-metrics_url = ""
-performance_samples = true
-
-[wasm_runtime]
-enabled = true
-```
-
-In one shell run:
-
-```bash
-target/debug/edgeless_inabox
-```
-
-In another shell run:
-
-```bash
-target/debug/edgeless_node_d -c node-2.toml
+```shell
+sed -i -e "s/performance_samples = false/performance_samples = true/" node[01].toml
 ```
 
 Compile the WASM bytecode of the `vector_mul` function, which performs the
-multiplication of an internal random matrix by the vector received as input:
+multiplication of an internal random matrix by the vector received as input, and
+of the `message_generator` function, which produces periodically a message with
+given given payload and a counter:
 
 ```bash
 target/debug/edgeless_cli function build functions/vector_mul/function.json
+target/debug/edgeless_cli function build functions/message_generator/function.json
+```
+
+### Example#1: telemetry and application metrics
+
+Run the system:
+
+```bash
+target/debug/edgeless_inabox
 ```
 
 Start a workflow consisting of three `vector_mul` functions in a chain:
@@ -300,17 +254,10 @@ target/debug/proxy_cli show node health
 Example of output:
 
 ```
-03337f46-1dbe-41a1-94a4-75c0abc4e8f5 -> global cpu usage 20%, load 2, memory free 82208 kb, used 20916064 kb, total 37748736 kb, available 14934992 kb, process cpu usage 49%, memory 458032 kb, vmemory 420661520 kb
-fda6ce79-46df-4f96-a0d2-456f720f606c -> global cpu usage 20%, load 2, memory free 82208 kb, used 20916064 kb, total 37748736 kb, available 14934992 kb, process cpu usage 49%, memory 458032 kb, vmemory 420661520 kb
-fda6ce79-46df-4f96-a0d2-456f720f606d -> global cpu usage 20%, load 2, memory free 82048 kb, used 20916192 kb, total 37748736 kb, available 14934688 kb, process cpu usage 51%, memory 462160 kb, vmemory 429048624 kb
+4595df5d-21c9-43a5-8b69-006b85eced96 -> memory free 307984 kb, used 24581664 kb, available 4496208 kb, process cpu usage 105%, memory 878432 kb, vmemory 437445216 kb, load avg 1 minute 361% 5 minutes 329% 15 minutes 290%, network tot rx 6656099328 bytes (43499471 pkts) 0 errs, tot tx 25220091 bytes (4136598528 pkts) 0 errs, disk available 994662584320 bytes, tot disk reads 193711325184 writes 119523094528, gpu_load_perc -1%, gpu_temp_cels -1.00°
+c422eb3d-98e4-4a6f-855e-45b879ab3e40 -> memory free 21696 kb, used 24831328 kb, available 4073872 kb, process cpu usage 0%, memory 878384 kb, vmemory 437443152 kb, load avg 1 minute 363% 5 minutes 328% 15 minutes 289%, network tot rx 6652385280 bytes (43495784 pkts) 0 errs, tot tx 25217790 bytes (4133952512 pkts) 0 errs, disk available 994662584320 bytes, tot disk reads 193711267840 writes 119525015552, gpu_load_perc -1%, gpu_temp_cels -1.00°
+faaf87ba-9b46-4ff6-ac42-3fca12523128 -> memory free 307984 kb, used 24581664 kb, available 4496208 kb, process cpu usage 105%, memory 878480 kb, vmemory 437445216 kb, load avg 1 minute 361% 5 minutes 329% 15 minutes 290%, network tot rx 6656099328 bytes (43499471 pkts) 0 errs, tot tx 25220091 bytes (4136598528 pkts) 0 errs, disk available 994662584320 bytes, tot disk reads 193711325184 writes 119523094528, gpu_load_perc -1%, gpu_temp_cels -1.00°
 ```
-
-Note that three nodes are shown, but only two can run function instances, i.e.,
-the one in the `edgeless_inabox` and that launched separately with the
-configuration in `node-2.toml`.
-The third node shown is the one embedded in the ε-ORC to host the
-metrics-collector resource provider, as illustrated above, and it does not
-have a run-time to execute function instances.
 
 To show the current mapping of functions/resources to nodes:
 
@@ -321,18 +268,18 @@ target/debug/proxy_cli show node instances
 Example of output:
 
 ```
-03337f46-1dbe-41a1-94a4-75c0abc4e8f5
-[R] 26828a53-21eb-4894-a723-4c4eeb9b6574
-fda6ce79-46df-4f96-a0d2-456f720f606c
-[F] cb314223-1021-428d-9df5-b73c53e258a2
-fda6ce79-46df-4f96-a0d2-456f720f606d
-[F] ee30d9c9-54c8-40e5-bfeb-cbcba527df05
-[F] 7725a7a8-9871-447d-9203-a5fd117fd6ba
+4595df5d-21c9-43a5-8b69-006b85eced96
+[F] 7fdfea80-2a12-4b0b-9658-08525452bc22
+[F] 1f427c5f-a491-4347-854d-ea846b80bf3d
+c422eb3d-98e4-4a6f-855e-45b879ab3e40
+[R] 4dd4c855-5702-477d-b97d-76475b6f0767
+faaf87ba-9b46-4ff6-ac42-3fca12523128
+[F] b615f0b3-4d0e-4df8-87b4-3fea0200682b
 ```
 
-As you can see, the first node (the one embedded in the ε-ORC) is only assigned
-one instance of type `R`, i.e., resource, while the three functions (`F`) are
-split between the two nodes with a WebAssembly run-time.
+As you can see, the metrics-collector node is only assigned one instance of
+type `R`, i.e., resource, while the three functions (`F`) are split between the
+two nodes with a WebAssembly run-time.
 
 With regard to performance samples (collected by the nodes' telemetry), they can
 dumped to files with:
@@ -391,14 +338,12 @@ Example of output:
 5) "843,1718287848.516"
 ```
 
-This completes the example on the collection of application metrics.
-We now move to the delegated orchestration.
+### Example#2: delegated orchestration
 
-Compile the WASM bytecode of the `message_generator` function, which produces
-periodically a message with given given payload and a counter:
+Run the system:
 
 ```bash
-target/debug/edgeless_cli function build functions/message_generator/function.json
+target/debug/edgeless_inabox
 ```
 
 Create a workflow consisting of a `message_generator` feeding a `file-log`
@@ -406,7 +351,7 @@ resource, which saves to a local file the content of the messages received,
 optionally adding a timestamp, with the following command:
 
 ```bash
-target/debug/edgeless_cli workflow start examples/file_log/workflow.json
+ID=$(target/debug/edgeless_cli workflow start examples/file_log/workflow.json)
 ```
 
 In another shell you can see the content of `my-local-file.log` growing each
@@ -418,52 +363,54 @@ tail -f my-local-file.log
 
 Example of output:
 
-```
-2024-09-05T18:04:21.175674+00:00 from node_id fda6ce79-46df-4f96-a0d2-456f720f606d function_id 1a5a0386-2115-4188-8e15-a8c8b8561770 [#0]: hello world
-2024-09-05T18:04:22.179790+00:00 from node_id fda6ce79-46df-4f96-a0d2-456f720f606d function_id 1a5a0386-2115-4188-8e15-a8c8b8561770 [#1]: hello world
-2024-09-05T18:04:23.185131+00:00 from node_id fda6ce79-46df-4f96-a0d2-456f720f606d function_id 1a5a0386-2115-4188-8e15-a8c8b8561770 [#2]: hello world
-```
-
-This also tells us that the function instance of `message_generator` has been
-assigned to the node `fda6ce79-46df-4f96-a0d2-456f720f606d`.
-If we want to migrate the function instance to the other node, which has the
-same UUID except for the last digit (`c` instead of `d`) then we need to know
-what is the logical UUID of the function.
-This can be retrieved, for instance, with `proxy_cli`:
-
-```bash
-target/debug/proxy_cli show logical-to-physical
+```log
+2024-12-12T11:56:30.023820+00:00 from node_id faaf87ba-9b46-4ff6-ac42-3fca12523128 function_id 597df9c4-db7f-4c5e-a716-bd8daeb7f480 [#0]: hello world
+2024-12-12T11:56:31.061053+00:00 from node_id faaf87ba-9b46-4ff6-ac42-3fca12523128 function_id 597df9c4-db7f-4c5e-a716-bd8daeb7f480 [#1]: hello world
+2024-12-12T11:56:32.285220+00:00 from node_id faaf87ba-9b46-4ff6-ac42-3fca12523128 function_id 597df9c4-db7f-4c5e-a716-bd8daeb7f480 [#2]: hello world
+2024-12-12T11:56:33.287956+00:00 from node_id faaf87ba-9b46-4ff6-ac42-3fca12523128 function_id 597df9c4-db7f-4c5e-a716-bd8daeb7f480 [#3]: hello world
+2024-12-12T11:56:34.460250+00:00 from node_id faaf87ba-9b46-4ff6-ac42-3fca12523128 function_id 597df9c4-db7f-4c5e-a716-bd8daeb7f480 [#4]: hello world
 ```
 
-Example output (look at the first entry):
+With the following command we can see the assignment of functions/resources
+to nodes:
+
+```shell
+target/debug/proxy_cli show node instances
+```
+
+Example output:
 
 ```
-02ccfc3d-8c9f-4a41-81c8-d4557cdb0c99 -> 1a5a0386-2115-4188-8e15-a8c8b8561770
-9fd2e89c-e6ca-457c-ac64-465ac6ddcce0 -> c2a0cdfc-1ebf-4766-9dfd-2473315e6cab
+4595df5d-21c9-43a5-8b69-006b85eced96
+[F] ed0b963e-d6ff-4d62-84dc-7de9a2175913
+[R] 16668152-2a27-4632-a482-336096c1be44
 ```
 
-At this point we can migrate the function to the node whose identifier ends
-with `c` using `proxy_cli`, again:
+From the output we can see that the function `ed0b963e...` has been assigned
+to node `4595df5d...`, like the resource.
+Let us migrate the function to the other node:
 
-```bash
+```shell
 target/debug/proxy_cli intent migrate \
-  02ccfc3d-8c9f-4a41-81c8-d4557cdb0c99 \
-  fda6ce79-46df-4f96-a0d2-456f720f606c
+  ed0b963e-d6ff-4d62-84dc-7de9a2175913 \
+  faaf87ba-9b46-4ff6-ac42-3fca12523128
 ```
 
-This will add an intent to Redis, which will promptly instruct the ε-ORC to
-perform the migration.
-This is visible from the content of the `my-local-file.log` which now contains
+Running again:
 
-```
-2024-09-05T18:08:26.475367+00:00 from node_id fda6ce79-46df-4f96-a0d2-456f720f606d function_id 1a5a0386-2115-4188-8e15-a8c8b8561770 [#244]: hello world
-2024-09-05T18:08:27.442057+00:00 from node_id fda6ce79-46df-4f96-a0d2-456f720f606c function_id 70cb6b96-f418-4746-921e-bba6bc3a9466 [#0]: hello world
-2024-09-05T18:08:28.444849+00:00 from node_id fda6ce79-46df-4f96-a0d2-456f720f606c function_id 70cb6b96-f418-4746-921e-bba6bc3a9466 [#1]: hello world
+```shell
+target/debug/proxy_cli show node instances
 ```
 
-Note that:
+We now see:
 
-- the identifier of the node now ends with `c` (this can be verified with
-  `target/debug/proxy_cli show functions`);
-- the counter restarted from 0, because it is kept in a function-local state
-  that is lost when the function instance is migrated.
+```
+4595df5d-21c9-43a5-8b69-006b85eced96
+[R] 16668152-2a27-4632-a482-336096c1be44
+faaf87ba-9b46-4ff6-ac42-3fca12523128
+[F] ed0b963e-d6ff-4d62-84dc-7de9a2175913
+```
+
+Note that the counter in `my-local-file.log` counter restarted from 0 upon
+migrating, because it is kept in a function-local state
+that is lost when the original function instance is terminated.
