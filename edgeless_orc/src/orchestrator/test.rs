@@ -656,70 +656,70 @@ async fn test_orc_node_with_fun_disconnects() {
     // Start f1
     let mut spawn_req = make_spawn_function_request("f1");
     spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
-    let ext_fid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    let lid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
-    let mut int_fid_1 = uuid::Uuid::nil();
+    let mut pid_1 = uuid::Uuid::nil();
     if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
         assert_eq!(node_id, stable_node_id);
-        int_fid_1 = new_instance_id.function_id;
+        pid_1 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
     // Start f2
     let mut spawn_req = make_spawn_function_request("f2");
     spawn_req.annotations.insert("label_match_all".to_string(), "unstable".to_string());
-    let ext_fid_2 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    let lid_2 = match fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
     let mut unstable_node_id = uuid::Uuid::nil();
-    let mut int_fid_2 = uuid::Uuid::nil();
+    let mut pid_2 = uuid::Uuid::nil();
     if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
         assert_ne!(node_id, stable_node_id);
         unstable_node_id = node_id;
-        int_fid_2 = new_instance_id.function_id;
+        pid_2 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
     // Start f3
     let mut spawn_req = make_spawn_function_request("f3");
     spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
-    let ext_fid_3 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    let lid_3 = match fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
-    let mut int_fid_3 = uuid::Uuid::nil();
+    let mut pid_3 = uuid::Uuid::nil();
     if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
         assert_eq!(node_id, stable_node_id);
-        int_fid_3 = new_instance_id.function_id;
+        pid_3 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
     // Start f4
     let mut spawn_req = make_spawn_function_request("f4");
     spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
-    let ext_fid_4 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    let lid_4 = match fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
-    let mut _int_fid_4 = uuid::Uuid::nil();
+    let mut _pid_4 = uuid::Uuid::nil();
     if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
         assert_eq!(node_id, stable_node_id);
-        _int_fid_4 = new_instance_id.function_id;
+        _pid_4 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
     // Patch f1->f2
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_fid_1,
+            function_id: lid_1,
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_2,
+                    function_id: lid_2,
                 },
             )]),
         })
@@ -737,12 +737,12 @@ async fn test_orc_node_with_fun_disconnects() {
     // Patch f2->f3
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_fid_2,
+            function_id: lid_2,
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_3,
+                    function_id: lid_3,
                 },
             )]),
         })
@@ -760,12 +760,12 @@ async fn test_orc_node_with_fun_disconnects() {
     // Patch f3->f4
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_fid_3,
+            function_id: lid_3,
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_4,
+                    function_id: lid_4,
                 },
             )]),
         })
@@ -804,7 +804,7 @@ async fn test_orc_node_with_fun_disconnects() {
                     assert_ne!(node_id, stable_node_id);
                     assert_eq!(node_id, new_instance_id.node_id);
                     new_node_id = new_instance_id.node_id;
-                    int_fid_2 = new_instance_id.function_id;
+                    pid_2 = new_instance_id.function_id;
                     assert_eq!("f2", spawn_req_rcvd.code.function_class_id);
                 }
                 MockAgentEvent::PatchFunction(patch_request) => {
@@ -837,10 +837,10 @@ async fn test_orc_node_with_fun_disconnects() {
 
     let patch_request_1 = patch_request_1.unwrap();
     let patch_request_2 = patch_request_2.unwrap();
-    assert_eq!(int_fid_1, patch_request_1.function_id);
-    assert_eq!(int_fid_2, patch_request_1.output_mapping.get("out").unwrap().function_id);
-    assert_eq!(int_fid_2, patch_request_2.function_id);
-    assert_eq!(int_fid_3, patch_request_2.output_mapping.get("out").unwrap().function_id);
+    assert_eq!(pid_1, patch_request_1.function_id);
+    assert_eq!(pid_2, patch_request_1.output_mapping.get("out").unwrap().function_id);
+    assert_eq!(pid_2, patch_request_2.function_id);
+    assert_eq!(pid_3, patch_request_2.output_mapping.get("out").unwrap().function_id);
 
     no_function_event(&mut nodes).await;
 }
@@ -863,14 +863,14 @@ async fn orc_node_with_res_disconnects() {
     // Start f1
     let mut spawn_req = make_spawn_function_request("f1");
     spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
-    let ext_fid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    let lid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
-    let mut int_fid_1 = uuid::Uuid::nil();
+    let mut pid_1 = uuid::Uuid::nil();
     if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
         assert_eq!(node_id, stable_node_id);
-        int_fid_1 = new_instance_id.function_id;
+        pid_1 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
@@ -878,11 +878,11 @@ async fn orc_node_with_res_disconnects() {
     let start_req = make_start_resource_request("rc-1");
 
     let mut unstable_node_id = uuid::Uuid::nil();
-    let mut int_fid_res = uuid::Uuid::nil();
-    let mut ext_fid_res = uuid::Uuid::nil();
-    assert!(ext_fid_res.is_nil());
+    let mut pid_res = uuid::Uuid::nil();
+    let mut lid_res = uuid::Uuid::nil();
+    assert!(lid_res.is_nil());
     loop {
-        ext_fid_res = match res_client.start(start_req.clone()).await.unwrap() {
+        lid_res = match res_client.start(start_req.clone()).await.unwrap() {
             edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
             edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         };
@@ -890,7 +890,7 @@ async fn orc_node_with_res_disconnects() {
         if let (node_id, MockAgentEvent::StartResource((int_instance_id, resource_instance_spec))) = wait_for_event_multiple(&mut nodes).await {
             assert_eq!(node_id, int_instance_id.node_id);
             unstable_node_id = int_instance_id.node_id;
-            int_fid_res = int_instance_id.function_id;
+            pid_res = int_instance_id.function_id;
             assert!(resource_instance_spec.configuration.is_empty());
             if int_instance_id.node_id != stable_node_id {
                 break;
@@ -899,7 +899,7 @@ async fn orc_node_with_res_disconnects() {
 
         // If we reach this point then the stable node has been selected,
         // so we stop the resource and try again.
-        match res_client.stop(ext_fid_res).await {
+        match res_client.stop(lid_res).await {
             Ok(_) => {}
             Err(err) => panic!("{}", err),
         }
@@ -907,22 +907,22 @@ async fn orc_node_with_res_disconnects() {
         if let (node_id, MockAgentEvent::StopResource(instance_id_rcvd)) = wait_for_event_multiple(&mut nodes).await {
             assert_eq!(unstable_node_id, node_id);
             assert_eq!(unstable_node_id, instance_id_rcvd.node_id);
-            assert_eq!(int_fid_res, instance_id_rcvd.function_id);
+            assert_eq!(pid_res, instance_id_rcvd.function_id);
         }
     }
     assert!(!unstable_node_id.is_nil());
-    assert!(!int_fid_res.is_nil());
-    assert!(!ext_fid_res.is_nil());
+    assert!(!pid_res.is_nil());
+    assert!(!lid_res.is_nil());
 
     // Patch f1->res
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_fid_1,
+            function_id: lid_1,
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_res,
+                    function_id: lid_res,
                 },
             )]),
         })
@@ -936,7 +936,7 @@ async fn orc_node_with_res_disconnects() {
     if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
         assert!(patch_request.output_mapping.contains_key("out"));
         assert_eq!(unstable_node_id, patch_request.output_mapping.get("out").unwrap().node_id);
-        assert_eq!(int_fid_res, patch_request.output_mapping.get("out").unwrap().function_id);
+        assert_eq!(pid_res, patch_request.output_mapping.get("out").unwrap().function_id);
     }
 
     // Make sure there are no pending events around.
@@ -960,7 +960,7 @@ async fn orc_node_with_res_disconnects() {
                     log::info!("start-resource");
                     assert_eq!(node_id, new_instance_id.node_id);
                     new_node_id = new_instance_id.node_id;
-                    int_fid_res = new_instance_id.function_id;
+                    pid_res = new_instance_id.function_id;
                 }
                 MockAgentEvent::PatchFunction(patch_request) => {
                     log::info!("patch-function");
@@ -989,8 +989,8 @@ async fn orc_node_with_res_disconnects() {
 
     assert!(!new_node_id.is_nil());
     let patch_request_rcv = patch_request_rcv.unwrap();
-    assert_eq!(int_fid_1, patch_request_rcv.function_id);
-    assert_eq!(int_fid_res, patch_request_rcv.output_mapping.get("out").unwrap().function_id);
+    assert_eq!(pid_1, patch_request_rcv.function_id);
+    assert_eq!(pid_res, patch_request_rcv.output_mapping.get("out").unwrap().function_id);
 
     no_function_event(&mut nodes).await;
 }
@@ -1009,53 +1009,53 @@ async fn test_patch_after_fun_stop() {
     // then stop f3
 
     // Start functions
-    let mut ext_fids = vec![];
-    let mut int_fids = vec![];
+    let mut lids = vec![];
+    let mut pids = vec![];
     for i in 1..=6 {
         let spawn_req = make_spawn_function_request(format!("f{}", i).as_str());
-        ext_fids.push(match fun_client.start(spawn_req.clone()).await.unwrap() {
+        lids.push(match fun_client.start(spawn_req.clone()).await.unwrap() {
             edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
             edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         });
         if let (_node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
-            int_fids.push(new_instance_id.function_id);
+            pids.push(new_instance_id.function_id);
             assert_eq!(spawn_req, spawn_req_rcvd);
         }
     }
-    assert_eq!(6, ext_fids.len());
-    assert_eq!(6, int_fids.len());
+    assert_eq!(6, lids.len());
+    assert_eq!(6, pids.len());
 
     // Patch functions
     let patch_instructions = [
-        (ext_fids[0], vec![ext_fids[2]]),
-        (ext_fids[1], vec![ext_fids[2]]),
-        (ext_fids[2], vec![ext_fids[3], ext_fids[4]]),
-        (ext_fids[3], vec![ext_fids[5]]),
-        (ext_fids[4], vec![ext_fids[5]]),
+        (lids[0], vec![lids[2]]),
+        (lids[1], vec![lids[2]]),
+        (lids[2], vec![lids[3], lids[4]]),
+        (lids[3], vec![lids[5]]),
+        (lids[4], vec![lids[5]]),
     ];
     let patch_instructions_int = [
-        (int_fids[0], vec![int_fids[2]]),
-        (int_fids[1], vec![int_fids[2]]),
-        (int_fids[2], vec![int_fids[3], int_fids[4]]),
-        (int_fids[3], vec![int_fids[5]]),
-        (int_fids[4], vec![int_fids[5]]),
+        (pids[0], vec![pids[2]]),
+        (pids[1], vec![pids[2]]),
+        (pids[2], vec![pids[3], pids[4]]),
+        (pids[3], vec![pids[5]]),
+        (pids[4], vec![pids[5]]),
     ];
 
     for j in 0..patch_instructions.len() {
-        let ext_fid_pair = &patch_instructions[j];
+        let lid_pair = &patch_instructions[j];
         let mut output_mapping = std::collections::HashMap::new();
-        for i in 0..ext_fid_pair.1.len() {
+        for i in 0..lid_pair.1.len() {
             output_mapping.insert(
                 format!("out{}", i),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_pair.1[i],
+                    function_id: lid_pair.1[i],
                 },
             );
         }
         match fun_client
             .patch(edgeless_api::common::PatchRequest {
-                function_id: ext_fid_pair.0,
+                function_id: lid_pair.0,
                 output_mapping,
             })
             .await
@@ -1082,7 +1082,7 @@ async fn test_patch_after_fun_stop() {
     no_function_event(&mut nodes).await;
 
     // Stop function f3
-    match fun_client.stop(ext_fids[2]).await {
+    match fun_client.stop(lids[2]).await {
         Ok(_) => {}
         Err(err) => panic!("{}", err),
     }
@@ -1098,11 +1098,11 @@ async fn test_patch_after_fun_stop() {
             match event {
                 MockAgentEvent::StopFunction(instance_id) => {
                     log::info!("stop-resource");
-                    assert_eq!(int_fids[2], instance_id.function_id);
+                    assert_eq!(pids[2], instance_id.function_id);
                 }
                 MockAgentEvent::PatchFunction(patch_request) => {
                     log::info!("patch-function");
-                    assert!(patch_request.function_id == int_fids[0] || patch_request.function_id == int_fids[1]);
+                    assert!(patch_request.function_id == pids[0] || patch_request.function_id == pids[1]);
                     assert!(patch_request.output_mapping.is_empty());
                 }
                 _ => panic!("unexpected event type: {}", event_to_string(&event)),
@@ -1135,21 +1135,21 @@ async fn test_recreate_fun_after_disconnect() {
     // Start f1
     let mut spawn_req = make_spawn_function_request("f1");
     spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
-    let ext_fid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    let lid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
-    let mut int_fid_1 = uuid::Uuid::nil();
+    let mut pid_1 = uuid::Uuid::nil();
     if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
         assert_eq!(node_id, stable_node_id);
-        int_fid_1 = new_instance_id.function_id;
+        pid_1 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
     // Start f2
     let mut spawn_req = make_spawn_function_request("f2");
     spawn_req.annotations.insert("label_match_all".to_string(), "unstable".to_string());
-    let ext_fid_2 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    let lid_2 = match fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
@@ -1163,7 +1163,7 @@ async fn test_recreate_fun_after_disconnect() {
     // Start f3
     let mut spawn_req = make_spawn_function_request("f3");
     spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
-    let ext_fid_3 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    let lid_3 = match fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
@@ -1175,12 +1175,12 @@ async fn test_recreate_fun_after_disconnect() {
     // Patch f1->f2
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_fid_1,
+            function_id: lid_1,
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_2,
+                    function_id: lid_2,
                 },
             )]),
         })
@@ -1198,12 +1198,12 @@ async fn test_recreate_fun_after_disconnect() {
     // Patch f2->f3
     match fun_client
         .patch(edgeless_api::common::PatchRequest {
-            function_id: ext_fid_2,
+            function_id: lid_2,
             output_mapping: std::collections::HashMap::from([(
                 "out".to_string(),
                 edgeless_api::function_instance::InstanceId {
                     node_id: uuid::Uuid::nil(),
-                    function_id: ext_fid_3,
+                    function_id: lid_3,
                 },
             )]),
         })
@@ -1244,7 +1244,7 @@ async fn test_recreate_fun_after_disconnect() {
                 }
                 MockAgentEvent::PatchFunction(patch_request) => {
                     log::info!("patch-function");
-                    assert_eq!(int_fid_1, patch_request.function_id);
+                    assert_eq!(pid_1, patch_request.function_id);
                     assert!(patch_request.output_mapping.is_empty());
                 }
                 _ => panic!("unexpected event type: {}", event_to_string(&event)),
@@ -1271,7 +1271,7 @@ async fn test_recreate_fun_after_disconnect() {
                 }
                 match event {
                     MockAgentEvent::PatchFunction(patch_request) => {
-                        assert_eq!(int_fid_1, patch_request.function_id);
+                        assert_eq!(pid_1, patch_request.function_id);
                         assert!(patch_request.output_mapping.is_empty());
                     }
                     _ => panic!("unexpected event type: {}", event_to_string(&event)),
@@ -1367,21 +1367,21 @@ async fn orc_reset() {
     for _wf_id in 0..num_workflows {
         // Start f1
         let spawn_req = make_spawn_function_request("f1");
-        let ext_fid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+        let lid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
             edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
             edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         };
 
         // Start f2
         let spawn_req = make_spawn_function_request("f2");
-        let ext_fid_2 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+        let lid_2 = match fun_client.start(spawn_req.clone()).await.unwrap() {
             edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
             edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         };
 
         // Start r1
         let start_req = make_start_resource_request("rc-1");
-        let ext_fid_res = match res_client.start(start_req.clone()).await.unwrap() {
+        let lid_res = match res_client.start(start_req.clone()).await.unwrap() {
             edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
             edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         };
@@ -1392,12 +1392,12 @@ async fn orc_reset() {
             "out".to_string(),
             edgeless_api::function_instance::InstanceId {
                 node_id: uuid::Uuid::nil(),
-                function_id: ext_fid_2,
+                function_id: lid_2,
             },
         );
         fun_client
             .patch(edgeless_api::common::PatchRequest {
-                function_id: ext_fid_1,
+                function_id: lid_1,
                 output_mapping,
             })
             .await
@@ -1409,12 +1409,12 @@ async fn orc_reset() {
             "out".to_string(),
             edgeless_api::function_instance::InstanceId {
                 node_id: uuid::Uuid::nil(),
-                function_id: ext_fid_res,
+                function_id: lid_res,
             },
         );
         fun_client
             .patch(edgeless_api::common::PatchRequest {
-                function_id: ext_fid_2,
+                function_id: lid_2,
                 output_mapping,
             })
             .await
