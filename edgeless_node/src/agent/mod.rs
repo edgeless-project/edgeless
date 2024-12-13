@@ -54,7 +54,7 @@ impl Agent {
         }
 
         let main_task = Box::pin(async move {
-            Self::main_task(node_id.clone(), receiver, runners, resources, data_plane_provider).await;
+            Self::main_task(node_id, receiver, runners, resources, data_plane_provider).await;
         });
 
         (Agent { sender, node_id }, main_task)
@@ -251,10 +251,7 @@ impl Agent {
                         Self::stop_function(
                             &mut function_runtimes,
                             &mut function_instances,
-                            edgeless_api::function_instance::InstanceId {
-                                node_id: node_id.clone(),
-                                function_id,
-                            },
+                            edgeless_api::function_instance::InstanceId { node_id, function_id },
                         )
                         .await;
                     }
@@ -270,7 +267,7 @@ impl Agent {
                             &mut resource_providers,
                             &mut resource_instances,
                             edgeless_api::function_instance::InstanceId {
-                                node_id: node_id.clone(),
+                                node_id,
                                 function_id: resource_id,
                             },
                         )
