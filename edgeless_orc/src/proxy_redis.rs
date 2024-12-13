@@ -153,11 +153,11 @@ impl ProxyRedis {
 #[derive(Clone, serde::Deserialize, Debug)]
 pub enum ActiveInstanceClone {
     // 0: request
-    // 1: [ (node_id, int_fid) ]
+    // 1: [ (node_id, lid) ]
     Function(edgeless_api::function_instance::SpawnFunctionRequest, Vec<String>),
 
     // 0: request
-    // 1: (node_id, int_fid)
+    // 1: (node_id, lid)
     Resource(edgeless_api::resource_configuration::ResourceInstanceSpecification, String),
 }
 
@@ -271,14 +271,14 @@ impl super::proxy::Proxy for ProxyRedis {
 
         // serialize the active instances
         let mut new_mapping_to_instance_id = std::collections::HashMap::new();
-        for (ext_fid, active_instance) in active_instances {
+        for (lid, active_instance) in active_instances {
             let _ = self.connection.set::<&str, &str, usize>(
-                format!("instance:{}", ext_fid).as_str(),
+                format!("instance:{}", lid).as_str(),
                 serde_json::to_string(&active_instance).unwrap_or_default().as_str(),
             );
             let new_instance_ids = active_instance.instance_ids();
             if let Some(outfile) = &mut self.mapping_to_instance_id_file {
-                let write = if let Some(old_instance_ids) = self.mapping_to_instance_id.get(ext_fid) {
+                let write = if let Some(old_instance_ids) = self.mapping_to_instance_id.get(lid) {
                     *old_instance_ids != new_instance_ids
                 } else {
                     true
@@ -289,7 +289,7 @@ impl super::proxy::Proxy for ProxyRedis {
                         "{},{},{},{}",
                         self.additional_fields,
                         timestamp,
-                        ext_fid,
+                        lid,
                         new_instance_ids
                             .iter()
                             .map(|x| format!("{},{}", x.node_id, x.function_id))
@@ -298,14 +298,14 @@ impl super::proxy::Proxy for ProxyRedis {
                     );
                 }
             }
-            new_mapping_to_instance_id.insert(*ext_fid, new_instance_ids);
+            new_mapping_to_instance_id.insert(*lid, new_instance_ids);
         }
         let _ = std::mem::replace(&mut self.mapping_to_instance_id, new_mapping_to_instance_id);
 
         // remove instances that are not active anymore
         let new_node_uuids = active_instances.keys().cloned().collect::<std::collections::HashSet<uuid::Uuid>>();
-        self.node_uuids.difference(&new_node_uuids).for_each(|ext_fid| {
-            let _ = self.connection.del::<&str, usize>(format!("instance:{}", ext_fid).as_str());
+        self.node_uuids.difference(&new_node_uuids).for_each(|lid| {
+            let _ = self.connection.del::<&str, usize>(format!("instance:{}", lid).as_str());
         });
 
         // update the list of active instance ext fids
@@ -314,17 +314,17 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn update_dependency_graph(&mut self, dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>) {
         // serialize the dependency graph
-        for (ext_fid, dependencies) in dependency_graph {
+        for (lid, dependencies) in dependency_graph {
             let _ = self.connection.set::<&str, &str, usize>(
-                format!("dependency:{}", ext_fid).as_str(),
+                format!("dependency:{}", lid).as_str(),
                 serde_json::to_string(&dependencies).unwrap_or_default().as_str(),
             );
         }
 
         // remove dependencies that do not exist anymore
         let new_dependency_uuids = dependency_graph.keys().cloned().collect::<std::collections::HashSet<uuid::Uuid>>();
-        self.dependency_uuids.difference(&new_dependency_uuids).for_each(|ext_fid| {
-            let _ = self.connection.del::<&str, usize>(format!("dependency:{}", ext_fid).as_str());
+        self.dependency_uuids.difference(&new_dependency_uuids).for_each(|lid| {
+            let _ = self.connection.del::<&str, usize>(format!("dependency:{}", lid).as_str());
         });
 
         // update the list of active instance ext fids

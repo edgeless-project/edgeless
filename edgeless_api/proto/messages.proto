@@ -61,7 +61,7 @@ message SpawnFunctionRequest {
     StateSpecification state_specification = 4;
 }
 
-// Some APIs provide the same inteface for different id types (external vs internal)
+// Some APIs provide the same inteface for logical vs physical identifiers.
 // This enables them to share a gRPC interface.
 message InstanceIdVariant {
     oneof InstanceIdType {
