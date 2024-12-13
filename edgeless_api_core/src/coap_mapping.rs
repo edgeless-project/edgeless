@@ -117,7 +117,7 @@ impl COAPEncoder {
         Self::encode(endpoint, token, "peers/remove", out_buf, true, &buffer[..len])
     }
 
-    pub fn encode_reset<'a, Endpoint>(endpoint: Endpoint, token: u8, out_buf: &'a mut [u8]) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+    pub fn encode_reset<Endpoint>(endpoint: Endpoint, token: u8, out_buf: &mut [u8]) -> ((&mut [u8], Endpoint), &mut [u8]) {
         Self::encode(endpoint, token, "reset", out_buf, true, &[])
     }
 
