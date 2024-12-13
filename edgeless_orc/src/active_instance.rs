@@ -6,14 +6,14 @@ use serde::ser::SerializeTupleVariant;
 #[derive(Clone)]
 pub enum ActiveInstance {
     // 0: request
-    // 1: [ (node_id, int_fid) ]
+    // 1: [ (node_id, lid) ]
     Function(
         edgeless_api::function_instance::SpawnFunctionRequest,
         Vec<edgeless_api::function_instance::InstanceId>,
     ),
 
     // 0: request
-    // 1: (node_id, int_fid)
+    // 1: (node_id, lid)
     Resource(
         edgeless_api::resource_configuration::ResourceInstanceSpecification,
         edgeless_api::function_instance::InstanceId,
@@ -59,13 +59,13 @@ impl std::fmt::Display for ActiveInstance {
                 "function, instances {}",
                 instances
                     .iter()
-                    .map(|x| format!("node_id {}, int_fid {}", x.node_id, x.function_id))
+                    .map(|x| format!("node_id {}, lid {}", x.node_id, x.function_id))
                     .collect::<Vec<String>>()
                     .join(",")
             ),
             ActiveInstance::Resource(req, instance_id) => write!(
                 f,
-                "resource class type {}, node_id {}, function_id {}",
+                "resource class type {}, node_id {}, lid {}",
                 req.class_type, instance_id.node_id, instance_id.function_id
             ),
         }
