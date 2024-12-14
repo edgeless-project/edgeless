@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 use crate::common::PatchRequest;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ResourceInstanceSpecification {
     pub class_type: String,
     #[serde(skip)]
