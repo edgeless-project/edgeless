@@ -5,14 +5,14 @@
 
 pub use edgeless_api_core::instance_id::*;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum StatePolicy {
     Transient,
     NodeLocal,
     Global,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StateSpecification {
     pub state_id: uuid::Uuid,
     pub state_policy: StatePolicy,
@@ -36,7 +36,7 @@ pub struct FunctionClassSpecification {
     /// Function class version.
     pub function_class_version: String,
     /// Inline function's code (if present).
-    #[serde(skip_serializing)]
+    #[serde(skip)]
     pub function_class_code: Vec<u8>,
     /// Output channels in which the function may generate new. Can be empty.
     pub function_class_outputs: Vec<String>,
@@ -54,11 +54,9 @@ impl FunctionClassSpecification {
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SpawnFunctionRequest {
     #[serde(skip)]
-    pub instance_id: Option<InstanceId>,
-    #[serde(skip)]
+    pub instance_id: Option<InstanceId>, // XXX
     pub code: FunctionClassSpecification,
     pub annotations: std::collections::HashMap<String, String>,
-    #[serde(skip)]
     pub state_specification: StateSpecification,
 }
 
