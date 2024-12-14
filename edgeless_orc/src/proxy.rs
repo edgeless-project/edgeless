@@ -49,6 +49,16 @@ pub trait Proxy: Sync + Send {
     /// Fetch the performance samples.
     fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, std::collections::HashMap<String, Vec<(f64, f64)>>>;
 
+    /// Fetch the spawn requests of active function instances.
+    fn fetch_function_instance_requests(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::SpawnFunctionRequest>;
+
+    /// Fetch the configurations of active resource instances.
+    fn fetch_resource_instance_configurations(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::resource_configuration::ResourceInstanceSpecification>;
+
     /// Fetch the mapping between active function instances and nodes.
     fn fetch_function_instances_to_nodes(
         &mut self,
