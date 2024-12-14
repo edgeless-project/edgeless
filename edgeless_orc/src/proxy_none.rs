@@ -31,6 +31,17 @@ impl super::proxy::Proxy for ProxyNone {
     fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, std::collections::HashMap<String, Vec<(f64, f64)>>> {
         std::collections::HashMap::new()
     }
+    fn fetch_function_instance_requests(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::SpawnFunctionRequest> {
+        std::collections::HashMap::new()
+    }
+    fn fetch_resource_instance_configurations(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::resource_configuration::ResourceInstanceSpecification>
+    {
+        std::collections::HashMap::new()
+    }
     fn fetch_function_instances_to_nodes(
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::NodeId>> {
