@@ -2,7 +2,7 @@
 
 logs="build.log build_functions.log edgeless_bal.log edgeless_con.log edgeless_orc.log edgeless_node.log my-local-file.log reading-errors.log"
 confs="balancer.toml controller.toml orchestrator.toml node.toml cli.toml"
-specialized_workflows="container dda_demo esp32_resources redis vector_mul matrix_mul ollama kafka_egress"
+specialized_workflows="container dda_demo dda_test esp32_resources redis vector_mul matrix_mul ollama kafka_egress"
 
 echo "checking for existing files"
 existing_files=""
@@ -55,7 +55,16 @@ pids+=($!)
 RUST_LOG=info target/debug/edgeless_node_d >& edgeless_node.log &
 pids+=($!)
 
-sleep 0.5
+echo -n "waiting for the cluster to be ready"
+while (true) ; do
+    echo -n "."
+    out=$(target/debug/edgeless_cli domain inspect domain-1 | grep "1 node")
+    if [ "$out" != "" ] ; then
+        break
+    fi
+    sleep 0.1
+done
+echo "done"
 
 echo "starting workflows"
 for workflow in $(find examples -type f -name "workflow*.json") ; do
