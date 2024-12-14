@@ -629,7 +629,7 @@ mod test {
                             function_class_type: "class".to_string(),
                             function_class_version: "1.0".to_string(),
                             function_class_code: vec![],
-                            function_class_outputs: vec![],
+                            function_class_outputs: vec!["out1".to_string(), "out2".to_string()],
                         },
                         annotations: std::collections::HashMap::new(),
                         state_specification: edgeless_api::function_instance::StateSpecification {
@@ -653,7 +653,10 @@ mod test {
                     edgeless_api::resource_configuration::ResourceInstanceSpecification {
                         class_type: "res".to_string(),
                         output_mapping: std::collections::HashMap::new(),
-                        configuration: std::collections::HashMap::new(),
+                        configuration: std::collections::HashMap::from([
+                            ("key1".to_string(), "val1".to_string()),
+                            ("key2".to_string(), "val2".to_string()),
+                        ]),
                     },
                     edgeless_api::function_instance::InstanceId {
                         node_id: node2_id,
@@ -746,6 +749,41 @@ mod test {
         let samples_2_res = entry.get(&fid_perf_2.to_string()).unwrap();
         assert_eq!(samples_1, samples_1_res.iter().map(|x| x.0).collect::<Vec<f64>>());
         assert_eq!(samples_2, samples_2_res.iter().map(|x| x.0).collect::<Vec<f64>>());
+
+        // Check nodes and resource providers.
+        let mut resource_providers = std::collections::HashMap::new();
+        resource_providers.insert(
+            "provider1".to_string(),
+            crate::resource_provider::ResourceProvider {
+                class_type: "class1".to_string(),
+                node_id: node2_id.clone(),
+                outputs: vec!["out".to_string()],
+            },
+        );
+        redis_proxy.update_resource_providers(&resource_providers);
+
+        assert_eq!(resource_providers, redis_proxy.fetch_resource_providers());
+
+        let mut nodes = std::collections::HashMap::new();
+        let (mock_node_sender, _mock_node_receiver) = futures::channel::mpsc::unbounded::<crate::orchestrator::test::MockAgentEvent>();
+        nodes.insert(
+            node1_id.clone(),
+            crate::client_desc::ClientDesc {
+                agent_url: "http://127.0.0.1:10000".to_string(),
+                invocation_url: "http://127.0.0.1:10001".to_string(),
+                api: Box::new(crate::orchestrator::test::MockNode {
+                    node_id: node1_id.clone(),
+                    sender: mock_node_sender,
+                }) as Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
+                capabilities: edgeless_api::node_registration::NodeCapabilities::minimum(),
+            },
+        );
+        redis_proxy.update_nodes(&nodes);
+
+        let mut nodes_expected = std::collections::HashMap::new();
+        nodes_expected.insert(node1_id.clone(), edgeless_api::node_registration::NodeCapabilities::minimum());
+
+        assert_eq!(nodes_expected, redis_proxy.fetch_node_capabilities());
     }
 
     #[test]

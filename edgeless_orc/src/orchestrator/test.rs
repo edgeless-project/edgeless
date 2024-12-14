@@ -11,7 +11,7 @@ use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use super::*;
 
-enum MockAgentEvent {
+pub enum MockAgentEvent {
     StartFunction(
         (
             edgeless_api::function_instance::InstanceId,
@@ -33,9 +33,9 @@ enum MockAgentEvent {
     Reset(),
 }
 
-struct MockNode {
-    node_id: uuid::Uuid,
-    sender: futures::channel::mpsc::UnboundedSender<MockAgentEvent>,
+pub struct MockNode {
+    pub node_id: uuid::Uuid,
+    pub sender: futures::channel::mpsc::UnboundedSender<MockAgentEvent>,
 }
 
 impl edgeless_api::outer::agent::AgentAPI for MockNode {
