@@ -8,8 +8,9 @@ under active development within the project
 
 ## Introduction
 
-EDGELESS is a framework that enables _serverless edge computing_, which is
-intended especially for edge nodes with limited capabilities.
+EDGELESS is a framework that enables
+[serverless edge computing](documentation/serverless_edge_computing.md) and it
+is intended especially for edge nodes with limited computational capabilities.
 
 An EDGELESS cluster is managed by an ε-CON (controller) and consists of one
 or more _orchestration domains_, each managed by an ε-ORC (orchestrator).
