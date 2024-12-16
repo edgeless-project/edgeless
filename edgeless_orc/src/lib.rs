@@ -11,7 +11,7 @@ pub mod deployment_requirements;
 pub mod domain_subscriber;
 pub mod node_register;
 pub mod node_register_client;
-mod orchestration_logic;
+pub mod orchestration_logic;
 pub mod orchestrator;
 pub mod orchestrator_task;
 pub mod proxy;

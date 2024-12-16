@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
+use std::io::Read;
+
 use anyhow::anyhow;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -90,6 +92,11 @@ impl Default for MapReduceData {
     }
 }
 
+pub struct JsonSpecData {
+    pub spec_string: String,
+    pub parent_path: Box<std::path::Path>,
+}
+
 pub enum WorkflowType {
     None,
 
@@ -112,6 +119,10 @@ pub enum WorkflowType {
     // next stage, the output from all the processing blocks in the stage before
     // must be received.
     MapReduce(MapReduceData),
+
+    // A workflow provided in a JSON spec file in the path given.
+    // The string @WFID is substituted with the workflow counter.
+    JsonSpec(JsonSpecData),
 }
 
 impl WorkflowType {
@@ -148,6 +159,16 @@ impl WorkflowType {
             let reader = std::io::BufReader::new(file);
             let data: MapReduceData = serde_json::from_reader(reader)?;
             return WorkflowType::MapReduce(data).check();
+        } else if !tokens.is_empty() && tokens[0] == "json-spec" && tokens.len() == 2 {
+            let file = std::fs::File::open(tokens[1])?;
+            let mut reader = std::io::BufReader::new(file);
+            let mut spec_string = String::default();
+            reader.read_to_string(&mut spec_string)?;
+            let parent_path = std::path::Path::new(tokens[1])
+                .parent()
+                .expect("cannot find the workflow spec's parent path")
+                .into();
+            return WorkflowType::JsonSpec(JsonSpecData { spec_string, parent_path }).check();
         }
         Err(anyhow!("unknown workflow type: {}", wf_type))
     }
@@ -186,17 +207,21 @@ impl WorkflowType {
                 anyhow::ensure!(data.max_memory_bytes >= data.min_memory_bytes, "allocation: min > max");
                 anyhow::ensure!(!data.functions_path.is_empty(), "empty library path");
             }
+            WorkflowType::JsonSpec(data) => {
+                anyhow::ensure!(!data.spec_string.is_empty(), "empty workflow specification file");
+            }
         }
         Ok(self)
     }
 
-    pub fn all() -> [String; 5] {
+    pub fn all() -> [String; 6] {
         [
             "none".to_string(),
             "single".to_string(),
             "matrix-mul-chain (*)".to_string(),
             "vector-mul-chain (*)".to_string(),
             "map-reduce (*)".to_string(),
+            "json-spec".to_string(),
         ]
     }
 
