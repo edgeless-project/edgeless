@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-mod workflow_spec;
 
+mod workflow_spec;
 use clap::Parser;
 use edgeless_api::{outer::controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
 
@@ -137,53 +137,14 @@ async fn main() -> anyhow::Result<()> {
                 match workflow_command {
                     WorkflowCommands::Start { spec_file } => {
                         log::debug!("Start Workflow");
-                        let workflow: workflow_spec::WorkflowSpec =
-                            serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
-                        let res = wf_client
-                            .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                                workflow_functions: workflow
-                                    .functions
-                                    .into_iter()
-                                    .map(|func_spec| {
-                                        let function_class_code = match func_spec.class_specification.function_type.as_str() {
-                                            "RUST_WASM" => std::fs::read(
-                                                std::path::Path::new(&spec_file)
-                                                    .parent()
-                                                    .unwrap()
-                                                    .join(func_spec.class_specification.code.unwrap()),
-                                            )
-                                            .unwrap(),
-                                            "CONTAINER" => func_spec.class_specification.code.unwrap().as_bytes().to_vec(),
-                                            _ => panic!("unknown function class type: {}", func_spec.class_specification.function_type),
-                                        };
 
-                                        edgeless_api::workflow_instance::WorkflowFunction {
-                                            name: func_spec.name,
-                                            function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                                                function_class_id: func_spec.class_specification.id,
-                                                function_class_type: func_spec.class_specification.function_type,
-                                                function_class_version: func_spec.class_specification.version,
-                                                function_class_code,
-                                                function_class_outputs: func_spec.class_specification.outputs,
-                                            },
-                                            output_mapping: func_spec.output_mapping,
-                                            annotations: func_spec.annotations,
-                                        }
-                                    })
-                                    .collect(),
-                                workflow_resources: workflow
-                                    .resources
-                                    .into_iter()
-                                    .map(|res_spec| edgeless_api::workflow_instance::WorkflowResource {
-                                        name: res_spec.name,
-                                        class_type: res_spec.class_type,
-                                        output_mapping: res_spec.output_mapping,
-                                        configurations: res_spec.configurations,
-                                    })
-                                    .collect(),
-                                annotations: workflow.annotations.clone(),
-                            })
-                            .await;
+                        let workflow_spec: edgeless_cli::workflow_spec::WorkflowSpec =
+                            serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
+                        let parent_path = std::path::Path::new(&spec_file)
+                            .parent()
+                            .expect("cannot find the workflow spec's parent path");
+                        let workflow = edgeless_cli::workflow_spec_to_request(workflow_spec, parent_path);
+                        let res = wf_client.start(workflow).await;
                         match res {
                             Ok(response) => {
                                 match &response {
