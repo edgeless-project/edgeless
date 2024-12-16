@@ -60,4 +60,10 @@ impl super::proxy::Proxy for ProxyNone {
     fn fetch_nodes_to_instances(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, Vec<crate::proxy::Instance>> {
         std::collections::HashMap::new()
     }
+    fn fetch_dependency_graph(&mut self) -> std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>> {
+        std::collections::HashMap::new()
+    }
+    fn updated(&mut self, _category: crate::proxy::Category) -> bool {
+        true
+    }
 }
