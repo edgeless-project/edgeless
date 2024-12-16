@@ -512,8 +512,6 @@ async fn messaging_call_raw_input_err() {
 
 #[tokio::test]
 async fn state_management() {
-    env_logger::init();
-
     let node_id = uuid::Uuid::new_v4();
     let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
     let fid2 = edgeless_api::function_instance::InstanceId::new(node_id);
