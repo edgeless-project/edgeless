@@ -1589,7 +1589,7 @@ dependencies = [
  "rand",
  "rand_distr",
  "rand_pcg",
- "redis",
+ "redis 0.25.4",
  "serde",
  "serde_json",
  "tokio 1.38.0",
@@ -1767,7 +1767,7 @@ dependencies = [
  "prost 0.12.6",
  "rand",
  "rdkafka",
- "redis",
+ "redis 0.25.4",
  "reqwest 0.11.27",
  "rs-docker",
  "serde",
@@ -1797,7 +1797,7 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "rand",
- "redis",
+ "redis 0.27.6",
  "serde",
  "serde_json",
  "serial_test",
@@ -1822,7 +1822,7 @@ dependencies = [
  "env_logger",
  "futures 0.3.30",
  "log",
- "redis",
+ "redis 0.25.4",
  "serial_test",
  "tokio 1.38.0",
  "toml 0.7.8",
@@ -4535,10 +4535,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-bigint"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "num-conv"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51d515d32fb182ee37cda2ccdcb92950d6a3c2893aa280e540671c2cd0f3b1d9"
+
+[[package]]
+name = "num-integer"
+version = "0.1.46"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7969661fd2958a5cb096e56c8e1ad0444ac2bbcd0061bd28660485a44879858f"
+dependencies = [
+ "num-traits",
+]
 
 [[package]]
 name = "num-traits"
@@ -5304,6 +5323,24 @@ checksum = "e0d7a6955c7511f60f3ba9e86c6d02b3c3f144f8c24b288d1f4e18074ab8bbec"
 dependencies = [
  "combine",
  "itoa 1.0.11",
+ "percent-encoding",
+ "ryu",
+ "sha1_smol",
+ "socket2 0.5.7",
+ "url",
+]
+
+[[package]]
+name = "redis"
+version = "0.27.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09d8f99a4090c89cc489a94833c901ead69bfbf3877b4867d5482e321ee875bc"
+dependencies = [
+ "arc-swap",
+ "combine",
+ "itertools 0.13.0",
+ "itoa 1.0.11",
+ "num-bigint",
  "percent-encoding",
  "ryu",
  "sha1_smol",
