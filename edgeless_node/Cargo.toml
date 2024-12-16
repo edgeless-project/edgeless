@@ -60,7 +60,10 @@ wasmi = { version = "0.31", default-features = false, optional = true }
 tonic = "0.11.0"
 prost = "0.12.6"
 base64 = "0.22.1"
-rs-docker = "0.0.58"
+# A fork is used instead of the actual crate code because Devices support is needed for Intel SGX
+# But is not implemented in the latest version of rs-docker "0.0.60"
+# See this GitHub issue: https://github.com/edgeless-project/edgeless/issues/226 for more information
+rs-docker = { version = "0.0.61", git = "https://github.com/edgeless-project/rust-docker.git" }
 chrono = "0.4.38"
 ollama-rs = { version = "0.2.0", features = ["chat-history"] }
 rdkafka = { version = "0.36.2", optional = true }

@@ -49,6 +49,7 @@ fn test_docker_basic() {
 
     let name = uuid::Uuid::new_v4();
     let image_name = "edgeless_function".to_string();
+    let devices = vec![];
 
     match docker.create_container(
         name.to_string(),
@@ -60,6 +61,7 @@ fn test_docker_basic() {
                 NetworkMode: None,
                 PublishAllPorts: Some(true),
                 PortBindings: None,
+                Devices: Some(devices),
             }),
         },
     ) {
