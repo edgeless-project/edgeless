@@ -47,35 +47,19 @@ pub(crate) struct OrchestratorTask {
     //        value: lid (target function)
     dependency_graph: std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
     dependency_graph_changed: bool,
-    last_domain_capabilities: edgeless_api::domain_registration::DomainCapabilities,
 }
 
 impl OrchestratorTask {
     pub async fn new(
         receiver: futures::channel::mpsc::UnboundedReceiver<crate::orchestrator::OrchestratorRequest>,
         orchestrator_settings: crate::EdgelessOrcBaselineSettings,
-        nodes: std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>,
-        resource_providers: std::collections::HashMap<String, crate::resource_provider::ResourceProvider>,
         proxy: std::sync::Arc<tokio::sync::Mutex<dyn super::proxy::Proxy>>,
         subscriber_sender: futures::channel::mpsc::UnboundedSender<super::domain_subscriber::DomainSubscriberRequest>,
     ) -> Self {
-        for (node_id, client_desc) in &nodes {
-            log::info!(
-                "New node: node_id {}, agent URL {}, invocation URL {}",
-                node_id,
-                client_desc.agent_url,
-                client_desc.invocation_url
-            );
-        }
-
-        for (provider, resource_provider) in &resource_providers {
-            log::info!("New resource: provider {}, {}", provider, resource_provider);
-        }
-
         Self {
             receiver,
-            nodes,
-            resource_providers,
+            nodes: std::collections::HashMap::new(),
+            resource_providers: std::collections::HashMap::new(),
             proxy,
             subscriber_sender,
             orchestration_logic: crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy),
@@ -84,7 +68,6 @@ impl OrchestratorTask {
             active_instances_changed: false,
             dependency_graph: std::collections::HashMap::new(),
             dependency_graph_changed: false,
-            last_domain_capabilities: edgeless_api::domain_registration::DomainCapabilities::default(),
         }
     }
 
@@ -776,15 +759,8 @@ impl OrchestratorTask {
     }
 
     async fn update_domain(&mut self) {
-        let new_domain_capabilities = self.domain_capabilities();
-        if new_domain_capabilities == self.last_domain_capabilities {
-            return;
-        }
-
-        // Keep the last domain capabilities for the future.
-        self.last_domain_capabilities = new_domain_capabilities.clone();
-
         // Notify the domain register of the updated capabilities.
+        let new_domain_capabilities = self.domain_capabilities();
         let _ = self
             .subscriber_sender
             .send(super::domain_subscriber::DomainSubscriberRequest::Update(Box::new(

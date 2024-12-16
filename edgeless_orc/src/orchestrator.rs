@@ -108,15 +108,7 @@ impl Orchestrator {
             .await;
 
         let main_task = Box::pin(async move {
-            let mut orchestrator_task = super::orchestrator_task::OrchestratorTask::new(
-                receiver,
-                settings,
-                std::collections::HashMap::new(),
-                std::collections::HashMap::new(),
-                proxy,
-                subscriber_sender,
-            )
-            .await;
+            let mut orchestrator_task = super::orchestrator_task::OrchestratorTask::new(receiver, settings, proxy, subscriber_sender).await;
             orchestrator_task.run().await;
         });
 
