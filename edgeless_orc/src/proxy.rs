@@ -7,6 +7,14 @@ pub enum Instance {
     Resource(edgeless_api::function_instance::ComponentId),
 }
 
+#[derive(Eq, Hash, PartialEq, Clone)]
+pub enum Category {
+    NodeCapabilities,
+    ResourceProviders,
+    ActiveInstances,
+    DependencyGraph,
+}
+
 #[async_trait::async_trait]
 pub trait Proxy: Sync + Send {
     /// Update the info on the currently actives nodes as given.
@@ -75,6 +83,12 @@ pub trait Proxy: Sync + Send {
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::NodeId>;
 
-    /// Find all the active instances on nodes.
+    /// Fetch all the active instances grouped by node.
     fn fetch_nodes_to_instances(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, Vec<Instance>>;
+
+    /// Fetch all the dependecies of logical function/resource instances.
+    fn fetch_dependency_graph(&mut self) -> std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>;
+
+    /// Return true if the given category has been updated since the last fetch.
+    fn updated(&mut self, category: Category) -> bool;
 }

@@ -26,6 +26,9 @@ pub struct ProxyRedis {
     active_instance_uuids: std::collections::HashSet<uuid::Uuid>,
     dependency_uuids: std::collections::HashSet<uuid::Uuid>,
 
+    // last update timestamps
+    last_update_timestamps: std::collections::HashMap<crate::proxy::Category, String>,
+
     // copy of data structures dumped to files
     mapping_to_instance_id: std::collections::HashMap<uuid::Uuid, Vec<edgeless_api::function_instance::InstanceId>>,
     node_capabilities: std::collections::HashMap<uuid::Uuid, String>,
@@ -85,6 +88,7 @@ impl ProxyRedis {
             resource_provider_ids: std::collections::HashSet::new(),
             active_instance_uuids: std::collections::HashSet::new(),
             dependency_uuids: std::collections::HashSet::new(),
+            last_update_timestamps: std::collections::HashMap::new(),
             mapping_to_instance_id: std::collections::HashMap::new(),
             node_capabilities: std::collections::HashMap::new(),
             node_health_status: std::collections::HashMap::new(),
@@ -185,6 +189,7 @@ impl ProxyRedis {
     }
 
     fn fetch_instances(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, crate::active_instance::ActiveInstance> {
+        self.local_timestamp_update(&crate::proxy::Category::ActiveInstances);
         let mut instance_ids = vec![];
         for instance_key in self.connection.keys::<&str, Vec<String>>("instance:*").unwrap_or(vec![]) {
             let tokens: Vec<&str> = instance_key.split(':').collect();
@@ -228,21 +233,40 @@ impl ProxyRedis {
         }
         instances
     }
+
+    fn get_last_update(&mut self, category: &crate::proxy::Category) -> String {
+        let category_name = match category {
+            crate::proxy::Category::NodeCapabilities => "node:capabilities",
+            crate::proxy::Category::ResourceProviders => "provider",
+            crate::proxy::Category::ActiveInstances => "instance",
+            crate::proxy::Category::DependencyGraph => "dependency",
+        };
+        self.connection
+            .get::<String, String>(format!("{}:last_update", category_name))
+            .unwrap_or_default()
+    }
+
+    fn local_timestamp_update(&mut self, category: &crate::proxy::Category) {
+        let redis_timestamp = self.get_last_update(category);
+        self.last_update_timestamps.insert(category.clone(), redis_timestamp);
+    }
 }
 
 impl super::proxy::Proxy for ProxyRedis {
     fn update_nodes(&mut self, nodes: &std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>) {
         let timestamp = ProxyRedis::timestamp_now();
 
+        // update the timestamp when the nodes were updated
+        let _ = redis::Cmd::set(format!("node:capabilities:last_update"), &timestamp).exec(&mut self.connection);
+
         // serialize the nodes' capabilities and health status to Redis
         let mut new_node_capabilities = std::collections::HashMap::new();
         for (uuid, client_desc) in nodes {
-            redis::pipe()
-                .set::<&str, &str>(
-                    format!("node:capabilities:{}", uuid).as_str(),
-                    serde_json::to_string(&client_desc.capabilities).unwrap_or_default().as_str(),
-                )
-                .execute(&mut self.connection);
+            let _ = redis::Cmd::set(
+                format!("node:capabilities:{}", uuid).as_str(),
+                serde_json::to_string(&client_desc.capabilities).unwrap_or_default().as_str(),
+            )
+            .exec(&mut self.connection);
             let new_caps = client_desc.capabilities.to_csv();
             if let Some(outfile) = &mut self.capabilities_file {
                 let write: bool = if let Some(old_caps) = self.node_capabilities.get(uuid) {
@@ -261,10 +285,11 @@ impl super::proxy::Proxy for ProxyRedis {
         // remove nodes that are not anymore in the orchestration domain
         let new_active_instance_uuids = nodes.keys().cloned().collect::<std::collections::HashSet<uuid::Uuid>>();
         self.active_instance_uuids.difference(&new_active_instance_uuids).for_each(|uuid| {
-            redis::pipe()
+            let _ = redis::pipe()
                 .del(format!("node:capabilities:{}", uuid).as_str())
+                .ignore()
                 .del(format!("node:health:{}", uuid).as_str())
-                .execute(&mut self.connection);
+                .exec(&mut self.connection);
         });
 
         // update the list of node UUIDs
@@ -272,6 +297,9 @@ impl super::proxy::Proxy for ProxyRedis {
     }
 
     fn update_resource_providers(&mut self, resource_providers: &std::collections::HashMap<String, crate::resource_provider::ResourceProvider>) {
+        // update the timestamp when the resource providers were updated
+        let _ = redis::Cmd::set(format!("provider:last_update"), ProxyRedis::timestamp_now()).exec(&mut self.connection);
+
         // serialize the resource providers
         for (provider_id, resource_provider) in resource_providers {
             let _ = self.connection.set::<&str, &str, usize>(
@@ -292,6 +320,9 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn update_active_instances(&mut self, active_instances: &std::collections::HashMap<uuid::Uuid, crate::active_instance::ActiveInstance>) {
         let timestamp = ProxyRedis::timestamp_now();
+
+        // update the timestamp when the active instances were updated
+        let _ = redis::Cmd::set(format!("instance:last_update"), &timestamp).exec(&mut self.connection);
 
         // serialize the active instances
         let mut new_mapping_to_instance_id = std::collections::HashMap::new();
@@ -337,18 +368,19 @@ impl super::proxy::Proxy for ProxyRedis {
     }
 
     fn update_dependency_graph(&mut self, dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>) {
+        // update the timestamp when the dependency graph was updated
+        let _ = redis::Cmd::set(format!("dependency:last_update"), ProxyRedis::timestamp_now()).exec(&mut self.connection);
+
         // serialize the dependency graph
         for (lid, dependencies) in dependency_graph {
-            let _ = self.connection.set::<&str, &str, usize>(
-                format!("dependency:{}", lid).as_str(),
-                serde_json::to_string(&dependencies).unwrap_or_default().as_str(),
-            );
+            let _ =
+                redis::Cmd::set(format!("dependency:{}", lid), serde_json::to_string(&dependencies).unwrap_or_default()).exec(&mut self.connection);
         }
 
         // remove dependencies that do not exist anymore
         let new_dependency_uuids = dependency_graph.keys().cloned().collect::<std::collections::HashSet<uuid::Uuid>>();
         self.dependency_uuids.difference(&new_dependency_uuids).for_each(|lid| {
-            let _ = self.connection.del::<&str, usize>(format!("dependency:{}", lid).as_str());
+            let _ = redis::Cmd::del(format!("dependency:{}", lid)).exec(&mut self.connection);
         });
 
         // update the list of active instance ext fids
@@ -359,12 +391,11 @@ impl super::proxy::Proxy for ProxyRedis {
         let timestamp = ProxyRedis::timestamp_now();
 
         // Save to Redis.
-        redis::pipe()
-            .set::<&str, &str>(
-                format!("node:health:{}", node_id).as_str(),
-                serde_json::to_string(&node_health).unwrap_or_default().as_str(),
-            )
-            .execute(&mut self.connection);
+        let _ = redis::Cmd::set(
+            format!("node:health:{}", node_id).as_str(),
+            serde_json::to_string(&node_health).unwrap_or_default().as_str(),
+        )
+        .exec(&mut self.connection);
         let new_health_status = node_health.to_csv();
 
         // Save to dataset output.
@@ -387,9 +418,7 @@ impl super::proxy::Proxy for ProxyRedis {
         for (function_id, values) in performance_samples.function_execution_times {
             let key = format!("performance:function_execution_time:{}", function_id);
             for value in values {
-                redis::pipe()
-                    .rpush::<&str, &str>(&key, format!("{},{}", value, &timestamp).as_str())
-                    .execute(&mut self.connection);
+                let _ = redis::Cmd::rpush(&key, format!("{},{}", value, &timestamp).as_str()).exec(&mut self.connection);
 
                 // Save to dataset output.
                 if let Some(outfile) = &mut self.performance_samples_file {
@@ -450,6 +479,7 @@ impl super::proxy::Proxy for ProxyRedis {
     fn fetch_node_capabilities(
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeCapabilities> {
+        self.local_timestamp_update(&crate::proxy::Category::NodeCapabilities);
         let mut capabilities = std::collections::HashMap::new();
         for node_key in self.connection.keys::<&str, Vec<String>>("node:capabilities:*").unwrap_or(vec![]) {
             let tokens: Vec<&str> = node_key.split(':').collect();
@@ -466,6 +496,7 @@ impl super::proxy::Proxy for ProxyRedis {
     }
 
     fn fetch_resource_providers(&mut self) -> std::collections::HashMap<String, crate::resource_provider::ResourceProvider> {
+        self.local_timestamp_update(&crate::proxy::Category::ResourceProviders);
         let mut resource_providers = std::collections::HashMap::new();
         for node_key in self.connection.keys::<&str, Vec<String>>("provider:*").unwrap_or(vec![]) {
             let tokens: Vec<&str> = node_key.split(':').collect();
@@ -612,6 +643,30 @@ impl super::proxy::Proxy for ProxyRedis {
         }
         nodes_mapping
     }
+
+    fn fetch_dependency_graph(&mut self) -> std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>> {
+        self.local_timestamp_update(&crate::proxy::Category::DependencyGraph);
+        let mut dependency_graph = std::collections::HashMap::new();
+        for node_key in self.connection.keys::<&str, Vec<String>>("dependency:*").unwrap_or(vec![]) {
+            let tokens: Vec<&str> = node_key.split(':').collect();
+            assert_eq!(tokens.len(), 2);
+            assert_eq!("dependency", tokens[0]);
+            if let Ok(lid) = uuid::Uuid::parse_str(tokens[1]) {
+                if let Ok(val) = self.connection.get::<&str, String>(&node_key) {
+                    if let Ok(val) = serde_json::from_str::<std::collections::HashMap<String, uuid::Uuid>>(&val) {
+                        dependency_graph.insert(lid, val);
+                    }
+                }
+            }
+        }
+        dependency_graph
+    }
+
+    fn updated(&mut self, category: crate::proxy::Category) -> bool {
+        let redis_timestamp = self.get_last_update(&category);
+        let local_timestamp = self.last_update_timestamps.entry(category).or_default();
+        *local_timestamp != redis_timestamp
+    }
 }
 
 #[cfg(test)]
@@ -622,23 +677,50 @@ mod test {
 
     use super::*;
 
-    #[test]
-    fn test_redis_proxy() {
+    fn get_proxy() -> Option<ProxyRedis> {
         // Skip the test if there is no local Redis listening on default port.
-        let mut redis_proxy = match ProxyRedis::new("redis://localhost:6379", true, None) {
-            Ok(redis_proxy) => redis_proxy,
+        match ProxyRedis::new("redis://localhost:6379", true, None) {
+            Ok(redis_proxy) => return Some(redis_proxy),
             Err(_) => {
                 println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
-                return;
             }
         };
+        None
+    }
 
+    #[serial_test::serial]
+    #[test]
+    fn test_redis_proxy_ctor() {
+        let mut redis_proxy = match get_proxy() {
+            Some(redis_proxy) => redis_proxy,
+            None => return,
+        };
+        assert!(redis_proxy.fetch_dependency_graph().is_empty());
+        assert!(redis_proxy.fetch_function_instance_requests().is_empty());
         assert!(redis_proxy.fetch_function_instances_to_nodes().is_empty());
         assert!(redis_proxy.fetch_instances().is_empty());
+        assert!(redis_proxy.fetch_instances_to_physical_ids().is_empty());
         assert!(redis_proxy.fetch_node_capabilities().is_empty());
         assert!(redis_proxy.fetch_node_health().is_empty());
         assert!(redis_proxy.fetch_nodes_to_instances().is_empty());
+        assert!(redis_proxy.fetch_performance_samples().is_empty());
+        assert!(redis_proxy.fetch_resource_instance_configurations().is_empty());
         assert!(redis_proxy.fetch_resource_instances_to_nodes().is_empty());
+        assert!(redis_proxy.fetch_resource_providers().is_empty());
+
+        assert!(!redis_proxy.updated(crate::proxy::Category::ActiveInstances));
+        assert!(!redis_proxy.updated(crate::proxy::Category::NodeCapabilities));
+        assert!(!redis_proxy.updated(crate::proxy::Category::DependencyGraph));
+        assert!(!redis_proxy.updated(crate::proxy::Category::ResourceProviders));
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn test_redis_proxy_instances() {
+        let mut redis_proxy = match get_proxy() {
+            Some(redis_proxy) => redis_proxy,
+            None => return,
+        };
 
         let mut active_instances = std::collections::HashMap::new();
         let node1_id = uuid::Uuid::new_v4(); // functions
@@ -693,7 +775,9 @@ mod test {
             );
         }
 
+        assert!(!redis_proxy.updated(crate::proxy::Category::ActiveInstances));
         redis_proxy.update_active_instances(&active_instances);
+        assert!(redis_proxy.updated(crate::proxy::Category::ActiveInstances));
 
         let mut function_requests_expected = std::collections::HashMap::new();
         for (lid, instance) in &active_instances {
@@ -702,6 +786,7 @@ mod test {
             }
         }
         assert_eq!(function_requests_expected, redis_proxy.fetch_function_instance_requests());
+        assert!(!redis_proxy.updated(crate::proxy::Category::ActiveInstances));
 
         let mut resource_configurations_expected = std::collections::HashMap::new();
         for (lid, instance) in &active_instances {
@@ -745,6 +830,15 @@ mod test {
             assert_eq!(logical, elem.0);
             assert_eq!(*physical, elem.1);
         }
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn test_redis_proxy_health_and_performance_samples() {
+        let mut redis_proxy = match get_proxy() {
+            Some(redis_proxy) => redis_proxy,
+            None => return,
+        };
 
         // Check health status and performance samples.
         let health_status = edgeless_api::node_registration::NodeHealthStatus {
@@ -792,6 +886,15 @@ mod test {
         let samples_2_res = entry.get(&fid_perf_2.to_string()).unwrap();
         assert_eq!(samples_1, samples_1_res.iter().map(|x| x.0).collect::<Vec<f64>>());
         assert_eq!(samples_2, samples_2_res.iter().map(|x| x.0).collect::<Vec<f64>>());
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn test_redis_proxy_resource_providers() {
+        let mut redis_proxy = match get_proxy() {
+            Some(redis_proxy) => redis_proxy,
+            None => return,
+        };
 
         // Check nodes and resource providers.
         let mut resource_providers = std::collections::HashMap::new();
@@ -799,43 +902,88 @@ mod test {
             "provider1".to_string(),
             crate::resource_provider::ResourceProvider {
                 class_type: "class1".to_string(),
-                node_id: node2_id.clone(),
+                node_id: uuid::Uuid::new_v4(),
                 outputs: vec!["out".to_string()],
             },
         );
+
+        assert!(!redis_proxy.updated(crate::proxy::Category::ResourceProviders));
         redis_proxy.update_resource_providers(&resource_providers);
+        assert!(redis_proxy.updated(crate::proxy::Category::ResourceProviders));
 
         assert_eq!(resource_providers, redis_proxy.fetch_resource_providers());
+        assert!(!redis_proxy.updated(crate::proxy::Category::ResourceProviders));
+    }
+    #[serial_test::serial]
+    #[test]
+    fn test_redis_proxy_node_capabilities() {
+        let mut redis_proxy = match get_proxy() {
+            Some(redis_proxy) => redis_proxy,
+            None => return,
+        };
 
+        let node_id = uuid::Uuid::new_v4();
         let mut nodes = std::collections::HashMap::new();
         let (mock_node_sender, _mock_node_receiver) = futures::channel::mpsc::unbounded::<crate::orchestrator::test::MockAgentEvent>();
         nodes.insert(
-            node1_id.clone(),
+            node_id.clone(),
             crate::client_desc::ClientDesc {
                 agent_url: "http://127.0.0.1:10000".to_string(),
                 invocation_url: "http://127.0.0.1:10001".to_string(),
                 api: Box::new(crate::orchestrator::test::MockNode {
-                    node_id: node1_id.clone(),
+                    node_id: node_id.clone(),
                     sender: mock_node_sender,
                 }) as Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
                 capabilities: edgeless_api::node_registration::NodeCapabilities::minimum(),
             },
         );
+        assert!(!redis_proxy.updated(crate::proxy::Category::NodeCapabilities));
         redis_proxy.update_nodes(&nodes);
+        assert!(redis_proxy.updated(crate::proxy::Category::NodeCapabilities));
 
         let mut nodes_expected = std::collections::HashMap::new();
-        nodes_expected.insert(node1_id.clone(), edgeless_api::node_registration::NodeCapabilities::minimum());
+        nodes_expected.insert(node_id.clone(), edgeless_api::node_registration::NodeCapabilities::minimum());
 
         assert_eq!(nodes_expected, redis_proxy.fetch_node_capabilities());
+        assert!(!redis_proxy.updated(crate::proxy::Category::NodeCapabilities));
     }
 
+    #[serial_test::serial]
     #[test]
-    #[ignore]
-    fn test_redis_retrieve_intents() {
-        let redis_url = "redis://127.0.0.1:6379";
+    fn test_redis_proxy_dependency_graph() {
+        let mut redis_proxy = match get_proxy() {
+            Some(redis_proxy) => redis_proxy,
+            None => return,
+        };
 
-        // create the proxy, also flushing the db
-        let mut proxy = ProxyRedis::new(redis_url, true, None).unwrap();
+        let mut dependency_graph = std::collections::HashMap::new();
+        for _ in 0..10 {
+            let mut dependencies = std::collections::HashMap::new();
+            for j in 0..5 {
+                dependencies.insert(format!("out-{}", j), uuid::Uuid::new_v4());
+            }
+            dependency_graph.insert(uuid::Uuid::new_v4(), dependencies);
+        }
+
+        assert!(!redis_proxy.updated(crate::proxy::Category::DependencyGraph));
+        redis_proxy.update_dependency_graph(&dependency_graph);
+        assert!(redis_proxy.updated(crate::proxy::Category::DependencyGraph));
+
+        assert_eq!(dependency_graph, redis_proxy.fetch_dependency_graph());
+        assert!(!redis_proxy.updated(crate::proxy::Category::DependencyGraph));
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn test_redis_proxy_intents() {
+        // Skip the test if there is no local Redis listening on default port.
+        let mut redis_proxy = match ProxyRedis::new("redis://localhost:6379", true, None) {
+            Ok(redis_proxy) => redis_proxy,
+            Err(_) => {
+                println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
+                return;
+            }
+        };
 
         // fill intents
         let component1 = uuid::Uuid::new_v4();
@@ -850,14 +998,10 @@ mod test {
             DeployIntent::Migrate(component3, vec![node1, node2]),
             DeployIntent::Migrate(component4, vec![node1, node2, node2]),
         ];
-        let mut connection = redis::Client::open(redis_url).unwrap().get_connection().unwrap();
-        for intent in intents {
-            assert!(connection.set::<&str, &str, String>(&intent.key(), &intent.value()).is_ok());
-            assert!(connection.rpush::<&str, &str, usize>("intents", &intent.key()).is_ok());
-        }
+        redis_proxy.add_deploy_intents(intents);
 
         // retrieve them
-        for intent in proxy.retrieve_deploy_intents() {
+        for intent in redis_proxy.retrieve_deploy_intents() {
             match intent {
                 DeployIntent::Migrate(component, targets) => {
                     if component == component1 {
