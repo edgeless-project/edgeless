@@ -1487,7 +1487,7 @@ async fn test_update_domain_capabilities() {
     }
     assert_eq!(expected_caps, last_caps);
 
-    assert_eq!(10, num_events);
+    assert_eq!(11, num_events);
 }
 
 #[test]
