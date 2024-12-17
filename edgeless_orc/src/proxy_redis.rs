@@ -257,7 +257,7 @@ impl super::proxy::Proxy for ProxyRedis {
         let timestamp = ProxyRedis::timestamp_now();
 
         // update the timestamp when the nodes were updated
-        let _ = redis::Cmd::set(format!("node:capabilities:last_update"), &timestamp).exec(&mut self.connection);
+        let _ = redis::Cmd::set(String::from("node:capabilities:last_update"), &timestamp).exec(&mut self.connection);
 
         // serialize the nodes' capabilities and health status to Redis
         let mut new_node_capabilities = std::collections::HashMap::new();
@@ -298,7 +298,7 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn update_resource_providers(&mut self, resource_providers: &std::collections::HashMap<String, crate::resource_provider::ResourceProvider>) {
         // update the timestamp when the resource providers were updated
-        let _ = redis::Cmd::set(format!("provider:last_update"), ProxyRedis::timestamp_now()).exec(&mut self.connection);
+        let _ = redis::Cmd::set(String::from("provider:last_update"), ProxyRedis::timestamp_now()).exec(&mut self.connection);
 
         // serialize the resource providers
         for (provider_id, resource_provider) in resource_providers {
@@ -322,7 +322,7 @@ impl super::proxy::Proxy for ProxyRedis {
         let timestamp = ProxyRedis::timestamp_now();
 
         // update the timestamp when the active instances were updated
-        let _ = redis::Cmd::set(format!("instance:last_update"), &timestamp).exec(&mut self.connection);
+        let _ = redis::Cmd::set(String::from("instance:last_update"), &timestamp).exec(&mut self.connection);
 
         // serialize the active instances
         let mut new_mapping_to_instance_id = std::collections::HashMap::new();
@@ -369,7 +369,7 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn update_dependency_graph(&mut self, dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>) {
         // update the timestamp when the dependency graph was updated
-        let _ = redis::Cmd::set(format!("dependency:last_update"), ProxyRedis::timestamp_now()).exec(&mut self.connection);
+        let _ = redis::Cmd::set(String::from("dependency:last_update"), ProxyRedis::timestamp_now()).exec(&mut self.connection);
 
         // serialize the dependency graph
         for (lid, dependencies) in dependency_graph {
