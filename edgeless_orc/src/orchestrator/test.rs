@@ -330,7 +330,6 @@ async fn clear_events(receivers: &mut std::collections::HashMap<uuid::Uuid, futu
 
 fn make_spawn_function_request(class_id: &str) -> edgeless_api::function_instance::SpawnFunctionRequest {
     edgeless_api::function_instance::SpawnFunctionRequest {
-        instance_id: None,
         code: FunctionClassSpecification {
             function_class_id: class_id.to_string(),
             function_class_type: "RUST_WASM".to_string(),
