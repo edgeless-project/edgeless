@@ -186,7 +186,6 @@ async fn single_function_start_stop() {
     assert!(new_func_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
         new_func_id = id;
-        assert!(spawn_req.instance_id.is_none());
         assert_eq!(function_class_specification, spawn_req.code);
         assert!(spawn_req.annotations.is_empty());
         // TODO check state specifications
@@ -366,7 +365,6 @@ async fn function_link_loop_start_stop() {
     assert!(new_func1_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
         new_func1_id = id;
-        assert!(spawn_req.instance_id.is_none());
         assert!(spawn_req.annotations.is_empty());
         // TODO check state specifications
     } else {
@@ -377,7 +375,6 @@ async fn function_link_loop_start_stop() {
     assert!(new_func2_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
         new_func2_id = id;
-        assert!(spawn_req.instance_id.is_none());
         assert!(spawn_req.annotations.is_empty());
         // TODO check state specifications
     } else {

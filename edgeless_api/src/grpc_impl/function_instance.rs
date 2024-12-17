@@ -23,10 +23,6 @@ impl FunctonInstanceConverters {
         api_request: &crate::grpc_impl::api::SpawnFunctionRequest,
     ) -> anyhow::Result<crate::function_instance::SpawnFunctionRequest> {
         Ok(crate::function_instance::SpawnFunctionRequest {
-            instance_id: match api_request.instance_id.as_ref() {
-                Some(id) => Some(CommonConverters::parse_instance_id(id)?),
-                None => None,
-            },
             code: Self::parse_function_class_specification(match api_request.code.as_ref() {
                 Some(val) => val,
                 None => {
@@ -70,7 +66,6 @@ impl FunctonInstanceConverters {
 
     pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFunctionRequest) -> crate::grpc_impl::api::SpawnFunctionRequest {
         crate::grpc_impl::api::SpawnFunctionRequest {
-            instance_id: req.instance_id.as_ref().map(CommonConverters::serialize_instance_id),
             code: Some(Self::serialize_function_class_specification(&req.code)),
             annotations: req.annotations.clone(),
             state_specification: Some(Self::serialize_state_specification(&req.state_specification)),
@@ -310,10 +305,6 @@ mod tests {
     #[test]
     fn serialize_deserialize_spawn_function_request() {
         let messages = vec![SpawnFunctionRequest {
-            instance_id: Some(InstanceId {
-                node_id: uuid::Uuid::new_v4(),
-                function_id: uuid::Uuid::new_v4(),
-            }),
             code: FunctionClassSpecification {
                 function_class_id: "my-func-id".to_string(),
                 function_class_type: "WASM".to_string(),

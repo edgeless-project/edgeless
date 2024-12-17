@@ -591,7 +591,6 @@ impl ControllerTask {
             .fn_client(domain)
             .ok_or(format!("No function client for domain: {}", domain))?
             .start(edgeless_api::function_instance::SpawnFunctionRequest {
-                instance_id: None,
                 code: function.function_class_specification.clone(),
                 annotations: function.annotations.clone(),
                 state_specification: edgeless_api::function_instance::StateSpecification {

@@ -10,14 +10,17 @@ pub mod test;
 
 enum AgentRequest {
     // Function lifecycle management API.
-    SpawnFunction(edgeless_api::function_instance::SpawnFunctionRequest),
+    SpawnFunction(
+        edgeless_api::function_instance::SpawnFunctionRequest,
+        futures::channel::oneshot::Sender<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>>,
+    ),
     StopFunction(edgeless_api::function_instance::InstanceId),
     PatchFunction(edgeless_api::common::PatchRequest),
 
     // Resource  lifecycle management API.
     SpawnResource(
         edgeless_api::resource_configuration::ResourceInstanceSpecification,
-        futures::channel::oneshot::Sender<anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>>>,
+        futures::channel::oneshot::Sender<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>>,
     ),
     StopResource(
         edgeless_api::function_instance::InstanceId,
@@ -32,7 +35,6 @@ enum AgentRequest {
 
 pub struct Agent {
     sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
-    node_id: uuid::Uuid,
 }
 
 pub struct ResourceDesc {
@@ -57,7 +59,7 @@ impl Agent {
             Self::main_task(node_id, receiver, runners, resources, data_plane_provider).await;
         });
 
-        (Agent { sender, node_id }, main_task)
+        (Agent { sender }, main_task)
     }
 
     async fn main_task(
@@ -89,73 +91,66 @@ impl Agent {
         // value: provider_id
         let mut resource_instances = std::collections::HashMap::<edgeless_api::function_instance::ComponentId, String>::new();
 
-        log::info!("Starting Edgeless Agent");
+        log::info!("Starting EDGELESS node agent");
         while let Some(req) = receiver.next().await {
             match req {
-                AgentRequest::SpawnFunction(spawn_req) => {
-                    log::debug!("Agent Spawn {:?}", spawn_req);
-
-                    // Save function_class for further interaction.
-                    // We can assume that the Optional<instance_id> is present.
-                    if spawn_req.instance_id.is_none() {
-                        log::error!("No instance_id provided for SpawnFunctionRequest!");
-                        continue;
-                    }
-                    function_instances.insert(spawn_req.instance_id.unwrap().function_id, spawn_req.code.function_class_type.clone());
+                AgentRequest::SpawnFunction(spawn_req, responder) => {
+                    log::debug!("Agent SpawnFunction {:?}", spawn_req.code.to_short_string());
 
                     // Get runner for function_class of spawn_req
-                    match function_runtimes.get_mut(&spawn_req.code.function_class_type) {
+                    let res = match function_runtimes.get_mut(&spawn_req.code.function_class_type) {
                         Some(runner) => {
-                            // Forward the start request to the correct runner
-                            match runner.start(spawn_req).await {
-                                Ok(_) => {}
-                                Err(err) => {
-                                    log::error!("Unhandled Start Error: {}", err);
-                                    continue;
-                                }
+                            // Assign a new physical identifier to the function instance being created.
+                            let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
+
+                            // Save function_class for further interaction.
+                            function_instances.insert(instance_id.function_id, spawn_req.code.function_class_type.clone());
+
+                            // Forward the start request to the matching runtime.
+                            match runner.start(instance_id, spawn_req).await {
+                                Ok(_) => edgeless_api::common::StartComponentResponse::InstanceId(instance_id),
+                                Err(err) => edgeless_api::common::StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
+                                    summary: "Could not start function".to_string(),
+                                    detail: Some(format!("{}", err)),
+                                }),
                             }
                         }
-                        None => {
-                            log::warn!("Could not find runner for {}", spawn_req.code.function_class_type);
-                            continue;
-                        }
-                    }
+                        None => edgeless_api::common::StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
+                            summary: "Error when creating a function instance".to_string(),
+                            detail: Some(format!("Could not find runner for {}", spawn_req.code.function_class_type)),
+                        }),
+                    };
+                    responder
+                        .send(res)
+                        .unwrap_or_else(|_| log::warn!("Agent SpawnFunction: responder send error"));
                 }
                 AgentRequest::StopFunction(stop_function_id) => {
-                    log::debug!("Agent Stop {:?}", stop_function_id);
+                    log::debug!("Agent StopFunction {:?}", stop_function_id);
 
                     Self::stop_function(&mut function_runtimes, &mut function_instances, stop_function_id).await;
                 }
 
                 // PatchRequest contains function_id: ComponentId
                 AgentRequest::PatchFunction(update) => {
-                    log::debug!("Agent UpdatePeers {:?}", update);
+                    log::debug!("Agent PatchFunction {:?}", update);
 
                     // Get function class by looking it up in the instanceId->functionClass map
-                    let function_class: String = match function_instances.get(&update.function_id) {
-                        Some(v) => v.clone(),
-                        None => {
-                            log::error!("Could not find function_class for instanceId {}", update.function_id);
-                            continue;
-                        }
-                    };
-
-                    // Get runner for function_class
-                    match function_runtimes.get_mut(&function_class) {
-                        Some(runner) => {
-                            // Forward the patch request to the correct runner
-                            match runner.patch(update).await {
-                                Ok(_) => {}
-                                Err(err) => {
+                    // and then orward the patch request to the correct runner.
+                    match function_instances.get(&update.function_id) {
+                        Some(function_class) => match function_runtimes.get_mut(function_class) {
+                            Some(runner) => {
+                                if let Err(err) = runner.patch(update).await {
                                     log::error!("Unhandled Patch Error: {}", err);
                                 }
                             }
-                        }
+                            None => {
+                                log::error!("Could not find runner for function class '{}' when patching", function_class);
+                            }
+                        },
                         None => {
-                            log::error!("Could not find runner for {}", function_class);
-                            continue;
+                            log::error!("Could not find function class for instanceId '{}' patching", update.function_id);
                         }
-                    }
+                    };
                 }
                 AgentRequest::UpdatePeers(request) => {
                     log::debug!("Agent UpdatePeers {:?}", request);
@@ -170,74 +165,70 @@ impl Agent {
                     };
                 }
                 AgentRequest::SpawnResource(instance_specification, responder) => {
-                    if let Some((provider_id, resource_desc)) = resource_providers
+                    log::debug!("Agent SpawnResource {:?}", instance_specification);
+
+                    let res = if let Some((provider_id, resource_desc)) = resource_providers
                         .iter_mut()
                         .find(|(_provider_id, resource_desc)| resource_desc.class_type == instance_specification.class_type)
                     {
-                        let res = match resource_desc.client.start(instance_specification).await {
-                            Ok(val) => val,
-                            Err(err) => {
-                                responder
-                                    .send(Err(anyhow::anyhow!("Internal Resource Error {}", err)))
-                                    .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                                continue;
-                            }
-                        };
-                        if let edgeless_api::common::StartComponentResponse::InstanceId(id) = res {
-                            log::info!(
-                                "Started resource class_type {}, provider_id {}, node_id {}, fid {}",
-                                resource_desc.class_type,
-                                provider_id,
-                                id.node_id,
-                                id.function_id
-                            );
-                            resource_instances.insert(id.function_id, provider_id.clone());
-                            responder
-                                .send(Ok(edgeless_api::common::StartComponentResponse::InstanceId(id)))
-                                .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                        } else {
-                            responder.send(Ok(res)).unwrap_or_else(|_| log::warn!("Responder Send Error"));
+                        match resource_desc.client.start(instance_specification).await {
+                            Ok(val) => match val {
+                                edgeless_api::common::StartComponentResponse::InstanceId(id) => {
+                                    log::info!(
+                                        "Started resource class_type {}, provider_id {}, node_id {}, fid {}",
+                                        resource_desc.class_type,
+                                        provider_id,
+                                        id.node_id,
+                                        id.function_id
+                                    );
+                                    resource_instances.insert(id.function_id, provider_id.clone());
+                                    edgeless_api::common::StartComponentResponse::InstanceId(id)
+                                }
+                                edgeless_api::common::StartComponentResponse::ResponseError(err) => {
+                                    edgeless_api::common::StartComponentResponse::ResponseError(err)
+                                }
+                            },
+                            Err(err) => edgeless_api::common::StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
+                                summary: "Error when creating a resource".to_string(),
+                                detail: Some(format!("{}", err)),
+                            }),
                         }
                     } else {
-                        responder
-                            .send(Ok(edgeless_api::common::StartComponentResponse::ResponseError(
-                                edgeless_api::common::ResponseError {
-                                    summary: "Error when creating a resource".to_string(),
-                                    detail: Some(format!("Provider for class_type does not exist: {}", instance_specification.class_type)),
-                                },
-                            )))
-                            .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                    }
+                        edgeless_api::common::StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
+                            summary: "Error when creating a resource".to_string(),
+                            detail: Some(format!("Provider for class_type does not exist: {}", instance_specification.class_type)),
+                        })
+                    };
+                    responder
+                        .send(res)
+                        .unwrap_or_else(|_| log::warn!("Agent SpawnResource: responder send error"));
                 }
                 AgentRequest::StopResource(resource_id, responder) => {
+                    log::debug!("Agent StopResource {:?}", resource_id);
+
                     responder
                         .send(Self::stop_resource(&mut resource_providers, &mut resource_instances, resource_id).await)
-                        .unwrap_or_else(|_| log::warn!("Responder Send Error"));
+                        .unwrap_or_else(|_| log::warn!("Agent StopResource: responder send error"));
                 }
                 AgentRequest::PatchResource(update, responder) => {
-                    if let Some(provider_id) = resource_instances.get(&update.function_id) {
+                    log::debug!("Agent PatchResource {:?}", update);
+
+                    let res = if let Some(provider_id) = resource_instances.get(&update.function_id) {
                         if let Some(resource_desc) = resource_providers.get_mut(provider_id) {
                             log::info!("Patch resource provider_id {} fid {}", provider_id, update.function_id);
-                            responder
-                                .send(resource_desc.client.patch(update).await)
-                                .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                            continue;
+                            resource_desc.client.patch(update).await
                         } else {
-                            responder
-                                .send(Err(anyhow::anyhow!(
-                                    "Cannot patch a resource, provider not found with provider_id: {}",
-                                    provider_id
-                                )))
-                                .unwrap_or_else(|_| log::warn!("Responder Send Error"));
-                            continue;
+                            Err(anyhow::anyhow!(
+                                "Cannot patch a resource, provider not found with provider_id: {}",
+                                provider_id
+                            ))
                         }
-                    }
+                    } else {
+                        Err(anyhow::anyhow!("Cannot patch a resource, not found with fid: {}", update.function_id))
+                    };
                     responder
-                        .send(Err(anyhow::anyhow!(
-                            "Cannot patch a resource, not found with fid: {}",
-                            update.function_id
-                        )))
-                        .unwrap_or_else(|_| log::warn!("Responder Send Error"));
+                        .send(res)
+                        .unwrap_or_else(|_| log::warn!("Agent PatchResource: responder send error"));
                 }
                 AgentRequest::Reset() => {
                     log::info!("Resetting the node to a clean state");
@@ -342,10 +333,7 @@ impl Agent {
 
     pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::outer::agent::AgentAPI + Send> {
         Box::new(AgentClient {
-            function_instance_client: Box::new(FunctionInstanceNodeClient {
-                sender: self.sender.clone(),
-                node_id: self.node_id,
-            }),
+            function_instance_client: Box::new(FunctionInstanceNodeClient { sender: self.sender.clone() }),
             node_management_client: Box::new(NodeManagementClient { sender: self.sender.clone() }),
             resource_configuration_client: Box::new(ResourceConfigurationClient { sender: self.sender.clone() }),
         })
@@ -355,7 +343,6 @@ impl Agent {
 #[derive(Clone)]
 pub struct FunctionInstanceNodeClient {
     sender: futures::channel::mpsc::UnboundedSender<AgentRequest>,
-    node_id: uuid::Uuid,
 }
 
 #[derive(Clone)]
@@ -382,60 +369,45 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
         &mut self,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
-        let mut request = request;
-        let f_id = match request.instance_id {
-            Some(id) => id,
-            None => {
-                let new_id = edgeless_api::function_instance::InstanceId::new(self.node_id);
-                request.instance_id = Some(new_id);
-                new_id
-            }
-        };
-        match self.sender.send(AgentRequest::SpawnFunction(request)).await {
-            Ok(_) => Ok(edgeless_api::common::StartComponentResponse::InstanceId(f_id)),
-            Err(err) => Err(anyhow::anyhow!(
-                "Agent channel error when creating a function instance: {}",
-                err.to_string()
-            )),
-        }
+        let (rsp_sender, rsp_receiver) =
+            futures::channel::oneshot::channel::<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>>();
+        let _ = self
+            .sender
+            .send(AgentRequest::SpawnFunction(request, rsp_sender))
+            .await
+            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a function instance: {}", err.to_string()))?;
+        rsp_receiver
+            .await
+            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a function instance: {}", err.to_string()))
     }
     async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-        match self.sender.send(AgentRequest::StopFunction(id)).await {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Agent channel error when stopping a function instance: {}",
-                err.to_string()
-            )),
-        }
+        self.sender
+            .send(AgentRequest::StopFunction(id))
+            .await
+            .map_err(|err| anyhow::anyhow!("Agent channel error when stopping a function instance: {}", err.to_string()))
     }
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
-        match self.sender.send(AgentRequest::PatchFunction(update)).await {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Agent channel error when updating the links of a function instance: {}",
-                err.to_string()
-            )),
-        }
+        self.sender
+            .send(AgentRequest::PatchFunction(update))
+            .await
+            .map_err(|err| anyhow::anyhow!("Agent channel error when patching a function instance: {}", err.to_string()))
     }
 }
 
 #[async_trait::async_trait]
 impl edgeless_api::node_management::NodeManagementAPI for NodeManagementClient {
     async fn update_peers(&mut self, request: edgeless_api::node_management::UpdatePeersRequest) -> anyhow::Result<()> {
-        match self.sender.send(AgentRequest::UpdatePeers(request)).await {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Agent channel error when updating the peers of a node: {}",
-                err.to_string()
-            )),
-        }
+        self.sender
+            .send(AgentRequest::UpdatePeers(request))
+            .await
+            .map_err(|err| anyhow::anyhow!("Agent channel error when updating a node's peers: {}", err.to_string()))
     }
     async fn reset(&mut self) -> anyhow::Result<()> {
-        match self.sender.send(AgentRequest::Reset()).await {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Agent channel error when resetting a node: {}", err.to_string())),
-        }
+        self.sender
+            .send(AgentRequest::Reset())
+            .await
+            .map_err(|err| anyhow::anyhow!("Agent channel error when resetting a node: {}", err.to_string()))
     }
 }
 
@@ -445,9 +417,8 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         &mut self,
         request: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
-        let (rsp_sender, rsp_receiver) = futures::channel::oneshot::channel::<
-            anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>>,
-        >();
+        let (rsp_sender, rsp_receiver) =
+            futures::channel::oneshot::channel::<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>>();
         let _ = self
             .sender
             .send(AgentRequest::SpawnResource(request, rsp_sender))
@@ -455,7 +426,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err.to_string()))?;
         rsp_receiver
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err.to_string()))?
+            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err.to_string()))
     }
     async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
         let (rsp_sender, rsp_receiver) = futures::channel::oneshot::channel::<anyhow::Result<()>>();
@@ -473,10 +444,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         self.sender
             .send(AgentRequest::PatchResource(update, rsp_sender))
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err.to_string()))?;
+            .map_err(|err| anyhow::anyhow!("Agent channel error when patching a resource instance: {}", err.to_string()))?;
         rsp_receiver
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err.to_string()))?
+            .map_err(|err| anyhow::anyhow!("Agent channel error when patching a resource instance: {}", err.to_string()))?
     }
 }
 

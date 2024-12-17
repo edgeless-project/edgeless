@@ -51,8 +51,6 @@ message FunctionClassSpecification {
 
 // Message to request the creation a new function instance.
 message SpawnFunctionRequest {
-    // The function instance identifier.
-    InstanceId instance_id = 1;
     // The function class specification.
     FunctionClassSpecification code = 2;
     // The set of annotations associated with this function instance.

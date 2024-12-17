@@ -732,7 +732,6 @@ mod test {
                 logical_physical_ids.last().unwrap().0,
                 crate::active_instance::ActiveInstance::Function(
                     SpawnFunctionRequest {
-                        instance_id: None,
                         code: edgeless_api::function_instance::FunctionClassSpecification {
                             function_class_id: "fun".to_string(),
                             function_class_type: "class".to_string(),
