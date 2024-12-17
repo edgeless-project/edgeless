@@ -13,17 +13,6 @@ impl ResourceConfigurationConverters {
         Ok(crate::resource_configuration::ResourceInstanceSpecification {
             class_type: api_spec.resource_class_type.clone(),
             configuration: api_spec.configuration.clone(),
-            output_mapping: api_spec
-                .output_mapping
-                .iter()
-                .flat_map(|(name, id)| {
-                    let id = CommonConverters::parse_instance_id(id);
-                    match id {
-                        Ok(val) => Some((name.to_string(), val)),
-                        Err(_) => None,
-                    }
-                })
-                .collect(),
         })
     }
 
@@ -33,11 +22,6 @@ impl ResourceConfigurationConverters {
         crate::grpc_impl::api::ResourceInstanceSpecification {
             resource_class_type: crate_spec.class_type.clone(),
             configuration: crate_spec.configuration.clone(),
-            output_mapping: crate_spec
-                .output_mapping
-                .iter()
-                .map(|(name, id)| (name.to_string(), CommonConverters::serialize_instance_id(id)))
-                .collect(),
         }
     }
 }

@@ -8,12 +8,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<crate::common::StartComponentResponse<edgeless_api_core::instance_id::InstanceId>> {
-        let mut outputs = heapless::Vec::<(&str, edgeless_api_core::instance_id::InstanceId), 16>::new();
         let mut configuration = heapless::Vec::<(&str, &str), 16>::new();
-        for (key, val) in &instance_specification.output_mapping {
-            outputs.push((key, *val)).map_err(|_| anyhow::anyhow!("Too many outputs"))?;
-        }
-
         for (key, val) in &instance_specification.configuration {
             configuration
                 .push((key, val))
@@ -22,7 +17,6 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
 
         let encoded_resource_spec = edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification {
             class_type: &instance_specification.class_type,
-            output_mapping: outputs,
             configuration,
         };
 

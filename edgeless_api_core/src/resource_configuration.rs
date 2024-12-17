@@ -5,7 +5,6 @@
 #[derive(Clone, PartialEq, Eq)]
 pub struct EncodedResourceInstanceSpecification<'a> {
     pub class_type: &'a str,
-    pub output_mapping: heapless::Vec<(&'a str, crate::instance_id::InstanceId), 16>,
     pub configuration: heapless::Vec<(&'a str, &'a str), 16>,
 }
 
@@ -19,13 +18,6 @@ impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
     fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
         let mut e = e.str(self.class_type)?;
         {
-            e = e.array(self.output_mapping.len() as u64)?;
-            for data in &self.output_mapping {
-                e = e.encode(data)?;
-            }
-        }
-
-        {
             e = e.array(self.configuration.len() as u64)?;
             for data in &self.configuration {
                 e = e.encode(data)?;
@@ -38,12 +30,7 @@ impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
 impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b> {
     fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let id = d.str()?;
-        let mut outputs = heapless::Vec::<(&'b str, crate::instance_id::InstanceId), 16>::new();
         let mut configuration = heapless::Vec::<(&'b str, &'b str), 16>::new();
-
-        for item in d.array_iter::<(&str, crate::instance_id::InstanceId)>().unwrap().flatten() {
-            let _ = outputs.push(item);
-        }
 
         for item in d.array_iter::<(&str, &str)>().unwrap().flatten() {
             let _ = configuration.push(item);
@@ -51,7 +38,6 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
 
         Ok(EncodedResourceInstanceSpecification {
             class_type: id,
-            output_mapping: outputs,
             configuration,
         })
     }
@@ -60,8 +46,6 @@ impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b>
 impl<C> minicbor::CborLen<C> for EncodedResourceInstanceSpecification<'_> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         let mut len: usize = self.class_type.cbor_len(ctx);
-
-        len += self.output_mapping[..self.output_mapping.len()].cbor_len(ctx);
 
         len += self.configuration[..self.configuration.len()].cbor_len(ctx);
 
@@ -136,7 +120,6 @@ mod test {
 
         let id = super::EncodedResourceInstanceSpecification {
             class_type: "class-1",
-            output_mapping: outputs,
             configuration,
         };
 

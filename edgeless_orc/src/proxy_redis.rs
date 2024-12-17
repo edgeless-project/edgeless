@@ -761,7 +761,6 @@ mod test {
                 crate::active_instance::ActiveInstance::Resource(
                     edgeless_api::resource_configuration::ResourceInstanceSpecification {
                         class_type: "res".to_string(),
-                        output_mapping: std::collections::HashMap::new(),
                         configuration: std::collections::HashMap::from([
                             ("key1".to_string(), "val1".to_string()),
                             ("key2".to_string(), "val2".to_string()),

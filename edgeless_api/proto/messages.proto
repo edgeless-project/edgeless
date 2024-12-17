@@ -461,8 +461,6 @@ message ResourceInstanceSpecification {
     string resource_class_type = 1;
     // Resource configuration (depends on the type).
     map<string, string> configuration = 2;
-    // Mapping of the outputs to concrete function/resource instances.
-    map<string, InstanceId> output_mapping = 3;
 }
 
 // Message containing information provided as response to failed request.
