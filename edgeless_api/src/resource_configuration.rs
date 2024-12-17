@@ -7,8 +7,6 @@ use crate::common::PatchRequest;
 #[derive(Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ResourceInstanceSpecification {
     pub class_type: String,
-    #[serde(skip)]
-    pub output_mapping: std::collections::HashMap<String, crate::function_instance::InstanceId>, // XXX
     pub configuration: std::collections::HashMap<String, String>,
 }
 

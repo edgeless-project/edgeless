@@ -320,8 +320,6 @@ impl OrchestratorTask {
                         .resource_configuration_api()
                         .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
                             class_type: resource_provider.class_type.clone(),
-                            // [TODO] Issue #94 remove output mapping
-                            output_mapping: std::collections::HashMap::new(),
                             configuration: start_req.configuration.clone(),
                         })
                         .await
