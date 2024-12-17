@@ -638,7 +638,6 @@ impl ControllerTask {
             .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
                 class_type: resource.class_type.clone(),
                 configuration: resource.configurations.clone(),
-                output_mapping: std::collections::HashMap::new(),
             })
             .await;
 

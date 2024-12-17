@@ -349,7 +349,6 @@ fn make_spawn_function_request(class_id: &str) -> edgeless_api::function_instanc
 fn make_start_resource_request(class_type: &str) -> edgeless_api::resource_configuration::ResourceInstanceSpecification {
     edgeless_api::resource_configuration::ResourceInstanceSpecification {
         class_type: class_type.to_string(),
-        output_mapping: std::collections::HashMap::new(),
         configuration: std::collections::HashMap::new(),
     }
 }
