@@ -53,8 +53,6 @@ impl FunctionClassSpecification {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SpawnFunctionRequest {
-    #[serde(skip)]
-    pub instance_id: Option<InstanceId>, // XXX
     pub code: FunctionClassSpecification,
     pub annotations: std::collections::HashMap<String, String>,
     pub state_specification: StateSpecification,
