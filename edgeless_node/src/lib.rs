@@ -648,9 +648,9 @@ pub fn edgeless_node_default_conf() -> String {
         "[general]\nnode_id = \"{}\"\n{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}disk_tot_space = {}\nnum_gpus = {}\nmodel_name_gpu = \"{}\"\nmem_size_gpu = {}{}",
         uuid::Uuid::new_v4(),
         r##"agent_url = "http://0.0.0.0:7021"
-agent_url_announced = "http://127.0.0.1:7021"
+agent_url_announced = ""
 invocation_url = "http://0.0.0.0:7002"
-invocation_url_announced = "http://127.0.0.1:7002"
+invocation_url_announced = ""
 invocation_url_coap = "coap://127.0.0.1:7002"
 invocation_url_announced_coap = ""
 node_register_url = "http://127.0.0.1:7012"

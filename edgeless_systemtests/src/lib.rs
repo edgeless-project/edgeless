@@ -46,7 +46,7 @@ mod system_tests {
                     subscription_refresh_interval_sec: 1,
                     domain_id: domain_id.clone(),
                     orchestrator_url: orchestrator_url.to_string(),
-                    orchestrator_url_announced: "".to_string(),
+                    orchestrator_url_announced: orchestrator_url.to_string(),
                     node_register_url: node_register_url.clone(),
                     node_register_coap_url: None,
                 },
@@ -76,13 +76,15 @@ mod system_tests {
                     _ => None,
                 };
                 let node_id = uuid::Uuid::new_v4();
+                let agent_url = format!("http://{}:{}", address, next_port());
+                let invocation_url = format!("http://{}:{}", address, next_port());
                 let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(edgeless_node::EdgelessNodeSettings {
                     general: edgeless_node::EdgelessNodeGeneralSettings {
                         node_id: node_id.clone(),
-                        agent_url: format!("http://{}:{}", address, next_port()),
-                        agent_url_announced: "".to_string(),
-                        invocation_url: format!("http://{}:{}", address, next_port()),
-                        invocation_url_announced: "".to_string(),
+                        agent_url: agent_url.clone(),
+                        agent_url_announced: agent_url,
+                        invocation_url: invocation_url.clone(),
+                        invocation_url_announced: invocation_url,
                         invocation_url_coap: None,
                         invocation_url_announced_coap: None,
                         node_register_url: node_register_url.clone(),
