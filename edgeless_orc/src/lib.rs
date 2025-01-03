@@ -106,7 +106,18 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     // notify domain updates (periodically refreshed).
     let (mut subscriber, subscriber_task, subscriber_refresh_task) = domain_subscriber::DomainSubscriber::new(
         settings.general.domain_id.clone(),
-        settings.general.orchestrator_url.clone(),
+        match edgeless_api::util::get_announced(&settings.general.orchestrator_url, &settings.general.orchestrator_url_announced) {
+            Ok(url) => url,
+            Err(err) => {
+                log::error!(
+                    "invalid URL '{}' (announced: '{}'): {}",
+                    settings.general.orchestrator_url,
+                    settings.general.orchestrator_url_announced,
+                    err
+                );
+                String::default()
+            }
+        },
         settings.general.domain_register_url,
         settings.general.subscription_refresh_interval_sec,
     )
@@ -172,7 +183,7 @@ domain_register_url = "http://127.0.0.1:7004"
 subscription_refresh_interval_sec = 10
 domain_id = "domain-1"
 orchestrator_url = "http://0.0.0.0:7011"
-orchestrator_url_announced = "http://127.0.0.1:7011"
+orchestrator_url_announced = ""
 node_register_url = "http://0.0.0.0:7012"
 node_register_coap_url = "coap://0.0.0.0:7050"
 

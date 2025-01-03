@@ -62,13 +62,29 @@ impl NodeSubscriber {
     ) {
         let node_register_url = settings.node_register_url;
         let node_id = settings.node_id;
-        let agent_url = match settings.agent_url_announced.is_empty() {
-            true => settings.agent_url.clone(),
-            false => settings.agent_url_announced.clone(),
+        let agent_url = match edgeless_api::util::get_announced(&settings.agent_url, &settings.agent_url_announced) {
+            Ok(url) => url,
+            Err(err) => {
+                log::error!(
+                    "invalid URL '{}' (announced: '{}'): {}",
+                    settings.agent_url,
+                    settings.agent_url_announced,
+                    err
+                );
+                String::default()
+            }
         };
-        let invocation_url = match settings.invocation_url_announced.is_empty() {
-            true => settings.invocation_url.clone(),
-            false => settings.invocation_url_announced.clone(),
+        let invocation_url = match edgeless_api::util::get_announced(&settings.invocation_url, &settings.invocation_url_announced) {
+            Ok(url) => url,
+            Err(err) => {
+                log::error!(
+                    "invalid URL '{}' (announced: '{}'): {}",
+                    settings.invocation_url,
+                    settings.invocation_url_announced,
+                    err
+                );
+                String::default()
+            }
         };
         let subscription_refresh_interval_sec = settings.subscription_refresh_interval_sec;
 

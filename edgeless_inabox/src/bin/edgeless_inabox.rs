@@ -57,24 +57,29 @@ fn generate_configs(config_path: String, number_of_nodes: u32, metrics_collector
 
     let reserved_controller_port = 7001;
     let reserved_domain_register_port = 7002;
+    let my_ip = edgeless_api::util::get_my_ip()?;
 
     // Closure that returns a URL with a new port on each call
     let mut port = initial_port - 1;
-    let mut next_url = || {
+    let mut next_url = |any: bool| {
         port += 1;
         while port == reserved_controller_port || port == reserved_domain_register_port {
             port += 1;
         }
-        format!("http://127.0.0.1:{}", port)
+        if any {
+            format!("http://0.0.0.0:{}", port)
+        } else {
+            format!("http://{}:{}", my_ip, port)
+        }
     };
 
-    let controller_url = format!("http://127.0.0.1:{}", reserved_controller_port);
-    let domain_register_url = format!("http://127.0.0.1:{}", reserved_domain_register_port);
+    let controller_url = format!("http://{}:{}", my_ip, reserved_controller_port);
+    let domain_register_url = format!("http://{}:{}", my_ip, reserved_domain_register_port);
 
     // Balancer
     let bal_conf = edgeless_bal::EdgelessBalSettings {
         balancer_id: Uuid::new_v4(),
-        invocation_url: next_url(),
+        invocation_url: next_url(false),
     };
 
     // Orchestrator
@@ -83,9 +88,9 @@ fn generate_configs(config_path: String, number_of_nodes: u32, metrics_collector
             domain_register_url: domain_register_url.clone(),
             subscription_refresh_interval_sec: 2,
             domain_id: format!("domain-{}", initial_port),
-            orchestrator_url: next_url(),
-            orchestrator_url_announced: "".to_string(),
-            node_register_url: next_url(),
+            orchestrator_url: next_url(true),
+            orchestrator_url_announced: String::default(),
+            node_register_url: next_url(false),
             node_register_coap_url: None,
         },
         baseline: edgeless_orc::EdgelessOrcBaselineSettings {
@@ -118,17 +123,17 @@ fn generate_configs(config_path: String, number_of_nodes: u32, metrics_collector
         node_confs.push(EdgelessNodeSettings {
             general: EdgelessNodeGeneralSettings {
                 node_id: uuid::Uuid::new_v4(),
-                agent_url: next_url(),
-                agent_url_announced: "".to_string(),
-                invocation_url: next_url(),
-                invocation_url_announced: "".to_string(),
+                agent_url: next_url(true),
+                agent_url_announced: String::default(),
+                invocation_url: next_url(true),
+                invocation_url_announced: String::default(),
                 invocation_url_coap: None,
                 invocation_url_announced_coap: None,
                 node_register_url: orc_conf.general.node_register_url.clone(),
                 subscription_refresh_interval_sec: 2,
             },
             telemetry: EdgelessNodeTelemetrySettings {
-                metrics_url: next_url(),
+                metrics_url: next_url(false),
                 log_level: None,
                 performance_samples: false,
             },
@@ -136,7 +141,7 @@ fn generate_configs(config_path: String, number_of_nodes: u32, metrics_collector
             container_runtime: None,
             resources: Some(EdgelessNodeResourceSettings {
                 http_ingress_url: match counter == 0 {
-                    true => Some(next_url()),
+                    true => Some(next_url(false)),
                     false => None,
                 },
                 http_ingress_provider: match counter == 0 {
@@ -171,17 +176,17 @@ fn generate_configs(config_path: String, number_of_nodes: u32, metrics_collector
         node_confs.push(EdgelessNodeSettings {
             general: EdgelessNodeGeneralSettings {
                 node_id: uuid::Uuid::new_v4(),
-                agent_url: next_url(),
-                agent_url_announced: "".to_string(),
-                invocation_url: next_url(),
-                invocation_url_announced: "".to_string(),
+                agent_url: next_url(true),
+                agent_url_announced: String::default(),
+                invocation_url: next_url(true),
+                invocation_url_announced: String::default(),
                 invocation_url_coap: None,
                 invocation_url_announced_coap: None,
                 node_register_url: orc_conf.general.node_register_url.clone(),
                 subscription_refresh_interval_sec: 10,
             },
             telemetry: EdgelessNodeTelemetrySettings {
-                metrics_url: next_url(),
+                metrics_url: next_url(false),
                 log_level: None,
                 performance_samples: false,
             },
