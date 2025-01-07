@@ -143,7 +143,7 @@ pub struct NodeHealthStatus {
 
 impl NodeHealthStatus {
     pub fn csv_header() -> String {
-        "cpu_usage,cpu_load,mem_free,mem_used,mem_total,mem_available,proc_cpu_usage,proc_memory,proc_vmemory,load_avg_1,load_avg_5,load_avg_15,tot_rx_bytes,tot_rx_pkts,tot_rx_errs,tot_tx_bytes,tot_tx_pkts,tot_tx_errs,disk_tot_space,disk_free_space,disk_tot_reads,disk_tot_writes,gpu_load_perc,gpu_temp_cels".to_string()
+        "mem_free,mem_used,mem_available,proc_cpu_usage,proc_memory,proc_vmemory,load_avg_1,load_avg_5,load_avg_15,tot_rx_bytes,tot_rx_pkts,tot_rx_errs,tot_tx_bytes,tot_tx_pkts,tot_tx_errs,disk_free_space,disk_tot_reads,disk_tot_writes,gpu_load_perc,gpu_temp_cels".to_string()
     }
     pub fn to_csv(&self) -> String {
         format!(
@@ -296,5 +296,27 @@ where
 impl Clone for Box<dyn NodeRegistrationAPI> {
     fn clone(&self) -> Box<dyn NodeRegistrationAPI> {
         self.clone_box()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::NodeCapabilities;
+    use super::NodeHealthStatus;
+
+    #[test]
+    fn test_node_health_status_header() {
+        let header = NodeHealthStatus::csv_header();
+        let csv = NodeHealthStatus::default().to_csv();
+
+        assert_eq!(header.split(",").count(), csv.split(",").count());
+    }
+
+    #[test]
+    fn test_node_capabilities_header() {
+        let header = NodeCapabilities::csv_header();
+        let csv = NodeCapabilities::default().to_csv();
+
+        assert_eq!(header.split(",").count(), csv.split(",").count());
     }
 }
