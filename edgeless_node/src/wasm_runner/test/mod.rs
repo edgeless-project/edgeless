@@ -107,6 +107,7 @@ async fn basic_lifecycle() {
             state_id: instance_id.function_id,
             state_policy: edgeless_api::function_instance::StatePolicy::Transient,
         },
+        workflow_id: "workflow_1".to_string(),
     };
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
@@ -246,6 +247,7 @@ async fn messaging_test_setup() -> (
             state_id: instance_id.function_id,
             state_policy: edgeless_api::function_instance::StatePolicy::Transient,
         },
+        workflow_id: "workflow_1".to_string(),
     };
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
@@ -556,6 +558,7 @@ async fn state_management() {
             state_id: instance_id.function_id,
             state_policy: edgeless_api::function_instance::StatePolicy::Transient,
         },
+        workflow_id: "workflow_1".to_string()
     };
 
     assert!(telemetry_mock_receiver.try_recv().is_err());

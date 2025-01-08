@@ -13,6 +13,7 @@ impl ResourceConfigurationConverters {
         Ok(crate::resource_configuration::ResourceInstanceSpecification {
             class_type: api_spec.resource_class_type.clone(),
             configuration: api_spec.configuration.clone(),
+            workflow_id: api_spec.workflow_id.clone(),
         })
     }
 
@@ -22,6 +23,7 @@ impl ResourceConfigurationConverters {
         crate::grpc_impl::api::ResourceInstanceSpecification {
             resource_class_type: crate_spec.class_type.clone(),
             configuration: crate_spec.configuration.clone(),
+            workflow_id: crate_spec.workflow_id.clone(),
         }
     }
 }

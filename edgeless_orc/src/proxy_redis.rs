@@ -662,6 +662,21 @@ impl super::proxy::Proxy for ProxyRedis {
         dependency_graph
     }
 
+    fn fetch_logical_id_to_workflow_id(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, String> {
+        let mut workflow_ids = std::collections::HashMap::new();
+        for (logical_id, instance) in self.fetch_instances() {
+            match instance {
+                crate::active_instance::ActiveInstance::Function(spawn_function_request, _) => {
+                    workflow_ids.insert(logical_id, spawn_function_request.workflow_id);
+                }
+                crate::active_instance::ActiveInstance::Resource(resource_instance_specification, _) => {
+                    workflow_ids.insert(logical_id, resource_instance_specification.workflow_id);
+                }
+            }
+        }
+        workflow_ids
+    }
+
     fn updated(&mut self, category: crate::proxy::Category) -> bool {
         let redis_timestamp = self.get_last_update(&category);
         let local_timestamp = self.last_update_timestamps.entry(category).or_default();
@@ -744,6 +759,7 @@ mod test {
                             state_id: uuid::Uuid::new_v4(),
                             state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
                         },
+                        workflow_id: "workflow_1".to_string(),
                     },
                     vec![edgeless_api::function_instance::InstanceId {
                         node_id: node1_id,
@@ -764,6 +780,7 @@ mod test {
                             ("key1".to_string(), "val1".to_string()),
                             ("key2".to_string(), "val2".to_string()),
                         ]),
+                        workflow_id: "workflow_1".to_string(),
                     },
                     edgeless_api::function_instance::InstanceId {
                         node_id: node2_id,

@@ -56,6 +56,7 @@ pub struct SpawnFunctionRequest {
     pub code: FunctionClassSpecification,
     pub annotations: std::collections::HashMap<String, String>,
     pub state_specification: StateSpecification,
+    pub workflow_id: String,
 }
 
 #[async_trait::async_trait]

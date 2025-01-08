@@ -36,6 +36,7 @@ impl FunctonInstanceConverters {
                     return Err(anyhow::anyhow!("Request does not contain state_spec."));
                 }
             })?,
+            workflow_id: api_request.workflow_id.clone(),
         })
     }
 
@@ -69,6 +70,7 @@ impl FunctonInstanceConverters {
             code: Some(Self::serialize_function_class_specification(&req.code)),
             annotations: req.annotations.clone(),
             state_specification: Some(Self::serialize_state_specification(&req.state_specification)),
+            workflow_id: req.workflow_id.clone(),
         }
     }
 
@@ -317,6 +319,7 @@ mod tests {
                 state_id: uuid::Uuid::new_v4(),
                 state_policy: StatePolicy::NodeLocal,
             },
+            workflow_id: "workflow_1".to_string(),
         }];
         for msg in messages {
             match FunctonInstanceConverters::parse_spawn_function_request(&FunctonInstanceConverters::serialize_spawn_function_request(&msg)) {

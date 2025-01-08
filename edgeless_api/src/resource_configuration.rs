@@ -8,6 +8,7 @@ use crate::common::PatchRequest;
 pub struct ResourceInstanceSpecification {
     pub class_type: String,
     pub configuration: std::collections::HashMap<String, String>,
+    pub workflow_id: String,
 }
 
 #[async_trait::async_trait]
