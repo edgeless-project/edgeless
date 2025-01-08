@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 mod workflow_spec;
+use cargo::GlobalContext;
 use clap::Parser;
 use edgeless_api::{outer::controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
 
@@ -230,8 +231,8 @@ async fn main() -> anyhow::Result<()> {
                     let function_spec: workflow_spec::WorkflowSpecFunctionClass = serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
                     let build_dir = std::env::temp_dir().join(format!("edgeless-{}-{}", function_spec.id, uuid::Uuid::new_v4()));
 
-                    let config = &cargo::util::config::Config::default()?;
-                    let mut ws = cargo::core::Workspace::new(&cargo_manifest, config)?;
+                    let context = GlobalContext::default().expect("Could not construct a global context for the workspace");
+                    let mut ws = cargo::core::Workspace::new(&cargo_manifest, &context)?;
                     ws.set_target_dir(cargo::util::Filesystem::new(build_dir.clone()));
 
                     let out_file = cargo_project_path
@@ -284,7 +285,7 @@ async fn main() -> anyhow::Result<()> {
                         };
 
                         let mut build_config = cargo::core::compiler::BuildConfig::new(
-                            config,
+                            &context,
                             None,
                             false,
                             &["wasm32-unknown-unknown".to_string()],
@@ -303,7 +304,7 @@ async fn main() -> anyhow::Result<()> {
                             target_rustc_args: None,
                             target_rustc_crate_types: None,
                             rustdoc_document_private_items: false,
-                            honor_rust_version: true,
+                            honor_rust_version: Some(true),
                         };
 
                         cargo::ops::compile(&ws, &compile_options)?;

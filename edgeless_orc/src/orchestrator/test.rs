@@ -342,6 +342,7 @@ fn make_spawn_function_request(class_id: &str) -> edgeless_api::function_instanc
             state_id: uuid::Uuid::new_v4(),
             state_policy: StatePolicy::NodeLocal,
         },
+        workflow_id: "workflow_1".to_string(),
     }
 }
 
@@ -349,6 +350,7 @@ fn make_start_resource_request(class_type: &str) -> edgeless_api::resource_confi
     edgeless_api::resource_configuration::ResourceInstanceSpecification {
         class_type: class_type.to_string(),
         configuration: std::collections::HashMap::new(),
+        workflow_id: "workflow_1".to_string(),
     }
 }
 

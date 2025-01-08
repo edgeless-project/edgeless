@@ -57,6 +57,8 @@ message SpawnFunctionRequest {
     map<string, string> annotations = 3;
     // The state specification.
     StateSpecification state_specification = 4;
+    // The workflow id to which this function belongs
+    string workflow_id = 5;
 }
 
 // Some APIs provide the same inteface for logical vs physical identifiers.
@@ -459,6 +461,8 @@ message ResourceInstanceSpecification {
     string resource_class_type = 1;
     // Resource configuration (depends on the type).
     map<string, string> configuration = 2;
+    // The workflow id to which this resource instance belongs 
+    string workflow_id = 3;
 }
 
 // Message containing information provided as response to failed request.
