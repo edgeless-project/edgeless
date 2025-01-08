@@ -597,6 +597,7 @@ impl ControllerTask {
                     state_id: uuid::Uuid::new_v4(),
                     state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
                 },
+                workflow_id: wf_id.workflow_id.to_string(),
             })
             .await;
 
@@ -637,6 +638,7 @@ impl ControllerTask {
             .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
                 class_type: resource.class_type.clone(),
                 configuration: resource.configurations.clone(),
+                workflow_id: wf_id.workflow_id.to_string(),
             })
             .await;
 

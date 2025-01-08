@@ -321,6 +321,7 @@ impl OrchestratorTask {
                         .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
                             class_type: resource_provider.class_type.clone(),
                             configuration: start_req.configuration.clone(),
+                            workflow_id: start_req.workflow_id.clone(),
                         })
                         .await
                     {
