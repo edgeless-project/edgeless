@@ -31,9 +31,10 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
 }
 
 pub fn edgeless_con_default_conf() -> String {
-    String::from(
-        r##"controller_url = "http://127.0.0.1:7001"
-domain_register_url = "http://127.0.0.1:7004"
-"##,
-    )
+    let con_conf = EdgelessConSettings {
+        controller_url: String::from("http://127.0.0.1:7001"),
+        domain_register_url: String::from("http://127.0.0.1:7002"),
+    };
+
+    toml::to_string(&con_conf).expect("Wrong")
 }

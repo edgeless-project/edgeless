@@ -57,6 +57,15 @@ pub struct EdgelessNodeContainerRuntimeSettings {
     pub guest_api_host_url: String,
 }
 
+impl Default for EdgelessNodeContainerRuntimeSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            guest_api_host_url: String::from("http://127.0.0.1:7100"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeGeneralSettings {
     /// The UUID of this node.
@@ -124,6 +133,17 @@ pub struct OllamaProviderSettings {
     pub provider: String,
 }
 
+impl Default for OllamaProviderSettings {
+    fn default() -> Self {
+        Self {
+            host: String::from("localhost"),
+            port: 11434,
+            messages_number_limit: 30,
+            provider: String::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct MetricsCollectorProviderSettings {
     /// Type of the metrics collector that is used to store run-time
@@ -133,6 +153,16 @@ pub struct MetricsCollectorProviderSettings {
     pub redis_url: Option<String>,
     /// If not empty, a metrics collector resource provider with that name is created.
     pub provider: String,
+}
+
+impl Default for MetricsCollectorProviderSettings {
+    fn default() -> Self {
+        Self {
+            collector_type: String::from("None"),
+            redis_url: Some(String::from("redis://localhost:6379")),
+            provider: String::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -166,6 +196,26 @@ impl NodeCapabilitiesUser {
             num_gpus: None,
             model_name_gpu: None,
             mem_size_gpu: None,
+        }
+    }
+}
+
+impl Default for NodeCapabilitiesUser {
+    fn default() -> Self {
+        let caps = get_capabilities(vec!["RUST_WASM".to_string()], NodeCapabilitiesUser::empty());
+        Self {
+            num_cpus: Some(caps.num_cpus),
+            model_name_cpu: Some(caps.model_name_cpu),
+            clock_freq_cpu: Some(caps.clock_freq_cpu),
+            num_cores: Some(caps.num_cores),
+            mem_size: Some(caps.mem_size),
+            labels: Some(caps.labels),
+            is_tee_running: Some(caps.is_tee_running),
+            has_tpm: Some(caps.has_tpm),
+            disk_tot_space: Some(caps.disk_tot_space),
+            num_gpus: Some(caps.num_gpus),
+            model_name_gpu: Some(caps.model_name_gpu),
+            mem_size_gpu: Some(caps.mem_size_gpu),
         }
     }
 }
@@ -642,68 +692,38 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 }
 
 pub fn edgeless_node_default_conf() -> String {
-    let caps = get_capabilities(vec!["RUST_WASM".to_string()], NodeCapabilitiesUser::empty());
+    let node_conf = EdgelessNodeSettings {
+        general: EdgelessNodeGeneralSettings {
+            node_id: uuid::Uuid::new_v4(),
+            agent_url: String::from("http://127.0.0.1:7005"),
+            agent_url_announced: String::from("http://127.0.0.1:7005"),
+            invocation_url: String::from("http://127.0.0.1:7006"),
+            invocation_url_announced: String::from("http://127.0.0.1:7006"),
+            invocation_url_coap: None,
+            invocation_url_announced_coap: None,
+            node_register_url: String::from("http://127.0.0.1:7004"),
+            subscription_refresh_interval_sec: 2,
+        },
+        telemetry: EdgelessNodeTelemetrySettings {
+            metrics_url: String::from("http://127.0.0.1:7007"),
+            log_level: Some(String::default()),
+            performance_samples: false,
+        },
+        wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
+        container_runtime: Some(EdgelessNodeContainerRuntimeSettings::default()),
+        resources: Some(EdgelessNodeResourceSettings {
+            http_ingress_url: Some(String::from("http://127.0.0.1:7008")),
+            http_ingress_provider: Some("http-ingress-1".to_string()),
+            http_egress_provider: Some("http-egress-1".to_string()),
+            file_log_provider: Some("file-log-1".to_string()),
+            redis_provider: Some("redis-1".to_string()),
+            dda_provider: Some("dda-1".to_string()),
+            ollama_provider: Some(OllamaProviderSettings::default()),
+            kafka_egress_provider: Some(String::default()),
+            metrics_collector_provider: Some(MetricsCollectorProviderSettings::default()),
+        }),
+        user_node_capabilities: Some(NodeCapabilitiesUser::default()),
+    };
 
-    format!(
-        "[general]\nnode_id = \"{}\"\n{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}disk_tot_space = {}\nnum_gpus = {}\nmodel_name_gpu = \"{}\"\nmem_size_gpu = {}{}",
-        uuid::Uuid::new_v4(),
-        r##"agent_url = "http://0.0.0.0:7021"
-agent_url_announced = ""
-invocation_url = "http://0.0.0.0:7002"
-invocation_url_announced = ""
-invocation_url_coap = "coap://127.0.0.1:7002"
-invocation_url_announced_coap = ""
-node_register_url = "http://127.0.0.1:7012"
-subscription_refresh_interval_sec = 10
-
-[telemetry]
-metrics_url = "http://127.0.0.1:7003"
-log_level = "info"
-performance_samples = true
-
-[wasm_runtime]
-enabled = true
-
-[container_runtime]
-enabled = false
-guest_api_host_url = "http://127.0.0.1:7100"
-
-[resources]
-http_ingress_url = "http://127.0.0.1:7035"
-http_ingress_provider = "http-ingress-1"
-http_egress_provider = "http-egress-1"
-file_log_provider = "file-log-1"
-redis_provider = "redis-1"
-dda_provider = "dda-1"
-kafka_egress_provider = "kafka-egress-1"
-
-#[resources.ollama_provider]
-#host = "localhost"
-#port = 11434
-#messages_number_limit = 30
-#provider = "ollama-1"
-
-#[resources.metrics_collector_provider]
-#collector_type = "Redis"
-#redis_url = "redis://localhost:6379"
-#provider = "metrics-collector-1"
-
-[user_node_capabilities]
-"##,
-        caps.num_cpus,
-        caps.model_name_cpu,
-        caps.clock_freq_cpu,
-        caps.num_cores,
-        caps.mem_size,
-        r##"labels = []
-is_tee_running = false
-has_tpm = false
-"##,
-        caps.disk_tot_space,
-        caps.num_gpus,
-        caps.model_name_gpu,
-        caps.mem_size_gpu,
-        r##"
-"##
-    )
+    toml::to_string(&node_conf).expect("Wrong")
 }
