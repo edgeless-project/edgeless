@@ -663,18 +663,10 @@ impl super::proxy::Proxy for ProxyRedis {
     }
 
     fn fetch_logical_id_to_workflow_id(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, String> {
-        let mut workflow_ids = std::collections::HashMap::new();
-        for (logical_id, instance) in self.fetch_instances() {
-            match instance {
-                crate::active_instance::ActiveInstance::Function(spawn_function_request, _) => {
-                    workflow_ids.insert(logical_id, spawn_function_request.workflow_id);
-                }
-                crate::active_instance::ActiveInstance::Resource(resource_instance_specification, _) => {
-                    workflow_ids.insert(logical_id, resource_instance_specification.workflow_id);
-                }
-            }
-        }
-        workflow_ids
+        self.fetch_instances()
+            .iter()
+            .map(|(logical_id, instance)| (*logical_id, instance.workflow_id()))
+            .collect()
     }
 
     fn updated(&mut self, category: crate::proxy::Category) -> bool {

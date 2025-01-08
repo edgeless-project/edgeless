@@ -36,6 +36,7 @@ enum ShowCommands {
     Functions {},
     Resources {},
     LogicalToPhysical {},
+    LogicalToWorkflow {},
     Node {
         #[command(subcommand)]
         node_command: NodeCommands,
@@ -98,6 +99,11 @@ fn main() -> anyhow::Result<()> {
                         logical,
                         physical.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
                     );
+                }
+            }
+            ShowCommands::LogicalToWorkflow {} => {
+                for (logical, workflow_id) in proxy.fetch_logical_id_to_workflow_id().iter().sorted_by_key(|x| x.0.to_string()) {
+                    println!("{} -> {}", logical, workflow_id);
                 }
             }
             ShowCommands::Node { node_command } => match node_command {
