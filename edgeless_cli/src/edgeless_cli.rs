@@ -83,13 +83,22 @@ struct Args {
     template: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 struct CLiConfig {
     controller_url: String,
     function_repository: Option<FunctionRepositoryConfig>,
 }
 
-#[derive(serde::Deserialize)]
+impl Default for CLiConfig {
+    fn default() -> Self {
+        Self {
+            controller_url: String::from("http://127.0.0.1:7001"),
+            function_repository: Some(FunctionRepositoryConfig::default()),
+        }
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Default)]
 struct FunctionRepositoryConfig {
     pub url: String,
     pub basic_auth_user: String,
@@ -97,15 +106,8 @@ struct FunctionRepositoryConfig {
 }
 
 pub fn edgeless_cli_default_conf() -> String {
-    String::from(
-        r##"controller_url = "http://127.0.0.1:7001"
-
-#[function_repository]
-#url = ""
-#basic_auth_user = ""
-#basic_auth_pass = ""
-"##,
-    )
+    let cli_conf = CLiConfig::default();
+    toml::to_string(&cli_conf).expect("Wrong")
 }
 
 async fn wf_client(config_file: &str) -> anyhow::Result<Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>> {
