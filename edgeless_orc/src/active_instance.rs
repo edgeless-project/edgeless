@@ -23,8 +23,14 @@ pub enum ActiveInstance {
 impl ActiveInstance {
     pub fn instance_ids(&self) -> Vec<edgeless_api::function_instance::InstanceId> {
         match self {
-            ActiveInstance::Function(_, ids) => ids.clone(),
-            ActiveInstance::Resource(_, id) => vec![*id],
+            Self::Function(_, ids) => ids.clone(),
+            Self::Resource(_, id) => vec![*id],
+        }
+    }
+    pub fn workflow_id(&self) -> String {
+        match &self {
+            Self::Function(spawn_function_request, _) => spawn_function_request.workflow_id.clone(),
+            Self::Resource(resource_instance_specification, _) => resource_instance_specification.workflow_id.clone(),
         }
     }
 }
