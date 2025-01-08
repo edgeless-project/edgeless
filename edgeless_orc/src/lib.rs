@@ -76,6 +76,17 @@ pub struct EdgelessOrcProxyDatasetSettings {
     additional_header: String,
 }
 
+impl Default for EdgelessOrcProxyDatasetSettings {
+    fn default() -> Self {
+        Self {
+            dataset_path: String::default(),
+            append: true,
+            additional_fields: String::default(),
+            additional_header: String::default(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub enum OrchestrationStrategy {
     /// Random strategy utilizes a random number generator to select the worker
@@ -177,28 +188,25 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
 }
 
 pub fn edgeless_orc_default_conf() -> String {
-    String::from(
-        r##"[general]
-domain_register_url = "http://127.0.0.1:7004"
-subscription_refresh_interval_sec = 10
-domain_id = "domain-1"
-orchestrator_url = "http://0.0.0.0:7011"
-orchestrator_url_announced = ""
-node_register_url = "http://0.0.0.0:7012"
-node_register_coap_url = "coap://0.0.0.0:7050"
+    let orc_conf = EdgelessOrcSettings {
+        general: EdgelessOrcGeneralSettings {
+            domain_register_url: String::from("http://127.0.0.1:7002"),
+            subscription_refresh_interval_sec: 2,
+            domain_id: String::from("domain-7000"),
+            orchestrator_url: String::from("http://127.0.0.1:7003"),
+            orchestrator_url_announced: String::from("http://127.0.0.1:7003"),
+            node_register_url: String::from("http://127.0.0.1:7004"),
+            node_register_coap_url: None,
+        },
+        baseline: EdgelessOrcBaselineSettings {
+            orchestration_strategy: OrchestrationStrategy::Random,
+        },
+        proxy: EdgelessOrcProxySettings {
+            proxy_type: "None".to_string(),
+            redis_url: Some(String::from("redis://127.0.0.1:6379")),
+            dataset_settings: Some(EdgelessOrcProxyDatasetSettings::default()),
+        },
+    };
 
-[baseline]
-orchestration_strategy = "Random"
-
-[proxy]
-proxy_type = "None"
-redis_url = ""
-
-[proxy.dataset_settings]
-dataset_path = ""
-append = true
-additional_fields = ""
-additional_header = ""
-"##,
-    )
+    toml::to_string(&orc_conf).expect("Wrong")
 }
