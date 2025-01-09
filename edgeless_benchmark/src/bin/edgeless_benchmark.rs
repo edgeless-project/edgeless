@@ -32,6 +32,9 @@ struct Args {
     /// Average inter-arrival between consecutive workflows, in s
     #[arg(short, long, default_value_t = 5.0)]
     interarrival: f64,
+    /// Do not terminate workflows at the end of the experiment.
+    #[arg(short, long)]
+    keep_workflows: bool,
     /// Workload trace of comma-separated arrival,end times of workflows
     #[arg(long, default_value_t = String::from(""))]
     workload_trace: String,
@@ -239,19 +242,22 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // terminate all workflows that are still active
-    for event_type in events.iter() {
-        if let Event::WfEnd(_, uuid) = event_type {
-            if !uuid.is_empty() {
-                log::info!("{} wf terminated  '{}'", utils::to_seconds(now), &uuid);
-                match engine.stop_workflow(uuid).await {
-                    Ok(_) => {}
-                    Err(err) => {
-                        panic!("error when stopping a workflow: {}", err);
+    if !args.keep_workflows {
+        for event_type in events.iter() {
+            if let Event::WfEnd(_, uuid) = event_type {
+                if !uuid.is_empty() {
+                    log::info!("{} wf terminated  '{}'", utils::to_seconds(now), &uuid);
+                    match engine.stop_workflow(uuid).await {
+                        Ok(_) => {}
+                        Err(err) => {
+                            panic!("error when stopping a workflow: {}", err);
+                        }
                     }
                 }
             }
         }
     }
+
     if metrics_collection {
         let _ = engine.stop_workflow(&single_trigger_workflow_id).await;
     }
