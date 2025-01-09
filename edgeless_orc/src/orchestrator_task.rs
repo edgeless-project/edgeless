@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use futures::{SinkExt, StreamExt};
+use itertools::Itertools;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
@@ -923,9 +924,18 @@ impl OrchestratorTask {
         let deploy_intents = self.proxy.lock().await.retrieve_deploy_intents();
         for intent in deploy_intents {
             match intent {
-                crate::deploy_intent::DeployIntent::Migrate(component, targets) => {
-                    self.migrate(&component, &targets).await;
-                    to_be_repatched.push(component)
+                crate::deploy_intent::DeployIntent::Migrate(lid, targets) => {
+                    self.migrate(&lid, &targets).await;
+
+                    // Repatch the component migrated.
+                    to_be_repatched.push(lid);
+
+                    // Repatch all the component that depend on it.
+                    for (origin_lid, output_mapping) in self.dependency_graph.iter() {
+                        if output_mapping.values().contains(&lid) {
+                            to_be_repatched.push(*origin_lid);
+                        }
+                    }
                 }
             }
         }
