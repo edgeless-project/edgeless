@@ -211,3 +211,125 @@ impl OrchestrationLogic {
         }
     }
 }
+
+/// Tests
+#[cfg(test)]
+mod tests {
+
+    use crate::affinity_level::AffinityLevel;
+    use crate::deployment_requirements::DeploymentRequirements;
+
+    #[test]
+    fn test_orchestration_logic_is_node_feasible() {
+        let node_id = uuid::Uuid::new_v4();
+        let mut reqs = DeploymentRequirements::none();
+        let mut caps = edgeless_api::node_registration::NodeCapabilities::minimum();
+        let mut providers = std::collections::HashSet::new();
+        let mut runtime = "RUST_WASM".to_string();
+
+        // Empty requirements
+        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        // Match any node_id
+        reqs.node_id_match_any.push(node_id);
+        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        reqs.node_id_match_any.push(uuid::Uuid::new_v4());
+        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        reqs.node_id_match_any.clear();
+        reqs.node_id_match_any.push(uuid::Uuid::new_v4());
+        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+        reqs.node_id_match_any.clear();
+
+        // Match all labels
+        reqs.label_match_all.push("red".to_string());
+        caps.labels.push("green".to_string());
+        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        caps.labels.push("red".to_string());
+        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        reqs.label_match_all.push("blue".to_string());
+        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        caps.labels.push("blue".to_string());
+        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        // Match all providers
+        reqs.resource_match_all.push("file-1".to_string());
+        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        providers.insert("file-1".to_string());
+        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        providers.insert("file-2".to_string());
+        providers.insert("file-3".to_string());
+        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        reqs.resource_match_all.push("file-9".to_string());
+        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        providers.insert("file-9".to_string());
+        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        // Match TEE and TPM
+        reqs.tee = AffinityLevel::Required;
+        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+        caps.is_tee_running = true;
+        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        reqs.tpm = AffinityLevel::Required;
+        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+        caps.has_tpm = true;
+        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+
+        // Match runtime
+        runtime = "CONTAINER".to_string();
+        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+        runtime = "".to_string();
+        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+        runtime = "RUST_WASM".to_string();
+        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+            &runtime, &reqs, &node_id, &caps, &providers
+        ));
+    }
+}
