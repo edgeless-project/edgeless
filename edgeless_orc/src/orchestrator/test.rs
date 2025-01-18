@@ -3,9 +3,10 @@
 
 #![allow(clippy::all)]
 
-use crate::affinity_level::AffinityLevel;
 use crate::deployment_requirements::DeploymentRequirements;
 use crate::domain_subscriber::DomainSubscriberRequest;
+use crate::proxy::Proxy;
+use crate::{affinity_level::AffinityLevel, deploy_intent};
 use edgeless_api::function_instance::{FunctionClassSpecification, StatePolicy, StateSpecification};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 
@@ -136,7 +137,7 @@ type ClientDescsResources = std::collections::HashMap<
 >;
 
 #[allow(clippy::type_complexity)]
-fn test_create_clients_resources(
+fn create_clients_resources(
     num_nodes: u32,
     num_resources_per_node: u32,
 ) -> (
@@ -186,25 +187,26 @@ fn test_create_clients_resources(
     (nodes, client_descs_resources, stable_node_id)
 }
 
-async fn test_setup(
-    num_nodes: u32,
-    num_resources_per_node: u32,
-) -> (
-    Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::DomainManagedInstanceId>>,
-    Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::DomainManagedInstanceId>>,
-    std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>,
-    uuid::Uuid,
-    UnboundedReceiver<DomainSubscriberRequest>,
-    UnboundedSender<OrchestratorRequest>,
-) {
-    let (mut nodes, client_descs_resources, stable_node_id) = test_create_clients_resources(num_nodes, num_resources_per_node);
+struct SetupResult {
+    fun_client: Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::DomainManagedInstanceId>>,
+    res_client: Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::DomainManagedInstanceId>>,
+    nodes: std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>>,
+    stable_node_id: uuid::Uuid,
+    subscriber_receiver: UnboundedReceiver<DomainSubscriberRequest>,
+    orc_sender: UnboundedSender<OrchestratorRequest>,
+    proxy: std::sync::Arc<tokio::sync::Mutex<proxy_test::ProxyTest>>,
+}
+
+async fn setup(num_nodes: u32, num_resources_per_node: u32) -> SetupResult {
+    let (mut nodes, client_descs_resources, stable_node_id) = create_clients_resources(num_nodes, num_resources_per_node);
     let (subscriber_sender, subscriber_receiver) = futures::channel::mpsc::unbounded();
 
+    let proxy = std::sync::Arc::new(tokio::sync::Mutex::new(proxy_test::ProxyTest::default()));
     let (mut orchestrator, orchestrator_task, _refresh_task) = Orchestrator::new(
         crate::EdgelessOrcBaselineSettings {
             orchestration_strategy: crate::OrchestrationStrategy::Random,
         },
-        std::sync::Arc::new(tokio::sync::Mutex::new(crate::proxy_none::ProxyNone {})),
+        proxy.clone(),
         subscriber_sender,
     )
     .await;
@@ -219,14 +221,15 @@ async fn test_setup(
 
     clear_events(&mut nodes).await;
 
-    (
-        orchestrator.get_api_client().function_instance_api(),
-        orchestrator.get_api_client().resource_configuration_api(),
+    SetupResult {
+        fun_client: orchestrator.get_api_client().function_instance_api(),
+        res_client: orchestrator.get_api_client().resource_configuration_api(),
         nodes,
         stable_node_id,
         subscriber_receiver,
-        orchestrator.get_sender(),
-    )
+        orc_sender: orchestrator.get_sender(),
+        proxy,
+    }
 }
 
 #[allow(dead_code)]
@@ -356,9 +359,10 @@ fn make_start_resource_request(class_type: &str) -> edgeless_api::resource_confi
 
 #[tokio::test]
 async fn test_orc_single_node_function_start_stop() {
-    let (mut fun_client, mut _res_client, mut nodes, _, _, _orc_sender) = test_setup(1, 0).await;
-    assert_eq!(1, nodes.len());
-    let (node_id, mock_node_receiver) = nodes.iter_mut().next().unwrap();
+    let mut setup = setup(1, 0).await;
+
+    assert_eq!(1, setup.nodes.len());
+    let (node_id, mock_node_receiver) = setup.nodes.iter_mut().next().unwrap();
     assert!(!node_id.is_nil());
 
     assert!(mock_node_receiver.try_next().is_err());
@@ -366,7 +370,7 @@ async fn test_orc_single_node_function_start_stop() {
     // Start a function.
 
     let spawn_req = make_spawn_function_request("fc-1");
-    let instance_id = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    let instance_id = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
@@ -382,7 +386,7 @@ async fn test_orc_single_node_function_start_stop() {
 
     // Stop the function previously started.
 
-    match fun_client.stop(instance_id).await {
+    match setup.fun_client.stop(instance_id).await {
         Ok(_) => {}
         Err(err) => {
             panic!("{}", err);
@@ -397,19 +401,18 @@ async fn test_orc_single_node_function_start_stop() {
     }
 
     // Stop the function again.
-    match fun_client.stop(instance_id).await {
+    match setup.fun_client.stop(instance_id).await {
         Ok(_) => {}
         Err(err) => {
             panic!("{}", err);
         }
     }
-    no_function_event(&mut nodes).await;
+    no_function_event(&mut setup.nodes).await;
 }
 
 #[tokio::test]
 async fn test_orc_multiple_nodes_function_start_stop() {
-    let (mut fun_client, mut _res_client, mut nodes, _, _, _orc_sender) = test_setup(3, 0).await;
-    assert_eq!(3, nodes.len());
+    let mut setup = setup(3, 0).await;
 
     // Start 100 functions.
 
@@ -418,12 +421,12 @@ async fn test_orc_multiple_nodes_function_start_stop() {
     let mut node_ids = vec![];
     for i in 0..100 {
         let spawn_req = make_spawn_function_request(format!("fc-{}", i).as_str());
-        ext_instance_ids.push(match fun_client.start(spawn_req.clone()).await.unwrap() {
+        ext_instance_ids.push(match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
             edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
             edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         });
 
-        if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+        if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
             node_ids.push(node_id);
             int_instance_ids.push(new_instance_id);
             assert_eq!(spawn_req, spawn_req_rcvd);
@@ -446,14 +449,14 @@ async fn test_orc_multiple_nodes_function_start_stop() {
     assert_eq!(100, int_instance_ids.len());
     assert_eq!(100, node_ids.len());
     for i in 0..100 {
-        match fun_client.stop(ext_instance_ids[i]).await {
+        match setup.fun_client.stop(ext_instance_ids[i]).await {
             Ok(_) => {}
             Err(err) => {
                 panic!("{}", err);
             }
         }
 
-        if let (node_id, MockAgentEvent::StopFunction(instance_id_rcvd)) = wait_for_event_multiple(&mut nodes).await {
+        if let (node_id, MockAgentEvent::StopFunction(instance_id_rcvd)) = wait_for_event_multiple(&mut setup.nodes).await {
             assert_eq!(node_ids[i], node_id);
             assert_eq!(int_instance_ids[i], instance_id_rcvd);
         } else {
@@ -464,8 +467,7 @@ async fn test_orc_multiple_nodes_function_start_stop() {
 
 #[tokio::test]
 async fn test_orc_multiple_resources_start_stop() {
-    let (mut _fun_client, mut res_client, mut nodes, _, _, _orc_sender) = test_setup(3, 3).await;
-    assert_eq!(3, nodes.len());
+    let mut setup = setup(3, 3).await;
 
     // Start 100 resources.
 
@@ -474,12 +476,12 @@ async fn test_orc_multiple_resources_start_stop() {
     let mut node_ids = vec![];
     for _i in 0..100 {
         let start_req = make_start_resource_request("rc-1");
-        ext_instance_ids.push(match res_client.start(start_req.clone()).await.unwrap() {
+        ext_instance_ids.push(match setup.res_client.start(start_req.clone()).await.unwrap() {
             edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
             edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         });
 
-        if let (node_id, MockAgentEvent::StartResource((int_instance_id, resource_instance_spec))) = wait_for_event_multiple(&mut nodes).await {
+        if let (node_id, MockAgentEvent::StartResource((int_instance_id, resource_instance_spec))) = wait_for_event_multiple(&mut setup.nodes).await {
             assert_eq!(node_id, int_instance_id.node_id);
             node_ids.push(node_id);
             int_instance_ids.push(int_instance_id.function_id);
@@ -503,14 +505,14 @@ async fn test_orc_multiple_resources_start_stop() {
     assert_eq!(100, int_instance_ids.len());
     assert_eq!(100, node_ids.len());
     for i in 0..100 {
-        match res_client.stop(ext_instance_ids[i]).await {
+        match setup.res_client.stop(ext_instance_ids[i]).await {
             Ok(_) => {}
             Err(err) => {
                 panic!("{}", err);
             }
         }
 
-        if let (node_id, MockAgentEvent::StopResource(instance_id_rcvd)) = wait_for_event_multiple(&mut nodes).await {
+        if let (node_id, MockAgentEvent::StopResource(instance_id_rcvd)) = wait_for_event_multiple(&mut setup.nodes).await {
             assert_eq!(node_ids[i], node_id);
             assert_eq!(node_ids[i], instance_id_rcvd.node_id);
             assert_eq!(int_instance_ids[i], instance_id_rcvd.function_id);
@@ -520,7 +522,7 @@ async fn test_orc_multiple_resources_start_stop() {
     }
 
     // Start a resource with unknown class type.
-    match res_client.start(make_start_resource_request("rc-666")).await.unwrap() {
+    match setup.res_client.start(make_start_resource_request("rc-666")).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(_) => {
             panic!("started a resource for a non-existing class type");
         }
@@ -532,21 +534,21 @@ async fn test_orc_multiple_resources_start_stop() {
 
 #[tokio::test]
 async fn test_orc_patch() {
-    let (mut fun_client, mut res_client, mut nodes, _, _, _orc_sender) = test_setup(1, 1).await;
-    assert_eq!(1, nodes.len());
-    let client_node_id = *nodes.keys().next().unwrap();
+    let mut setup = setup(1, 1).await;
+    assert_eq!(1, setup.nodes.len());
+    let client_node_id = *setup.nodes.keys().next().unwrap();
 
     // Spawn a function instance.
 
     let spawn_req = make_spawn_function_request("fc-1");
-    let ext_function_id = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    let ext_function_id = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
 
     let mut int_function_id = None;
     assert!(int_function_id.is_none());
-    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
         assert_eq!(client_node_id, node_id);
         assert_eq!(client_node_id, new_instance_id.node_id);
         int_function_id = Some(new_instance_id);
@@ -558,14 +560,14 @@ async fn test_orc_patch() {
     // Start a resource.
 
     let start_req = make_start_resource_request("rc-1");
-    let ext_resource_id = match res_client.start(start_req.clone()).await.unwrap() {
+    let ext_resource_id = match setup.res_client.start(start_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
 
     let mut int_resource_id = None;
     assert!(int_resource_id.is_none());
-    if let (node_id, MockAgentEvent::StartResource((new_instance_id, resource_instance_spec))) = wait_for_event_multiple(&mut nodes).await {
+    if let (node_id, MockAgentEvent::StartResource((new_instance_id, resource_instance_spec))) = wait_for_event_multiple(&mut setup.nodes).await {
         assert_eq!(client_node_id, node_id);
         assert_eq!(client_node_id, new_instance_id.node_id);
         int_resource_id = Some(new_instance_id);
@@ -576,7 +578,8 @@ async fn test_orc_patch() {
 
     // Gotta patch 'em all.
 
-    match fun_client
+    match setup
+        .fun_client
         .patch(edgeless_api::common::PatchRequest {
             function_id: ext_function_id,
             output_mapping: std::collections::HashMap::from([(
@@ -595,7 +598,7 @@ async fn test_orc_patch() {
         }
     };
 
-    if let (node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+    if let (node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut setup.nodes).await {
         assert_eq!(client_node_id, node_id);
         assert_eq!(int_function_id.unwrap().function_id, patch_request.function_id);
         assert_eq!(1, patch_request.output_mapping.len());
@@ -606,7 +609,8 @@ async fn test_orc_patch() {
         panic!("wrong event received");
     }
 
-    match res_client
+    match setup
+        .res_client
         .patch(edgeless_api::common::PatchRequest {
             function_id: ext_resource_id,
             output_mapping: std::collections::HashMap::from([(
@@ -625,7 +629,7 @@ async fn test_orc_patch() {
         }
     };
 
-    if let (node_id, MockAgentEvent::PatchResource(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+    if let (node_id, MockAgentEvent::PatchResource(patch_request)) = wait_for_event_multiple(&mut setup.nodes).await {
         assert_eq!(client_node_id, node_id);
         assert_eq!(int_resource_id.unwrap().function_id, patch_request.function_id);
         assert_eq!(1, patch_request.output_mapping.len());
@@ -640,8 +644,7 @@ async fn test_orc_patch() {
 #[tokio::test]
 #[serial_test::serial]
 async fn test_orc_node_with_fun_disconnects() {
-    let (mut fun_client, mut _res_client, mut nodes, stable_node_id, _, mut orc_sender) = test_setup(10, 0).await;
-    assert_eq!(10, nodes.len());
+    let mut setup = setup(10, 0).await;
 
     // Start this workflow
     //
@@ -655,14 +658,16 @@ async fn test_orc_node_with_fun_disconnects() {
 
     // Start f1
     let mut spawn_req = make_spawn_function_request("f1");
-    spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
-    let lid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    spawn_req
+        .annotations
+        .insert("node_id_match_any".to_string(), setup.stable_node_id.to_string());
+    let lid_1 = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
     let mut pid_1 = uuid::Uuid::nil();
-    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
-        assert_eq!(node_id, stable_node_id);
+    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+        assert_eq!(node_id, setup.stable_node_id);
         pid_1 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
@@ -670,14 +675,14 @@ async fn test_orc_node_with_fun_disconnects() {
     // Start f2
     let mut spawn_req = make_spawn_function_request("f2");
     spawn_req.annotations.insert("label_match_all".to_string(), "unstable".to_string());
-    let lid_2 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    let lid_2 = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
     let mut unstable_node_id = uuid::Uuid::nil();
     let mut pid_2 = uuid::Uuid::nil();
-    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
-        assert_ne!(node_id, stable_node_id);
+    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+        assert_ne!(node_id, setup.stable_node_id);
         unstable_node_id = node_id;
         pid_2 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
@@ -685,34 +690,39 @@ async fn test_orc_node_with_fun_disconnects() {
 
     // Start f3
     let mut spawn_req = make_spawn_function_request("f3");
-    spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
-    let lid_3 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    spawn_req
+        .annotations
+        .insert("node_id_match_any".to_string(), setup.stable_node_id.to_string());
+    let lid_3 = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
     let mut pid_3 = uuid::Uuid::nil();
-    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
-        assert_eq!(node_id, stable_node_id);
+    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+        assert_eq!(node_id, setup.stable_node_id);
         pid_3 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
     // Start f4
     let mut spawn_req = make_spawn_function_request("f4");
-    spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
-    let lid_4 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    spawn_req
+        .annotations
+        .insert("node_id_match_any".to_string(), setup.stable_node_id.to_string());
+    let lid_4 = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
     let mut _pid_4 = uuid::Uuid::nil();
-    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
-        assert_eq!(node_id, stable_node_id);
+    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+        assert_eq!(node_id, setup.stable_node_id);
         _pid_4 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
     // Patch f1->f2
-    match fun_client
+    match setup
+        .fun_client
         .patch(edgeless_api::common::PatchRequest {
             function_id: lid_1,
             output_mapping: std::collections::HashMap::from([(
@@ -730,12 +740,13 @@ async fn test_orc_node_with_fun_disconnects() {
             panic!("{}", err);
         }
     };
-    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut setup.nodes).await {
         assert!(patch_request.output_mapping.contains_key("out"));
     }
 
     // Patch f2->f3
-    match fun_client
+    match setup
+        .fun_client
         .patch(edgeless_api::common::PatchRequest {
             function_id: lid_2,
             output_mapping: std::collections::HashMap::from([(
@@ -753,12 +764,13 @@ async fn test_orc_node_with_fun_disconnects() {
             panic!("{}", err);
         }
     };
-    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut setup.nodes).await {
         assert!(patch_request.output_mapping.contains_key("out"));
     }
 
     // Patch f3->f4
-    match fun_client
+    match setup
+        .fun_client
         .patch(edgeless_api::common::PatchRequest {
             function_id: lid_3,
             output_mapping: std::collections::HashMap::from([(
@@ -777,22 +789,22 @@ async fn test_orc_node_with_fun_disconnects() {
         }
     };
 
-    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut setup.nodes).await {
         assert!(patch_request.output_mapping.contains_key("out"));
     }
 
     // Make sure there are no pending events around.
-    no_function_event(&mut nodes).await;
+    no_function_event(&mut setup.nodes).await;
 
     // Disconnect the unstable node
-    let _ = orc_sender.send(OrchestratorRequest::DelNode(unstable_node_id)).await;
+    let _ = setup.orc_sender.send(OrchestratorRequest::DelNode(unstable_node_id)).await;
 
     let mut num_events = std::collections::HashMap::new();
     let mut new_node_id = uuid::Uuid::nil();
     let mut patch_request_1 = None;
     let mut patch_request_2 = None;
     loop {
-        if let Some((node_id, event)) = wait_for_events_if_any(&mut nodes).await {
+        if let Some((node_id, event)) = wait_for_events_if_any(&mut setup.nodes).await {
             if num_events.contains_key(event_to_string(&event)) {
                 *num_events.get_mut(event_to_string(&event)).unwrap() += 1;
             } else {
@@ -801,7 +813,7 @@ async fn test_orc_node_with_fun_disconnects() {
             match event {
                 MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd)) => {
                     log::info!("start-function");
-                    assert_ne!(node_id, stable_node_id);
+                    assert_ne!(node_id, setup.stable_node_id);
                     assert_eq!(node_id, new_instance_id.node_id);
                     new_node_id = new_instance_id.node_id;
                     pid_2 = new_instance_id.function_id;
@@ -810,7 +822,7 @@ async fn test_orc_node_with_fun_disconnects() {
                 MockAgentEvent::PatchFunction(patch_request) => {
                     log::info!("patch-function");
                     assert!(patch_request.output_mapping.contains_key("out"));
-                    if node_id == stable_node_id {
+                    if node_id == setup.stable_node_id {
                         patch_request_1 = Some(patch_request);
                     } else if node_id == new_node_id {
                         patch_request_2 = Some(patch_request);
@@ -842,13 +854,12 @@ async fn test_orc_node_with_fun_disconnects() {
     assert_eq!(pid_2, patch_request_2.function_id);
     assert_eq!(pid_3, patch_request_2.output_mapping.get("out").unwrap().function_id);
 
-    no_function_event(&mut nodes).await;
+    no_function_event(&mut setup.nodes).await;
 }
 
 #[tokio::test]
-async fn orc_node_with_res_disconnects() {
-    let (mut fun_client, mut res_client, mut nodes, stable_node_id, _, mut orc_sender) = test_setup(10, 1).await;
-    assert_eq!(10, nodes.len());
+async fn test_orc_node_with_res_disconnects() {
+    let mut setup = setup(10, 1).await;
 
     // Start this workflow
     //
@@ -862,14 +873,16 @@ async fn orc_node_with_res_disconnects() {
 
     // Start f1
     let mut spawn_req = make_spawn_function_request("f1");
-    spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
-    let lid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    spawn_req
+        .annotations
+        .insert("node_id_match_any".to_string(), setup.stable_node_id.to_string());
+    let lid_1 = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
     let mut pid_1 = uuid::Uuid::nil();
-    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
-        assert_eq!(node_id, stable_node_id);
+    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+        assert_eq!(node_id, setup.stable_node_id);
         pid_1 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
@@ -882,29 +895,29 @@ async fn orc_node_with_res_disconnects() {
     let mut lid_res = uuid::Uuid::nil();
     assert!(lid_res.is_nil());
     loop {
-        lid_res = match res_client.start(start_req.clone()).await.unwrap() {
+        lid_res = match setup.res_client.start(start_req.clone()).await.unwrap() {
             edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
             edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         };
 
-        if let (node_id, MockAgentEvent::StartResource((int_instance_id, resource_instance_spec))) = wait_for_event_multiple(&mut nodes).await {
+        if let (node_id, MockAgentEvent::StartResource((int_instance_id, resource_instance_spec))) = wait_for_event_multiple(&mut setup.nodes).await {
             assert_eq!(node_id, int_instance_id.node_id);
             unstable_node_id = int_instance_id.node_id;
             pid_res = int_instance_id.function_id;
             assert!(resource_instance_spec.configuration.is_empty());
-            if int_instance_id.node_id != stable_node_id {
+            if int_instance_id.node_id != setup.stable_node_id {
                 break;
             }
         }
 
         // If we reach this point then the stable node has been selected,
         // so we stop the resource and try again.
-        match res_client.stop(lid_res).await {
+        match setup.res_client.stop(lid_res).await {
             Ok(_) => {}
             Err(err) => panic!("{}", err),
         }
 
-        if let (node_id, MockAgentEvent::StopResource(instance_id_rcvd)) = wait_for_event_multiple(&mut nodes).await {
+        if let (node_id, MockAgentEvent::StopResource(instance_id_rcvd)) = wait_for_event_multiple(&mut setup.nodes).await {
             assert_eq!(unstable_node_id, node_id);
             assert_eq!(unstable_node_id, instance_id_rcvd.node_id);
             assert_eq!(pid_res, instance_id_rcvd.function_id);
@@ -915,7 +928,8 @@ async fn orc_node_with_res_disconnects() {
     assert!(!lid_res.is_nil());
 
     // Patch f1->res
-    match fun_client
+    match setup
+        .fun_client
         .patch(edgeless_api::common::PatchRequest {
             function_id: lid_1,
             output_mapping: std::collections::HashMap::from([(
@@ -933,23 +947,23 @@ async fn orc_node_with_res_disconnects() {
             panic!("{}", err);
         }
     };
-    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut setup.nodes).await {
         assert!(patch_request.output_mapping.contains_key("out"));
         assert_eq!(unstable_node_id, patch_request.output_mapping.get("out").unwrap().node_id);
         assert_eq!(pid_res, patch_request.output_mapping.get("out").unwrap().function_id);
     }
 
     // Make sure there are no pending events around.
-    no_function_event(&mut nodes).await;
+    no_function_event(&mut setup.nodes).await;
 
     // Disconnect the unstable node
-    let _ = orc_sender.send(OrchestratorRequest::DelNode(unstable_node_id)).await;
+    let _ = setup.orc_sender.send(OrchestratorRequest::DelNode(unstable_node_id)).await;
 
     let mut num_events = std::collections::HashMap::new();
     let mut new_node_id = uuid::Uuid::nil();
     let mut patch_request_rcv: Option<edgeless_api::common::PatchRequest> = None;
     loop {
-        if let Some((node_id, event)) = wait_for_events_if_any(&mut nodes).await {
+        if let Some((node_id, event)) = wait_for_events_if_any(&mut setup.nodes).await {
             if num_events.contains_key(event_to_string(&event)) {
                 *num_events.get_mut(event_to_string(&event)).unwrap() += 1;
             } else {
@@ -965,7 +979,7 @@ async fn orc_node_with_res_disconnects() {
                 MockAgentEvent::PatchFunction(patch_request) => {
                     log::info!("patch-function");
                     assert!(patch_request.output_mapping.contains_key("out"));
-                    assert_eq!(stable_node_id, node_id);
+                    assert_eq!(setup.stable_node_id, node_id);
                     patch_request_rcv = Some(patch_request);
                 }
                 MockAgentEvent::UpdatePeers(req) => {
@@ -992,13 +1006,12 @@ async fn orc_node_with_res_disconnects() {
     assert_eq!(pid_1, patch_request_rcv.function_id);
     assert_eq!(pid_res, patch_request_rcv.output_mapping.get("out").unwrap().function_id);
 
-    no_function_event(&mut nodes).await;
+    no_function_event(&mut setup.nodes).await;
 }
 
 #[tokio::test]
-async fn test_patch_after_fun_stop() {
-    let (mut fun_client, mut _res_client, mut nodes, _stable_node_id, _, _orc_sender) = test_setup(10, 0).await;
-    assert_eq!(10, nodes.len());
+async fn test_orc_patch_after_fun_stop() {
+    let mut setup = setup(10, 0).await;
 
     // Start this workflow
     //
@@ -1013,11 +1026,11 @@ async fn test_patch_after_fun_stop() {
     let mut pids = vec![];
     for i in 1..=6 {
         let spawn_req = make_spawn_function_request(format!("f{}", i).as_str());
-        lids.push(match fun_client.start(spawn_req.clone()).await.unwrap() {
+        lids.push(match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
             edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
             edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         });
-        if let (_node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+        if let (_node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
             pids.push(new_instance_id.function_id);
             assert_eq!(spawn_req, spawn_req_rcvd);
         }
@@ -1053,7 +1066,8 @@ async fn test_patch_after_fun_stop() {
                 },
             );
         }
-        match fun_client
+        match setup
+            .fun_client
             .patch(edgeless_api::common::PatchRequest {
                 function_id: lid_pair.0,
                 output_mapping,
@@ -1065,7 +1079,7 @@ async fn test_patch_after_fun_stop() {
                 panic!("{}", err);
             }
         };
-        if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+        if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut setup.nodes).await {
             assert_eq!(patch_instructions_int[j].0, patch_request.function_id);
             assert!(patch_request.output_mapping.contains_key("out0"));
             assert_eq!(
@@ -1079,17 +1093,17 @@ async fn test_patch_after_fun_stop() {
     }
 
     // Make sure there are no pending events around.
-    no_function_event(&mut nodes).await;
+    no_function_event(&mut setup.nodes).await;
 
     // Stop function f3
-    match fun_client.stop(lids[2]).await {
+    match setup.fun_client.stop(lids[2]).await {
         Ok(_) => {}
         Err(err) => panic!("{}", err),
     }
 
     let mut num_events = std::collections::HashMap::new();
     loop {
-        if let Some((_node_id, event)) = wait_for_events_if_any(&mut nodes).await {
+        if let Some((_node_id, event)) = wait_for_events_if_any(&mut setup.nodes).await {
             if num_events.contains_key(event_to_string(&event)) {
                 *num_events.get_mut(event_to_string(&event)).unwrap() += 1;
             } else {
@@ -1115,14 +1129,13 @@ async fn test_patch_after_fun_stop() {
     assert_eq!(Some(&2), num_events.get("patch-function"));
 
     // Make sure there are no pending events around.
-    no_function_event(&mut nodes).await;
+    no_function_event(&mut setup.nodes).await;
 }
 
 #[tokio::test]
 #[serial_test::serial]
-async fn test_recreate_fun_after_disconnect() {
-    let (mut fun_client, mut _res_client, mut nodes, stable_node_id, _, mut orc_sender) = test_setup(2, 0).await;
-    assert_eq!(2, nodes.len());
+async fn test_orc_recreate_fun_after_disconnect() {
+    let mut setup = setup(2, 0).await;
 
     // Start this workflow
     //
@@ -1134,14 +1147,16 @@ async fn test_recreate_fun_after_disconnect() {
 
     // Start f1
     let mut spawn_req = make_spawn_function_request("f1");
-    spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
-    let lid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    spawn_req
+        .annotations
+        .insert("node_id_match_any".to_string(), setup.stable_node_id.to_string());
+    let lid_1 = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
     let mut pid_1 = uuid::Uuid::nil();
-    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
-        assert_eq!(node_id, stable_node_id);
+    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+        assert_eq!(node_id, setup.stable_node_id);
         pid_1 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
@@ -1149,31 +1164,34 @@ async fn test_recreate_fun_after_disconnect() {
     // Start f2
     let mut spawn_req = make_spawn_function_request("f2");
     spawn_req.annotations.insert("label_match_all".to_string(), "unstable".to_string());
-    let lid_2 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    let lid_2 = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
     let mut unstable_node_id = uuid::Uuid::nil();
-    if let (node_id, MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
-        assert_ne!(node_id, stable_node_id);
+    if let (node_id, MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+        assert_ne!(node_id, setup.stable_node_id);
         unstable_node_id = node_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
     // Start f3
     let mut spawn_req = make_spawn_function_request("f3");
-    spawn_req.annotations.insert("node_id_match_any".to_string(), stable_node_id.to_string());
-    let lid_3 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+    spawn_req
+        .annotations
+        .insert("node_id_match_any".to_string(), setup.stable_node_id.to_string());
+    let lid_3 = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
-    if let (node_id, MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
-        assert_eq!(node_id, stable_node_id);
+    if let (node_id, MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+        assert_eq!(node_id, setup.stable_node_id);
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
     // Patch f1->f2
-    match fun_client
+    match setup
+        .fun_client
         .patch(edgeless_api::common::PatchRequest {
             function_id: lid_1,
             output_mapping: std::collections::HashMap::from([(
@@ -1191,12 +1209,13 @@ async fn test_recreate_fun_after_disconnect() {
             panic!("{}", err);
         }
     };
-    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut setup.nodes).await {
         assert!(patch_request.output_mapping.contains_key("out"));
     }
 
     // Patch f2->f3
-    match fun_client
+    match setup
+        .fun_client
         .patch(edgeless_api::common::PatchRequest {
             function_id: lid_2,
             output_mapping: std::collections::HashMap::from([(
@@ -1214,19 +1233,19 @@ async fn test_recreate_fun_after_disconnect() {
             panic!("{}", err);
         }
     };
-    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+    if let (_node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut setup.nodes).await {
         assert!(patch_request.output_mapping.contains_key("out"));
     }
 
     // Make sure there are no pending events around.
-    no_function_event(&mut nodes).await;
+    no_function_event(&mut setup.nodes).await;
 
     // Disconnect the unstable node
-    let _ = orc_sender.send(OrchestratorRequest::DelNode(unstable_node_id)).await;
+    let _ = setup.orc_sender.send(OrchestratorRequest::DelNode(unstable_node_id)).await;
 
     let mut num_events = std::collections::HashMap::new();
     loop {
-        if let Some((_node_id, event)) = wait_for_events_if_any(&mut nodes).await {
+        if let Some((_node_id, event)) = wait_for_events_if_any(&mut setup.nodes).await {
             if num_events.contains_key(event_to_string(&event)) {
                 *num_events.get_mut(event_to_string(&event)).unwrap() += 1;
             } else {
@@ -1258,12 +1277,12 @@ async fn test_recreate_fun_after_disconnect() {
 
     for _ in 0..5 {
         let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
-        let _ = orc_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
+        let _ = setup.orc_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
         let _ = reply_receiver.await;
 
         let mut num_events = std::collections::HashMap::new();
         loop {
-            if let Some((_node_id, event)) = wait_for_events_if_any(&mut nodes).await {
+            if let Some((_node_id, event)) = wait_for_events_if_any(&mut setup.nodes).await {
                 if num_events.contains_key(event_to_string(&event)) {
                     *num_events.get_mut(event_to_string(&event)).unwrap() += 1;
                 } else {
@@ -1284,7 +1303,7 @@ async fn test_recreate_fun_after_disconnect() {
     }
 
     // Make sure there are no pending events.
-    no_function_event(&mut nodes).await;
+    no_function_event(&mut setup.nodes).await;
 
     // Re-create the unstable node.
 
@@ -1292,11 +1311,12 @@ async fn test_recreate_fun_after_disconnect() {
     let mut capabilities = edgeless_api::node_registration::NodeCapabilities::minimum();
     capabilities.labels.push("unstable".to_string());
 
-    if let Some(val) = nodes.get_mut(&unstable_node_id) {
+    if let Some(val) = setup.nodes.get_mut(&unstable_node_id) {
         *val = mock_node_receiver;
     }
 
-    let _ = orc_sender
+    let _ = setup
+        .orc_sender
         .send(crate::orchestrator::OrchestratorRequest::AddNode(
             unstable_node_id,
             crate::client_desc::ClientDesc {
@@ -1312,7 +1332,7 @@ async fn test_recreate_fun_after_disconnect() {
         ))
         .await;
 
-    if let Some(entry) = nodes.get_mut(&stable_node_id) {
+    if let Some(entry) = setup.nodes.get_mut(&setup.stable_node_id) {
         let mut num_update_peers = 0;
         for _ in 0..2 {
             let event = wait_for_event_at_node(entry).await;
@@ -1326,7 +1346,7 @@ async fn test_recreate_fun_after_disconnect() {
         }
         assert_eq!(1, num_update_peers);
     }
-    if let Some(entry) = nodes.get_mut(&unstable_node_id) {
+    if let Some(entry) = setup.nodes.get_mut(&unstable_node_id) {
         let mut num_update_peers = 0;
         let mut num_reset = 0;
         for _ in 0..5 {
@@ -1350,15 +1370,149 @@ async fn test_recreate_fun_after_disconnect() {
         assert_eq!(1, num_reset);
     }
 
-    no_function_event(&mut nodes).await;
+    no_function_event(&mut setup.nodes).await;
 }
 
 #[tokio::test]
-async fn orc_reset() {
+async fn test_orc_migrate_function() {
+    let mut setup = setup(2, 0).await;
+
+    // Deploy the following workflow:
+    //
+    // f0 <--> f1 <--> f2
+
+    // Spawn the function instances.
+    let mut lids = vec![];
+    let mut pids = vec![];
+    let mut nodes_assigned = vec![];
+    for i in 0..=2 {
+        let spawn_req = make_spawn_function_request(format!("fc-{}", i).as_str());
+        lids.push(match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
+            edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+            edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        });
+
+        if let (node_id, MockAgentEvent::StartFunction((new_instance_id, _spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+            assert_eq!(node_id, new_instance_id.node_id);
+            nodes_assigned.push(node_id);
+            pids.push(new_instance_id.function_id);
+        } else {
+            panic!("wrong event received");
+        }
+    }
+
+    // Gotta patch 'em all.
+    let patch_requests = vec![
+        edgeless_api::common::PatchRequest {
+            function_id: lids[0],
+            output_mapping: std::collections::HashMap::from([(
+                "out-1".to_string(),
+                edgeless_api::function_instance::InstanceId {
+                    node_id: uuid::Uuid::nil(),
+                    function_id: lids[1],
+                },
+            )]),
+        },
+        edgeless_api::common::PatchRequest {
+            function_id: lids[1],
+            output_mapping: std::collections::HashMap::from([
+                (
+                    "out-1".to_string(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: lids[0],
+                    },
+                ),
+                (
+                    "out-2".to_string(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: lids[2],
+                    },
+                ),
+            ]),
+        },
+        edgeless_api::common::PatchRequest {
+            function_id: lids[2],
+            output_mapping: std::collections::HashMap::from([(
+                "out-1".to_string(),
+                edgeless_api::function_instance::InstanceId {
+                    node_id: uuid::Uuid::nil(),
+                    function_id: lids[1],
+                },
+            )]),
+        },
+    ];
+
+    for (i, patch_request) in patch_requests.iter().enumerate() {
+        match setup.fun_client.patch(patch_request.clone()).await {
+            Ok(_) => {}
+            Err(err) => {
+                panic!("{}", err);
+            }
+        };
+        if let (node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut setup.nodes).await {
+            assert_eq!(node_id, nodes_assigned[i]);
+            assert_eq!(patch_request.function_id, pids[i]);
+        } else {
+            panic!("wrong event received");
+        }
+    }
+
+    // Ask to migrate function f1 to node to which it is already assigned
+    // and then to the other node.
+    let old_node = nodes_assigned[1];
+
+    let mut another_node = old_node;
+    for node_id in setup.nodes.keys() {
+        if *node_id != old_node {
+            another_node = *node_id
+        }
+    }
+    assert_ne!(another_node, old_node);
+
+    let new_nodes = vec![nodes_assigned[1], another_node];
+
+    for new_node in new_nodes {
+        setup
+            .proxy
+            .lock()
+            .await
+            .add_deploy_intents(vec![deploy_intent::DeployIntent::Migrate(lids[1], vec![new_node])]);
+
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
+        let _ = setup.orc_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
+        let _ = reply_receiver.await;
+
+        let mut num_patches = 0;
+        for _ in 0..5 {
+            let (node_id, event) = wait_for_event_multiple(&mut setup.nodes).await;
+            match event {
+                MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd)) => {
+                    assert_eq!("fc-1", spawn_req_rcvd.code.function_class_id);
+                    assert_eq!(new_node, node_id);
+                }
+                MockAgentEvent::StopFunction(_new_instance_id) => {
+                    assert_eq!(old_node, node_id);
+                }
+                MockAgentEvent::PatchFunction(_patch_request) => {
+                    num_patches += 1;
+                }
+                _ => panic!("unexpected event"),
+            }
+        }
+        assert_eq!(3, num_patches);
+
+        no_function_event(&mut setup.nodes).await;
+    }
+}
+
+#[tokio::test]
+async fn test_orc_reset() {
     let num_nodes = 3;
     let num_workflows = 100;
-    let (mut fun_client, mut res_client, mut nodes, _stable_node_id, _, mut orc_sender) = test_setup(num_nodes, 1).await;
-    assert_eq!(num_nodes, nodes.len() as u32);
+    let mut setup = setup(num_nodes, 1).await;
+    assert_eq!(num_nodes, setup.nodes.len() as u32);
 
     // Start 10 workflows:
     //
@@ -1367,21 +1521,21 @@ async fn orc_reset() {
     for _wf_id in 0..num_workflows {
         // Start f1
         let spawn_req = make_spawn_function_request("f1");
-        let lid_1 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+        let lid_1 = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
             edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
             edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         };
 
         // Start f2
         let spawn_req = make_spawn_function_request("f2");
-        let lid_2 = match fun_client.start(spawn_req.clone()).await.unwrap() {
+        let lid_2 = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
             edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
             edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         };
 
         // Start r1
         let start_req = make_start_resource_request("rc-1");
-        let lid_res = match res_client.start(start_req.clone()).await.unwrap() {
+        let lid_res = match setup.res_client.start(start_req.clone()).await.unwrap() {
             edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
             edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
         };
@@ -1395,7 +1549,8 @@ async fn orc_reset() {
                 function_id: lid_2,
             },
         );
-        fun_client
+        setup
+            .fun_client
             .patch(edgeless_api::common::PatchRequest {
                 function_id: lid_1,
                 output_mapping,
@@ -1412,7 +1567,8 @@ async fn orc_reset() {
                 function_id: lid_res,
             },
         );
-        fun_client
+        setup
+            .fun_client
             .patch(edgeless_api::common::PatchRequest {
                 function_id: lid_2,
                 output_mapping,
@@ -1422,14 +1578,14 @@ async fn orc_reset() {
     }
 
     // Make sure there are no pending events around.
-    clear_events(&mut nodes).await;
+    clear_events(&mut setup.nodes).await;
 
     // Send a Reset to the orchestrator.
-    let _ = orc_sender.send(OrchestratorRequest::Reset()).await;
+    let _ = setup.orc_sender.send(OrchestratorRequest::Reset()).await;
 
     // Disconnect the unstable
     let mut num_events = std::collections::HashMap::new();
-    while let Some((_node_id, event)) = wait_for_events_if_any(&mut nodes).await {
+    while let Some((_node_id, event)) = wait_for_events_if_any(&mut setup.nodes).await {
         *num_events.entry(event_to_string(&event)).or_insert(0) += 1;
     }
 
@@ -1441,15 +1597,15 @@ async fn orc_reset() {
     assert_eq!(expected_events, num_events);
 
     // Ensure that there's no pending event.
-    no_function_event(&mut nodes).await;
+    no_function_event(&mut setup.nodes).await;
 }
 
 #[tokio::test]
 #[serial_test::serial]
-async fn test_update_domain_capabilities() {
+async fn test_orc_update_domain_capabilities() {
     let num_nodes = 10;
     let num_resources = 5;
-    let (_fun_client, mut _res_client, _nodes, _stable_node_id, mut subscriber_receiver, _orc_sender) = test_setup(num_nodes, num_resources).await;
+    let mut setup = setup(num_nodes, num_resources).await;
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
@@ -1470,7 +1626,7 @@ async fn test_update_domain_capabilities() {
     }
     expected_caps.resource_classes.insert("rc-1".to_string());
     let mut last_caps = edgeless_api::domain_registration::DomainCapabilities::default();
-    while let Ok(event) = subscriber_receiver.try_next() {
+    while let Ok(event) = setup.subscriber_receiver.try_next() {
         match event {
             Some(event) => match event {
                 DomainSubscriberRequest::Update(actual_caps) => {
@@ -1491,7 +1647,7 @@ async fn test_update_domain_capabilities() {
 }
 
 #[test]
-fn test_deployment_requirements() {
+fn test_orc_deployment_requirements() {
     let no_reqs = DeploymentRequirements::none();
 
     let empty_annotations = std::collections::HashMap::new();
@@ -1521,121 +1677,7 @@ fn test_deployment_requirements() {
 }
 
 #[test]
-fn test_orchestration_logic_is_node_feasible() {
-    let node_id = uuid::Uuid::new_v4();
-    let mut reqs = DeploymentRequirements::none();
-    let mut caps = edgeless_api::node_registration::NodeCapabilities::minimum();
-    let mut providers = std::collections::HashSet::new();
-    let mut runtime = "RUST_WASM".to_string();
-
-    // Empty requirements
-    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    // Match any node_id
-    reqs.node_id_match_any.push(node_id);
-    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    reqs.node_id_match_any.push(uuid::Uuid::new_v4());
-    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    reqs.node_id_match_any.clear();
-    reqs.node_id_match_any.push(uuid::Uuid::new_v4());
-    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-    reqs.node_id_match_any.clear();
-
-    // Match all labels
-    reqs.label_match_all.push("red".to_string());
-    caps.labels.push("green".to_string());
-    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    caps.labels.push("red".to_string());
-    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    reqs.label_match_all.push("blue".to_string());
-    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    caps.labels.push("blue".to_string());
-    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    // Match all providers
-    reqs.resource_match_all.push("file-1".to_string());
-    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    providers.insert("file-1".to_string());
-    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    providers.insert("file-2".to_string());
-    providers.insert("file-3".to_string());
-    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    reqs.resource_match_all.push("file-9".to_string());
-    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    providers.insert("file-9".to_string());
-    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    // Match TEE and TPM
-    reqs.tee = AffinityLevel::Required;
-    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-    caps.is_tee_running = true;
-    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    reqs.tpm = AffinityLevel::Required;
-    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-    caps.has_tpm = true;
-    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-
-    // Match runtime
-    runtime = "CONTAINER".to_string();
-    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-    runtime = "".to_string();
-    assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-    runtime = "RUST_WASM".to_string();
-    assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-        &runtime, &reqs, &node_id, &caps, &providers
-    ));
-}
-
-#[test]
-fn test_orchestration_feasible_nodes() {
+fn test_orc_feasible_nodes() {
     let mut logic = crate::orchestration_logic::OrchestrationLogic::new(crate::OrchestrationStrategy::Random);
 
     // No nodes
@@ -1647,7 +1689,7 @@ fn test_orchestration_feasible_nodes() {
         .is_empty());
 
     // Add nodes
-    let (nodes, mut client_descs_resources, _stable_node_id) = test_create_clients_resources(5, 0);
+    let (nodes, mut client_descs_resources, _stable_node_id) = create_clients_resources(5, 0);
 
     let mut client_descs = std::collections::HashMap::new();
     for node_id in nodes.keys() {
