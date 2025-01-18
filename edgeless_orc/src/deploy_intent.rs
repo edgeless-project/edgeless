@@ -4,6 +4,7 @@
 use std::str::FromStr;
 
 /// Intent to update/change deployment.
+#[derive(Clone)]
 pub enum DeployIntent {
     /// The component with givel logical identifier should be migrated to
     /// the given target nodes, if possible.
