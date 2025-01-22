@@ -7,7 +7,9 @@ use edgeless_http::*;
 struct HttpReadParameters;
 
 impl EdgeFunction for HttpReadParameters {
-    fn handle_cast(_src: InstanceId, _encoded_message: &[u8]) {}
+    fn handle_cast(_src: InstanceId, _encoded_message: &[u8]) {
+        log::info!("http_read_parameters cast");
+    }
 
     fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
         let str_message = core::str::from_utf8(encoded_message).unwrap();
