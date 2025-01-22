@@ -6,7 +6,7 @@
                 "id": "http_read_parameters",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./http_read_parameters/http_read_parameters.wasm",
+                "code": "../../functions/http_read_parameters/http_read_parameters.wasm",
                 "outputs": [
                     "parameters"
                 ]
@@ -22,7 +22,7 @@
                 "id": "work_splitter",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./work_splitter/work_splitter.wasm",
+                "code": "../../functions/work_splitter/work_splitter.wasm",
                 "outputs": [
                     "chunk-metadata",
                     "chunkinfo"
@@ -40,7 +40,7 @@
                 "id": "calculator",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./calculator/calculator.wasm",
+                "code": "../../functions/calculator/calculator.wasm",
                 "outputs": [
                     "chunk-0-data"
                 ]
