@@ -18,7 +18,9 @@ This workflow calculates a mandelbrot set image and stores the rendered data in 
 
 The example creates the following chain:
 
-- an HTTP ingress that waits for an external source to POST a message whose body contains calculation parameters
+- an HTTP ingress that waits for an external source to POST a message whose body
+  contains calculation parameters
+- a function `http_read_parameters` that 
 - a function `work_splitter` that ...
 - a function `calculator` that ...
 - an HTTP egress that sends the received message to an external sink

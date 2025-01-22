@@ -8,18 +8,20 @@ lto = true
 opt-level = "s"
 
 [package]
-name = "edgeless_fractal_demo_work_splitter"
+name = "edgeless_fractal_demo_http_read_parameters"
 version = "0.1.0"
-authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "steffen.gerhold.@siemens.com"]
+authors = [
+    "Claudio Cicconetti <c.cicconetti@iit.cnr.it>",
+    "steffen.gerhold@siemens.com",
+]
 edition = "2021"
 
 [lib]
-name = "edgeless_fractal_demo_work_splitter"
+name = "edgeless_fractal_demo_http_read_parameters"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-edgeless_function = { path = "../../../edgeless_function" }
-serde = {version="1", features=["derive"] }
-serde_json = "1"
+edgeless_function = { path = "../../edgeless_function" }
+edgeless_http = { path = "../../edgeless_http" }
 log = "0.4"
