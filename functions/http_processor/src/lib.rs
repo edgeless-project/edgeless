@@ -13,6 +13,7 @@ impl EdgeFunction for ProcesorFun {
 
     fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
         let str_message = core::str::from_utf8(encoded_message).unwrap();
+        log::error!("Hello???");
         log::info!("HTTP_Processor: 'Call' called, MSG: {}", str_message);
         let req: EdgelessHTTPRequest = edgeless_http::request_from_string(str_message).unwrap();
 
@@ -34,6 +35,7 @@ impl EdgeFunction for ProcesorFun {
     }
 
     fn handle_init(_payload: Option<&[u8]>, serialized_state: Option<&[u8]>) {
+        edgeless_function::init_logger();
         log::info!("HTTP_Processor: 'Init' called");
     }
 
