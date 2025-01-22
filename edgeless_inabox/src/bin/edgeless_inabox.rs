@@ -166,7 +166,7 @@ fn generate_configs(
             },
             telemetry: EdgelessNodeTelemetrySettings {
                 metrics_url: next_url(false),
-                log_level: Some(String::default()),
+                log_level: Some(String::from("info")),
                 performance_samples: false,
             },
             wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
@@ -221,7 +221,7 @@ fn generate_configs(
             },
             telemetry: EdgelessNodeTelemetrySettings {
                 metrics_url: next_url(false),
-                log_level: Some(String::default()),
+                log_level: Some(String::from("info")),
                 performance_samples: false,
             },
             wasm_runtime: None,

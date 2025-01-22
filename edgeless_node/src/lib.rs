@@ -706,7 +706,7 @@ pub fn edgeless_node_default_conf() -> String {
         },
         telemetry: EdgelessNodeTelemetrySettings {
             metrics_url: String::from("http://127.0.0.1:7007"),
-            log_level: Some(String::default()),
+            log_level: Some(String::from("info")),
             performance_samples: false,
         },
         wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
