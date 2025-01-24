@@ -154,55 +154,131 @@ impl OrchestratorTask {
 
     /// Deploy an instance to a new set of targets, if possible. No repatching.
     ///
+    /// If the component cannot be migrate to the target, then the current
+    /// component instances is not stopped.
+    ///
+    /// If the component is already allocated precisely on the same targets
+    /// the nothing happens.
+    ///
     /// * `lid` - The LID of the function/resource to be migrated.
     /// * `targets` - The set of nodes to which the instance has to be migrated.
-    async fn migrate(&mut self, lid: &edgeless_api::function_instance::ComponentId, targets: &Vec<edgeless_api::function_instance::NodeId>) {
-        let (spawn_req, instance_ids) = match self.active_instances.get(lid) {
+    ///
+    /// * Return the id of the node to which this instance has been migrated,
+    ///   in case of success.
+    async fn migrate(
+        &mut self,
+        lid: &edgeless_api::function_instance::ComponentId,
+        targets: &Vec<edgeless_api::function_instance::NodeId>,
+    ) -> anyhow::Result<uuid::Uuid> {
+        // Retrieve the origin logical IDs and:
+        // - if it's a function: the spawn request
+        // - if it's a resource: the specification
+        // One or the other must be set to some value.
+        let (spawn_req, resource_req, origin_instances) = match self.active_instances.get(lid) {
             Some(active_instance) => match active_instance {
-                crate::active_instance::ActiveInstance::Function(spawn_req, instance_ids) => (spawn_req.clone(), instance_ids.clone()),
-                crate::active_instance::ActiveInstance::Resource(_spec, origin) => {
-                    log::warn!(
-                        "Unsupported resource migration: ignoring request for LID {} to migrate from node_id {}",
-                        lid,
-                        origin.node_id
-                    );
-                    return;
+                crate::active_instance::ActiveInstance::Function(spawn_req, origin_instances) => {
+                    (Some(spawn_req.clone()), None, origin_instances.clone())
                 }
+                crate::active_instance::ActiveInstance::Resource(resource_spec, origin_lid) => (None, Some(resource_spec.clone()), vec![*origin_lid]),
             },
             None => {
-                log::warn!("Intent to migrate component LID {} that is not active: ignored", lid);
-                return;
+                anyhow::bail!("Intent to migrate component LID {} that is not active: ignored", lid);
             }
         };
 
-        // Stop all the function instances associated with this LID.
-        for instance_id in &instance_ids {
-            self.stop_function(instance_id).await;
-        }
+        assert!(spawn_req.is_some() ^ resource_req.is_some());
 
-        // Filter out the unfeasible targets.
-        let targets = self.orchestration_logic.feasible_nodes(&spawn_req, targets);
+        // Return immediately if the migration is requested to precisely the
+        // set of nodes to which the instance is already assigned.
+        let target_node_ids: std::collections::HashSet<&uuid::Uuid> = std::collections::HashSet::from_iter(targets.iter());
+        let origin_node_ids: std::collections::HashSet<&uuid::Uuid> =
+            std::collections::HashSet::from_iter(origin_instances.iter().map(|x| &x.node_id));
+        anyhow::ensure!(target_node_ids != origin_node_ids, "instance already running on the migration target(s)");
 
-        // Select one feasible target as the candidate one.
-        let target = targets.first();
-        let mut to_be_started = vec![];
-        if let Some(target) = target {
-            if targets.len() > 1 {
-                log::warn!(
-                    "Currently supporting only a single target node per component: choosing {}, the others will be ignored",
-                    target
-                );
+        // Do the migration of the function of resource.
+        if let Some(spawn_req) = spawn_req {
+            // Filter out the unfeasible targets.
+            let target_node_ids = self.orchestration_logic.feasible_nodes(&spawn_req, targets);
+
+            // Select one feasible target as the candidate one.
+            let target = target_node_ids.first();
+            let mut to_be_started = vec![];
+            if let Some(target) = target {
+                if target_node_ids.len() > 1 {
+                    log::warn!(
+                        "Currently supporting only a single target node per component: choosing {}, the others will be ignored",
+                        target
+                    );
+                }
+                to_be_started.push((spawn_req.clone(), *target));
+            } else {
+                anyhow::bail!("No (valid) target found for the migration of function LID {}", lid);
             }
-            to_be_started.push((spawn_req.clone(), *target));
+
+            // Stop all the function instances associated with this LID.
+            for origin_instance in &origin_instances {
+                self.stop_function(origin_instance).await;
+            }
+
+            // Remove the association of the component with origin instances.
+            // If the start below fails, then the function instance will remain
+            // associated with no instances.
+            if let Some(crate::active_instance::ActiveInstance::Function(_spawn_req, origin_instances)) = self.active_instances.get_mut(lid) {
+                origin_instances.clear();
+            }
+            self.active_instances_changed = true;
+
+            // Start the new function instances.
+            assert_eq!(1, to_be_started.len());
+            for (spawn_request, node_id) in to_be_started {
+                if let Err(err) = self.start_function_in_node(&spawn_request, lid, &node_id).await {
+                    // TODO: if migration to multiple instances is supported,
+                    // then we should choose how to consider the case of a
+                    // function start failing while others succeed:
+                    // - if this is considered a failure, then the function
+                    // instances already started should be stopped (rollback)
+                    // - otherwise, an Ok must be returned instead of an Err
+                    anyhow::bail!("Error when migrating function LID {} to node_id {}: {}", lid, node_id, err);
+                }
+            }
+            Ok(*target.expect("impossible: the target node must have a value"))
+        } else if let Some(resource_req) = resource_req {
+            assert!(origin_instances.len() <= 1);
+
+            // Try to allocate the resource on the given node.
+            if let Some(target_node_id) = targets.first() {
+                if self.is_node_feasible_for_resource(&resource_req, target_node_id) {
+                    // Stop the resource instances associated with this LID, if any.
+                    for origin_lid in &origin_instances {
+                        self.stop_resource(origin_lid).await;
+                    }
+
+                    // Remove the association of the component with origin instances.
+                    // If the start below fails, then the function instance will remain
+                    // associated with no instances.
+                    if let Some(crate::active_instance::ActiveInstance::Resource(_resource_req, origin_instance)) = self.active_instances.get_mut(lid)
+                    {
+                        *origin_instance = edgeless_api::function_instance::InstanceId::none();
+                    }
+                    self.active_instances_changed = true;
+
+                    if let Err(err) = self.start_resource_in_node(resource_req, lid, target_node_id).await {
+                        anyhow::bail!("Error when migrating resource LID {} to node_id {}: {}", lid, target_node_id, err);
+                    } else {
+                        Ok(*target_node_id)
+                    }
+                } else {
+                    anyhow::bail!(
+                        "Request to migrate resource '{}' to node_id '{}', which does not have matching resource providers",
+                        lid,
+                        target_node_id
+                    );
+                }
+            } else {
+                anyhow::bail!("Request to migrate resource '{}' to a null target", lid);
+            }
         } else {
-            log::warn!("No (valid) target found for the migration of function LID {}", lid);
-        }
-
-        for (spawn_request, node_id) in to_be_started {
-            match self.start_function_in_node(&spawn_request, lid, &node_id).await {
-                Ok(_) => {}
-                Err(err) => log::error!("Error when migrating function LID {} to node_id {}: {}", lid, node_id, err),
-            }
+            panic!("the impossible happened, this branch should never be reached")
         }
     }
 
@@ -297,79 +373,59 @@ impl OrchestratorTask {
     /// updated, i.e., it is as if the request to create the
     /// resource has never been issued.
     ///
-    /// * `start_req` - The specifications of the resource.
+    /// * `resource_req` - The specifications of the resource.
     /// * `lid` - The logical identifier of the resource.
     async fn start_resource(
         &mut self,
-        start_req: edgeless_api::resource_configuration::ResourceInstanceSpecification,
+        resource_req: edgeless_api::resource_configuration::ResourceInstanceSpecification,
         lid: uuid::Uuid,
     ) -> Result<edgeless_api::common::StartComponentResponse<uuid::Uuid>, anyhow::Error> {
         // Find all resource providers that can start this resource.
-        let matching_providers = self
-            .resource_providers
-            .iter()
-            .filter_map(|(id, p)| if p.class_type == start_req.class_type { Some(id.clone()) } else { None })
-            .collect::<Vec<String>>();
+        let matching_providers = self.feasible_providers(&resource_req);
 
         // Select one provider at random.
         match matching_providers.choose(&mut self.rng) {
             Some(provider_id) => {
-                let resource_provider = self.resource_providers.get_mut(provider_id).unwrap();
-                match self.nodes.get_mut(&resource_provider.node_id) {
-                    Some(client) => match client
-                        .api
-                        .resource_configuration_api()
-                        .start(edgeless_api::resource_configuration::ResourceInstanceSpecification {
-                            class_type: resource_provider.class_type.clone(),
-                            configuration: start_req.configuration.clone(),
-                            workflow_id: start_req.workflow_id.clone(),
-                        })
-                        .await
-                    {
-                        Ok(start_response) => match start_response {
-                            edgeless_api::common::StartComponentResponse::InstanceId(instance_id) => {
-                                assert!(resource_provider.node_id == instance_id.node_id);
-                                self.active_instances.insert(
-                                    lid,
-                                    crate::active_instance::ActiveInstance::Resource(
-                                        start_req,
-                                        edgeless_api::function_instance::InstanceId {
-                                            node_id: resource_provider.node_id,
-                                            function_id: instance_id.function_id,
-                                        },
-                                    ),
-                                );
-                                self.active_instances_changed = true;
-                                log::info!(
-                                    "Started resource provider_id {}, node_id {}, lid {}, pid {}",
-                                    provider_id,
-                                    resource_provider.node_id,
-                                    &lid,
-                                    instance_id.function_id
-                                );
-                                Ok(edgeless_api::common::StartComponentResponse::InstanceId(lid))
-                            }
-                            edgeless_api::common::StartComponentResponse::ResponseError(err) => {
-                                Ok(edgeless_api::common::StartComponentResponse::ResponseError(err))
-                            }
-                        },
-                        Err(err) => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
-                            edgeless_api::common::ResponseError {
-                                summary: "could not start resource".to_string(),
-                                detail: Some(err.to_string()),
-                            },
-                        )),
-                    },
-                    None => Err(anyhow::anyhow!("Resource Client Missing")),
-                }
+                let resource_provider = self.resource_providers.get(provider_id).unwrap();
+                let node_id = resource_provider.node_id;
+                self.start_resource_in_node(resource_req, &lid, &node_id).await
             }
             None => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                 edgeless_api::common::ResponseError {
                     summary: "class type not found".to_string(),
-                    detail: Some(format!("class_type: {}", start_req.class_type)),
+                    detail: Some(format!("class_type: {}", resource_req.class_type)),
                 },
             )),
         }
+    }
+
+    /// Return the list of resource providers that are feasible for the given
+    /// resource specification.
+    fn feasible_providers(&self, resource_req: &edgeless_api::resource_configuration::ResourceInstanceSpecification) -> Vec<String> {
+        self.resource_providers
+            .iter()
+            .filter_map(|(provider_id, provider)| {
+                if provider.class_type == resource_req.class_type {
+                    Some(provider_id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<String>>()
+    }
+
+    // Return true if the given resource can be created on this node.
+    fn is_node_feasible_for_resource(
+        &self,
+        resource_req: &edgeless_api::resource_configuration::ResourceInstanceSpecification,
+        node_id: &edgeless_api::function_instance::NodeId,
+    ) -> bool {
+        for provider in self.resource_providers.values() {
+            if resource_req.class_type == provider.class_type && *node_id == provider.node_id {
+                return true;
+            }
+        }
+        false
     }
 
     /// Select the node to which to deploy a given function instance.
@@ -522,6 +578,61 @@ impl OrchestratorTask {
                 log::error!("Unhandled: {}", err);
                 Err(anyhow::anyhow!("Could not start a function instance for LID {}: {}", lid, err))
             }
+        }
+    }
+
+    /// Start a new resource instance on a specific node/resource provider.
+    ///
+    /// If the operation fails, then active_instances is not
+    /// updated, i.e., it is as if the request to start the
+    /// resource has never been issued.
+    ///
+    /// * `resource_spec` - The specifications of the function.
+    /// * `lid` - The logical identifier of the function.
+    /// * `node_id` - The node hosting the given resource provider.
+    async fn start_resource_in_node(
+        &mut self,
+        resource_req: edgeless_api::resource_configuration::ResourceInstanceSpecification,
+        lid: &uuid::Uuid,
+        node_id: &edgeless_api::function_instance::NodeId,
+    ) -> Result<edgeless_api::common::StartComponentResponse<uuid::Uuid>, anyhow::Error> {
+        let class_type = resource_req.class_type.clone();
+        match self.nodes.get_mut(node_id) {
+            Some(client) => match client.api.resource_configuration_api().start(resource_req.clone()).await {
+                Ok(start_response) => match start_response {
+                    edgeless_api::common::StartComponentResponse::InstanceId(instance_id) => {
+                        self.active_instances.insert(
+                            *lid,
+                            crate::active_instance::ActiveInstance::Resource(
+                                resource_req,
+                                edgeless_api::function_instance::InstanceId {
+                                    node_id: *node_id,
+                                    function_id: instance_id.function_id,
+                                },
+                            ),
+                        );
+                        self.active_instances_changed = true;
+                        log::info!(
+                            "Started resource type {}, node_id {}, lid {}, pid {}",
+                            class_type,
+                            node_id,
+                            &lid,
+                            instance_id.function_id
+                        );
+                        Ok(edgeless_api::common::StartComponentResponse::InstanceId(*lid))
+                    }
+                    edgeless_api::common::StartComponentResponse::ResponseError(err) => {
+                        Ok(edgeless_api::common::StartComponentResponse::ResponseError(err))
+                    }
+                },
+                Err(err) => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
+                    edgeless_api::common::ResponseError {
+                        summary: "could not start resource".to_string(),
+                        detail: Some(format!("resource type {}, node_id {}, lid {}: {}", class_type, node_id, &lid, err)),
+                    },
+                )),
+            },
+            None => Err(anyhow::anyhow!("Resource client missing for node_id {}", node_id)),
         }
     }
 
@@ -925,15 +1036,21 @@ impl OrchestratorTask {
         for intent in deploy_intents {
             match intent {
                 crate::deploy_intent::DeployIntent::Migrate(lid, targets) => {
-                    self.migrate(&lid, &targets).await;
+                    match self.migrate(&lid, &targets).await {
+                        Err(err) => log::warn!("Request to migrate '{}' declined: {}", lid, err),
+                        Ok(target_node_id) => {
+                            // Migration was successful.
+                            log::info!("Request to migrate '{}' accepted, now running in '{}'", lid, target_node_id);
 
-                    // Repatch the component migrated.
-                    to_be_repatched.push(lid);
+                            // Repatch the component migrated.
+                            to_be_repatched.push(lid);
 
-                    // Repatch all the component that depend on it.
-                    for (origin_lid, output_mapping) in self.dependency_graph.iter() {
-                        if output_mapping.values().contains(&lid) {
-                            to_be_repatched.push(*origin_lid);
+                            // Repatch all the component that depend on it.
+                            for (origin_lid, output_mapping) in self.dependency_graph.iter() {
+                                if output_mapping.values().contains(&lid) {
+                                    to_be_repatched.push(*origin_lid);
+                                }
+                            }
                         }
                     }
                 }
