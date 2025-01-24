@@ -208,7 +208,7 @@ async fn main() -> anyhow::Result<()> {
                                         println!("OUT {} -> {}", out, next);
                                     }
                                     for (name, annotation) in res.configurations {
-                                        println!("CONF{} -> {}", name, annotation);
+                                        println!("CONF {} -> {}", name, annotation);
                                     }
                                 }
                                 println!("* mapping");
