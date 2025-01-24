@@ -1459,8 +1459,7 @@ async fn test_orc_migrate_function() {
         }
     }
 
-    // Ask to migrate function f1 to node to which it is already assigned
-    // and then to the other node.
+    // Ask to migrate function f1 to node to the other node.
     let old_node = nodes_assigned[1];
 
     let mut another_node = old_node;
@@ -1471,39 +1470,476 @@ async fn test_orc_migrate_function() {
     }
     assert_ne!(another_node, old_node);
 
-    let new_nodes = vec![nodes_assigned[1], another_node];
+    setup
+        .proxy
+        .lock()
+        .await
+        .add_deploy_intents(vec![deploy_intent::DeployIntent::Migrate(lids[1], vec![another_node])]);
 
-    for new_node in new_nodes {
-        setup
-            .proxy
-            .lock()
-            .await
-            .add_deploy_intents(vec![deploy_intent::DeployIntent::Migrate(lids[1], vec![new_node])]);
+    let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
+    let _ = setup.orc_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
+    let _ = reply_receiver.await;
 
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
-        let _ = setup.orc_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
-        let _ = reply_receiver.await;
+    let mut num_patches = 0;
+    for _ in 0..5 {
+        let (node_id, event) = wait_for_event_multiple(&mut setup.nodes).await;
+        match event {
+            MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd)) => {
+                assert_eq!("fc-1", spawn_req_rcvd.code.function_class_id);
+                assert_eq!(another_node, node_id);
+            }
+            MockAgentEvent::StopFunction(_new_instance_id) => {
+                assert_eq!(old_node, node_id);
+            }
+            MockAgentEvent::PatchFunction(_patch_request) => {
+                num_patches += 1;
+            }
+            _ => panic!("unexpected event"),
+        }
+    }
+    assert_eq!(3, num_patches);
 
-        let mut num_patches = 0;
-        for _ in 0..5 {
-            let (node_id, event) = wait_for_event_multiple(&mut setup.nodes).await;
-            match event {
-                MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd)) => {
-                    assert_eq!("fc-1", spawn_req_rcvd.code.function_class_id);
-                    assert_eq!(new_node, node_id);
+    no_function_event(&mut setup.nodes).await;
+}
+
+#[tokio::test]
+async fn test_orc_migrate_resource() {
+    let mut setup = setup(2, 1).await;
+
+    // Deploy the following workflow:
+    //
+    // r0 <--> r1 <--> r2
+
+    // Spawn the resource instances.
+    let mut lids = vec![];
+    let mut pids = vec![];
+    let mut nodes_assigned = vec![];
+    for _ in 0..=2 {
+        let resource_req = make_start_resource_request("rc-1");
+        lids.push(match setup.res_client.start(resource_req).await.unwrap() {
+            edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+            edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        });
+
+        if let (node_id, MockAgentEvent::StartResource((new_instance_id, _resource_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+            assert_eq!(node_id, new_instance_id.node_id);
+            nodes_assigned.push(node_id);
+            pids.push(new_instance_id.function_id);
+        } else {
+            panic!("wrong event received");
+        }
+    }
+
+    // Gotta patch 'em all.
+    let patch_requests = vec![
+        edgeless_api::common::PatchRequest {
+            function_id: lids[0],
+            output_mapping: std::collections::HashMap::from([(
+                "out-1".to_string(),
+                edgeless_api::function_instance::InstanceId {
+                    node_id: uuid::Uuid::nil(),
+                    function_id: lids[1],
+                },
+            )]),
+        },
+        edgeless_api::common::PatchRequest {
+            function_id: lids[1],
+            output_mapping: std::collections::HashMap::from([
+                (
+                    "out-1".to_string(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: lids[0],
+                    },
+                ),
+                (
+                    "out-2".to_string(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: lids[2],
+                    },
+                ),
+            ]),
+        },
+        edgeless_api::common::PatchRequest {
+            function_id: lids[2],
+            output_mapping: std::collections::HashMap::from([(
+                "out-1".to_string(),
+                edgeless_api::function_instance::InstanceId {
+                    node_id: uuid::Uuid::nil(),
+                    function_id: lids[1],
+                },
+            )]),
+        },
+    ];
+
+    for (i, patch_request) in patch_requests.iter().enumerate() {
+        match setup.fun_client.patch(patch_request.clone()).await {
+            Ok(_) => {}
+            Err(err) => {
+                panic!("{}", err);
+            }
+        };
+        if let (node_id, MockAgentEvent::PatchResource(patch_request)) = wait_for_event_multiple(&mut setup.nodes).await {
+            assert_eq!(node_id, nodes_assigned[i]);
+            assert_eq!(patch_request.function_id, pids[i]);
+        } else {
+            panic!("wrong event received");
+        }
+    }
+
+    // Ask to migrate resource r1 to the other node.
+    let old_node = nodes_assigned[1];
+
+    let mut another_node = old_node;
+    for node_id in setup.nodes.keys() {
+        if *node_id != old_node {
+            another_node = *node_id
+        }
+    }
+    assert_ne!(another_node, old_node);
+
+    setup
+        .proxy
+        .lock()
+        .await
+        .add_deploy_intents(vec![deploy_intent::DeployIntent::Migrate(lids[1], vec![another_node])]);
+
+    let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
+    let _ = setup.orc_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
+    let _ = reply_receiver.await;
+
+    let mut num_patches = 0;
+    for _ in 0..5 {
+        let (node_id, event) = wait_for_event_multiple(&mut setup.nodes).await;
+        match event {
+            MockAgentEvent::StartResource((_new_instance_id, resource_req_rcvd)) => {
+                assert_eq!("rc-1", resource_req_rcvd.class_type);
+                assert_eq!(another_node, node_id);
+            }
+            MockAgentEvent::StopResource(_new_instance_id) => {
+                assert_eq!(old_node, node_id);
+            }
+            MockAgentEvent::PatchResource(_patch_request) => {
+                num_patches += 1;
+            }
+            _ => panic!("unexpected event"),
+        }
+    }
+    assert_eq!(3, num_patches);
+
+    no_function_event(&mut setup.nodes).await;
+}
+
+#[tokio::test]
+async fn test_orc_invalid_migration() {
+    // Deploy the following workflow:
+    //
+    // f0 <--> f1 <--> f2 <--> r0 <--> r1 <--> r2
+    //
+    // Two nodes:
+    // - one node has a suitable function run-time and resource
+    // - another node does not have them
+    //
+    // In this test we try to migrate to the node with insufficient resources
+
+    // Setup nodes
+
+    let mut nodes = std::collections::HashMap::new();
+    let mut client_descs_resources = std::collections::HashMap::new();
+    let mut node_ids = vec![];
+    for i in 0..=1 {
+        let (mock_node_sender, mock_node_receiver) = futures::channel::mpsc::unbounded::<MockAgentEvent>();
+        let node_id = uuid::Uuid::new_v4();
+        node_ids.push(node_id);
+        let mut capabilities = edgeless_api::node_registration::NodeCapabilities::minimum();
+        if i == 1 {
+            capabilities.runtimes.clear();
+        }
+        nodes.insert(node_id, mock_node_receiver);
+
+        let client_desc = crate::client_desc::ClientDesc {
+            agent_url: "".to_string(),
+            invocation_url: "".to_string(),
+            api: Box::new(MockNode {
+                node_id,
+                sender: mock_node_sender,
+            }) as Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
+            capabilities,
+        };
+
+        let mut resources = vec![];
+        if i == 0 {
+            resources.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id: "provider-1".to_string(),
+                class_type: "rc-1".to_string(),
+                outputs: vec![],
+            });
+        }
+
+        client_descs_resources.insert(node_id, (client_desc, resources));
+    }
+    assert_eq!(2, nodes.len());
+    assert_eq!(2, client_descs_resources.len());
+
+    let good_node_id = *node_ids.first().unwrap();
+    let bad_node_id = *node_ids.last().unwrap();
+
+    let (subscriber_sender, _subscriber_receiver) = futures::channel::mpsc::unbounded();
+
+    let proxy = std::sync::Arc::new(tokio::sync::Mutex::new(proxy_test::ProxyTest::default()));
+    let (mut orchestrator, orchestrator_task, _refresh_task) = Orchestrator::new(
+        crate::EdgelessOrcBaselineSettings {
+            orchestration_strategy: crate::OrchestrationStrategy::Random,
+        },
+        proxy.clone(),
+        subscriber_sender,
+    )
+    .await;
+    tokio::spawn(orchestrator_task);
+
+    let mut orchestrator_sender = orchestrator.get_sender();
+    for (node_id, (client_desc, resources)) in client_descs_resources {
+        let _ = orchestrator_sender
+            .send(crate::orchestrator::OrchestratorRequest::AddNode(node_id, client_desc, resources))
+            .await;
+    }
+
+    let mut fun_client = orchestrator.get_api_client().function_instance_api();
+    let mut res_client = orchestrator.get_api_client().resource_configuration_api();
+    let mut orc_sender = orchestrator.get_sender();
+
+    clear_events(&mut nodes).await;
+
+    // Spawn the function instances.
+    let mut function_lids = vec![];
+    let mut function_pids = vec![];
+    let mut function_nodes = vec![];
+    for i in 0..=2 {
+        let spawn_req = make_spawn_function_request(format!("fc-{}", i).as_str());
+        function_lids.push(match fun_client.start(spawn_req.clone()).await.unwrap() {
+            edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+            edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        });
+
+        if let (node_id, MockAgentEvent::StartFunction((new_instance_id, _spawn_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+            assert_eq!(node_id, new_instance_id.node_id);
+            function_nodes.push(node_id);
+            function_pids.push(new_instance_id.function_id);
+        } else {
+            panic!("wrong event received");
+        }
+    }
+    for assigned in function_nodes {
+        assert_eq!(good_node_id, assigned);
+    }
+
+    // Spawn the resource instances.
+    let mut resource_lids = vec![];
+    let mut resource_pids = vec![];
+    let mut resource_nodes = vec![];
+    for _ in 0..=2 {
+        let resource_req = make_start_resource_request("rc-1");
+        resource_lids.push(match res_client.start(resource_req).await.unwrap() {
+            edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+            edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+        });
+
+        if let (node_id, MockAgentEvent::StartResource((new_instance_id, _resource_req_rcvd))) = wait_for_event_multiple(&mut nodes).await {
+            assert_eq!(node_id, new_instance_id.node_id);
+            resource_nodes.push(node_id);
+            resource_pids.push(new_instance_id.function_id);
+        } else {
+            panic!("wrong event received");
+        }
+    }
+    for assigned in resource_nodes {
+        assert_eq!(good_node_id, assigned);
+    }
+
+    // Gotta patch 'em all.
+    let patch_requests = vec![
+        edgeless_api::common::PatchRequest {
+            function_id: function_lids[0],
+            output_mapping: std::collections::HashMap::from([(
+                "out-1".to_string(),
+                edgeless_api::function_instance::InstanceId {
+                    node_id: uuid::Uuid::nil(),
+                    function_id: function_lids[1],
+                },
+            )]),
+        },
+        edgeless_api::common::PatchRequest {
+            function_id: function_lids[1],
+            output_mapping: std::collections::HashMap::from([
+                (
+                    "out-1".to_string(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: function_lids[0],
+                    },
+                ),
+                (
+                    "out-2".to_string(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: function_lids[2],
+                    },
+                ),
+            ]),
+        },
+        edgeless_api::common::PatchRequest {
+            function_id: function_lids[2],
+            output_mapping: std::collections::HashMap::from([
+                (
+                    "out-1".to_string(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: function_lids[1],
+                    },
+                ),
+                (
+                    "out-2".to_string(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: resource_lids[0],
+                    },
+                ),
+            ]),
+        },
+        edgeless_api::common::PatchRequest {
+            function_id: resource_lids[0],
+            output_mapping: std::collections::HashMap::from([
+                (
+                    "out-1".to_string(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: function_lids[2],
+                    },
+                ),
+                (
+                    "out-2".to_string(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: resource_lids[1],
+                    },
+                ),
+            ]),
+        },
+        edgeless_api::common::PatchRequest {
+            function_id: resource_lids[1],
+            output_mapping: std::collections::HashMap::from([
+                (
+                    "out-1".to_string(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: resource_lids[0],
+                    },
+                ),
+                (
+                    "out-2".to_string(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: resource_lids[2],
+                    },
+                ),
+            ]),
+        },
+        edgeless_api::common::PatchRequest {
+            function_id: resource_lids[2],
+            output_mapping: std::collections::HashMap::from([(
+                "out-1".to_string(),
+                edgeless_api::function_instance::InstanceId {
+                    node_id: uuid::Uuid::nil(),
+                    function_id: resource_lids[1],
+                },
+            )]),
+        },
+    ];
+    assert_eq!(6, patch_requests.len());
+
+    for (i, patch_request) in patch_requests.iter().enumerate() {
+        if i < 3 {
+            match fun_client.patch(patch_request.clone()).await {
+                Ok(_) => {}
+                Err(err) => {
+                    panic!("{}", err);
                 }
-                MockAgentEvent::StopFunction(_new_instance_id) => {
-                    assert_eq!(old_node, node_id);
+            };
+            if let (node_id, MockAgentEvent::PatchFunction(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+                assert_eq!(good_node_id, node_id);
+                assert_eq!(patch_request.function_id, function_pids[i]);
+            } else {
+                panic!("wrong event received");
+            }
+        } else {
+            match res_client.patch(patch_request.clone()).await {
+                Ok(_) => {}
+                Err(err) => {
+                    panic!("{}", err);
                 }
-                MockAgentEvent::PatchFunction(_patch_request) => {
-                    num_patches += 1;
-                }
-                _ => panic!("unexpected event"),
+            };
+            if let (node_id, MockAgentEvent::PatchResource(patch_request)) = wait_for_event_multiple(&mut nodes).await {
+                assert_eq!(good_node_id, node_id);
+                assert_eq!(patch_request.function_id, resource_pids[i - 3]);
+            } else {
+                panic!("wrong event received");
             }
         }
-        assert_eq!(3, num_patches);
+    }
 
-        no_function_event(&mut setup.nodes).await;
+    // Migrate functions to the good node.
+    for function_lid in &function_lids {
+        proxy
+            .lock()
+            .await
+            .add_deploy_intents(vec![deploy_intent::DeployIntent::Migrate(*function_lid, vec![good_node_id])]);
+
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
+        let _ = orc_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
+        let _ = reply_receiver.await;
+
+        no_function_event(&mut nodes).await;
+    }
+
+    // Migrate resources to the good node.
+    for resource_lid in &resource_lids {
+        proxy
+            .lock()
+            .await
+            .add_deploy_intents(vec![deploy_intent::DeployIntent::Migrate(*resource_lid, vec![good_node_id])]);
+
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
+        let _ = orc_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
+        let _ = reply_receiver.await;
+        no_function_event(&mut nodes).await;
+    }
+
+    // Migrate functions to the bad node.
+    for function_lid in &function_lids {
+        proxy
+            .lock()
+            .await
+            .add_deploy_intents(vec![deploy_intent::DeployIntent::Migrate(*function_lid, vec![bad_node_id])]);
+
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
+        let _ = orc_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
+        let _ = reply_receiver.await;
+
+        no_function_event(&mut nodes).await;
+    }
+
+    // Migrate resources to the bad node.
+    for resource_lid in &resource_lids {
+        proxy
+            .lock()
+            .await
+            .add_deploy_intents(vec![deploy_intent::DeployIntent::Migrate(*resource_lid, vec![bad_node_id])]);
+
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
+        let _ = orc_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
+        let _ = reply_receiver.await;
+        no_function_event(&mut nodes).await;
     }
 }
 
