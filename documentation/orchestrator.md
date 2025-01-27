@@ -35,3 +35,46 @@ The ε-ORC has the following interfaces, also illustrated in the diagram below:
 | NodeRegistration      | `node_register_url`    |
 
 ![](diagrams-orc.png)
+
+## Proxy
+
+When used, the ε-ORC mirrors its internal data structures on the proxy.
+
+Currently, we only support Redis, which is enabled by means of the following
+section in `orchestrator.toml`: 
+
+```ini
+[proxy]
+proxy_type = "Redis"
+redis_url = "redis://127.0.0.1:6379"
+```
+
+_The Redis database is flushed automatically by the ε-ORC when it starts._
+
+We provide a command-line interface, called `proxy_cli`, which can be used
+as a convenient alternative to reading directly from the Redis database.
+
+### Schema
+
+| Key                                       | Value                                                                                                                                                                                                                        | Data type                              |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| domain_info:domain_id                     | Identifier of the domain managed by this ε-ORC                                                                                                                                                                               | `String`                               |
+| nodes:capabilities:`node_id`              | JSON object representing the capabilities of the node with given node identifier                                                                                                                                             | `NodeCapabilities`                     |
+| node:health:`node_id`                     | JSON object representing the health status of the node with given node identifier                                                                                                                                            | `NodeHealthStatus`                     |
+| performance:function_execution_time:`pid` | List of function execution times of the function with the given Physical Identifier, in fractional seconds, each associated with a timestamp with a millisecond resolution taken by the ε-ORC (format `exec_time,timestamp`) | `NodePerformanceSamples`               |
+| provider:`provider_id`                    | JSON object representing the configuration of the resource provider with given identifier                                                                                                                                    | `ResourceProvider`                     |
+| instance:`lid`                            | JSON object including the annotations of the function with given Logical identifier and the currently active instances (each with node identifier and physical function identifier)                                          | `ActiveInstance`                       |
+| dependency:`lid`                          | JSON object representing the dependencies of the function with given Logical identifier through a map of output channel names to logical function identifiers                                                                | `HashMap<Uuid, HashMap<String, Uuid>>` |
+|                                           |
+
+The following identifiers are represented in
+[UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier) format:
+
+- node's identifier (`node_id`)
+- logical function/resource instance identifier (`lid`)
+- physical function/resource instance identifier (`pid`)
+
+The following identifiers are represented as free-text strings:
+
+- domain identifier
+- provider identifier

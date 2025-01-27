@@ -51,12 +51,24 @@ The following diagram illustrates these mechanisms, which are described separate
 
 ## Delegated orchestration through a proxy
 
-This feature currently requires an external Redis in-memory database, which is used to:
+This feature requires:
 
-- mirror the internal data structures of the ε-ORC: these are updated periodically by ε-ORC and read by the delegated orchestrator to take its decisions, and
-- receive orchestration intents: once the delegated orchestrator has taken a decision it informs the ε-ORC by updating the in-memory database with its intents, which will be promptly enforced, if possible.
+- an external in-memory database, e.g., Redis;
+- the proxy feature enabled at the ε-ORC (see the
+  [orchestrator's doc](orchestrator.md) for more details).
 
-_The in-memory database is flushed by the ε-ORC when it starts._
+The proxy mirrors the internal data structures of the ε-ORC, so that an external
+component, called **delegated orchestrator**  can make its decisions on which
+function/resource instance should be executed on which node.
+
+Such decisions are implemented by submitting _migration intents_ from the
+delegated orchestrator to the ε-ORC through the proxy and they will be promptly
+enforced, if possible.
+If the migration is not feasible according to the deployment requirements,
+the intent will be ignored by the ε-ORC.
+For instance, if the latter receives a request to migrate a function instance
+for which only nodes running in a TEE are allowed to a node that is not running
+in a TEE, the ε-ORC will not enforce the intent.
 
 The Redis proxy is enabled by means of the following section in `orchestrator.toml`: 
 
@@ -66,32 +78,21 @@ proxy_type = "Redis"
 redis_url = "redis://127.0.0.1:6379"
 ```
 
-The ε-ORC internal status is serialized to Redis by means of the following entries:
-
-| Key                                      | Value                                                                                                                                                                                                                  | `struct`                               |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| nodes:capabilities:UUID                  | JSON object representing the capabilities of the node with given UUID                                                                                                                                                  | `NodeCapabilities`                     |
-| node:health:UUID                         | JSON object representing the health status of the node with given UUID                                                                                                                                                 | `NodeHealthStatus`                     |
-| performance:function_execution_time:UUID | List of function execution times of the function with the given physical UUID, in fractional seconds, each associated with a timestamp with a millisecond resolution taken by the ε-ORC (format `exec_time,timestamp`) | `NodePerformanceSamples`               |
-| provider:ID                              | JSON object representing the configuration of the resource provider with given ID                                                                                                                                      | `ResourceProvider`                     |
-| instance:UUID                            | JSON object including the annotations of the function with given logical UUID and the currently active instances (each with node identifier and physical function identifier)                                          | `ActiveInstance`                       |
-| dependency:UUID                          | JSON object representing the dependencies of the function with given logical UUID through a map of output channel names to logical function identifiers                                                                | `HashMap<Uuid, HashMap<String, Uuid>>` |
-|                                          |
-
-Currently, we only support one intent type, which allows the delegated orchestrator to migrate one function instance from its current node to another.
-Note that this operation must be feasible according to the deployment requirements, otherwise it will be ignored by the ε-ORC.
-For instance, if the latter receives a request to migrate a function instance for which only nodes running in a TEE are allowed to a node that is not running in a TEE, the ε-ORC will not enforce the intent.
-
-To migrate the function with logical identifier `FID` to the node with identifier `NODE`, the delegated orchestrator has two update two keys in the in-memory database:
+To migrate the function with logical identifier `FID` to the node with
+identifier `NODE` by operating manually through Redis, the delegated
+orchestrator has two update two keys in the in-memory database:
 
 1. Set the key `intent:migrate:FID` to `NODE`
 2. Append the key `intent:migrate:FID` to the list `intents`
 
-Multiple intents can be submitted at the same time: the ε-ORC will process them in order from head to tail.
+Multiple intents can be submitted at the same time: the ε-ORC will process them
+in order from head to tail.
 
-We provide a command-line interface, called `proxy_cli`, which can be used
-as a convenient alternative to manipulating directly the Redis database,
-as shown in the step-by-step example below.
+The command-line utility `proxy_cli` can be used as a convenient alternative:
+
+```shell
+proxy_cli intent migrate FID NODE
+```
 
 ## Node's telemetry
 

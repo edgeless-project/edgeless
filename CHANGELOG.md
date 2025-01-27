@@ -13,6 +13,7 @@ New features:
 - Add json-spec workflow type to edgeless_benchmark, which allows to create
   workflows based on a JSON template.
 - New WASM function dup: duplicates the cast payload over two output channels.
+- Add new proxy method to retrieve the domain identifier.
 
 Improvements:
 
