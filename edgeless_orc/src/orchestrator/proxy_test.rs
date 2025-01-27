@@ -19,8 +19,12 @@ impl crate::proxy::Proxy for ProxyTest {
     fn update_resource_providers(&mut self, _resource_providers: &std::collections::HashMap<String, crate::resource_provider::ResourceProvider>) {}
     fn update_active_instances(&mut self, _active_instances: &std::collections::HashMap<uuid::Uuid, crate::active_instance::ActiveInstance>) {}
     fn update_dependency_graph(&mut self, _dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>) {}
+    fn update_domain_info(&mut self, _domain_info: &crate::domain_info::DomainInfo) {}
     fn push_node_health(&mut self, _node_id: &uuid::Uuid, _node_health: edgeless_api::node_registration::NodeHealthStatus) {}
     fn push_performance_samples(&mut self, _node_id: &uuid::Uuid, _performance_samples: edgeless_api::node_registration::NodePerformanceSamples) {}
+    fn fetch_domain_info(&mut self) -> crate::domain_info::DomainInfo {
+        crate::domain_info::DomainInfo::default()
+    }
     fn fetch_node_capabilities(
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeCapabilities> {

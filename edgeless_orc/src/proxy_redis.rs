@@ -58,14 +58,15 @@ impl ProxyRedis {
             if flushdb { "flush DB" } else { "do not flush DB" }
         );
 
-        // create the connection with the Redis server
+        // Create the connection with the Redis server
         let mut connection = redis::Client::open(redis_url)?.get_connection()?;
 
+        // Flush the in-memory database upon construction
         if flushdb {
-            // flush the in-memory database upon construction
             let _ = redis::cmd("FLUSHDB").query::<String>(&mut connection)?;
         }
 
+        // Open dataset files
         let additional_fields = match &dataset_settings {
             Some(dataset_settings) => dataset_settings.additional_fields.clone(),
             None => "".to_string(),
@@ -387,6 +388,10 @@ impl super::proxy::Proxy for ProxyRedis {
         self.dependency_uuids = new_dependency_uuids;
     }
 
+    fn update_domain_info(&mut self, domain_info: &crate::domain_info::DomainInfo) {
+        let _ = self.connection.set::<&str, &str, usize>("domain_info:domain_id", &domain_info.domain_id);
+    }
+
     fn push_node_health(&mut self, node_id: &uuid::Uuid, node_health: edgeless_api::node_registration::NodeHealthStatus) {
         let timestamp = ProxyRedis::timestamp_now();
 
@@ -474,6 +479,14 @@ impl super::proxy::Proxy for ProxyRedis {
             }
         }
         intents
+    }
+
+    fn fetch_domain_info(&mut self) -> crate::domain_info::DomainInfo {
+        if let Ok(domain_id) = self.connection.get::<&str, String>("domain_info:domain_id") {
+            crate::domain_info::DomainInfo { domain_id }
+        } else {
+            crate::domain_info::DomainInfo::default()
+        }
     }
 
     fn fetch_node_capabilities(
@@ -978,6 +991,21 @@ mod test {
 
         assert_eq!(dependency_graph, redis_proxy.fetch_dependency_graph());
         assert!(!redis_proxy.updated(crate::proxy::Category::DependencyGraph));
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn test_redis_proxy_domain_info() {
+        let domain_info = crate::domain_info::DomainInfo {
+            domain_id: String::from("my-domain"),
+        };
+        let mut redis_proxy = match get_proxy() {
+            Some(redis_proxy) => redis_proxy,
+            None => return,
+        };
+        redis_proxy.update_domain_info(&domain_info);
+
+        assert_eq!(domain_info, redis_proxy.fetch_domain_info());
     }
 
     #[serial_test::serial]
