@@ -8,6 +8,7 @@ pub mod affinity_level;
 pub mod client_desc;
 pub mod deploy_intent;
 pub mod deployment_requirements;
+pub mod domain_info;
 pub mod domain_subscriber;
 pub mod node_register;
 pub mod node_register_client;
@@ -136,6 +137,9 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
 
     // Create the proxy.
     let proxy = make_proxy(settings.proxy);
+    proxy.lock().await.update_domain_info(&crate::domain_info::DomainInfo {
+        domain_id: settings.general.domain_id.to_string(),
+    });
 
     // Create the orchestrator.
     let (mut orchestrator, orchestrator_task, orchestrator_refresh_task) =

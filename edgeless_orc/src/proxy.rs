@@ -29,6 +29,9 @@ pub trait Proxy: Sync + Send {
     /// Update the dependency graph.
     fn update_dependency_graph(&mut self, dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>);
 
+    // Update the domain's info.
+    fn update_domain_info(&mut self, domain_info: &crate::domain_info::DomainInfo);
+
     /// Push node health status.
     fn push_node_health(&mut self, node_id: &uuid::Uuid, node_health: edgeless_api::node_registration::NodeHealthStatus);
 
@@ -40,6 +43,9 @@ pub trait Proxy: Sync + Send {
 
     /// Retrieve the pending deploy intents. Consume the intents retrieved.
     fn retrieve_deploy_intents(&mut self) -> Vec<crate::deploy_intent::DeployIntent>;
+
+    // Fetch the domain's info.
+    fn fetch_domain_info(&mut self) -> crate::domain_info::DomainInfo;
 
     /// Fetch the nodes' capabilities.
     fn fetch_node_capabilities(
