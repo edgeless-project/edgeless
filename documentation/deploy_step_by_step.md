@@ -6,7 +6,6 @@
     - [Deploying the orchestrator (ε-ORC)](#deploying-the-orchestrator-ε-orc)
     - [Deploying a node](#deploying-a-node)
   - [Building and executing a simple function](#building-and-executing-a-simple-function)
-  - [Where to go next](#where-to-go-next)
 
 # A step-by-step guide to deploying a minimal EDGELESS system
 
@@ -378,12 +377,3 @@ Finally, the workflow can be stopped with the following command:
 ```bash
 ./edgeless_cli workflow stop $UUID
 ```
-
-## Where to go next
-
-- [Repository layout](documentation/repository_layout.md)
-- [How to create a new function](documentation/rust_functions.md)
-  ([YouTube tutorial](https://youtu.be/1JnQIM9VTLk?si=o34YKRRJXNz0H54f))
-- [How to compose a new workflow](documentation/workflows.md)
-  ([YouTube tutorial](https://youtu.be/kc4Ku5p5Nrw?si=ZRxx0kmsIuAYLie1))
-- [Examples shipped with the repository](../examples/README.md)

@@ -1,7 +1,19 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use clap::Parser;
+use edgeless_node::resources::dda::DdaResourceSpec;
+use edgeless_node::resources::file_log::FileLogResourceSpec;
+use edgeless_node::resources::http_egress::HttpEgressResourceSpec;
+use edgeless_node::resources::http_ingress::HttpIngressResourceSpec;
+#[cfg(feature = "rdkafka")]
+use edgeless_node::resources::kafka_egress::KafkaEgressResourceSpec;
+use edgeless_node::resources::metrics_collector::MetricsCollectorResourceSpec;
+use edgeless_node::resources::ollama::OllamasResourceSpec;
+use edgeless_node::resources::redis::RedisResourceSpec;
+use edgeless_node::resources::resource_provider_specs::ResourceProviderSpecOutput;
+use edgeless_node::resources::resource_provider_specs::ResourceProviderSpecs;
 
 #[derive(Debug, clap::Parser)]
 #[command(long_about = None)]
@@ -10,6 +22,10 @@ struct Args {
     config_file: String,
     #[arg(short, long, default_value_t = String::from(""))]
     template: String,
+    #[arg(long, default_value_t = false)]
+    available_resources: bool,
+    #[arg(long, default_value_t = false)]
+    output_json: bool,
 }
 
 fn main() -> anyhow::Result<()> {
@@ -20,6 +36,47 @@ fn main() -> anyhow::Result<()> {
     // console_subscriber::init();
 
     let args = Args::parse();
+    if args.available_resources {
+        #[allow(unused_mut)]
+        let mut specs: Vec<Box<dyn ResourceProviderSpecs>> = vec![
+            Box::new(DdaResourceSpec {}),
+            Box::new(FileLogResourceSpec {}),
+            Box::new(HttpEgressResourceSpec {}),
+            Box::new(HttpIngressResourceSpec {}),
+            Box::new(OllamasResourceSpec {}),
+            Box::new(RedisResourceSpec {}),
+            Box::new(MetricsCollectorResourceSpec {}),
+        ];
+        #[cfg(feature = "rdkafka")]
+        specs.push(Box::new(KafkaEgressResourceSpec {}));
+
+        if args.output_json {
+            println!(
+                "{}",
+                serde_json::to_string(&specs.iter().map(|x| x.to_output()).collect::<Vec<ResourceProviderSpecOutput>>())
+                    .expect("could not serialize available resources to JSON")
+            );
+        } else {
+            for spec in specs {
+                println!("class_type: {}", spec.class_type());
+                println!("version: {}", spec.version());
+                println!("outputs: [{}]", spec.outputs().join(","));
+                if !spec.configurations().is_empty() {
+                    println!("configurations:");
+                    println!(
+                        "{}",
+                        spec.configurations()
+                            .iter()
+                            .map(|(field, desc)| format!("  - {}: {}", field, desc))
+                            .collect::<Vec<String>>()
+                            .join("\n")
+                    )
+                }
+                println!();
+            }
+        }
+        return Ok(());
+    }
     if !args.template.is_empty() {
         edgeless_api::util::create_template(&args.template, edgeless_node::edgeless_node_default_conf().as_str())?;
         return Ok(());

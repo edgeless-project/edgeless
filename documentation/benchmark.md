@@ -10,33 +10,61 @@ The tool supports different arrival models and workflow types.
 
 Arrival models (option `--arrival-model`):
 
-| Arrival model | Description                                                                                               |
-| ------------- | --------------------------------------------------------------------------------------------------------- |
-| poisson       | Inter-arrival between consecutive workflows and durations are exponentially distributed.                  |
-| incremental   | One new workflow arrive every new inter-arrival time.                                                     |
-| incr-and-keep | Add workflows incrementally until the warm up period finishes, then keep until the end of the experiment. |
-| single        | Add a single workflow.                                                                                    |
+| Arrival model | Description                                                                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| poisson       | Inter-arrival between consecutive workflows and lifetimes are exponentially distributed.                                                          |
+| incremental   | One new workflow arrive every new inter-arrival time, with constant lifetime.                                                                     |
+| incr-and-keep | Add workflows, with constant lifetimes, incrementally until the warm up period finishes, then keep until the end of the experiment.               |
+| single        | Add a single workflow that lasts for the entire experiment.                                                                                       |
+| trace         | Read the arrival and end times of workflows from a file specified with `--workload-trace`, one workflow per line in the format `arrival,end_time` |
 
 Workflow types (option `--wf_type`):
 
-| Workflow type    | Description                                                                                                                                                                                                                               | Application metrics |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| single           | A single function.                                                                                                                                                                                                                        | None                |
-| matrix-mul-chain | A chain of functions, each performing the multiplication of two matrices of 32-bit floating point random numbers at each invocation.                                                                                                      | workflow,function   |
-| vector-mul-chain | A chain of functions, each performing the multiplication of an internal random matrix of 32-bit floating point numbers by the input vector received from the caller.                                                                      | workflow,function   |
-| map-reduce       | A workflow consisting of a random number of stages, where each stage is composed of a random number of processing blocks. Before going to the next stage, the output from all the processing blocks in the stage before must be received. | workflow            |
+| Workflow type    | Description                                                                                                                                                                                                                               | Application metrics | Template |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- | -------- |
+| none             | No workflow is created. This option is meant only for testing/troubleshooting.                                                                                                                                                            | None                | N        |
+| single           | A single function.                                                                                                                                                                                                                        | --                  | N        |
+| matrix-mul-chain | A chain of functions, each performing the multiplication of two matrices of 32-bit floating point random numbers at each invocation.                                                                                                      | workflow,function   | Y        |
+| vector-mul-chain | A chain of functions, each performing the multiplication of an internal random matrix of 32-bit floating point numbers by the input vector received from the caller.                                                                      | workflow,function   | Y        |
+| map-reduce       | A workflow consisting of a random number of stages, where each stage is composed of a random number of processing blocks. Before going to the next stage, the output from all the processing blocks in the stage before must be received. | workflow            | Y        |
+| json-spec        | The workflow specified in the given JSON file. The string `@WF_ID` in the file is substituted with a sequential identifier of the workflow.                                                                                               | --                  | N        |
+
+For all the workflow types with Y in the template column a template can be generated by specifying `--wf-type "NAME;template"`.
+For example, by running:
+
+```shell
+target/debug/edgeless_benchmark --wf-type "map-reduce;template" > map_reduce.json
+```
+
+A template will be generated in `map_reduce.json`, which can then be loaded with:
+
+```shell
+target/debug/edgeless_benchmark --wf-type "map-reduce;map_reduce.json"
+```
 
 The duration of the experiment is configurable via a command-line option,
 like the seed used to generate pseudo-random numbers to enable repeatable
 experiments and the duration of a warm-up period.
+
+## Metric collection
+
+The collection of performance metrics is done on Redis, an instance of which
+must be reachable by `edgeless_benchmark` at the URL specified with the
+command-line argument `--redis-url` (e.g., `--redis-url redis://127.0.0.1:6379`).
+
+_If the command-line argument is not specified, then `edgeless_benchmark` will
+create the workload as specified without saving any performance metrics._
+
+When used to collect performance metrics, one EDGELESS node with the
+`metrics-collection` resource provider is also needed and can be created by
+following the instructions in the step by step example below.
 
 ## Dataset creation
 
 The command `edgeless_benchmark` and the ε-ORC both support the option to save
 run-time events during the execution for the purpose of creating a dataset from
 an execution of the benchmark.
-It is also possible to specify 
-additional_fields
+It is also possible to specify  additional_fields
 
 For `edgeleless_benchmark` this option is enabled by specifying a non-empty
 value for option `--dataset_path`, which defines the path of where to save
@@ -91,15 +119,15 @@ Then, create the configuration files:
 
 ```bash
 target/debug/edgeless_inabox -t
-sed -i \
-    -e "s/proxy_type = \"None\"/proxy_type = \"Redis\"/" \
-    -e "s/redis_url = \"\"/redis_url = \"redis:\/\/127.0.0.1:6379\"/" \
-    orchestrator.toml
 ```
 
-Add the following section to `orchestrator.toml`:
+Modify the `[proxy]` section of `orchestrator.toml` as follows:
 
 ```ini
+[proxy]
+proxy_type = "Redis"
+redis_url = "redis://127.0.0.1:6379"
+
 [proxy.dataset_settings]
 dataset_path = "dataset/myexp-"
 append = true
@@ -119,11 +147,42 @@ In one shell start the EDGELESS in-a-box:
 target/debug/edgeless_inabox
 ```
 
+Modify the configuration of `node.toml` so that it includes the following:
+
+```ini
+[resources.metrics_collector_provider]
+collector_type = "Redis"
+redis_url = "redis://localhost:6379"
+provider = "metrics-collector-1"
+```
+
+Then create the JSON file specifying the characteristics of the vector-mul-chain
+workflow:
+
+```shell
+cat << EOF > vector_mul_chain.json
+{
+  "min_chain_length": 5,
+  "max_chain_length": 5,
+  "min_input_size": 1000,
+  "max_input_size": 2000,
+  "function_wasm_path": "functions/vector_mul/vector_mul.wasm"
+}
+EOF
+```
+
+Create the directory that will host the dataset:
+
+```shell
+mkdir dataset
+```
+
 In another run the following benchmark, which lasts 30 seconds:
 
 ```shell
 target/debug/edgeless_benchmark \
-    -w "vector-mul-chain;5;5;1000;2000;functions/vector_mul/vector_mul.wasm" \
+    --redis-url redis://127.0.0.1:6379 \
+    -w "vector-mul-chain;vector_mul_chain.json" \
     --dataset-path "dataset/myexp-" \
     --additional-fields "a,b" \
     --additional-header "h_a,h_b" \

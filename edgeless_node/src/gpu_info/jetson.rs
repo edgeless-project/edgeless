@@ -1,7 +1,9 @@
-// SPDX-FileCopyrightText: © 2024 Technical University of Crete, Greece
+// SPDX-FileCopyrightText: © 2024 Technical University of Crete
 // SPDX-License-Identifier: MIT
 
 use std::fs;
+use std::io::{self, BufRead};
+use std::path;
 
 /// Jetson-specific implementation to retrieve the instantaneous GPU temperature.
 /// see: https://forums.developer.nvidia.com/t/temperatures-for-jetson-nano/181675
@@ -115,13 +117,87 @@ pub fn jetson_get_gpu_load() -> i32 {
     }
 }
 
+/// Jetson-specific implementation to retrieve the model name
+/// see: https://forums.developer.nvidia.com/t/get-jetson-model-name-at-runtime/280150
+/// In order to understand how it is extracted
+///
+/// # Returns
+/// * `String` - The model name retrieved, or an empty string if an error occurs.
+pub fn jetson_get_model_name_gpu() -> String {
+    if let Ok(contents) = fs::read_to_string("/sys/firmware/devicetree/base/model") {
+        // it also trims all non-printable characters like \0 or \n that may exist at the end
+        return contents.chars().filter(|c| c.is_ascii_graphic() || c.is_whitespace()).collect();
+    }
+
+    "".to_string()
+}
+
+/// Jetson-specific implementation to retrieve the GPU mem size
+/// see:
+/// - https://forums.developer.nvidia.com/t/unified-memory-on-jetson-platforms/187448
+/// - https://forums.developer.nvidia.com/t/gpu-memory-usage-got-by-using-cudamemgetinfo-is-different-with-tegrastats-command/243798
+///
+/// In order to understand why it is extracted like this
+///
+/// Jetson boards have a Unified Memory, which means that CPU and GPU share the same physical memory
+///
+/// # Returns
+/// * `i32` - The GPU memory size in kb or a negative number if the operation fails
+//         * -30.0
+//              MemTotal not found in the /proc/meminfo file
+//
+//         * -20.0
+//             Could not parse as u32 the value read from /proc/meminfo
+//
+//         * -10.0
+//             Could not read the /proc/meminfo file (file does not exist or permission error)
+pub fn jetson_get_mem_size_gpu() -> i32 {
+    // Read the /proc/meminfo file
+    let meminfo = match fs::File::open(path::Path::new("/proc/meminfo")) {
+        Ok(f) => f,
+        Err(_) => return -10,
+    };
+
+    // For each entry in the /proc/meminfo
+    for line in io::BufReader::new(meminfo).lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+
+        // Check if this line contains info regarding the total memory
+        if line.starts_with("MemTotal:") {
+            // Extract the value and parse it
+            let parts: Vec<&str> = line.split_whitespace().collect();
+            if let Some(mem_value) = parts.get(1) {
+                match mem_value.parse::<u32>() {
+                    Ok(mem_total) => {
+                        return mem_total as i32;
+                    }
+                    Err(_) => return -20,
+                }
+            }
+        }
+    }
+
+    // MemTotal was not detected in the /proc/meminfo file
+    -30
+}
+
+/// Jetson-specific implementation to retrieve number of GPUs that the board has.
+///
+/// # Returns
+/// * `i32` - The number of available GPUs or a negative number if the operation fails
+pub fn jetson_get_num_gpus() -> i32 {
+    // Jetson boards only contain a single GPU
+    // see: https://forums.developer.nvidia.com/t/detect-number-of-gpus/314622
+    1
+}
+
 /// Determines if the system is a Jetson board by checking `/sys/firmware/devicetree/base/model`.
 ///
 /// # Returns
 /// * `bool` - True if running on a Jetson board, otherwise false.
 pub fn is_jetson_board() -> bool {
-    if let Ok(contents) = fs::read_to_string("/sys/firmware/devicetree/base/model") {
-        return contents.to_lowercase().contains("jetson");
-    }
-    false
+    jetson_get_model_name_gpu().to_lowercase().contains("jetson")
 }

@@ -1,15 +1,21 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 pub mod alias_mapping;
 pub mod function_instance_runner;
 pub mod guest_api;
 pub mod runtime;
 
-/// (Deprecated) Trait to be implemented by each runtime.
+/// Trait to be implemented by each runtime.
 /// You won't need to implement this trait if you use the base_runtime that is generic over the `FunctionInstance` trait
 #[async_trait::async_trait]
 pub trait RuntimeAPI {
-    async fn start(&mut self, request: edgeless_api::function_instance::SpawnFunctionRequest) -> anyhow::Result<()>;
+    async fn start(
+        &mut self,
+        instance_id: edgeless_api::function_instance::InstanceId,
+        request: edgeless_api::function_instance::SpawnFunctionRequest,
+    ) -> anyhow::Result<()>;
     async fn stop(&mut self, instance_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()>;
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()>;
 }

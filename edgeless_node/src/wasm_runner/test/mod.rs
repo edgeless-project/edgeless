@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use futures::SinkExt;
 use std::time::Duration;
@@ -94,7 +95,6 @@ async fn basic_lifecycle() {
     tokio::spawn(async move { rt_task.run().await });
 
     let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
-        instance_id: Some(instance_id),
         code: edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "EXAMPLE_1".to_string(),
             function_class_type: "RUST_WASM".to_string(),
@@ -107,11 +107,12 @@ async fn basic_lifecycle() {
             state_id: instance_id.function_id,
             state_policy: edgeless_api::function_instance::StatePolicy::Transient,
         },
+        workflow_id: "workflow_1".to_string(),
     };
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
-    let _res = client.start(spawn_req).await;
+    let _res = client.start(instance_id, spawn_req).await;
 
     // wait for lifetime events created during spawn
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -234,7 +235,6 @@ async fn messaging_test_setup() -> (
     tokio::spawn(async move { rt_task.run().await });
 
     let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
-        instance_id: Some(instance_id),
         code: edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "EXAMPLE_1".to_string(),
             function_class_type: "RUST_WASM".to_string(),
@@ -247,11 +247,12 @@ async fn messaging_test_setup() -> (
             state_id: instance_id.function_id,
             state_policy: edgeless_api::function_instance::StatePolicy::Transient,
         },
+        workflow_id: "workflow_1".to_string(),
     };
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
-    let res = client.start(spawn_req).await;
+    let res = client.start(instance_id, spawn_req).await;
     assert!(res.is_ok());
 
     let res = client
@@ -511,11 +512,9 @@ async fn messaging_call_raw_input_err() {
 
 #[tokio::test]
 async fn state_management() {
-    env_logger::init();
-
     let node_id = uuid::Uuid::new_v4();
     let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
-    let fid2 = edgeless_api::function_instance::InstanceId::new(node_id);
+    let instance_id_another = edgeless_api::function_instance::InstanceId::new(node_id);
 
     let output_mocks = std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
     let (state_mock_sender, mut state_mock_receiver) = futures::channel::mpsc::unbounded::<(uuid::Uuid, String)>();
@@ -546,8 +545,7 @@ async fn state_management() {
 
     tokio::spawn(async move { rt_task.run().await });
 
-    let mut spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
-        instance_id: Some(instance_id),
+    let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
         code: edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "EXAMPLE_1".to_string(),
             function_class_type: "RUST_WASM".to_string(),
@@ -560,11 +558,12 @@ async fn state_management() {
             state_id: instance_id.function_id,
             state_policy: edgeless_api::function_instance::StatePolicy::Transient,
         },
+        workflow_id: "workflow_1".to_string(),
     };
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
-    let res = client.start(spawn_req.clone()).await;
+    let res = client.start(instance_id, spawn_req.clone()).await;
     assert!(res.is_ok());
 
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -609,9 +608,7 @@ async fn state_management() {
     output_mocks.lock().await.insert(instance_id.function_id, "existing_state".to_string());
 
     // TODO(raphaelhetzel) InstanceId reuse leads to problems that need to be fixed.
-    spawn_req.instance_id = Some(fid2);
-
-    let res2 = client.start(spawn_req).await;
+    let res2 = client.start(instance_id_another, spawn_req).await;
     assert!(res2.is_ok());
 
     tokio::time::sleep(Duration::from_millis(100)).await;

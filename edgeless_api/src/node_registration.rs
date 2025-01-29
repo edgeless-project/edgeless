@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
 #[derive(Debug, Clone, PartialEq)]
@@ -8,7 +10,7 @@ pub struct ResourceProviderSpecification {
     pub outputs: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub struct NodeCapabilities {
     // Number of (actual or virtual) CPUs associated with the edge node.
     pub num_cpus: u32,
@@ -39,25 +41,6 @@ pub struct NodeCapabilities {
 }
 
 impl NodeCapabilities {
-    /// Create capabilities with all values empty.
-    pub fn empty() -> Self {
-        Self {
-            num_cpus: 0,
-            model_name_cpu: "".to_string(),
-            clock_freq_cpu: 0.0,
-            num_cores: 0,
-            mem_size: 0,
-            labels: vec![],
-            is_tee_running: false,
-            has_tpm: false,
-            runtimes: vec![],
-            disk_tot_space: 0,
-            num_gpus: 0,
-            model_name_gpu: "".to_string(),
-            mem_size_gpu: 0,
-        }
-    }
-
     /// Create a usable node with minimum capabilities.
     pub fn minimum() -> Self {
         Self {
@@ -134,17 +117,145 @@ impl std::fmt::Display for NodeCapabilities {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum UpdateNodeRequest {
-    // 0: node_id (cannot be nil)
-    // 1: agent_url (cannot be empty)
-    // 2: invocation_url (cannot be empty)
-    // 3: resource provider specifications (can be empty)
-    // 4: node capabilities
-    Registration(uuid::Uuid, String, String, Vec<ResourceProviderSpecification>, NodeCapabilities),
+#[derive(Debug, Clone, PartialEq, Default, serde::Serialize, serde::Deserialize)]
+pub struct NodeHealthStatus {
+    pub mem_free: i32,
+    pub mem_used: i32,
+    pub mem_available: i32,
+    pub proc_cpu_usage: i32,
+    pub proc_memory: i32,
+    pub proc_vmemory: i32,
+    pub load_avg_1: i32,
+    pub load_avg_5: i32,
+    pub load_avg_15: i32,
+    pub tot_rx_bytes: i64,
+    pub tot_rx_pkts: i64,
+    pub tot_rx_errs: i64,
+    pub tot_tx_bytes: i64,
+    pub tot_tx_pkts: i64,
+    pub tot_tx_errs: i64,
+    pub disk_free_space: i64,
+    pub disk_tot_reads: i64,
+    pub disk_tot_writes: i64,
+    pub gpu_load_perc: i32,
+    pub gpu_temp_cels: i32,
+}
 
-    // 0: node_id (cannot be empty)
-    Deregistration(uuid::Uuid),
+impl NodeHealthStatus {
+    pub fn csv_header() -> String {
+        "mem_free,mem_used,mem_available,proc_cpu_usage,proc_memory,proc_vmemory,load_avg_1,load_avg_5,load_avg_15,tot_rx_bytes,tot_rx_pkts,tot_rx_errs,tot_tx_bytes,tot_tx_pkts,tot_tx_errs,disk_free_space,disk_tot_reads,disk_tot_writes,gpu_load_perc,gpu_temp_cels".to_string()
+    }
+    pub fn to_csv(&self) -> String {
+        format!(
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            self.mem_free,
+            self.mem_used,
+            self.mem_available,
+            self.proc_cpu_usage,
+            self.proc_memory,
+            self.proc_vmemory,
+            self.load_avg_1,
+            self.load_avg_5,
+            self.load_avg_15,
+            self.tot_rx_bytes,
+            self.tot_rx_pkts,
+            self.tot_rx_errs,
+            self.tot_tx_bytes,
+            self.tot_tx_pkts,
+            self.tot_tx_errs,
+            self.disk_free_space,
+            self.disk_tot_reads,
+            self.disk_tot_writes,
+            self.gpu_load_perc,
+            (self.gpu_temp_cels as f32 / 1000.0),
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct NodePerformanceSamples {
+    pub function_execution_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<f64>>,
+}
+
+impl std::fmt::Display for NodeHealthStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "memory free {} kb, used {} kb, available {} kb, process cpu usage {:.1}%, memory {} kb, vmemory {} kb, load avg 1 minute {}% 5 minutes {}% 15 minutes {}%, network tot rx {} bytes ({} pkts) {} errs, tot tx {} bytes ({} pkts) {} errs, disk available {} bytes, tot disk reads {} writes {}, gpu_load_perc {}%, gpu_temp_cels {:.2}°",
+            self.mem_free,
+            self.mem_used,
+            self.mem_available,
+            self.proc_cpu_usage,
+            self.proc_memory,
+            self.proc_vmemory,
+            self.load_avg_1,
+            self.load_avg_5,
+            self.load_avg_15,
+            self.tot_rx_bytes,
+            self.tot_rx_pkts,
+            self.tot_rx_errs,
+            self.tot_tx_bytes,
+            self.tot_tx_pkts,
+            self.tot_tx_errs,
+            self.disk_free_space,
+            self.disk_tot_reads,
+            self.disk_tot_writes,
+            self.gpu_load_perc,
+            (self.gpu_temp_cels as f32 / 1000.0)
+        )
+    }
+}
+
+impl NodeHealthStatus {
+    pub fn invalid() -> Self {
+        Self {
+            mem_free: -1,
+            mem_used: -1,
+            mem_available: -1,
+            proc_cpu_usage: -1,
+            proc_memory: -1,
+            proc_vmemory: -1,
+            load_avg_1: -1,
+            load_avg_5: -1,
+            load_avg_15: -1,
+            tot_rx_bytes: -1,
+            tot_rx_pkts: -1,
+            tot_rx_errs: -1,
+            tot_tx_bytes: -1,
+            tot_tx_pkts: -1,
+            tot_tx_errs: -1,
+            disk_free_space: -1,
+            disk_tot_reads: -1,
+            disk_tot_writes: -1,
+            gpu_load_perc: -1,
+            gpu_temp_cels: -1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct UpdateNodeRequest {
+    // Node identifier.
+    pub node_id: uuid::Uuid,
+    // URL of the node's agent server.
+    pub agent_url: String,
+    // URL of the node's invocation server.
+    pub invocation_url: String,
+    // Resources offered by this node.
+    pub resource_providers: Vec<ResourceProviderSpecification>,
+    // Node capabilities.
+    pub capabilities: NodeCapabilities,
+    // Deadline for refreshing the node request, in seconds since Unix epoch.
+    // After this time the node can be considered to be offline.
+    pub refresh_deadline: std::time::SystemTime,
+    // Number that identifies the specific instance of this node, which allows
+    // the node register to detect service restarts.
+    // It is drawn randomly when the node starts and never changes.
+    pub nonce: u64,
+    // Node health status.
+    pub health_status: NodeHealthStatus,
+    // Node performance info.
+    pub performance_samples: NodePerformanceSamples,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -156,7 +267,6 @@ pub enum UpdateNodeResponse {
 #[async_trait::async_trait]
 pub trait NodeRegistrationAPI: NodeRegistrationAPIClone + Sync + Send {
     async fn update_node(&mut self, request: UpdateNodeRequest) -> anyhow::Result<UpdateNodeResponse>;
-    async fn keep_alive(&mut self);
 }
 
 impl std::fmt::Display for ResourceProviderSpecification {
@@ -186,5 +296,27 @@ where
 impl Clone for Box<dyn NodeRegistrationAPI> {
     fn clone(&self) -> Box<dyn NodeRegistrationAPI> {
         self.clone_box()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::NodeCapabilities;
+    use super::NodeHealthStatus;
+
+    #[test]
+    fn test_node_health_status_header() {
+        let header = NodeHealthStatus::csv_header();
+        let csv = NodeHealthStatus::default().to_csv();
+
+        assert_eq!(header.split(",").count(), csv.split(",").count());
+    }
+
+    #[test]
+    fn test_node_capabilities_header() {
+        let header = NodeCapabilities::csv_header();
+        let csv = NodeCapabilities::default().to_csv();
+
+        assert_eq!(header.split(",").count(), csv.split(",").count());
     }
 }

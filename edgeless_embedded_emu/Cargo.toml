@@ -1,12 +1,19 @@
 # SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+# SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+# SPDX-FileCopyrightText: © 2023 Siemens AG
 # SPDX-License-Identifier: MIT
 
 [package]
 name = "edgeless-embedded-emu"
-version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de>>"]
+version = "1.0.0"
+authors = [ "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
 resolver = "2"
+description = "EDGELESS embedded devices emulator"
+homepage = "https://edgeless-project.eu/"
+license = "MIT"
+repository = "https://github.com/edgeless-project/edgeless/"
+readme = "../README.md"
 
 [dependencies]
 log = { version = "0.4", default-features = false }

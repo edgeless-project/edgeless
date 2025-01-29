@@ -1,5 +1,31 @@
-// SPDX-FileCopyrightText: © 2024 Yuan Yuan Luo
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
+
+pub struct KafkaEgressResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for KafkaEgressResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("kafka-egress")
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([
+            (
+                String::from("brokers"),
+                String::from("Comma-separated list of initial brokers to access the cluster"),
+            ),
+            (String::from("topic"), String::from("Topic to which messages are posted")),
+        ])
+    }
+
+    fn version(&self) -> String {
+        String::from("1.0")
+    }
+}
 
 #[derive(Clone)]
 pub struct KafkaEgressResourceProvider {

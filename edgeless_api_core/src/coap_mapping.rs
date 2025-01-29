@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use alloc::vec;
 use coap_lite::{MessageClass, MessageType, ResponseType};
@@ -87,19 +89,6 @@ impl COAPEncoder {
         Self::encode(endpoint, token, "registration/register", out_buf, true, &buffer[..len])
     }
 
-    pub fn encode_node_deregistration<Endpoint>(
-        endpoint: Endpoint,
-        node_id: crate::node_registration::NodeId,
-        token: u8,
-        out_buf: &mut [u8],
-    ) -> ((&mut [u8], Endpoint), &mut [u8]) {
-        let mut buffer = [0_u8; 2048];
-        minicbor::encode(&node_id, &mut buffer[..]).unwrap();
-        let len = minicbor::len(&node_id);
-
-        Self::encode(endpoint, token, "registration/deregister", out_buf, true, &buffer[..len])
-    }
-
     pub fn encode_peer_add<'a, Endpoint>(
         endpoint: Endpoint,
         node_id: &crate::node_registration::NodeId,
@@ -126,6 +115,10 @@ impl COAPEncoder {
         let len = minicbor::len(node_id);
 
         Self::encode(endpoint, token, "peers/remove", out_buf, true, &buffer[..len])
+    }
+
+    pub fn encode_reset<Endpoint>(endpoint: Endpoint, token: u8, out_buf: &mut [u8]) -> ((&mut [u8], Endpoint), &mut [u8]) {
+        Self::encode(endpoint, token, "reset", out_buf, true, &[])
     }
 
     pub fn encode_keepalive<Endpoint>(endpoint: Endpoint, token: u8, out_buf: &mut [u8]) -> ((&mut [u8], Endpoint), &mut [u8]) {
@@ -206,7 +199,6 @@ pub enum CoapMessage<'a> {
     PeerAdd((crate::instance_id::NodeId, [u8; 4], u16)),
     PeerRemove(crate::instance_id::NodeId),
     NodeRegistration(crate::node_registration::EncodedNodeRegistration<'a>),
-    NodeDeregistration(crate::node_registration::NodeId),
     Response(&'a [u8], bool),
 }
 
@@ -290,10 +282,6 @@ impl CoapDecoder {
             "registration/register" => {
                 let registration: crate::node_registration::EncodedNodeRegistration = minicbor::decode(body_ref).unwrap();
                 Ok((CoapMessage::NodeRegistration(registration), packet.get_token()[0]))
-            }
-            "registration/deregister" => {
-                let resource_id: crate::node_registration::NodeId = minicbor::decode(body_ref).unwrap();
-                Ok((CoapMessage::NodeDeregistration(resource_id), packet.get_token()[0]))
             }
             _ => Err(CoapDecoderError {}),
         }

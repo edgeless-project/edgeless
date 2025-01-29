@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 pub struct CommonConverters {}
 
@@ -19,8 +20,8 @@ impl ParseableId<edgeless_api_core::instance_id::InstanceId> for crate::grpc_imp
     }
 }
 
-impl ParseableId<crate::orc::DomainManagedInstanceId> for crate::grpc_impl::api::InstanceIdVariant {
-    fn parse(api_id_variant: &Self) -> anyhow::Result<crate::orc::DomainManagedInstanceId> {
+impl ParseableId<crate::function_instance::DomainManagedInstanceId> for crate::grpc_impl::api::InstanceIdVariant {
+    fn parse(api_id_variant: &Self) -> anyhow::Result<crate::function_instance::DomainManagedInstanceId> {
         match api_id_variant.clone().instance_id_type.ok_or(anyhow::anyhow!("Missing Id"))? {
             crate::grpc_impl::api::instance_id_variant::InstanceIdType::DomainManagedInstanceId(instance_id) => {
                 CommonConverters::parse_domain_managed_instance_id(&instance_id)
@@ -40,7 +41,7 @@ impl SerializeableId for edgeless_api_core::instance_id::InstanceId {
     }
 }
 
-impl SerializeableId for crate::orc::DomainManagedInstanceId {
+impl SerializeableId for crate::function_instance::DomainManagedInstanceId {
     fn serialize(id: &Self) -> crate::grpc_impl::api::InstanceIdVariant {
         crate::grpc_impl::api::InstanceIdVariant {
             instance_id_type: Some(crate::grpc_impl::api::instance_id_variant::InstanceIdType::DomainManagedInstanceId(
@@ -67,7 +68,7 @@ impl CommonConverters {
 
     pub fn parse_domain_managed_instance_id(
         api_id: &crate::grpc_impl::api::DomainManagedInstanceId,
-    ) -> anyhow::Result<crate::orc::DomainManagedInstanceId> {
+    ) -> anyhow::Result<crate::function_instance::DomainManagedInstanceId> {
         Ok(uuid::Uuid::parse_str(&api_id.instance_id)?)
     }
 
@@ -122,7 +123,9 @@ impl CommonConverters {
         }
     }
 
-    pub fn serialize_domain_managed_instance_id(instance_id: &crate::orc::DomainManagedInstanceId) -> crate::grpc_impl::api::DomainManagedInstanceId {
+    pub fn serialize_domain_managed_instance_id(
+        instance_id: &crate::function_instance::DomainManagedInstanceId,
+    ) -> crate::grpc_impl::api::DomainManagedInstanceId {
         crate::grpc_impl::api::DomainManagedInstanceId {
             instance_id: instance_id.to_string(),
         }

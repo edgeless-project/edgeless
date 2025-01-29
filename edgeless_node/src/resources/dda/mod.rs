@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
@@ -10,6 +11,36 @@ use serde_json::Error;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 use uuid::Uuid;
+
+pub struct DdaResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for DdaResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("dda")
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec![String::from("out")]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([
+            (String::from("dda_url"), String::from("URL of the DDA")),
+            (
+                String::from("dda_com_subscription_mapping"),
+                String::from("JSON encoding the DDA subscription mapping"),
+            ),
+            (
+                String::from("dda_com_publication_mapping"),
+                String::from("JSON encoding the DDA publication mapping"),
+            ),
+        ])
+    }
+
+    fn version(&self) -> String {
+        String::from("1.0")
+    }
+}
 
 // imports the generated proto file for dda
 pub mod dda_com {
@@ -70,10 +101,6 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
             // resource provider as its component
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
-
-            // insert the initial output_mapping before the Instance is created
-            // to avoid data race
-            lck.mappings.insert(new_id.function_id, instance_specification.output_mapping);
 
             // create the resource
             let dda_res = match DDAResource::new(

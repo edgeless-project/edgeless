@@ -1,9 +1,33 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
 extern crate redis;
 use redis::Commands;
+
+pub struct RedisResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for RedisResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("redis")
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([
+            (String::from("url"), String::from("URL of the Redis server to use")),
+            (String::from("key"), String::from("Key to set")),
+        ])
+    }
+
+    fn version(&self) -> String {
+        String::from("1.0")
+    }
+}
 
 #[derive(Clone)]
 pub struct RedisResourceProvider {

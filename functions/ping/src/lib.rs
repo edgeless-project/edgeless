@@ -25,8 +25,10 @@ impl EdgeFunction for PingerFun {
             sync(&serde_json::to_string(STATE.get().unwrap().lock().unwrap().deref()).unwrap().as_bytes());
 
             let res = call("ponger", &format!("PING-{}", id).as_bytes());
-            if let CallRet::Reply(_msg) = res {
-                log::info!("Got Reply");
+            if let CallRet::Reply(msg) = res {
+                if let Ok(msg) = std::str::from_utf8(&msg) {
+                    log::info!("Got Reply: {}", msg);
+                }
             }
 
             delayed_cast(1000, "self", b"wakeup");

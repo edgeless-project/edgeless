@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 #[derive(Debug)]
 pub struct Measurement {
@@ -42,7 +43,7 @@ impl SCD30Sensor {
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<SCD30SensorConfiguration, edgeless_api_core::common::ErrorResponse> {
-        let mut out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
+        let out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
 
         if data.class_type != "scd30-sensor" {
             return Err(edgeless_api_core::common::ErrorResponse {
@@ -50,14 +51,6 @@ impl SCD30Sensor {
                 detail: None,
             });
         }
-
-        for (key, val) in data.output_mapping {
-            if key == "data_out" {
-                out_id = Some(val);
-                break;
-            }
-        }
-
         Ok(SCD30SensorConfiguration { data_out_id: out_id })
     }
 

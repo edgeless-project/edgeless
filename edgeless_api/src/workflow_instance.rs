@@ -1,11 +1,12 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use std::str::FromStr;
 
 const WORKFLOW_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, PartialOrd, Ord)]
 pub struct WorkflowId {
     pub workflow_id: uuid::Uuid,
 }
@@ -73,6 +74,12 @@ pub struct SpawnWorkflowRequest {
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize)]
+pub struct WorkflowInfo {
+    pub request: SpawnWorkflowRequest,
+    pub status: WorkflowInstance,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
 pub enum SpawnWorkflowResponse {
     ResponseError(crate::common::ResponseError),
     WorkflowInstance(WorkflowInstance),
@@ -82,7 +89,12 @@ pub enum SpawnWorkflowResponse {
 pub trait WorkflowInstanceAPI: WorkflowInstanceAPIClone + Send + Sync {
     async fn start(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<SpawnWorkflowResponse>;
     async fn stop(&mut self, id: WorkflowId) -> anyhow::Result<()>;
-    async fn list(&mut self, id: WorkflowId) -> anyhow::Result<Vec<WorkflowInstance>>;
+    async fn list(&mut self) -> anyhow::Result<Vec<WorkflowId>>;
+    async fn inspect(&mut self, id: WorkflowId) -> anyhow::Result<WorkflowInfo>;
+    async fn domains(
+        &mut self,
+        domain_id: String,
+    ) -> anyhow::Result<std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>>;
 }
 
 // https://stackoverflow.com/a/30353928

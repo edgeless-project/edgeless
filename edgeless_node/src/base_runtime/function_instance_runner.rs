@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 use futures::{FutureExt, SinkExt};
 use std::marker::PhantomData;
@@ -35,6 +37,7 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
 
 impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInstanceType> {
     pub async fn new(
+        instance_id: edgeless_api::function_instance::InstanceId,
         spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
         data_plane: edgeless_dataplane::handle::DataplaneHandle,
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
@@ -42,7 +45,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
     ) -> Self {
-        let instance_id = spawn_req.instance_id.unwrap();
         let mut telemetry_handle = telemetry_handle;
         let mut state_handle = state_handle;
 

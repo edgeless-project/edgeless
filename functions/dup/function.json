@@ -1,0 +1,10 @@
+{
+    "id": "dup",
+    "function_type": "RUST_WASM",
+    "version": "0.1",
+    "build": "Cargo.toml",
+    "outputs": [
+        "out1",
+        "out2"
+    ]
+}

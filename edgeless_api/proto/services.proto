@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 syntax = "proto3";
 
@@ -8,7 +9,7 @@ import "messages.proto";
 
 package edgeless_api;
 
-// API exposed by the nodes / orchestrator to manage the lifecycle of function instances (s07).
+// API exposed by the nodes / orchestrator to manage the lifecycle of function instances.
 service FunctionInstance {
     // Start a new function instance.
     // Input: request containing the description of the function to create.
@@ -34,23 +35,33 @@ service NodeManagement {
     // Input: the node identifier and invocation URL (only for add operations).
     // Output: none.
     rpc UpdatePeers (UpdatePeersRequest) returns (google.protobuf.Empty);
-
-    // Check if the component is still alive.
+    // Reset the node to a clean state.
     // Input: none.
-    // Output: health status information.
-    rpc KeepAlive (google.protobuf.Empty) returns (KeepAliveResponse);
+    // Output: none.
+    rpc Reset (google.protobuf.Empty) returns (google.protobuf.Empty);
 }
 
-// API that allows nodes to register themselves with the orchestrator
+// API that allows nodes to register themselves with the orchestrator.
 service NodeRegistration {
-    // Register a new node on an orchestrator or deregister an existing node.
-    // Input: registration: identifier of the new node and agent/invocation URLs;
+    // Notify that the node is alive (also acts as registration).
+    // Input: registration: identifier of the new node and agent/invocation
+    // URLs, health status information, and performance samples.
     // deregistration: identifier of the existing node to be deregistered.
     // Output: UpdateNodeResponse.
     rpc UpdateNode (UpdateNodeRequest) returns (UpdateNodeResponse);
 }
 
-// API to manage the lifecycle of workflow instances (s04).
+// API that allows the orchestrators to register with the controller.
+service DomainRegistration {
+    // Register a new orchestration domain on a controller.
+    // Input: registration data, including a deadline by which the orchestration
+    // domain can be considered offline; to disconnect a domain, use a value in
+    // the past for this deadline
+    // Output: UpdateDomainResponse.
+    rpc UpdateDomain (UpdateDomainRequest) returns (UpdateDomainResponse);
+}
+
+// API to manage the lifecycle of workflow instances.
 service WorkflowInstance {
     // Start a new workflow.
     // Input: request containing the description of the workflow to create.
@@ -62,13 +73,23 @@ service WorkflowInstance {
     // Output: none.
     rpc Stop (WorkflowId) returns (google.protobuf.Empty);
 
-    // List the active workflows or shows the status of a given active workflow.
-    // Input: the identifier of the active workflow or a special value indicating all workflows.
-    // Output: the list of status of the active workflow instances.
-    rpc List (WorkflowId) returns (WorkflowInstanceList);
+    // List the known workflow identifiers.
+    // Input: none.
+    // Output: the list of workflow identifiers..
+    rpc List (google.protobuf.Empty) returns (WorkflowIdList);
+
+    // Inspect a given workflow.
+    // Input: the identifier of the workflow to inspect.
+    // Output: information about the workflow identifiers.
+    rpc Inspect(WorkflowId) returns (WorkflowInstanceInfo);
+
+    // List the domain capabilities.
+    // Input: the identifier of the domain or an empty value to query all.
+    // Output: the list of capabilities of the known domains.
+    rpc Domains (DomainId) returns (DomainCapabilitiesList);
 }
 
-// API to handle events (s01).
+// API to handle events.
 service FunctionInvocation {
     // Handle an event.
     // Input: event to be handled.
@@ -76,7 +97,7 @@ service FunctionInvocation {
     rpc Handle (Event) returns (google.protobuf.Empty); 
 }
 
-// API to handle the lifecycle of resources (s06).
+// API to handle the lifecycle of resources.
 service ResourceConfiguration {
     // Create a new resource.
     // Input: specification of the resource to be created.
