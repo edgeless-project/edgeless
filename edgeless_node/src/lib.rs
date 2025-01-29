@@ -744,6 +744,7 @@ pub fn edgeless_node_default_conf() -> String {
             ollama_provider: Some(OllamaProviderSettings::default()),
             kafka_egress_provider: Some(String::default()),
             metrics_collector_provider: Some(MetricsCollectorProviderSettings::default()),
+            sqlx_provider: Some(String::from("sqlite://sqlite.db")),
         }),
         user_node_capabilities: Some(NodeCapabilitiesUser::default()),
     };
