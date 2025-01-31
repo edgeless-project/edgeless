@@ -1,9 +1,8 @@
 use aws_sdk_ec2::types::Tag;
+use rand::distributions::Alphanumeric;
+use rand::{thread_rng, Rng};
 use std::time::Duration;
 use tokio::time::sleep;
-use rand::{thread_rng, Rng};
-use rand::distributions::Alphanumeric;
-
 
 fn generate_instance_name() -> String {
     let random_string: String = thread_rng()
@@ -16,7 +15,6 @@ fn generate_instance_name() -> String {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     // TODO: Get Region from config.toml file
 
     let region_provider = "eu-west-1";
@@ -47,28 +45,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .create_tags()
         .resources(instance_id)
-        .tags(
-            Tag::builder()
-                .key("Name")
-                .value(&instance_name)
-                .build(),
-        )
+        .tags(Tag::builder().key("Name").value(&instance_name).build())
         .send()
         .await?;
 
     println!("Instance: {instance_id}, with name: {instance_name} has been created.");
-
 
     // Pause to check the status
     println!("Pausing for 120 seconds...");
     sleep(Duration::from_secs(120)).await;
 
     // Terminate the EC2 instance
-    client
-        .terminate_instances()
-        .instance_ids(instance_id)
-        .send()
-        .await?;
+    client.terminate_instances().instance_ids(instance_id).send().await?;
 
     println!("Instance: {instance_id}, with name: {instance_name} has been terminated.");
 
