@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: © 2024 Chen Chen <cc2181@cam.ac.uk>
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
+use serde::Deserialize;
 use sqlx::{migrate::MigrateDatabase, FromRow, Sqlite, SqlitePool};
 use tokio;
 
@@ -30,14 +31,12 @@ impl SqlxResource {
     async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, sqlx_url: &str, workflow_id: &String) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
         let sqlx_url = sqlx_url.to_string();
-        // let workflow_id: String = workflow_id.to_string();
-        // log::info!("Workflow ID: {:?}", workflow_id);
 
         let workflow_id = workflow_id.clone();
         let handle = tokio::spawn(async move {
             loop {
                 let workflow_id = workflow_id.clone();
-                // let workflow_id_int = &workflow_id.parse::<i32>().unwrap();
+
                 let edgeless_dataplane::core::DataplaneEvent {
                     source_id,
                     channel_id,
@@ -69,17 +68,21 @@ impl SqlxResource {
                 let db = SqlitePool::connect(&sqlx_url).await.unwrap();
 
                 let response = sqlx::query(
-                    "CREATE TABLE IF NOT EXISTS workflow (
+                    "CREATE TABLE IF NOT EXISTS WorkflowState (
                     id VARCHAR(255) PRIMARY KEY,
                     name VARCHAR(255)  NOT NULL,
-                    result INTEGER NOT NULL);",
+                    result INTEGER NOT NULL,
+                    timestamp VARCHAR(255),);",
                 )
                 .execute(&db)
                 .await
                 .unwrap();
 
+                log::info!("create table in sql {:?}", response);
+
                 if message_data.to_string().contains("SELECT") {
-                    let result: sqlx::Result<Workflow, sqlx::Error> = sqlx::query_as(message_data.as_str()).bind(workflow_id).fetch_one(&db).await;
+                    let result: sqlx::Result<WorkflowState, sqlx::Error> =
+                        sqlx::query_as(message_data.as_str()).bind(workflow_id).fetch_one(&db).await;
 
                     match result {
                         Ok(response) => {
@@ -204,16 +207,20 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 }
 
-#[derive(Clone, FromRow, Debug)]
-struct Workflow {
+#[derive(Clone, FromRow, Debug, Deserialize)]
+struct WorkflowState {
     id: String,
     name: String,
     result: i64,
+    timestamp: String,
 }
 
-impl Workflow {
+impl WorkflowState {
     fn to_string(&self) -> String {
-        let data = format!("id: {}, name: {}, result: {:?},", self.id, self.name, self.result);
+        let data = format!(
+            "id: {}, name: {}, result: {:?}, timestamp: {}",
+            self.id, self.name, self.result, self.timestamp
+        );
         data
     }
 }
