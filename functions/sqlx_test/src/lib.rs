@@ -17,11 +17,11 @@ impl EdgeFunction for Sqlx_test {
         edgeless_function::init_logger();
         log::info!("sqlx function init");
 
-        let res = call("database", b"INSERT INTO workflow (id, name, result) Values(666, 'foobar', 9527)");
+        let res = call("database", b"INSERT INTO workflow (id, name, result) Values($1, 'foobar', 9527)");
         log::info!("call keep running");
-        call("database", b"SELECT id, name,  result FROM workflow WHERE id=666");
-        call("database", b"UPDATE workflow SET name='this is to test football'  WHERE id = 666");
-        call("database", b"DELETE FROM workflow WHERE id=666");
+        call("database", b"SELECT id, name,  result FROM workflow WHERE id=$1");
+        call("database", b"UPDATE workflow SET name='this is to test football'  WHERE id = $1");
+        call("database", b"DELETE FROM workflow WHERE id=$1");
         
         //why is msg u8 not owneddatabyte?
         if let CallRet::Reply(msg) = res {

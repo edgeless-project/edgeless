@@ -27,12 +27,17 @@ impl Drop for SqlxResource {
 }
 
 impl SqlxResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, sqlx_url: &str) -> anyhow::Result<Self> {
+    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, sqlx_url: &str, workflow_id: &String) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
         let sqlx_url = sqlx_url.to_string();
+        // let workflow_id: String = workflow_id.to_string();
+        // log::info!("Workflow ID: {:?}", workflow_id);
 
+        let workflow_id = workflow_id.clone();
         let handle = tokio::spawn(async move {
             loop {
+                let workflow_id = workflow_id.clone();
+                // let workflow_id_int = &workflow_id.parse::<i32>().unwrap();
                 let edgeless_dataplane::core::DataplaneEvent {
                     source_id,
                     channel_id,
@@ -65,7 +70,7 @@ impl SqlxResource {
 
                 let response = sqlx::query(
                     "CREATE TABLE IF NOT EXISTS workflow (
-                    id INTEGER PRIMARY KEY,
+                    id VARCHAR(255) PRIMARY KEY,
                     name VARCHAR(255)  NOT NULL,
                     result INTEGER NOT NULL);",
                 )
@@ -74,7 +79,7 @@ impl SqlxResource {
                 .unwrap();
 
                 if message_data.to_string().contains("SELECT") {
-                    let result: sqlx::Result<Workflow, sqlx::Error> = sqlx::query_as(message_data.as_str()).fetch_one(&db).await;
+                    let result: sqlx::Result<Workflow, sqlx::Error> = sqlx::query_as(message_data.as_str()).bind(workflow_id).fetch_one(&db).await;
 
                     match result {
                         Ok(response) => {
@@ -96,7 +101,7 @@ impl SqlxResource {
                     || message_data.to_string().contains("UPDATE")
                     || message_data.to_string().contains("DELETE")
                 {
-                    let result = sqlx::query(message_data.as_str()).execute(&db).await;
+                    let result = sqlx::query(message_data.as_str()).bind(workflow_id).execute(&db).await;
                     match result {
                         Ok(response) => {
                             log::info!("Response from database: {:?}", response);
@@ -155,15 +160,16 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
-        if let (Some(url), Some(_key)) = (
+        if let (Some(url), Some(_key), workflow_id) = (
             instance_specification.configuration.get("url"),
             instance_specification.configuration.get("key"),
+            instance_specification.workflow_id,
         ) {
             let mut lck = self.inner.lock().await;
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
 
-            match SqlxResource::new(dataplane_handle, url).await {
+            match SqlxResource::new(dataplane_handle, url, &workflow_id).await {
                 Ok(resource) => {
                     lck.instances.insert(new_id, resource);
                     return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
@@ -200,7 +206,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
 #[derive(Clone, FromRow, Debug)]
 struct Workflow {
-    id: i64,
+    id: String,
     name: String,
     result: i64,
 }
