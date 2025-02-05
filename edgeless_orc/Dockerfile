@@ -15,40 +15,40 @@ RUN apt-get update && apt-get install -y gettext-base && rm -rf /var/lib/apt/lis
 # Create the template file in the temporary location
 RUN echo '\
 [general]\n\
+domain_register_url = "http://0.0.0.0:${DOMAIN_REGISTER_PORT}"\n\
+subscription_refresh_interval_sec = ${SUBSCRIPTION_REFRESH_INTERVAL_SEC}\n\
 domain_id = "${DOMAIN_ID}"\n\
 orchestrator_url = "http://0.0.0.0:${ORCHESTRATOR_PORT}"\n\
 orchestrator_url_announced = "${ORCHESTRATOR_URL_ANNOUNCED}"\n\
-agent_url = "http://0.0.0.0:${AGENT_PORT}"\n\
-agent_url_announced = "${AGENT_URL_ANNOUNCED}"\n\
-invocation_url = "http://0.0.0.0:${INVOCATION_PORT}"\n\
-invocation_url_announced = "${INVOCATION_URL_ANNOUNCED}"\n\
+node_register_url = "http://0.0.0.0:${NODE_REGISTER_PORT}"\n\
 \n\
 [baseline]\n\
 orchestration_strategy = "${ORCHESTRATION_STRATEGY}"\n\
-keep_alive_interval_secs = ${KEEP_ALIVE_INTERVAL_SECS}\n\
 \n\
 [proxy]\n\
 proxy_type = "${PROXY_TYPE}"\n\
 redis_url = "${REDIS_URL}"\n\
 \n\
-[collector]\n\
-collector_type = "${COLLECTOR_TYPE}"\n\
-redis_url = "${COLLECTOR_REDIS_URL}"\n' > /usr/local/etc/orchestrator-template.toml
+[proxy.dataset_settings]\n\
+dataset_path = "${DATASET_PATH}"\n\
+append = ${APPEND}\n\
+additional_fields = "${ADDITIONAL_FIELDS}"\n\
+additional_header = "${ADDITIONAL_HEADER}"\n' > /usr/local/etc/orchestrator-template.toml
 
 # Replace the variables and run the application
 ENTRYPOINT ["/bin/bash", "-c", "\
+  export DOMAIN_REGISTER_PORT=${DOMAIN_REGISTER_PORT:-7002} && \
+  export SUBSCRIPTION_REFRESH_INTERVAL_SEC=${SUBSCRIPTION_REFRESH_INTERVAL_SEC:-2} && \
   export DOMAIN_ID=${DOMAIN_ID:-domain-1} && \
-  export ORCHESTRATOR_PORT=${ORCHESTRATOR_PORT:-7011} && \
+  export ORCHESTRATOR_PORT=${ORCHESTRATOR_PORT:-7003} && \
   export ORCHESTRATOR_URL_ANNOUNCED=${ORCHESTRATOR_URL_ANNOUNCED:-} && \
-  export AGENT_PORT=${AGENT_PORT:-7121} && \
-  export AGENT_URL_ANNOUNCED=${AGENT_URL_ANNOUNCED:-} && \
-  export INVOCATION_PORT=${INVOCATION_PORT:-7102} && \
-  export INVOCATION_URL_ANNOUNCED=${INVOCATION_URL_ANNOUNCED:-} && \
+  export NODE_REGISTER_PORT=${NODE_REGISTER_PORT:-7004} && \
   export ORCHESTRATION_STRATEGY=${ORCHESTRATION_STRATEGY:-Random} && \
-  export KEEP_ALIVE_INTERVAL_SECS=${KEEP_ALIVE_INTERVAL_SECS:-2} && \
   export PROXY_TYPE=${PROXY_TYPE:-None} && \
   export REDIS_URL=${REDIS_URL:-} && \
-  export COLLECTOR_TYPE=${COLLECTOR_TYPE:-None} && \
-  export COLLECTOR_REDIS_URL=${COLLECTOR_REDIS_URL:-} && \
+  export DATASET_PATH=${DATASET_PATH:-} && \
+  export APPEND=${APPEND:-true} && \
+  export ADDITIONAL_FIELDS=${ADDITIONAL_FIELDS:-} && \
+  export ADDITIONAL_HEADER=${ADDITIONAL_HEADER:-} && \
   envsubst < /usr/local/etc/orchestrator-template.toml > /usr/local/etc/orchestrator.toml && \
   RUST_LOG=info /usr/local/bin/edgeless_orc_d --config-file /usr/local/etc/orchestrator.toml"]
