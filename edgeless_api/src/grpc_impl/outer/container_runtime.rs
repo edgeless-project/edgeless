@@ -16,7 +16,7 @@ impl ContainerRuntimeAPIClient {
     }
 }
 
-impl crate::container_runtime::ContainerRuntimeAPI for ContainerRuntimeAPIClient {
+impl crate::outer::container_runtime::ContainerRuntimeAPI for ContainerRuntimeAPIClient {
     fn guest_api_host(&mut self) -> Box<dyn crate::guest_api_host::GuestAPIHost> {
         self.guest_api_host.clone()
     }
@@ -26,7 +26,7 @@ pub struct GuestAPIHostServer {}
 
 impl GuestAPIHostServer {
     pub fn run(
-        container_runtime_api: Box<dyn crate::container_runtime::ContainerRuntimeAPI + Send>,
+        container_runtime_api: Box<dyn crate::outer::container_runtime::ContainerRuntimeAPI + Send>,
         container_runtime_url: String,
     ) -> futures::future::BoxFuture<'static, ()> {
         let mut container_runtime_api = container_runtime_api;

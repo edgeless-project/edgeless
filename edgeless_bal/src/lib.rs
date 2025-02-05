@@ -24,9 +24,10 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
 }
 
 pub fn edgeless_bal_default_conf() -> String {
-    String::from(
-        r##"balancer_id = "2bb0867f-e9ee-4a3a-8872-dbaa5228ee23"
-invocation_url = "http://127.0.0.1:7032"
-"##,
-    )
+    let bal_conf = EdgelessBalSettings {
+        balancer_id: uuid::Uuid::new_v4(),
+        invocation_url: String::from("http://127.0.0.1:7000"),
+    };
+
+    toml::to_string(&bal_conf).expect("Wrong")
 }

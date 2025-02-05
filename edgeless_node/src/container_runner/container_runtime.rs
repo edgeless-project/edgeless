@@ -64,7 +64,7 @@ impl ContainerRuntime {
     ) -> (
         std::sync::Arc<tokio::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>>,
         std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
-        Box<dyn edgeless_api::container_runtime::ContainerRuntimeAPI + Send>,
+        Box<dyn edgeless_api::outer::container_runtime::ContainerRuntimeAPI + Send>,
     ) {
         log::debug!("new container runtime created");
         let (sender, receiver) = futures::channel::mpsc::unbounded();
@@ -300,7 +300,7 @@ pub struct ContainerRuntimeClient {
     container_runtime_client: Box<dyn edgeless_api::guest_api_host::GuestAPIHost>,
 }
 
-impl edgeless_api::container_runtime::ContainerRuntimeAPI for ContainerRuntimeClient {
+impl edgeless_api::outer::container_runtime::ContainerRuntimeAPI for ContainerRuntimeClient {
     fn guest_api_host(&mut self) -> Box<dyn edgeless_api::guest_api_host::GuestAPIHost> {
         self.container_runtime_client.clone()
     }

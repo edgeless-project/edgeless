@@ -3,11 +3,22 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-mod orchestration_logic;
+pub mod active_instance;
+pub mod affinity_level;
+pub mod client_desc;
+pub mod deploy_intent;
+pub mod deployment_requirements;
+pub mod domain_info;
+pub mod domain_subscriber;
+pub mod node_register;
+pub mod node_register_client;
+pub mod orchestration_logic;
 pub mod orchestrator;
+pub mod orchestrator_task;
 pub mod proxy;
 pub mod proxy_none;
 pub mod proxy_redis;
+pub mod resource_provider;
 
 use futures::join;
 
@@ -16,11 +27,14 @@ pub struct EdgelessOrcSettings {
     pub general: EdgelessOrcGeneralSettings,
     pub baseline: EdgelessOrcBaselineSettings,
     pub proxy: EdgelessOrcProxySettings,
-    pub collector: EdgelessOrcCollectorSettings,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessOrcGeneralSettings {
+    /// The URL of the domain register.
+    pub domain_register_url: String,
+    /// The interval at which the orchestrator refreshes subscription, s.
+    pub subscription_refresh_interval_sec: u64,
     /// The identifier of the orchestration domain managed by this orchestrator.
     pub domain_id: String,
     /// The URL to which the orchestrator is bound.
@@ -28,31 +42,16 @@ pub struct EdgelessOrcGeneralSettings {
     /// The URL to which the orchestrator can be reached, which may be
     /// different from `orchestrator_url`, e.g., for NAT traversal.
     pub orchestrator_url_announced: String,
-    /// The COAP URL to which the orchestrator is bound.
-    pub orchestrator_coap_url: Option<String>,
-    /// The COAP URL to which the orchestrator can be reached, which may be
-    /// different from `orchestrator_url`, e.g., for NAT traversal.
-    pub orchestrator_coap_url_announced: Option<String>,
-    /// The URL of the agent of the node embedded in the orchestrator.
-    pub agent_url: String,
-    /// The agent URL announced by the node.
-    /// It is the end-point used by the orchestrator to manage the node.
-    /// It can be different from `agent_url`, e.g., for NAT traversal.
-    pub agent_url_announced: String,
-    /// The URL of the data plane of the node embedded in the orchestrator.
-    pub invocation_url: String,
-    /// The invocation URL announced by the node.
-    /// It can be different from `invocation_url`, e.g., for NAT traversal.
-    pub invocation_url_announced: String,
+    /// The gRPC URL of the node register.
+    pub node_register_url: String,
+    /// The CoAP URL of the node register.
+    pub node_register_coap_url: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessOrcBaselineSettings {
     /// The orchestration strategy.
     pub orchestration_strategy: OrchestrationStrategy,
-    /// The periodic interval at which nodes are polled for keep-alive and
-    /// data structures are updated on the proxy.
-    pub keep_alive_interval_secs: u64,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -78,13 +77,15 @@ pub struct EdgelessOrcProxyDatasetSettings {
     additional_header: String,
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct EdgelessOrcCollectorSettings {
-    /// Type of the metrics collector that is used to store run-time
-    /// measurements from function instances.
-    pub collector_type: String,
-    /// If collector_type is "Redis" then this is the URL of the Redis server.
-    pub redis_url: Option<String>,
+impl Default for EdgelessOrcProxyDatasetSettings {
+    fn default() -> Self {
+        Self {
+            dataset_path: String::default(),
+            append: true,
+            additional_fields: String::default(),
+            additional_header: String::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -97,115 +98,119 @@ pub enum OrchestrationStrategy {
     RoundRobin,
 }
 
-pub fn make_proxy(settings: EdgelessOrcProxySettings) -> Box<dyn proxy::Proxy> {
+pub fn make_proxy(settings: EdgelessOrcProxySettings) -> std::sync::Arc<tokio::sync::Mutex<dyn proxy::Proxy>> {
     match settings.proxy_type.to_lowercase().as_str() {
         "none" => {}
         "redis" => match proxy_redis::ProxyRedis::new(&settings.redis_url.unwrap_or_default(), true, settings.dataset_settings) {
-            Ok(proxy_redis) => return Box::new(proxy_redis),
+            Ok(proxy_redis) => return std::sync::Arc::new(tokio::sync::Mutex::new(proxy_redis)),
             Err(err) => log::error!("error when connecting to Redis: {}", err),
         },
         _ => log::error!("unknown proxy type: {}", settings.proxy_type),
     }
-    Box::new(proxy_none::ProxyNone {})
+    std::sync::Arc::new(tokio::sync::Mutex::new(proxy_none::ProxyNone {}))
 }
 
 pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
-    log::info!("Starting Edgeless Orchestrator at {}", settings.general.orchestrator_url,);
+    log::info!("Starting Edgeless Orchestrator");
     log::debug!("Settings: {:?}", settings);
 
-    // Create a node embedded in the orchestrator for metrics collection.
-    let (node_id, agent_task, agent_api_server, resource_provider_specifications) = edgeless_node::create_metrics_collector_node(
-        settings.general.invocation_url.clone(),
-        settings.general.agent_url.clone(),
-        settings.collector.collector_type,
-        settings.collector.redis_url,
+    // Create the component that subscribes to the domain register to
+    // notify domain updates (periodically refreshed).
+    let (mut subscriber, subscriber_task, subscriber_refresh_task) = domain_subscriber::DomainSubscriber::new(
+        settings.general.domain_id.clone(),
+        match edgeless_api::util::get_announced(&settings.general.orchestrator_url, &settings.general.orchestrator_url_announced) {
+            Ok(url) => url,
+            Err(err) => {
+                log::error!(
+                    "invalid URL '{}' (announced: '{}'): {}",
+                    settings.general.orchestrator_url,
+                    settings.general.orchestrator_url_announced,
+                    err
+                );
+                String::default()
+            }
+        },
+        settings.general.domain_register_url,
+        settings.general.subscription_refresh_interval_sec,
     )
     .await;
 
+    // Create the proxy.
+    let proxy = make_proxy(settings.proxy);
+    proxy.lock().await.update_domain_info(&crate::domain_info::DomainInfo {
+        domain_id: settings.general.domain_id.to_string(),
+    });
+
     // Create the orchestrator.
-    let (mut orchestrator, orchestrator_task) = orchestrator::Orchestrator::new(settings.baseline.clone(), make_proxy(settings.proxy)).await;
+    let (mut orchestrator, orchestrator_task, orchestrator_refresh_task) =
+        orchestrator::Orchestrator::new(settings.baseline.clone(), proxy.clone(), subscriber.get_subscriber_sender()).await;
 
     let orchestrator_server =
-        edgeless_api::grpc_impl::orc::OrchestratorAPIServer::run(orchestrator.get_api_client(), settings.general.orchestrator_url.clone());
+        edgeless_api::grpc_impl::outer::orc::OrchestratorAPIServer::run(orchestrator.get_api_client(), settings.general.orchestrator_url);
 
-    let orchestrator_coap_server = if let Some(_url) = settings.general.orchestrator_coap_url {
-        edgeless_api::coap_impl::orchestration::CoapOrchestrationServer::run(
-            orchestrator.get_api_client().node_registration_api(),
-            std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), 7050),
-        )
+    // Create the node register.
+    let (mut node_register, node_register_task, node_register_refresh_task) =
+        node_register::NodeRegister::new(proxy, orchestrator.get_sender()).await;
+
+    let node_register_server = edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIServer::run(
+        node_register.get_node_registration_client(),
+        settings.general.node_register_url,
+    );
+
+    let node_register_coap_server = if let Some(url) = settings.general.node_register_coap_url {
+        if let Ok((proto, address, port)) = edgeless_api::util::parse_http_host(&url) {
+            if proto != edgeless_api::util::Proto::COAP {
+                log::warn!("Wrong protocol for the CoAP node register ({}): assuming coap://", url);
+            }
+            if address != "0.0.0.0" {
+                log::warn!("CoAP node register requested to be bound at {}: ignored, using 0.0.0.0 instead", address);
+            }
+            edgeless_api::coap_impl::node_register::CoapNodeRegisterServer::run(
+                node_register.get_node_registration_client().node_registration_api(),
+                std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
+            )
+        } else {
+            log::error!("Wrong URL for the CoAP node register: {}", url);
+            Box::pin(async {})
+        }
     } else {
         Box::pin(async {})
     };
 
-    if settings.baseline.keep_alive_interval_secs == 0 {
-        log::info!("node keep-alive disabled");
-    } else {
-        log::info!("node keep-alive enabled every {} seconds", settings.baseline.keep_alive_interval_secs);
-        let _keep_alive_task = tokio::spawn(async move {
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(settings.baseline.keep_alive_interval_secs));
-            loop {
-                interval.tick().await;
-                orchestrator.keep_alive().await;
-            }
-        });
-    }
-
+    // Wait for all the tasks to come to an end.
     join!(
-        agent_task,
-        agent_api_server,
         orchestrator_task,
+        orchestrator_refresh_task,
         orchestrator_server,
-        orchestrator_coap_server,
-        edgeless_node::register_node(
-            edgeless_node::EdgelessNodeGeneralSettings {
-                node_id,
-                agent_url: settings.general.agent_url,
-                agent_url_announced: settings.general.agent_url_announced,
-                invocation_url: settings.general.invocation_url,
-                invocation_url_announced: settings.general.invocation_url_announced,
-                invocation_url_coap: None,
-                invocation_url_announced_coap: None,
-                orchestrator_url: match settings.general.orchestrator_url_announced.is_empty() {
-                    true => settings.general.orchestrator_url,
-                    false => settings.general.orchestrator_url_announced.clone(),
-                },
-            },
-            edgeless_api::node_registration::NodeCapabilities::empty(),
-            resource_provider_specifications
-        )
+        node_register_task,
+        node_register_refresh_task,
+        node_register_server,
+        node_register_coap_server,
+        subscriber_task,
+        subscriber_refresh_task
     );
 }
 
 pub fn edgeless_orc_default_conf() -> String {
-    String::from(
-        r##"[general]
-domain_id = "domain-1"
-orchestrator_url = "http://127.0.0.1:7011"
-orchestrator_url_announced = ""
-orchestrator_coap_url = "coap://127.0.0.1:7050"
-orchestrator_coap_url_announced = ""
-agent_url = "http://127.0.0.1:7121"
-agent_url_announced = ""
-invocation_url = "http://127.0.0.1:7102"
-invocation_url_announced = ""
+    let orc_conf = EdgelessOrcSettings {
+        general: EdgelessOrcGeneralSettings {
+            domain_register_url: String::from("http://127.0.0.1:7002"),
+            subscription_refresh_interval_sec: 2,
+            domain_id: String::from("domain-7000"),
+            orchestrator_url: String::from("http://127.0.0.1:7003"),
+            orchestrator_url_announced: String::from("http://127.0.0.1:7003"),
+            node_register_url: String::from("http://127.0.0.1:7004"),
+            node_register_coap_url: None,
+        },
+        baseline: EdgelessOrcBaselineSettings {
+            orchestration_strategy: OrchestrationStrategy::Random,
+        },
+        proxy: EdgelessOrcProxySettings {
+            proxy_type: "None".to_string(),
+            redis_url: Some(String::from("redis://127.0.0.1:6379")),
+            dataset_settings: Some(EdgelessOrcProxyDatasetSettings::default()),
+        },
+    };
 
-[baseline]
-orchestration_strategy = "Random"
-keep_alive_interval_secs = 2
-
-[proxy]
-proxy_type = "None"
-redis_url = ""
-
-[proxy.dataset_settings]
-dataset_path = ""
-append = true
-additional_fields = ""
-additional_header = ""
-
-[collector]
-collector_type = "None"
-redis_url = ""
-"##,
-    )
+    toml::to_string(&orc_conf).expect("Wrong")
 }

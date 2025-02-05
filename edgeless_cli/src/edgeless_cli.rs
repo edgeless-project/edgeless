@@ -2,10 +2,11 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-mod workflow_spec;
 
+mod workflow_spec;
+use cargo::GlobalContext;
 use clap::Parser;
-use edgeless_api::{controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
+use edgeless_api::{outer::controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
 
 use mailparse::{parse_content_disposition, parse_header};
 use reqwest::header::ACCEPT;
@@ -22,6 +23,7 @@ enum WorkflowCommands {
     Start { spec_file: String },
     Stop { id: String },
     List {},
+    Inspect { id: String },
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -49,6 +51,12 @@ enum FunctionCommands {
 }
 
 #[derive(Debug, clap::Subcommand)]
+enum DomainCommands {
+    Inspect { id: String },
+    List {},
+}
+
+#[derive(Debug, clap::Subcommand)]
 enum Commands {
     Workflow {
         #[command(subcommand)]
@@ -57,6 +65,10 @@ enum Commands {
     Function {
         #[command(subcommand)]
         function_command: FunctionCommands,
+    },
+    Domain {
+        #[command(subcommand)]
+        domain_command: DomainCommands,
     },
 }
 
@@ -71,13 +83,22 @@ struct Args {
     template: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 struct CLiConfig {
     controller_url: String,
     function_repository: Option<FunctionRepositoryConfig>,
 }
 
-#[derive(serde::Deserialize)]
+impl Default for CLiConfig {
+    fn default() -> Self {
+        Self {
+            controller_url: String::from("http://127.0.0.1:7001"),
+            function_repository: Some(FunctionRepositoryConfig::default()),
+        }
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Default)]
 struct FunctionRepositoryConfig {
     pub url: String,
     pub basic_auth_user: String,
@@ -85,15 +106,20 @@ struct FunctionRepositoryConfig {
 }
 
 pub fn edgeless_cli_default_conf() -> String {
-    String::from(
-        r##"controller_url = "http://127.0.0.1:7001"
+    let cli_conf = CLiConfig::default();
+    toml::to_string(&cli_conf).expect("Wrong")
+}
 
-#[function_repository]
-#url = ""
-#basic_auth_user = ""
-#basic_auth_pass = ""
-"##,
-    )
+async fn wf_client(config_file: &str) -> anyhow::Result<Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>> {
+    anyhow::ensure!(
+        std::fs::metadata(config_file).is_ok(),
+        "configuration file does not exist or cannot be accessed: {}",
+        config_file
+    );
+
+    let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(config_file).unwrap()).unwrap();
+    let mut con_client = edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(&conf.controller_url).await;
+    Ok(con_client.workflow_instance_api())
 }
 
 #[tokio::main]
@@ -110,66 +136,18 @@ async fn main() -> anyhow::Result<()> {
         None => log::debug!("Bye"),
         Some(x) => match x {
             Commands::Workflow { workflow_command } => {
-                if std::fs::metadata(&args.config_file).is_err() {
-                    return Err(anyhow::anyhow!(
-                        "configuration file does not exist or cannot be accessed: {}",
-                        &args.config_file
-                    ));
-                }
-                log::debug!("Got Config");
-                let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
-                let mut con_client = edgeless_api::grpc_impl::controller::ControllerAPIClient::new(&conf.controller_url).await;
-                let mut con_wf_client = con_client.workflow_instance_api();
+                let mut wf_client = wf_client(&args.config_file).await?;
                 match workflow_command {
                     WorkflowCommands::Start { spec_file } => {
                         log::debug!("Start Workflow");
-                        let workflow: workflow_spec::WorkflowSpec =
-                            serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
-                        let res = con_wf_client
-                            .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                                workflow_functions: workflow
-                                    .functions
-                                    .into_iter()
-                                    .map(|func_spec| {
-                                        let function_class_code = match func_spec.class_specification.function_type.as_str() {
-                                            "RUST_WASM" => std::fs::read(
-                                                std::path::Path::new(&spec_file)
-                                                    .parent()
-                                                    .unwrap()
-                                                    .join(func_spec.class_specification.code.unwrap()),
-                                            )
-                                            .unwrap(),
-                                            "CONTAINER" => func_spec.class_specification.code.unwrap().as_bytes().to_vec(),
-                                            _ => panic!("unknown function class type: {}", func_spec.class_specification.function_type),
-                                        };
 
-                                        edgeless_api::workflow_instance::WorkflowFunction {
-                                            name: func_spec.name,
-                                            function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                                                function_class_id: func_spec.class_specification.id,
-                                                function_class_type: func_spec.class_specification.function_type,
-                                                function_class_version: func_spec.class_specification.version,
-                                                function_class_code,
-                                                function_class_outputs: func_spec.class_specification.outputs,
-                                            },
-                                            output_mapping: func_spec.output_mapping,
-                                            annotations: func_spec.annotations,
-                                        }
-                                    })
-                                    .collect(),
-                                workflow_resources: workflow
-                                    .resources
-                                    .into_iter()
-                                    .map(|res_spec| edgeless_api::workflow_instance::WorkflowResource {
-                                        name: res_spec.name,
-                                        class_type: res_spec.class_type,
-                                        output_mapping: res_spec.output_mapping,
-                                        configurations: res_spec.configurations,
-                                    })
-                                    .collect(),
-                                annotations: workflow.annotations.clone(),
-                            })
-                            .await;
+                        let workflow_spec: edgeless_cli::workflow_spec::WorkflowSpec =
+                            serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
+                        let parent_path = std::path::Path::new(&spec_file)
+                            .parent()
+                            .expect("cannot find the workflow spec's parent path");
+                        let workflow = edgeless_cli::workflow_spec_to_request(workflow_spec, parent_path);
+                        let res = wf_client.start(workflow).await;
                         match res {
                             Ok(response) => {
                                 match &response {
@@ -186,26 +164,64 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                     WorkflowCommands::Stop { id } => {
-                        let parsed_id = uuid::Uuid::parse_str(&id)?;
-                        match con_wf_client
-                            .stop(edgeless_api::workflow_instance::WorkflowId { workflow_id: parsed_id })
+                        match wf_client
+                            .stop(edgeless_api::workflow_instance::WorkflowId {
+                                workflow_id: uuid::Uuid::parse_str(&id)?,
+                            })
                             .await
                         {
                             Ok(_) => println!("Workflow Stopped"),
                             Err(err) => println!("{}", err),
                         }
                     }
-                    WorkflowCommands::List {} => match con_wf_client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
-                        Ok(instances) => {
-                            for instance in instances.iter() {
-                                println!("workflow: {}", instance.workflow_id);
-                                for function in instance.domain_mapping.iter() {
-                                    println!("\t{:?}", function);
-                                }
+                    WorkflowCommands::List {} => match wf_client.list().await {
+                        Ok(identifiers) => {
+                            for wf_id in identifiers {
+                                println!("{}", wf_id);
                             }
                         }
                         Err(err) => println!("{}", err),
                     },
+                    WorkflowCommands::Inspect { id } => {
+                        match wf_client
+                            .inspect(edgeless_api::workflow_instance::WorkflowId {
+                                workflow_id: uuid::Uuid::parse_str(&id)?,
+                            })
+                            .await
+                        {
+                            Ok(info) => {
+                                assert_eq!(id, info.status.workflow_id.to_string());
+                                for fun in info.request.workflow_functions {
+                                    println!("* function {}", fun.name);
+                                    println!("{}", fun.function_class_specification.to_short_string());
+                                    for (out, next) in fun.output_mapping {
+                                        println!("OUT {} -> {}", out, next);
+                                    }
+                                    for (name, annotation) in fun.annotations {
+                                        println!("F_ANN {} -> {}", name, annotation);
+                                    }
+                                }
+                                for res in info.request.workflow_resources {
+                                    println!("* resource {}", res.name);
+                                    println!("{}", res.class_type);
+                                    for (out, next) in res.output_mapping {
+                                        println!("OUT {} -> {}", out, next);
+                                    }
+                                    for (name, annotation) in res.configurations {
+                                        println!("CONF {} -> {}", name, annotation);
+                                    }
+                                }
+                                println!("* mapping");
+                                for (name, annotation) in info.request.annotations {
+                                    println!("W_ANN {} -> {}", name, annotation);
+                                }
+                                for mapping in info.status.domain_mapping {
+                                    println!("MAP {} -> {} [logical ID {}]", mapping.name, mapping.domain_id, mapping.function_id);
+                                }
+                            }
+                            Err(err) => println!("{}", err),
+                        }
+                    }
                 }
             }
             Commands::Function { function_command } => match function_command {
@@ -217,8 +233,8 @@ async fn main() -> anyhow::Result<()> {
                     let function_spec: workflow_spec::WorkflowSpecFunctionClass = serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
                     let build_dir = std::env::temp_dir().join(format!("edgeless-{}-{}", function_spec.id, uuid::Uuid::new_v4()));
 
-                    let config = &cargo::util::config::Config::default()?;
-                    let mut ws = cargo::core::Workspace::new(&cargo_manifest, config)?;
+                    let context = GlobalContext::default().expect("Could not construct a global context for the workspace");
+                    let mut ws = cargo::core::Workspace::new(&cargo_manifest, &context)?;
                     ws.set_target_dir(cargo::util::Filesystem::new(build_dir.clone()));
 
                     let out_file = cargo_project_path
@@ -235,7 +251,7 @@ async fn main() -> anyhow::Result<()> {
                     };
 
                     // standard files - could be extended to look for more
-                    let triggering_files = vec!["Cargo.toml", "Cargo.lock", "function.json", "src/lib.rs"];
+                    let triggering_files = ["Cargo.toml", "Cargo.lock", "function.json", "src/lib.rs"];
                     let full_paths: Vec<std::path::PathBuf> = triggering_files.iter().map(|&f| cargo_project_path.join(f)).collect();
                     let mod_timestamps: Vec<SystemTime> = full_paths
                         .iter()
@@ -271,7 +287,7 @@ async fn main() -> anyhow::Result<()> {
                         };
 
                         let mut build_config = cargo::core::compiler::BuildConfig::new(
-                            config,
+                            &context,
                             None,
                             false,
                             &["wasm32-unknown-unknown".to_string()],
@@ -290,7 +306,7 @@ async fn main() -> anyhow::Result<()> {
                             target_rustc_args: None,
                             target_rustc_crate_types: None,
                             rustdoc_document_private_items: false,
-                            honor_rust_version: true,
+                            honor_rust_version: Some(true),
                         };
 
                         cargo::ops::compile(&ws, &compile_options)?;
@@ -476,6 +492,23 @@ async fn main() -> anyhow::Result<()> {
                     println!("post_response body: {:?}", post_response);
                 }
             },
+            Commands::Domain { domain_command } => {
+                let mut wf_client = wf_client(&args.config_file).await?;
+                match domain_command {
+                    DomainCommands::List {} => {
+                        for (domain_id, caps) in wf_client.domains(String::from("")).await? {
+                            println!("domain {} ({} nodes)", domain_id, caps.num_nodes);
+                        }
+                    }
+                    DomainCommands::Inspect { id } => {
+                        let domains = wf_client.domains(id.clone()).await?;
+                        match domains.get(&id) {
+                            None => println!("domain {} not found", id),
+                            Some(caps) => println!("{}", caps),
+                        }
+                    }
+                }
+            }
         },
     }
     Ok(())

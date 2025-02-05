@@ -41,7 +41,10 @@ pub struct RuntimeTask<FunctionInstanceType: super::FunctionInstance> {
 }
 
 pub enum RuntimeRequest {
-    Start(edgeless_api::function_instance::SpawnFunctionRequest),
+    Start(
+        edgeless_api::function_instance::InstanceId,
+        edgeless_api::function_instance::SpawnFunctionRequest,
+    ),
     Stop(edgeless_api::function_instance::InstanceId),
     Patch(edgeless_api::common::PatchRequest),
     FunctionExit(edgeless_api::function_instance::InstanceId, Result<(), super::FunctionInstanceError>),
@@ -93,8 +96,8 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         log::info!("Starting Edgeless Runner");
         while let Some(req) = self.receiver.next().await {
             match req {
-                RuntimeRequest::Start(spawn_request) => {
-                    self.start_function(spawn_request).await;
+                RuntimeRequest::Start(instance_id, spawn_request) => {
+                    self.start_function(instance_id, spawn_request).await;
                 }
                 RuntimeRequest::Stop(instance_id) => {
                     self.stop_function(instance_id).await;
@@ -109,17 +112,16 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         }
     }
 
-    async fn start_function(&mut self, spawn_request: edgeless_api::function_instance::SpawnFunctionRequest) {
-        log::info!("Start Function {:?}", spawn_request.instance_id);
-        let instance_id = match spawn_request.instance_id {
-            Some(id) => id,
-            None => {
-                return;
-            }
-        };
+    async fn start_function(
+        &mut self,
+        instance_id: edgeless_api::function_instance::InstanceId,
+        spawn_request: edgeless_api::function_instance::SpawnFunctionRequest,
+    ) {
+        log::info!("Start Function {:?}", instance_id);
         let cloned_req = spawn_request.clone();
         let data_plane = self.data_plane_provider.get_handle_for(instance_id).await;
         let instance = super::function_instance_runner::FunctionInstanceRunner::new(
+            instance_id,
             cloned_req,
             data_plane,
             self.slf_channel.clone(),
@@ -166,8 +168,12 @@ impl RuntimeClient {
 
 #[async_trait::async_trait]
 impl super::RuntimeAPI for RuntimeClient {
-    async fn start(&mut self, request: edgeless_api::function_instance::SpawnFunctionRequest) -> anyhow::Result<()> {
-        match self.sender.send(RuntimeRequest::Start(request)).await {
+    async fn start(
+        &mut self,
+        instance_id: edgeless_api::function_instance::InstanceId,
+        request: edgeless_api::function_instance::SpawnFunctionRequest,
+    ) -> anyhow::Result<()> {
+        match self.sender.send(RuntimeRequest::Start(instance_id, request)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
         }

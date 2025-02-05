@@ -22,20 +22,13 @@ impl MockSensor {
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<MockSensorConfiguration, edgeless_api_core::common::ErrorResponse> {
-        let mut out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
+        let out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
 
         if data.class_type != "scd30-sensor" {
             return Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Wrong Resource class type",
                 detail: None,
             });
-        }
-
-        for (key, val) in data.output_mapping {
-            if key == "data_out" {
-                out_id = Some(val);
-                break;
-            }
         }
 
         // let out_id = match out_id {
