@@ -15,14 +15,11 @@ RUN apt-get update && apt-get install -y gettext-base && rm -rf /var/lib/apt/lis
 # Create the template file in the temporary location
 RUN echo '\
 controller_url = "http://0.0.0.0:${CONTROLLER_PORT}"\n\
-orchestrators = [\n\
-    { domain_id = "${DOMAIN_ID}", orchestrator_url="${ORCHESTRATOR_URL}:${ORCHESTRATOR_URL}" }\n\
-]\n' > /usr/local/etc/controller-template.toml
+domain_register_url = "http://0.0.0.0:${DOMAIN_REGISTER_PORT}"\n' > /usr/local/etc/controller-template.toml
 
 # Replace the variables and run the application
 ENTRYPOINT ["/bin/bash", "-c", "\
   export CONTROLLER_PORT=${CONTROLLER_PORT:-7001} && \
-  export DOMAIN_ID=${DOMAIN_ID:-domain-1} && \
-  export ORCHESTRATOR_URL=${ORCHESTRATOR_URL:-} && \
+  export DOMAIN_REGISTER_PORT=${DOMAIN_REGISTER_PORT:-7002} && \
   envsubst < /usr/local/etc/controller-template.toml > /usr/local/etc/controller.toml && \
   RUST_LOG=info /usr/local/bin/edgeless_con_d --config-file /usr/local/etc/controller.toml"]
