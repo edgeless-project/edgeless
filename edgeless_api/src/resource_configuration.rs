@@ -4,12 +4,11 @@
 // SPDX-License-Identifier: MIT
 use crate::common::PatchRequest;
 
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, PartialEq, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ResourceInstanceSpecification {
     pub class_type: String,
-    #[serde(skip)]
-    pub output_mapping: std::collections::HashMap<String, crate::function_instance::InstanceId>,
     pub configuration: std::collections::HashMap<String, String>,
+    pub workflow_id: String,
 }
 
 #[async_trait::async_trait]
@@ -43,8 +42,8 @@ impl Clone for Box<dyn ResourceConfigurationAPI<crate::function_instance::Instan
     }
 }
 
-impl Clone for Box<dyn ResourceConfigurationAPI<crate::orc::DomainManagedInstanceId>> {
-    fn clone(&self) -> Box<dyn ResourceConfigurationAPI<crate::orc::DomainManagedInstanceId>> {
+impl Clone for Box<dyn ResourceConfigurationAPI<crate::function_instance::DomainManagedInstanceId>> {
+    fn clone(&self) -> Box<dyn ResourceConfigurationAPI<crate::function_instance::DomainManagedInstanceId>> {
         self.clone_box()
     }
 }

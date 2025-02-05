@@ -3,7 +3,7 @@
 
 use crate::workflow_type::WorkflowType;
 use anyhow::anyhow;
-use edgeless_api::controller::ControllerAPI;
+use edgeless_api::outer::controller::ControllerAPI;
 use edgeless_api::workflow_instance::{SpawnWorkflowResponse, WorkflowFunction, WorkflowId, WorkflowInstanceAPI};
 use rand::prelude::*;
 use rand::SeedableRng;
@@ -27,7 +27,7 @@ pub async fn setup_metrics_collector(engine: &mut Engine, single_trigger_wasm: &
             workflow_functions: vec![WorkflowFunction {
                 name: "single_trigger".to_string(),
                 function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                    function_class_id: "matrix_mul".to_string(),
+                    function_class_id: "single_trigger".to_string(),
                     function_class_type: "RUST_WASM".to_string(),
                     function_class_version: "0.1".to_string(),
                     function_class_code,
@@ -75,7 +75,7 @@ pub struct Engine {
 impl Engine {
     pub async fn new(controller_url: &str, wf_type: WorkflowType, seed: u64, redis_client: Option<crate::redis_dumper::RedisDumper>) -> Self {
         Self {
-            client: edgeless_api::grpc_impl::controller::ControllerAPIClient::new(controller_url)
+            client: edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(controller_url)
                 .await
                 .workflow_instance_api(),
             wf_type,
@@ -103,6 +103,7 @@ impl Engine {
     pub async fn start_workflow(&mut self) -> anyhow::Result<String> {
         let mut functions = vec![];
         let mut resources: Vec<edgeless_api::workflow_instance::WorkflowResource> = vec![];
+        let mut annotations = std::collections::HashMap::new();
 
         let wf_name = format!("wf{}", self.wf_id);
 
@@ -224,10 +225,10 @@ impl Engine {
                         i => format!("f{}", chain_size - i - 1),
                     };
 
-                    let output_mapping = std::collections::HashMap::from([
-                        ("metric".to_string(), "metrics-collector".to_string()),
-                        ("out".to_string(), next_func_name),
-                    ]);
+                    let mut output_mapping = std::collections::HashMap::from([("out".to_string(), next_func_name)]);
+                    if self.redis_client.is_some() {
+                        output_mapping.insert("metric".to_string(), "metrics-collector".to_string());
+                    }
 
                     let annotations = std::collections::HashMap::from([(
                         "init-payload".to_string(),
@@ -310,7 +311,7 @@ impl Engine {
                     let outputs: Vec<u32> = if last { vec![] } else { (0..breadth).collect() };
                     breadths.push(outputs.len());
                     let mut output_mapping = std::collections::HashMap::new();
-                    if first || last {
+                    if self.redis_client.is_some() && (first || last) {
                         output_mapping.insert("metric".to_string(), "metrics-collector".to_string());
                     }
                     for out in &outputs {
@@ -377,9 +378,17 @@ impl Engine {
                         .join(",")
                 );
             }
+            WorkflowType::JsonSpec(data) => {
+                let spec_string = data.spec_string.replace("@WF_ID", self.wf_id.to_string().as_str());
+                let workflow_spec: edgeless_cli::workflow_spec::WorkflowSpec = serde_json::from_str(&spec_string).unwrap();
+                let mut workflow = edgeless_cli::workflow_spec_to_request(workflow_spec, &data.parent_path);
+                std::mem::swap(&mut workflow.workflow_functions, &mut functions);
+                std::mem::swap(&mut workflow.workflow_resources, &mut resources);
+                std::mem::swap(&mut workflow.annotations, &mut annotations);
+            }
         };
 
-        if self.wf_type.metrics_collector() {
+        if self.redis_client.is_some() && self.wf_type.metrics_collector() {
             resources.push(edgeless_api::workflow_instance::WorkflowResource {
                 name: "metrics-collector".to_string(),
                 class_type: "metrics-collector".to_string(),
@@ -404,7 +413,7 @@ impl Engine {
         let req = edgeless_api::workflow_instance::SpawnWorkflowRequest {
             workflow_functions: functions,
             workflow_resources: resources,
-            annotations: std::collections::HashMap::new(),
+            annotations,
         };
         if let Some(redis_client) = &mut self.redis_client {
             redis_client.set(format!("workflow:{}:begin", wf_name).as_str(), &timestamp_now());

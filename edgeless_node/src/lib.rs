@@ -3,14 +3,13 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::orc::OrchestratorAPI;
-use futures::Future;
 use resources::resource_provider_specs::ResourceProviderSpecs;
 
 pub mod agent;
 pub mod base_runtime;
 pub mod container_runner;
 pub mod gpu_info;
+pub mod node_subscriber;
 pub mod resources;
 pub mod state_management;
 #[cfg(feature = "wasmtime")]
@@ -58,6 +57,15 @@ pub struct EdgelessNodeContainerRuntimeSettings {
     pub guest_api_host_url: String,
 }
 
+impl Default for EdgelessNodeContainerRuntimeSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            guest_api_host_url: String::from("http://127.0.0.1:7100"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeGeneralSettings {
     /// The UUID of this node.
@@ -78,8 +86,10 @@ pub struct EdgelessNodeGeneralSettings {
     /// The COAP invocation URL announced by the node.
     /// It can be different from `agent_url`, e.g., for NAT traversal.
     pub invocation_url_announced_coap: Option<String>,
-    /// The URL of the orchestrator to which this node registers.
-    pub orchestrator_url: String,
+    /// The URL of the node register server.
+    pub node_register_url: String,
+    /// The interval at which the node refreshes subscription, s.
+    pub subscription_refresh_interval_sec: u64,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -107,6 +117,8 @@ pub struct EdgelessNodeResourceSettings {
     /// The resource will connect to a remote Kafka server to stream the
     /// messages received on a given topic.
     pub kafka_egress_provider: Option<String>,
+    /// The metrics collector settings.
+    pub metrics_collector_provider: Option<MetricsCollectorProviderSettings>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -119,6 +131,38 @@ pub struct OllamaProviderSettings {
     pub messages_number_limit: u16,
     /// If not empty, an ollama resource provider with that name is created.
     pub provider: String,
+}
+
+impl Default for OllamaProviderSettings {
+    fn default() -> Self {
+        Self {
+            host: String::from("localhost"),
+            port: 11434,
+            messages_number_limit: 30,
+            provider: String::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct MetricsCollectorProviderSettings {
+    /// Type of the metrics collector that is used to store run-time
+    /// measurements from function instances.
+    pub collector_type: String,
+    /// If collector_type is "Redis" then this is the URL of the Redis server.
+    pub redis_url: Option<String>,
+    /// If not empty, a metrics collector resource provider with that name is created.
+    pub provider: String,
+}
+
+impl Default for MetricsCollectorProviderSettings {
+    fn default() -> Self {
+        Self {
+            collector_type: String::from("None"),
+            redis_url: Some(String::from("redis://localhost:6379")),
+            provider: String::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -156,33 +200,22 @@ impl NodeCapabilitiesUser {
     }
 }
 
-impl EdgelessNodeSettings {
-    /// Create settings for a node with WASM run-time and no resources
-    /// binding the given ports on the same address.
-    pub fn new_without_resources(orchestrator_url: &str, node_address: &str, agent_port: u16, invocation_port: u16, metrics_port: u16) -> Self {
-        let agent_url = format!("http://{}:{}", node_address, agent_port);
-        let invocation_url = format!("http://{}:{}", node_address, invocation_port);
-        let invocation_url_coap = Some(format!("coap://{}:{}", node_address, invocation_port));
+impl Default for NodeCapabilitiesUser {
+    fn default() -> Self {
+        let caps = get_capabilities(vec!["RUST_WASM".to_string()], NodeCapabilitiesUser::empty());
         Self {
-            general: EdgelessNodeGeneralSettings {
-                node_id: uuid::Uuid::new_v4(),
-                agent_url: agent_url.clone(),
-                agent_url_announced: agent_url,
-                invocation_url: invocation_url.clone(),
-                invocation_url_announced: invocation_url,
-                invocation_url_coap: invocation_url_coap.clone(),
-                invocation_url_announced_coap: invocation_url_coap,
-                orchestrator_url: orchestrator_url.to_string(),
-            },
-            telemetry: EdgelessNodeTelemetrySettings {
-                metrics_url: format!("http://{}:{}", node_address, metrics_port),
-                log_level: None,
-                performance_samples: false,
-            },
-            wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
-            container_runtime: None,
-            resources: None,
-            user_node_capabilities: None,
+            num_cpus: Some(caps.num_cpus),
+            model_name_cpu: Some(caps.model_name_cpu),
+            clock_freq_cpu: Some(caps.clock_freq_cpu),
+            num_cores: Some(caps.num_cores),
+            mem_size: Some(caps.mem_size),
+            labels: Some(caps.labels),
+            is_tee_running: Some(caps.is_tee_running),
+            has_tpm: Some(caps.has_tpm),
+            disk_tot_space: Some(caps.disk_tot_space),
+            num_gpus: Some(caps.num_gpus),
+            model_name_gpu: Some(caps.model_name_gpu),
+            mem_size_gpu: Some(caps.mem_size_gpu),
         }
     }
 }
@@ -224,7 +257,6 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         log::debug!("CPUs have different frequencies, using: {}", clock_freq_cpu);
     }
 
-    // GPU information is not (yet) inferred automatically
     edgeless_api::node_registration::NodeCapabilities {
         num_cpus: user_node_capabilities.num_cpus.unwrap_or(sys.cpus().len() as u32),
         model_name_cpu: user_node_capabilities.model_name_cpu.unwrap_or(model_name_cpu),
@@ -238,52 +270,11 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         disk_tot_space: user_node_capabilities
             .disk_tot_space
             .unwrap_or((unique_total_space.values().sum::<u64>() / (1024 * 1024)) as u32),
-        num_gpus: user_node_capabilities.num_gpus.unwrap_or_default(),
-        model_name_gpu: user_node_capabilities.model_name_gpu.unwrap_or_default(),
-        mem_size_gpu: user_node_capabilities.mem_size_gpu.unwrap_or_default(),
-    }
-}
-
-pub async fn register_node(
-    settings: EdgelessNodeGeneralSettings,
-    capabilities: edgeless_api::node_registration::NodeCapabilities,
-    resource_provider_specifications: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
-) {
-    log::info!(
-        "Registering this node '{}' on e-ORC {}, capabilities: {}",
-        &settings.node_id,
-        &settings.orchestrator_url,
-        capabilities
-    );
-    match edgeless_api::grpc_impl::orc::OrchestratorAPIClient::new(&settings.orchestrator_url, None).await {
-        Ok(mut orc_client) => match orc_client
-            .node_registration_api()
-            .update_node(edgeless_api::node_registration::UpdateNodeRequest::Registration(
-                settings.node_id,
-                match settings.agent_url_announced.is_empty() {
-                    true => settings.agent_url.clone(),
-                    false => settings.agent_url_announced.clone(),
-                },
-                match settings.invocation_url_announced.is_empty() {
-                    true => settings.invocation_url.clone(),
-                    false => settings.invocation_url_announced.clone(),
-                },
-                resource_provider_specifications,
-                capabilities,
-            ))
-            .await
-        {
-            Ok(res) => match res {
-                edgeless_api::node_registration::UpdateNodeResponse::ResponseError(err) => {
-                    panic!("could not register to e-ORC {}: {}", &settings.orchestrator_url, err)
-                }
-                edgeless_api::node_registration::UpdateNodeResponse::Accepted => {
-                    log::info!("this node '{}' registered to e-ORC '{}'", &settings.node_id, &settings.orchestrator_url)
-                }
-            },
-            Err(err) => panic!("channel error when registering to e-ORC {}: {}", &settings.orchestrator_url, err),
-        },
-        Err(err) => panic!("could not connect to e-ORC {}: {}", &settings.orchestrator_url, err),
+        num_gpus: user_node_capabilities.num_gpus.unwrap_or(crate::gpu_info::get_num_gpus() as u32),
+        model_name_gpu: user_node_capabilities.model_name_gpu.unwrap_or(crate::gpu_info::get_model_name_gpu()),
+        mem_size_gpu: user_node_capabilities
+            .mem_size_gpu
+            .unwrap_or((crate::gpu_info::get_mem_size_gpu() / (1024)) as u32),
     }
 }
 
@@ -299,7 +290,7 @@ async fn fill_resources(
         if let (Some(http_ingress_url), Some(provider_id)) = (&settings.http_ingress_url, &settings.http_ingress_provider) {
             if !http_ingress_url.is_empty() && !provider_id.is_empty() {
                 let class_type = resources::http_ingress::HttpIngressResourceSpec {}.class_type();
-                log::info!("Creating resource '{}' at {}", provider_id, http_ingress_url);
+                log::info!("Creating http-ingress resource provider '{}' at {}", provider_id, http_ingress_url);
                 ret.insert(
                     provider_id.clone(),
                     agent::ResourceDesc {
@@ -322,7 +313,7 @@ async fn fill_resources(
 
         if let Some(provider_id) = &settings.http_egress_provider {
             if !provider_id.is_empty() {
-                log::info!("Creating resource '{}'", provider_id);
+                log::info!("Creating http-egress resource provider '{}'", provider_id);
                 let class_type = resources::http_egress::HttpEgressResourceSpec {}.class_type();
                 ret.insert(
                     provider_id.clone(),
@@ -347,7 +338,7 @@ async fn fill_resources(
 
         if let Some(provider_id) = &settings.file_log_provider {
             if !provider_id.is_empty() {
-                log::info!("Creating resource '{}'", provider_id);
+                log::info!("Creating file-log resource provider '{}'", provider_id);
                 let class_type = resources::file_log::FileLogResourceSpec {}.class_type();
                 ret.insert(
                     provider_id.clone(),
@@ -372,7 +363,7 @@ async fn fill_resources(
 
         if let Some(provider_id) = &settings.redis_provider {
             if !provider_id.is_empty() {
-                log::info!("Creating resource '{}'", provider_id);
+                log::info!("Creating redis resource provider '{}'", provider_id);
                 let class_type = resources::redis::RedisResourceSpec {}.class_type();
                 ret.insert(
                     provider_id.clone(),
@@ -421,7 +412,7 @@ async fn fill_resources(
         if let Some(settings) = &settings.ollama_provider {
             if !settings.host.is_empty() && !settings.provider.is_empty() {
                 log::info!(
-                    "Creating resource '{}' towards {}:{} (limit to {} messages per chat)",
+                    "Creating ollama resource provider '{}' towards {}:{} (limit to {} messages per chat)",
                     settings.provider,
                     settings.host,
                     settings.port,
@@ -457,7 +448,7 @@ async fn fill_resources(
             if !provider_id.is_empty() {
                 #[cfg(feature = "rdkafka")]
                 {
-                    log::info!("Creating resource '{}'", provider_id);
+                    log::info!("Creating kakfa-egress resource provider '{}'", provider_id);
                     let class_type = resources::kafka_egress::KafkaEgressResourceSpec {}.class_type();
                     ret.insert(
                         provider_id.clone(),
@@ -479,88 +470,67 @@ async fn fill_resources(
                     });
                 }
                 #[cfg(not(feature = "rdkafka"))]
-                log::error!("Could not create resource '{}' because rdkafka was disabled at compile time", provider_id);
+                log::error!(
+                    "Could not create resource provider '{}' because rdkafka was disabled at compile time",
+                    provider_id
+                );
+            }
+        }
+
+        if let Some(settings) = &settings.metrics_collector_provider {
+            if !settings.provider.is_empty() {
+                match settings.collector_type.to_lowercase().as_str() {
+                    "redis" => match &settings.redis_url {
+                        Some(redis_url) => {
+                            match redis::Client::open(redis_url.clone()) {
+                                Ok(client) => match client.get_connection() {
+                                    Ok(redis_connection) => {
+                                        let class_type = resources::metrics_collector::MetricsCollectorResourceSpec {}.class_type();
+                                        log::info!(
+                                            "Creating metrics-collector resource provider '{}' connected to a Redis server at {}",
+                                            settings.provider,
+                                            redis_url
+                                        );
+                                        ret.insert(
+                                            settings.provider.clone(),
+                                            agent::ResourceDesc {
+                                                class_type: class_type.clone(),
+                                                client: Box::new(
+                                                    resources::metrics_collector::MetricsCollectorResourceProvider::new(
+                                                        data_plane.clone(),
+                                                        edgeless_api::function_instance::InstanceId::new(node_id),
+                                                        redis_connection,
+                                                    )
+                                                    .await,
+                                                ),
+                                            },
+                                        );
+                                        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                                            provider_id: settings.provider.clone(),
+                                            class_type,
+                                            outputs: vec![],
+                                        });
+
+                                        log::info!("metrics collector connected to Redis at {}", redis_url);
+                                    }
+                                    Err(err) => log::error!("error when connecting to Redis at {}: {}", redis_url, err),
+                                },
+                                Err(err) => log::error!("error when creating a Redis client at {}: {}", redis_url, err),
+                            };
+                        }
+                        None => {
+                            log::error!("redis_url not specified for a Redis metrics collector");
+                        }
+                    },
+                    _ => {
+                        log::error!("unknown  metrics collector type");
+                    }
+                }
             }
         }
     }
 
     ret
-}
-
-pub async fn create_metrics_collector_node(
-    invocation_url: String,
-    agent_url: String,
-    metrics_collector_type: String,
-    redis_url: Option<String>,
-) -> (
-    uuid::Uuid,
-    std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
-    futures::future::BoxFuture<'static, ()>,
-    Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
-) {
-    // Create the data plane for the node.
-    let node_id = uuid::Uuid::new_v4();
-    let data_plane = edgeless_dataplane::handle::DataplaneProvider::new(node_id, invocation_url, None).await;
-
-    // Create the metrics collector resource.
-    let mut resource_provider_specifications = vec![];
-    let mut resources: std::collections::HashMap<String, agent::ResourceDesc> = std::collections::HashMap::new();
-
-    match metrics_collector_type.to_lowercase().as_str() {
-        "redis" => match redis_url {
-            Some(redis_url) => {
-                match redis::Client::open(redis_url.clone()) {
-                    Ok(client) => match client.get_connection() {
-                        Ok(redis_connection) => {
-                            let provider_id = "metrics-collector".to_string();
-                            let class_type = "metrics-collector".to_string();
-                            resource_provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                                provider_id: provider_id.clone(),
-                                class_type: class_type.clone(),
-                                outputs: vec![],
-                            });
-                            resources.insert(
-                                provider_id,
-                                agent::ResourceDesc {
-                                    class_type,
-                                    client: Box::new(
-                                        resources::metrics_collector::MetricsCollectorResourceProvider::new(
-                                            data_plane.clone(),
-                                            edgeless_api::function_instance::InstanceId::new(node_id),
-                                            redis_connection,
-                                        )
-                                        .await,
-                                    ),
-                                },
-                            );
-                            log::info!("metrics collector connected to Redis at {}", redis_url);
-                        }
-                        Err(err) => log::error!("error when connecting to Redis at {}: {}", redis_url, err),
-                    },
-                    Err(err) => log::error!("error when creating a Redis client at {}: {}", redis_url, err),
-                };
-            }
-            None => {
-                log::warn!("redis_url not specified for a Redis metrics collector");
-            }
-        },
-        _ => {
-            log::info!("no metrics collector is used");
-        }
-    }
-
-    // Create the agent of the node embedded in the orchestrator.
-    let telemetry_performance_target = edgeless_telemetry::performance_target::PerformanceTargetInner::new();
-    let (mut agent, agent_task) = agent::Agent::new(
-        std::collections::HashMap::new(),
-        resources,
-        node_id,
-        data_plane.clone(),
-        telemetry_performance_target,
-    );
-    let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), agent_url);
-
-    (node_id, agent_task, agent_api_server, resource_provider_specifications)
 }
 
 pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
@@ -660,7 +630,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                 let (container_runtime, container_runtime_task, container_runtime_api) = container_runner::container_runtime::ContainerRuntime::new(
                     std::collections::HashMap::from([("guest_api_host_url".to_string(), container_runtime_settings.guest_api_host_url.clone())]),
                 );
-                let server_task = edgeless_api::grpc_impl::container_runtime::GuestAPIHostServer::run(
+                let server_task = edgeless_api::grpc_impl::outer::container_runtime::GuestAPIHostServer::run(
                     container_runtime_api,
                     container_runtime_settings.guest_api_host_url,
                 );
@@ -697,14 +667,18 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
     // Create the agent.
     let runtimes = runners.keys().map(|x| x.to_string()).collect::<Vec<String>>();
-    let (mut agent, agent_task) = agent::Agent::new(
-        runners,
-        resources,
-        settings.general.node_id,
-        data_plane.clone(),
+    let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.general.node_id, data_plane.clone());
+    let agent_api_server = edgeless_api::grpc_impl::outer::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
+
+    // Create the component that subscribes to the node register to
+    // notify updates (periodically refreshed).
+    let (_subscriber, subscriber_task, refresh_task) = node_subscriber::NodeSubscriber::new(
+        settings.general,
+        resource_provider_specifications.clone(),
+        get_capabilities(runtimes, settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
         telemetry_performance_target,
-    );
-    let agent_api_server = edgeless_api::grpc_impl::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
+    )
+    .await;
 
     // Wait for all the tasks to complete.
     let _ = futures::join!(
@@ -712,72 +686,44 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         container_runtime_task,
         agent_task,
         agent_api_server,
-        register_node(
-            settings.general,
-            get_capabilities(runtimes, settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
-            resource_provider_specifications
-        )
+        subscriber_task,
+        refresh_task,
     );
 }
 
 pub fn edgeless_node_default_conf() -> String {
-    let caps = get_capabilities(vec!["RUST_WASM".to_string()], NodeCapabilitiesUser::empty());
+    let node_conf = EdgelessNodeSettings {
+        general: EdgelessNodeGeneralSettings {
+            node_id: uuid::Uuid::new_v4(),
+            agent_url: String::from("http://127.0.0.1:7005"),
+            agent_url_announced: String::from("http://127.0.0.1:7005"),
+            invocation_url: String::from("http://127.0.0.1:7006"),
+            invocation_url_announced: String::from("http://127.0.0.1:7006"),
+            invocation_url_coap: None,
+            invocation_url_announced_coap: None,
+            node_register_url: String::from("http://127.0.0.1:7004"),
+            subscription_refresh_interval_sec: 2,
+        },
+        telemetry: EdgelessNodeTelemetrySettings {
+            metrics_url: String::from("http://127.0.0.1:7007"),
+            log_level: Some(String::default()),
+            performance_samples: false,
+        },
+        wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
+        container_runtime: Some(EdgelessNodeContainerRuntimeSettings::default()),
+        resources: Some(EdgelessNodeResourceSettings {
+            http_ingress_url: Some(String::from("http://127.0.0.1:7008")),
+            http_ingress_provider: Some("http-ingress-1".to_string()),
+            http_egress_provider: Some("http-egress-1".to_string()),
+            file_log_provider: Some("file-log-1".to_string()),
+            redis_provider: Some("redis-1".to_string()),
+            dda_provider: Some("dda-1".to_string()),
+            ollama_provider: Some(OllamaProviderSettings::default()),
+            kafka_egress_provider: Some(String::default()),
+            metrics_collector_provider: Some(MetricsCollectorProviderSettings::default()),
+        }),
+        user_node_capabilities: Some(NodeCapabilitiesUser::default()),
+    };
 
-    format!(
-        "[general]\nnode_id = \"{}\"\n{}num_cpus = {}\nmodel_name_cpu = \"{}\"\nclock_freq_cpu = {}\nnum_cores = {}\nmem_size = {}\n{}disk_tot_space = {}{}",
-        uuid::Uuid::new_v4(),
-        r##"
-agent_url = "http://127.0.0.1:7021"
-agent_url_announced = ""
-invocation_url = "http://127.0.0.1:7002"
-invocation_url_announced = ""
-invocation_url_coap = "coap://127.0.0.1:7002"
-invocation_url_announced_coap = ""
-orchestrator_url = "http://127.0.0.1:7011"
-
-[telemetry]
-metrics_url = "http://127.0.0.1:7003"
-log_level = "info"
-performance_samples = true
-
-[wasm_runtime]
-enabled = true
-
-[container_runtime]
-enabled = false
-guest_api_host_url = "http://127.0.0.1:7100"
-
-[resources]
-http_ingress_url = "http://127.0.0.1:7035"
-http_ingress_provider = "http-ingress-1"
-http_egress_provider = "http-egress-1"
-file_log_provider = "file-log-1"
-redis_provider = "redis-1"
-dda_provider = "dda-1"
-kafka_egress_provider = "kafka-egress-1"
-
-[resources.ollama_provider]
-host = "localhost"
-port = 11434
-messages_number_limit = 30
-provider = "ollama-1"
-
-[user_node_capabilities]
-"##,
-        caps.num_cpus,
-        caps.model_name_cpu,
-        caps.clock_freq_cpu,
-        caps.num_cores,
-        caps.mem_size,
-        r##"labels = []
-is_tee_running = false
-has_tpm = false
-"##,
-        caps.disk_tot_space,
-        r##"
-num_gpus = 0
-model_name_gpu = ""
-mem_size_gpu = 0
-"##
-    )
+    toml::to_string(&node_conf).expect("Wrong")
 }

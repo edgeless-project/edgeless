@@ -2,13 +2,13 @@
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::container_function::ContainerFunctionAPI;
+use edgeless_api::outer::container_function::ContainerFunctionAPI;
 
 /// FunctionInstance implementation allowing to execute functions defined
 /// as computational containers through a gRPC API.
 pub struct ContainerFunctionInstance {
     /// gRPC function client to interact with the container function.
-    _function_client: edgeless_api::grpc_impl::container_function::ContainerFunctionAPIClient,
+    _function_client: edgeless_api::grpc_impl::outer::container_function::ContainerFunctionAPIClient,
     /// Protocol-neutral API to interact with the container function.
     function_client_api: Box<dyn edgeless_api::guest_api_function::GuestAPIFunction>,
     /// ID of the Docker container created.
@@ -65,8 +65,11 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
 
             // TODO(ccicconetti) timeout is hard-coded to 30 seconds, which might
             // not be enough with big containers
-            match edgeless_api::grpc_impl::container_function::ContainerFunctionAPIClient::new(&grpc_address, std::time::Duration::from_secs(30))
-                .await
+            match edgeless_api::grpc_impl::outer::container_function::ContainerFunctionAPIClient::new(
+                &grpc_address,
+                std::time::Duration::from_secs(30),
+            )
+            .await
             {
                 Ok(mut _function_client) => {
                     let mut function_client_api = _function_client.guest_api_function();

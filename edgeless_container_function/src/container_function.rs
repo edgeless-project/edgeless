@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::container_runtime::ContainerRuntimeAPI;
+use edgeless_api::outer::container_runtime::ContainerRuntimeAPI;
 use futures::{Future, SinkExt, StreamExt};
 
 pub struct ContainerFunction {
@@ -64,7 +64,7 @@ impl ContainerFunction {
                     if std::mem::discriminant(&fsm) != std::mem::discriminant(&FiniteStateMachine::PreBoot) {
                         log::error!("received boot command while not in a pre-boot state: ignored");
                     } else {
-                        match edgeless_api::grpc_impl::container_runtime::ContainerRuntimeAPIClient::new(
+                        match edgeless_api::grpc_impl::outer::container_runtime::ContainerRuntimeAPIClient::new(
                             boot_data.guest_api_host_endpoint.as_str(),
                             None,
                         )
@@ -156,7 +156,7 @@ impl ContainerFunction {
         }
     }
 
-    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::container_function::ContainerFunctionAPI + Send> {
+    pub fn get_api_client(&mut self) -> Box<dyn edgeless_api::outer::container_function::ContainerFunctionAPI + Send> {
         Box::new(ContainerFunctionClient {
             container_function_client: Box::new(GuestAPIFunctionClient { sender: self.sender.clone() }),
         })
@@ -167,7 +167,7 @@ pub struct ContainerFunctionClient {
     container_function_client: Box<dyn edgeless_api::guest_api_function::GuestAPIFunction>,
 }
 
-impl edgeless_api::container_function::ContainerFunctionAPI for ContainerFunctionClient {
+impl edgeless_api::outer::container_function::ContainerFunctionAPI for ContainerFunctionClient {
     fn guest_api_function(&mut self) -> Box<dyn edgeless_api::guest_api_function::GuestAPIFunction> {
         self.container_function_client.clone()
     }

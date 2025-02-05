@@ -51,17 +51,17 @@ message FunctionClassSpecification {
 
 // Message to request the creation a new function instance.
 message SpawnFunctionRequest {
-    // The function instance identifier.
-    InstanceId instance_id = 1;
     // The function class specification.
     FunctionClassSpecification code = 2;
     // The set of annotations associated with this function instance.
     map<string, string> annotations = 3;
     // The state specification.
     StateSpecification state_specification = 4;
+    // The workflow id to which this function belongs
+    string workflow_id = 5;
 }
 
-// Some APIs provide the same inteface for different id types (external vs internal)
+// Some APIs provide the same inteface for logical vs physical identifiers.
 // This enables them to share a gRPC interface.
 message InstanceIdVariant {
     oneof InstanceIdType {
@@ -82,27 +82,30 @@ message StartComponentResponse {
     optional InstanceIdVariant instance_id = 2;
 }
 
-// Possible message types of FunctionInstance::UpdateNode().
-enum UpdateNodeRequestType {
-    REGISTER   = 0;
-    DEREGISTER = 1;
-}
-
-// Request message of FunctionInstance::UpdateNode().
+// Request message of NodeRegistrationAPI::UpdateNode().
 message UpdateNodeRequest {
-    // Request type: registration or deregistration. Always present.
-    UpdateNodeRequestType request_type                        = 1;
-    // Identifier of the node that is entering/leaving the orchestration domain.
-    // This field must be always present.
-    string node_id                                            = 2;
-    // URL of the node's agent server. Always present if REGISTER type.
-    optional string agent_url                                 = 3;
-    // URL of the node's invocation server. Always present if REGISTER type.
-    optional string invocation_url                            = 4;
-    // Resources offered by this node. May be only present if REGISTER type.
+    // Identifier of the node.
+    string node_id                             = 2;
+    // URL of the node's agent server.
+    string agent_url                           = 3;
+    // URL of the node's invocation server.
+    string invocation_url                      = 4;
+    // Resources offered by this node.
     repeated ResourceProviderSpecification resource_providers = 5;
-    // Node capabilities. May be only present if REGISTER type.
-    NodeCapabilities capabilities                             = 6;
+    // Node capabilities.
+    NodeCapabilities capabilities              = 6;
+    // Deadline for refreshing the node request, in seconds since Unix epoch.
+    // After this time the node can be considered to be offline.
+    uint64 refresh_deadline                    = 10;
+    // Number that identifies the specific instance of this node, which allows
+    // the node register to detect service restarts.
+    // It is drawn randomly when the node starts and never changes.
+    uint64 nonce                               = 11;
+    // Node health status.
+    NodeHealthStatus health_status             = 20;
+    // Node performance info.
+    NodePerformanceSamples performance_samples = 30;
+
 }
 
 // Node capabilities exposed to the orchestrator.
@@ -135,7 +138,7 @@ message NodeCapabilities {
     uint32 mem_size_gpu      = 82;
 }
 
-// Response message of FunctionInstance::UpdateNode().
+// Response message of NodeRegistrationAPI::UpdateNode().
 message UpdateNodeResponse {
     // If present it means that the request has been rejected.
     // In this case, other fields may not be present or contain meaningful data.
@@ -236,15 +239,6 @@ message NodePerformanceSamples {
     repeated Samples function_execution_times = 100;
 }
 
-// Response message of FunctionInstance::KeepAlive().
-message KeepAliveResponse {
-    // Node health status.
-    NodeHealthStatus       health_status       = 1;
-
-    // Node performance info.
-    NodePerformanceSamples performance_samples = 2;
-}
-
 // Message to request the update of a function instance.
 message PatchRequest {
     // The function instance identifier.
@@ -324,10 +318,98 @@ message WorkflowId {
     string workflow_id = 1;
 }
 
-// List of workflow instances.
-message WorkflowInstanceList {
-    repeated WorkflowInstanceStatus workflow_statuses = 1;
+// List of workflow identifiers.
+message WorkflowIdList {
+    repeated string identifiers = 1;
 }
+
+// Info about a workflow.
+message WorkflowInstanceInfo {
+    // The workflow spawn request.
+    SpawnWorkflowRequest   request = 1;
+    // The workflow status.
+    WorkflowInstanceStatus status  = 2;   
+}
+
+// Identifier of a domain.
+message DomainId {
+    string domain_id = 1;
+}
+
+// Capabilities of a given domain.
+message DomainCapabilitiesEntry {
+    // Domain identifier.
+    string domain_id                       = 1;
+    // Domain capabilities.
+    DomainCapabilities domain_capabilities = 2;
+}
+
+// List of domain capabilities.
+message DomainCapabilitiesList {
+    repeated DomainCapabilitiesEntry domain_capabilities = 1;
+}
+
+// Request message of DomainRegistrationAPI::UpdateDomain().
+message UpdateDomainRequest {
+    // Domain name.
+    string domain_id                = 10;
+    // URL of the orchestrator server.
+    string orchestrator_url         = 20;
+    // Domain capabilities.
+    DomainCapabilities capabilities = 30;
+    // Deadline for refreshing the domain request, in seconds since Unix epoch.
+    // After this time the orchestration domain can be considered to be offline.
+    uint64 refresh_deadline         = 40;
+    // Incremental counter updated every time the capabilities change.
+    uint64 counter                  = 50;
+    // Number that identifies the specific instance of this orchestrator, which
+    // allows the domain register to detect service restarts.
+    // It is drawn randomly when the node starts and never changes.
+    uint64 nonce                     = 51;
+}
+
+// Domain capabilities exposed from the orchestrator to the controller.
+message DomainCapabilities {
+    // Number of nodes.
+    uint32 num_nodes          = 1;
+    // Total number of (actual or virtual) CPUs.
+    uint32 num_cpus           = 10;
+    // Total number of physical cores.
+    uint32 num_cores          = 11;
+    // Total size of memory available, in MiB.
+    uint32 mem_size           = 12;
+    // Superset of all the labels advertised by the nodes in the domain.
+    repeated string labels    = 20;
+    // Number of nodes with a Trusted Execution Environment.
+    uint32 num_tee            = 30;
+    // Number of nodes with a Trusted Platform Module.
+    uint32 num_tpm            = 40;
+    // Superset of all the run-times supported by the nodes in the domain.
+    repeated string runtimes  = 50;
+    // Total disk space, in MiB.
+    uint32 disk_tot_space     = 60;
+    // Total number of (actual or virtual) GPUs.
+    uint32 num_gpus           = 70;
+    // Total GPU memory available, in MiB.
+    uint32 mem_size_gpu       = 71;
+    // Superset of the names of the resource providers advertised by the nodes.
+    repeated string resource_providers = 80;
+    // Superset of the classes of the resource providers advertised by the nodes.
+    repeated string resource_classes   = 81;
+}
+
+// Response message of DomainRegistrationAPI::UpdateDomain().
+message UpdateDomainResponse {
+    // If present it means that the request has been rejected.
+    // In this case, other fields may not be present or contain meaningful data.
+    optional ResponseError response_error = 1;
+
+    // If the flag is true then the orchestration domain should be reset to
+    // an empty state.
+    bool reset = 2;
+}
+
+// message Domain
 
 // Event types.
 enum EventType {
@@ -379,8 +461,8 @@ message ResourceInstanceSpecification {
     string resource_class_type = 1;
     // Resource configuration (depends on the type).
     map<string, string> configuration = 2;
-    // Mapping of the outputs to concrete function/resource instances.
-    map<string, InstanceId> output_mapping = 3;
+    // The workflow id to which this resource instance belongs 
+    string workflow_id = 3;
 }
 
 // Message containing information provided as response to failed request.
