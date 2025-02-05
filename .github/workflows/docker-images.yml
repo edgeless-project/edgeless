@@ -4,12 +4,11 @@ on:
   workflow_dispatch:
     inputs:
       custom_tag:
-        description: 'Tag for manual builds'
+        description: 'Tag for manual build. If this field is empty, the latest Release tag will be used'
         required: false
-        default: 'manual-build'
   release:
     types: [published]
-  push:
+  push: # TODO: Delete this before doing PR
     branches:
       - docker-images
   
@@ -48,8 +47,9 @@ jobs:
             else
               echo "tag=${{ github.event.inputs.custom_tag }}" >> $GITHUB_ENV
             fi
-          elif [ "${{ github.event_name }}" == "push" ] && [ "${{ github.ref_name }}" == "docker-images" ]; then
-            echo "tag=v1.0.0" >> $GITHUB_ENV
+            elif [ "${{ github.event_name }}" == "push" ]; then
+              latest_release_tag=$(curl -s https://api.github.com/repos/edgeless-project/edgeless/releases/latest | jq -r .tag_name)
+              echo "tag=${latest_release_tag}" >> $GITHUB_ENV
           fi
         shell: bash
 
