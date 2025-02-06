@@ -1,5 +1,5 @@
 # Compilation stage
-FROM ghcr.io/edgeless-project/ci-image:latest AS builder
+FROM ghcr.io/edgeless-project/building-image:latest AS builder
 
 COPY . .
 WORKDIR /usr/src/edgeless_orc
@@ -7,7 +7,7 @@ RUN cargo build --release --bin edgeless_orc_d --verbose
 
 # Execution stage
 FROM debian:bookworm-slim
-COPY --from=builder /target/release/edgeless_orc_d /usr/local/bin/edgeless_orc_d
+COPY --from=builder /usr/src/target/release/edgeless_orc_d /usr/local/bin/edgeless_orc_d
 
 # Install necessary tools (gettext-base includes envsubst)
 RUN apt-get update && apt-get install -y gettext-base && rm -rf /var/lib/apt/lists/*
