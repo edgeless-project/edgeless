@@ -7,7 +7,7 @@ RUN cargo build --release --bin edgeless_node_d --verbose
 
 # Execution stage
 FROM debian:bookworm-slim
-COPY --from=builder /usr/src/target/release/edgeless_node_d /usr/local/bin/edgeless_node_d
+COPY --from=builder /target/release/edgeless_node_d /usr/local/bin/edgeless_node_d
 
 # Install necessary tools (gettext-base includes envsubst)
 RUN apt-get update && apt-get install -y gettext-base && rm -rf /var/lib/apt/lists/*
