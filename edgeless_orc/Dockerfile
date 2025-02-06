@@ -37,7 +37,7 @@ additional_header = "${ADDITIONAL_HEADER}"\n' > /usr/local/etc/orchestrator-temp
 
 # Replace the variables and run the application
 ENTRYPOINT ["/bin/bash", "-c", "\
-  export DOMAIN_REGISTER_HOST=${DOMAIN_REGISTER_HOST}:- && \
+  export DOMAIN_REGISTER_HOST=${DOMAIN_REGISTER_HOST:-} && \
   export DOMAIN_REGISTER_PORT=${DOMAIN_REGISTER_PORT:-7002} && \
   export SUBSCRIPTION_REFRESH_INTERVAL_SEC=${SUBSCRIPTION_REFRESH_INTERVAL_SEC:-2} && \
   export DOMAIN_ID=${DOMAIN_ID:-domain-1} && \
