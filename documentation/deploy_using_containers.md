@@ -63,4 +63,42 @@ Each component requires specific environment variables for configuration. Defaul
 - `CONTAINER_RUNTIME_ENABLED`: Default `false`
 - `GUEST_API_HOST_URL`, `LABELS`, `KAFKA_EGRESS_PROVIDER`: No defaults
 
-## TODO: Launching Containers
+## Launching Containers
+
+To deploy the Edgeless components (Controller, Orchestrator, and Node) and configure them to communicate with each other with a minimun configuration, follow the steps below. 
+
+### Step 1: Create a Docker Network
+
+First, create a Docker network to enable communication between the components:
+
+```bash
+docker network create edgeless-network
+```
+
+### Step 2: Deploy the Controller
+
+Run the Edgeless Controller within the created network:
+
+```bash
+docker run --name edgeless_con --network edgeless-network ghcr.io/edgeless-project/edgeless_con:v1.0.0
+```
+
+### Step 3: Deploy the Orchestrator
+
+Deploy the Orchestrator, ensuring it connects to the Controller using the network:
+
+```bash
+docker run --name edgeless_orc --network edgeless-network  -e DOMAIN_REGISTER_HOST=edgeless_con ghcr.io/edgeless-project/edgeless_orc:v1.0.0
+```
+
+### Step 4: Deploy a Node
+
+Finally, deploy a Node, configuring it to communicate with the Orchestrator, and itself for agent communication:
+
+```bash
+docker run --name edgeless_node_1 --network edgeless-network \
+  -e NODE_ID=node1 \
+  -e AGENT_URL_ANNOUNCED=edgeless_node:7005 \
+  -e NODE_REGISTER_URL=edgeless_orc:7002 \
+  ghcr.io/edgeless-project/edgeless_node:v1.0.0
+```
