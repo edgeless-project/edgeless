@@ -31,7 +31,7 @@ jobs:
       - name: Build x64 Release
         run: cargo build --release
       - name: Upload Binaries
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: binaries
           path: |
