@@ -15,12 +15,12 @@ RUN apt-get update && apt-get install -y gettext-base && rm -rf /var/lib/apt/lis
 # Create the template file in the temporary location
 RUN echo '\
 [general]\n\
-domain_register_url = "http://0.0.0.0:${DOMAIN_REGISTER_PORT}"\n\
+domain_register_url = "http://${DOMAIN_REGISTER_HOST}:${DOMAIN_REGISTER_PORT}"\n\
 subscription_refresh_interval_sec = ${SUBSCRIPTION_REFRESH_INTERVAL_SEC}\n\
 domain_id = "${DOMAIN_ID}"\n\
-orchestrator_url = "http://0.0.0.0:${ORCHESTRATOR_PORT}"\n\
+orchestrator_url = "http://${ORCHESTRATOR_HOST}:${ORCHESTRATOR_PORT}"\n\
 orchestrator_url_announced = "${ORCHESTRATOR_URL_ANNOUNCED}"\n\
-node_register_url = "http://0.0.0.0:${NODE_REGISTER_PORT}"\n\
+node_register_url = "http://${NODE_REGISTER_HOST}:${NODE_REGISTER_PORT}"\n\
 \n\
 [baseline]\n\
 orchestration_strategy = "${ORCHESTRATION_STRATEGY}"\n\
@@ -37,11 +37,14 @@ additional_header = "${ADDITIONAL_HEADER}"\n' > /usr/local/etc/orchestrator-temp
 
 # Replace the variables and run the application
 ENTRYPOINT ["/bin/bash", "-c", "\
+  export DOMAIN_REGISTER_HOST=${DOMAIN_REGISTER_HOST}:- && \
   export DOMAIN_REGISTER_PORT=${DOMAIN_REGISTER_PORT:-7002} && \
   export SUBSCRIPTION_REFRESH_INTERVAL_SEC=${SUBSCRIPTION_REFRESH_INTERVAL_SEC:-2} && \
   export DOMAIN_ID=${DOMAIN_ID:-domain-1} && \
+  export ORCHESTRATOR_HOST=${ORCHESTRATOR_HOST:-0.0.0.0} && \
   export ORCHESTRATOR_PORT=${ORCHESTRATOR_PORT:-7003} && \
   export ORCHESTRATOR_URL_ANNOUNCED=${ORCHESTRATOR_URL_ANNOUNCED:-} && \
+  export NODE_REGISTER_HOST=${NODE_REGISTER_HOST:-0.0.0.0} && \
   export NODE_REGISTER_PORT=${NODE_REGISTER_PORT:-7004} && \
   export ORCHESTRATION_STRATEGY=${ORCHESTRATION_STRATEGY:-Random} && \
   export PROXY_TYPE=${PROXY_TYPE:-None} && \
