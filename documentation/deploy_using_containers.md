@@ -88,7 +88,7 @@ docker run --name edgeless_con --network edgeless-network ghcr.io/edgeless-proje
 Deploy the Orchestrator, ensuring it connects to the Controller using the network:
 
 ```bash
-docker run --name edgeless_orc --network edgeless-network  -e DOMAIN_REGISTER_HOST=edgeless_con ghcr.io/edgeless-project/edgeless_orc:v1.0.0
+docker run --name edgeless_orc --network edgeless-network  -e DOMAIN_REGISTER_HOST=edgeless_con -e ORCHESTRATOR_URL_ANNOUNCED=http://edgeless_orc:7003 ghcr.io/edgeless-project/edgeless_orc:v1.0.0
 ```
 
 ### Step 4: Deploy a Node
@@ -97,8 +97,9 @@ Finally, deploy a Node, configuring it to communicate with the Orchestrator, and
 
 ```bash
 docker run --name edgeless_node_1 --network edgeless-network \
-  -e NODE_ID=node1 \
-  -e AGENT_URL_ANNOUNCED=edgeless_node:7005 \
-  -e NODE_REGISTER_URL=edgeless_orc:7002 \
+  -e NODE_ID=fda6ce79-46df-4f96-a0d2-456f720f606c \
+  -e NODE_REGISTER_URL=http://edgeless_orc:7004 \
+  -e AGENT_URL_ANNOUNCED=http://edgeless_node_1:7005 \
+  -e INVOCATION_URL_ANNOUNCED=http://edgeless_node_1:7002 \
   ghcr.io/edgeless-project/edgeless_node:v1.0.0
 ```

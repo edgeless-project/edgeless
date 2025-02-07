@@ -1,11 +1,8 @@
 # Compilation stage
 FROM ghcr.io/edgeless-project/building-image:latest AS builder
 
-COPY . .
-WORKDIR /usr/src/edgeless_node
-
 # Install and configure openssl before building
-RUN apt-get update && install -y pkg-config libssl-dev
+RUN apt-get update && apt-get install -y pkg-config libssl-dev
 
 ENV OPENSSL_DIR="/usr/lib/ssl" \
     OPENSSL_INCLUDE_DIR="/usr/include/openssl" \
@@ -29,6 +26,7 @@ agent_url_announced = "${AGENT_URL_ANNOUNCED}"\n\
 invocation_url = "http://${INVOCATION_HOST}:${INVOCATION_PORT}"\n\
 invocation_url_announced = "${INVOCATION_URL_ANNOUNCED}"\n\
 node_register_url = "${NODE_REGISTER_URL}"\n\
+subscription_refresh_interval_sec = ${SUBSCRIPTION_REFRESH_INTERVAL_SEC}\n\
 \n\
 [telemetry]\n\
 metrics_url = "http://${TELEMETRY_METRICS_HOST}:${TELEMETRY_METRICS_PORT}"\n\
@@ -71,6 +69,7 @@ ENTRYPOINT ["/bin/bash", "-c", "\
   export INVOCATION_PORT=${INVOCATION_PORT:-7002} && \
   export INVOCATION_URL_ANNOUNCED=${INVOCATION_URL_ANNOUNCED:-} && \
   export NODE_REGISTER_URL=${NODE_REGISTER_URL:-} && \
+  export SUBSCRIPTION_REFRESH_INTERVAL_SEC=${SUBSCRIPTION_REFRESH_INTERVAL_SEC:-2} && \
   export TELEMETRY_METRICS_HOST=${TELEMETRY_METRICS_HOST:-0.0.0.0} && \
   export TELEMETRY_METRICS_PORT=${TELEMETRY_METRICS_PORT:-7003} && \
   export TELEMETRY_LOG_LEVEL=${TELEMETRY_LOG_LEVEL:-info} && \
@@ -86,11 +85,11 @@ ENTRYPOINT ["/bin/bash", "-c", "\
   export REDIS_PROVIDER=${REDIS_PROVIDER:-redis-1} && \
   export DDA_PROVIDER=${DDA_PROVIDER:-dda-1} && \
   export KAFKA_EGRESS_PROVIDER=${KAFKA_EGRESS_PROVIDER:-} && \
-  export NUM_CPUS=${NUM_CPUS:-} && \
+  export NUM_CPUS=${NUM_CPUS:-4} && \
   export MODEL_NAME_CPU=${MODEL_NAME_CPU:-} && \
-  export CLOCK_FREQ_CPU=${CLOCK_FREQ_CPU:-} && \
-  export NUM_CORES=${NUM_CORES:-} && \
-  export MEM_SIZE=${MEM_SIZE:-} && \
+  export CLOCK_FREQ_CPU=${CLOCK_FREQ_CPU:-1500} && \
+  export NUM_CORES=${NUM_CORES:-4} && \
+  export MEM_SIZE=${MEM_SIZE:-7937} && \
   export LABELS=${LABELS:-} && \
   export IS_TEE_RUNNING=${IS_TEE_RUNNING:-false} && \
   export HAS_TPM=${HAS_TPM:-false} && \
