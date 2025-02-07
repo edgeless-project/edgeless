@@ -5,6 +5,7 @@ use edgeless_dataplane::core::Message;
 use serde::Deserialize;
 use sqlx::{migrate::MigrateDatabase, FromRow, Sqlite, SqlitePool};
 use tokio;
+use serde_json:: Value;
 
 #[derive(Clone)]
 pub struct SqlxResourceProvider {
@@ -62,7 +63,7 @@ impl SqlxResource {
                         Err(error) => panic!("error: {}", error),
                     }
                 } else {
-                    // log::info!("sqlx Database exists");
+                    log::info!("sqlx Database exists");
                 }
 
                 let db = SqlitePool::connect(&sqlx_url).await.unwrap();
@@ -70,15 +71,11 @@ impl SqlxResource {
                 let response = sqlx::query(
                     "CREATE TABLE IF NOT EXISTS WorkflowState (
                     id VARCHAR(255) PRIMARY KEY,
-                    name VARCHAR(255)  NOT NULL,
-                    result INTEGER NOT NULL,
-                    timestamp VARCHAR(255),);",
+                    metadata JSONB NOT NULL);",
                 )
                 .execute(&db)
                 .await
                 .unwrap();
-
-                log::info!("create table in sql {:?}", response);
 
                 if message_data.to_string().contains("SELECT") {
                     let result: sqlx::Result<WorkflowState, sqlx::Error> =
@@ -86,7 +83,7 @@ impl SqlxResource {
 
                     match result {
                         Ok(response) => {
-                            log::info!("Response from database: {:?}", response.to_string());
+                            log::info!("Response from database: {response:?}");
                             if need_reply {
                                 dataplane_handle
                                     .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(response.to_string()))
@@ -210,17 +207,17 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 #[derive(Clone, FromRow, Debug, Deserialize)]
 struct WorkflowState {
     id: String,
-    name: String,
-    result: i64,
-    timestamp: String,
+    metadata: Value,
 }
 
 impl WorkflowState {
     fn to_string(&self) -> String {
+        let metadata = self.metadata.to_string();
         let data = format!(
-            "id: {}, name: {}, result: {:?}, timestamp: {}",
-            self.id, self.name, self.result, self.timestamp
+            "id: {}, metadata: {}",
+            self.id, metadata,
         );
         data
     }
 }
+

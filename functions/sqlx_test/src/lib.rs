@@ -16,11 +16,11 @@ impl EdgeFunction for Sqlx_test {
     fn handle_init(init_message: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();
         log::info!("sqlx function init");
-
-        let res = call("database", b"INSERT INTO WorkflowState (id, name, result, timestamp) Values($1, 'foobar', 9527, '2024-12-30')");
+       
+        let res = call("database", b"INSERT INTO WorkflowState (id, metadata) Values($1, '{\"foo\":1,\"bar\":\"first\"}')");
         log::info!("call keep running");
-        call("database", b"SELECT id, name,  result, timestamp FROM WorkflowState WHERE id=$1");
-        call("database", b"UPDATE WorkflowState SET name='this is to test football'  WHERE id = $1");
+        call("database", b"SELECT id, metadata FROM WorkflowState WHERE id=$1");
+        call("database", b"UPDATE WorkflowState SET metadata='{\"foo\":2,\"bar\":\"second\"}'  WHERE id = $1");
         call("database", b"DELETE FROM WorkflowState WHERE id=$1");
         
         //why is msg u8 not owneddatabyte?

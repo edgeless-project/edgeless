@@ -9,4 +9,7 @@ Then you can start and stop the workflow with:
 ```
 ID=$(target/debug/edgeless_cli workflow start examples/slqx/workflow.json)
 target/debug/edgeless_cli workflow stop $ID
+the function can be found in functions/sqlx_test/function.json
+replace the metadata to a any information you like to insert in a json format
+The workflow id is managed by edgeless so please keep it as it is
 ```
