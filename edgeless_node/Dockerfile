@@ -3,6 +3,14 @@ FROM ghcr.io/edgeless-project/building-image:latest AS builder
 
 COPY . .
 WORKDIR /usr/src/edgeless_node
+
+# Install and configure openssl before building
+RUN apt-get update && install -y pkg-config libssl-dev
+
+ENV OPENSSL_DIR="/usr/lib/ssl" \
+    OPENSSL_INCLUDE_DIR="/usr/include/openssl" \
+    OPENSSL_LIB_DIR="/usr/lib"
+
 RUN cargo build --release --bin edgeless_node_d --verbose
 
 # Execution stage
