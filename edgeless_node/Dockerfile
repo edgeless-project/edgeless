@@ -1,6 +1,9 @@
 # Compilation stage
 FROM ghcr.io/edgeless-project/building-image:latest AS builder
 
+COPY . .
+WORKDIR /usr/src/edgeless_node
+
 # Install and configure openssl before building
 RUN apt-get update && apt-get install -y pkg-config libssl-dev
 
