@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
 use serde::Deserialize;
+use serde_json::Value;
 use sqlx::{migrate::MigrateDatabase, FromRow, Sqlite, SqlitePool};
 use tokio;
-use serde_json:: Value;
 
 #[derive(Clone)]
 pub struct SqlxResourceProvider {
@@ -76,6 +76,8 @@ impl SqlxResource {
                 .execute(&db)
                 .await
                 .unwrap();
+
+                log::info!("create table in sql {:?}", response);
 
                 if message_data.to_string().contains("SELECT") {
                     let result: sqlx::Result<WorkflowState, sqlx::Error> =
@@ -213,11 +215,7 @@ struct WorkflowState {
 impl WorkflowState {
     fn to_string(&self) -> String {
         let metadata = self.metadata.to_string();
-        let data = format!(
-            "id: {}, metadata: {}",
-            self.id, metadata,
-        );
+        let data = format!("id: {}, metadata: {}", self.id, metadata,);
         data
     }
 }
-
