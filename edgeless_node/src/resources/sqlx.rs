@@ -29,11 +29,11 @@ impl Drop for SqlxResource {
 }
 
 impl SqlxResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, sqlx_url: &str, workflow_id: &String) -> anyhow::Result<Self> {
+    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, sqlx_url: &str, workflow_id: &str) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
         let sqlx_url = sqlx_url.to_string();
 
-        let workflow_id = workflow_id.clone();
+        let workflow_id = workflow_id.to_string();
         let handle = tokio::spawn(async move {
             loop {
                 let workflow_id = workflow_id.clone();
@@ -212,10 +212,8 @@ struct WorkflowState {
     metadata: Value,
 }
 
-impl WorkflowState {
-    fn to_string(&self) -> String {
-        let metadata = self.metadata.to_string();
-        let data = format!("id: {}, metadata: {}", self.id, metadata,);
-        data
+impl std::fmt::Display for WorkflowState {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "id: {}, metadata: {}", self.id, self.metadata)
     }
 }
