@@ -9,7 +9,9 @@ First, build the `sqlx_test` WASM binary following the
 Then you can start and stop the workflow with:
 
 ```
-ID=$(target/debug/edgeless_cli workflow start examples/slqx/workflow.json)
+target/debug/edgeless_inabox
+target/debug/edgeless_cli function build functions/sqlx_test/function.json
+target/debug/edgeless_cli workflow start examples/slqx/workflow.json
 target/debug/edgeless_cli workflow stop $ID
 ```
 
