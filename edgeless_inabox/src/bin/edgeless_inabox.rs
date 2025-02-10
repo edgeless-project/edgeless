@@ -199,6 +199,10 @@ fn generate_configs(
                 ollama_provider: Some(OllamaProviderSettings::default()),
                 kafka_egress_provider: Some(String::default()),
                 metrics_collector_provider: Some(MetricsCollectorProviderSettings::default()),
+                sqlx_provider: match counter == 0 {
+                    true => Some("sqlx-1".to_string()),
+                    false => None,
+                },
             }),
             user_node_capabilities: Some(edgeless_node::NodeCapabilitiesUser::default()),
         });
@@ -240,6 +244,7 @@ fn generate_configs(
                     redis_url: Some(String::from("redis://127.0.0.1:6379")),
                     provider: String::from("metrics-collector-1"),
                 }),
+                sqlx_provider: None,
             }),
             user_node_capabilities: None,
         });

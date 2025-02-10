@@ -107,6 +107,7 @@ mod system_tests {
                         ollama_provider: None,
                         kafka_egress_provider: None,
                         metrics_collector_provider: None,
+                        sqlx_provider: None,
                     }),
                     user_node_capabilities: None,
                 }));
