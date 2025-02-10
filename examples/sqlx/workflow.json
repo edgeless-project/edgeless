@@ -1,11 +1,29 @@
 {
     "functions": [
         {
+            "name": "sensor_simulator",
+            "class_specification": {
+                "id": "sensor_simulator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/sensor_simulator/sensor_simulator.wasm",
+                "outputs": [
+                    "output"
+                ]
+            },
+            "output_mapping": {
+                "output": "sqlx_test"
+            },
+            "annotations": {
+                "init-payload": "period=2000,min-value=0,max-value=20"
+            }
+        },
+        {
             "name": "sqlx_test",
             "class_specification": {
                 "id": "sqlx_test",
                 "function_type": "RUST_WASM",
-                "version": "0.1",
+                "version": "0.2",
                 "code": "../../functions/sqlx_test/sqlx_test.wasm",
                 "outputs": []
             },
@@ -13,7 +31,7 @@
                 "database": "sqlx"
             },
             "annotations": {
-                "init-payload": "42"
+                "init-payload": "42.0"
             }
         }
     ],
