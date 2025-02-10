@@ -11,3 +11,4 @@ pub mod metrics_collector;
 pub mod ollama;
 pub mod redis;
 pub mod resource_provider_specs;
+pub mod sqlx;
