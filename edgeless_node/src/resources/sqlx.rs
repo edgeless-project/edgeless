@@ -2,8 +2,6 @@
 // SPDX-FileCopyrightText: © 2024 Chen Chen <cc2181@cam.ac.uk>
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
-use serde::Deserialize;
-use serde_json::Value;
 use sqlx::{migrate::MigrateDatabase, FromRow, Sqlite, SqlitePool};
 use tokio;
 
@@ -88,7 +86,11 @@ impl SqlxResource {
                             log::info!("Response from database: {response:?}");
                             if need_reply {
                                 dataplane_handle
-                                    .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(response.to_string()))
+                                    .reply(
+                                        source_id,
+                                        channel_id,
+                                        edgeless_dataplane::core::CallRet::Reply(serde_json::to_string(&response).unwrap_or_default()),
+                                    )
                                     .await;
                             }
                         }
@@ -206,10 +208,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 }
 
-#[derive(Clone, FromRow, Debug, Deserialize)]
+#[derive(Clone, FromRow, Debug, serde::Deserialize, serde::Serialize)]
 struct WorkflowState {
     id: String,
-    metadata: Value,
+    metadata: serde_json::Value,
 }
 
 impl std::fmt::Display for WorkflowState {
