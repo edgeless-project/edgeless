@@ -119,6 +119,7 @@ pub struct EdgelessNodeResourceSettings {
     pub kafka_egress_provider: Option<String>,
     /// The metrics collector settings.
     pub metrics_collector_provider: Option<MetricsCollectorProviderSettings>,
+    pub sqlx_provider: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -528,6 +529,28 @@ async fn fill_resources(
                 }
             }
         }
+
+        if let Some(provider_id) = &settings.sqlx_provider {
+            if !provider_id.is_empty() {
+                log::info!("Creating resource '{}'", provider_id);
+                let class_type = "sqlx".to_string();
+                ret.insert(
+                    provider_id.clone(),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::sqlx::SqlxResourceProvider::new(data_plane.clone(), edgeless_api::function_instance::InstanceId::new(node_id))
+                                .await,
+                        ),
+                    },
+                );
+                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id: provider_id.clone(),
+                    class_type,
+                    outputs: vec![],
+                });
+            }
+        }
     }
 
     ret
@@ -721,9 +744,9 @@ pub fn edgeless_node_default_conf() -> String {
             ollama_provider: Some(OllamaProviderSettings::default()),
             kafka_egress_provider: Some(String::default()),
             metrics_collector_provider: Some(MetricsCollectorProviderSettings::default()),
+            sqlx_provider: Some(String::from("sqlite://sqlite.db")),
         }),
         user_node_capabilities: Some(NodeCapabilitiesUser::default()),
     };
-
     toml::to_string(&node_conf).expect("Wrong")
 }
