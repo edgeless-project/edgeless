@@ -80,8 +80,11 @@ docker network create edgeless-network
 Run the Edgeless Controller within the created network:
 
 ```bash
-docker run --name edgeless_con --network edgeless-network ghcr.io/edgeless-project/edgeless_con:v1.0.0
+docker run --name edgeless_con -p 7001:7001 --network edgeless-network ghcr.io/edgeless-project/edgeless_con:v1.0.0
 ```
+
+The command above will expose to the host the port `7001` that the controller
+uses by default to accept commands from a client.
 
 ### Step 3: Deploy the Orchestrator
 
@@ -97,9 +100,48 @@ Finally, deploy a Node, configuring it to communicate with the Orchestrator, and
 
 ```bash
 docker run --name edgeless_node_1 --network edgeless-network \
-  -e NODE_ID=fda6ce79-46df-4f96-a0d2-456f720f606c \
+  -e NODE_ID=$(uuid) \
   -e NODE_REGISTER_URL=http://edgeless_orc:7004 \
   -e AGENT_URL_ANNOUNCED=http://edgeless_node_1:7005 \
   -e INVOCATION_URL_ANNOUNCED=http://edgeless_node_1:7002 \
   ghcr.io/edgeless-project/edgeless_node:v1.0.0
 ```
+
+### Step 5: Test the deployment (optional)
+
+If you have a local copy of EDGELESS you can try your new deployment straight
+away.
+
+If you don't have a local copy, get it from
+[GitHub](https://github.com/edgeless-project/edgeless/) and follow the
+build instructions.
+
+Let's assume in the following that you have `edgeless_cli` executable in the
+current working directory.
+
+First, create a default cli configuration file:
+
+```shell
+./edgeless_cli -t cli.toml
+```
+
+To inspect the (only) orchestration domain:
+
+```shell
+./edgeless_cli domain inspect domain-1
+```
+
+Example of output:
+
+```
+1 nodes, 4 CPUs (4 cores) with 7937 MiB, labels [], num TEE 0, num TPM 0, runtimes [RUST_WASM], resources classes [redis,dda,http-egress,file-log,http-ingress] providers [dda-1,file-log-1,redis-1,http-egress-1,http-ingress-1], disk space 12104732 MiB, 0 GPUs with 0 MiB
+```
+
+The list of active workflows should be empty:
+
+```shell
+./edgeless_cli workflow list
+```
+
+But you can try to add new workflows by looking under `/examples` in the
+[EDGELESS GitHub](https://github.com/edgeless-project/edgeless/tree/main/examples).
