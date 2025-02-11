@@ -1,21 +1,13 @@
 # Compilation stage
-FROM ghcr.io/edgeless-project/building-image:latest AS builder
+FROM ghcr.io/edgeless-project/ci-image:latest AS builder
 
 COPY . .
 WORKDIR /usr/src/edgeless_node
-
-# Install and configure openssl before building
-RUN apt-get update && apt-get install -y pkg-config libssl-dev
-
-ENV OPENSSL_DIR="/usr/lib/ssl" \
-    OPENSSL_INCLUDE_DIR="/usr/include/openssl" \
-    OPENSSL_LIB_DIR="/usr/lib"
-
 RUN cargo build --release --bin edgeless_node_d --verbose
 
 # Execution stage
 FROM debian:bookworm-slim
-COPY --from=builder /usr/src/target/release/edgeless_node_d /usr/local/bin/edgeless_node_d
+COPY --from=builder /target/release/edgeless_node_d /usr/local/bin/edgeless_node_d
 
 # Install necessary tools (gettext-base includes envsubst)
 RUN apt-get update && apt-get install -y gettext-base && rm -rf /var/lib/apt/lists/*
