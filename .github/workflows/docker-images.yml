@@ -8,10 +8,6 @@ on:
         required: false
   release:
     types: [published]
-  push: # TODO: Delete this before doing PR
-    branches:
-      - docker-images
-  
 
 jobs:
   build-and-push:
