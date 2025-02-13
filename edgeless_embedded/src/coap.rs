@@ -138,6 +138,7 @@ impl CoapMultiplexer {
         }
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn incoming_resource_start<'a>(
         &mut self,
         sender: smoltcp::wire::IpEndpoint,
@@ -224,6 +225,7 @@ impl CoapMultiplexer {
         }
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn incoming_resource_patch<'a>(
         &mut self,
         sender: smoltcp::wire::IpEndpoint,

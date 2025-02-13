@@ -208,7 +208,7 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
         )
         .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
 
-        let payload_len = msg.as_bytes().len();
+        let payload_len = msg.len();
         let payload_ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg.as_bytes())
             .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: {}", e)))?;
 
@@ -258,7 +258,7 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
         )
         .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("call failed: {}", e)))?;
 
-        let payload_len = msg.as_bytes().len();
+        let payload_len = msg.len();
         let payload_ptr = helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg.as_bytes())
             .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("call failed: {}", e)))?;
 
