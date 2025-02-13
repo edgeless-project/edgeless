@@ -381,7 +381,7 @@ impl Engine {
             WorkflowType::JsonSpec(data) => {
                 let spec_string = data.spec_string.replace("@WF_ID", self.wf_id.to_string().as_str());
                 let workflow_spec: edgeless_cli::workflow_spec::WorkflowSpec = serde_json::from_str(&spec_string).unwrap();
-                let mut workflow = edgeless_cli::workflow_spec_to_request(workflow_spec, &data.parent_path);
+                let mut workflow = edgeless_cli::workflow_spec_to_request(workflow_spec, &data.parent_path)?;
                 std::mem::swap(&mut workflow.workflow_functions, &mut functions);
                 std::mem::swap(&mut workflow.workflow_resources, &mut resources);
                 std::mem::swap(&mut workflow.annotations, &mut annotations);
