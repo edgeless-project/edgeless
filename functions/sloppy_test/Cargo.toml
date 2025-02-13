@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: © 2025 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+# SPDX-License-Identifier: MIT
+[workspace]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+lto = true
+opt-level = "z"
+panic = "abort"
+codegen-units = 1
+strip = true
+
+[package]
+name = "sloppy_test"
+version = "0.1.0"
+authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it>"]
+edition = "2021"
+
+[lib]
+name = "sloppy_test"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { path = "../../edgeless_function" }
+log = "0.4"
+serde = {version="1", features=["derive"] }
+serde_json = "1"
