@@ -9,13 +9,13 @@ pub fn cast_raw(target: crate::InstanceId, msg: &[u8]) {
 
 pub fn cast(name: &str, msg: &[u8]) {
     unsafe {
-        crate::imports::cast_asm(name.as_bytes().as_ptr(), name.as_bytes().len(), msg.as_ptr(), msg.len());
+        crate::imports::cast_asm(name.as_bytes().as_ptr(), name.len(), msg.as_ptr(), msg.len());
     }
 }
 
 pub fn delayed_cast(delay_ms: u64, name: &str, msg: &[u8]) {
     unsafe {
-        crate::imports::delayed_cast_asm(delay_ms, name.as_bytes().as_ptr(), name.as_bytes().len(), msg.as_ptr(), msg.len());
+        crate::imports::delayed_cast_asm(delay_ms, name.as_bytes().as_ptr(), name.len(), msg.as_ptr(), msg.len());
     }
 }
 
@@ -47,7 +47,7 @@ pub fn call(name: &str, msg: &[u8]) -> crate::CallRet {
         let mut out_len_ptr: usize = 0;
         let call_ret_type = crate::imports::call_asm(
             name.as_bytes().as_ptr(),
-            name.as_bytes().len(),
+            name.len(),
             msg.as_ptr(),
             msg.len(),
             &mut out_ptr_ptr as *mut *mut u8,
@@ -64,13 +64,7 @@ pub fn call(name: &str, msg: &[u8]) -> crate::CallRet {
 
 pub fn telemetry_log(level: usize, target: &str, msg: &str) {
     unsafe {
-        crate::imports::telemetry_log_asm(
-            level,
-            target.as_bytes().as_ptr(),
-            target.as_bytes().len(),
-            msg.as_bytes().as_ptr(),
-            msg.len(),
-        );
+        crate::imports::telemetry_log_asm(level, target.as_bytes().as_ptr(), target.len(), msg.as_bytes().as_ptr(), msg.len());
     }
 }
 
