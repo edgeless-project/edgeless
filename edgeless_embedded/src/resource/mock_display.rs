@@ -87,6 +87,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
         }
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,

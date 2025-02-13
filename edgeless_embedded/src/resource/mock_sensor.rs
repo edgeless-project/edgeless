@@ -134,6 +134,7 @@ impl crate::invocation::InvocationAPI for MockSensor {
 
 #[allow(clippy::await_holding_refcell_ref)]
 impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
+    #[allow(clippy::needless_lifetimes)]
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,

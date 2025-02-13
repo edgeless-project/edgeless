@@ -269,7 +269,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         .await
         .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: copy_to_vm2 {}", e)))?;
 
-        let payload_len = msg.as_bytes().len();
+        let payload_len = msg.len();
         let payload_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg.as_bytes())
             .await
             .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: copy_to_vm3 {}", e)))?;
@@ -327,7 +327,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         .await
         .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("call failed: {}", e)))?;
 
-        let payload_len = msg.as_bytes().len();
+        let payload_len = msg.len();
         let payload_ptr = super::helpers::copy_to_vm(&mut self.store.as_context_mut(), &self.memory, &self.edgeless_mem_alloc, msg.as_bytes())
             .await
             .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("call failed: {}", e)))?;
