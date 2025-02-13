@@ -5,8 +5,25 @@ use workflow_spec::WorkflowSpec;
 
 pub mod workflow_spec;
 
-pub fn workflow_spec_to_request(workflow_spec: WorkflowSpec, parent_path: &std::path::Path) -> edgeless_api::workflow_instance::SpawnWorkflowRequest {
-    edgeless_api::workflow_instance::SpawnWorkflowRequest {
+pub fn workflow_spec_to_request(
+    workflow_spec: WorkflowSpec,
+    parent_path: &std::path::Path,
+) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowRequest> {
+    // Check that all the RUST_WASM binaries are available.
+    for function in &workflow_spec.functions {
+        if function.class_specification.function_type == "RUST_WASM" {
+            if let Some(code_path_str) = &function.class_specification.code {
+                let code_path = std::path::Path::new(&code_path_str);
+                anyhow::ensure!(code_path.exists(), "code file does not exist for '{}': {}", function.name, code_path_str);
+                anyhow::ensure!(code_path.is_file(), "code file for '{}' is not regular: {}", function.name, code_path_str);
+            } else {
+                anyhow::bail!("RUST_WASM function code not specified for '{}'", function.name);
+            }
+        }
+    }
+
+    // Create the workflow specification.
+    Ok(edgeless_api::workflow_instance::SpawnWorkflowRequest {
         workflow_functions: workflow_spec
             .functions
             .into_iter()
@@ -42,5 +59,5 @@ pub fn workflow_spec_to_request(workflow_spec: WorkflowSpec, parent_path: &std::
             })
             .collect(),
         annotations: workflow_spec.annotations.clone(),
-    }
+    })
 }
