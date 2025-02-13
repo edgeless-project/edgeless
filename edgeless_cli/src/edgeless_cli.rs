@@ -146,7 +146,7 @@ async fn main() -> anyhow::Result<()> {
                         let parent_path = std::path::Path::new(&spec_file)
                             .parent()
                             .expect("cannot find the workflow spec's parent path");
-                        let workflow = edgeless_cli::workflow_spec_to_request(workflow_spec, parent_path);
+                        let workflow = edgeless_cli::workflow_spec_to_request(workflow_spec, parent_path)?;
                         let res = wf_client.start(workflow).await;
                         match res {
                             Ok(response) => {
