@@ -83,7 +83,7 @@ pub async fn call_raw(
     match call_ret {
         edgeless_dataplane::core::CallRet::NoReply => Ok(0),
         edgeless_dataplane::core::CallRet::Reply(data) => {
-            let len = data.as_bytes().len();
+            let len = data.len();
 
             let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes()).await?;
             super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
@@ -142,7 +142,7 @@ pub async fn call(
     match call_ret {
         edgeless_dataplane::core::CallRet::NoReply => Ok(0),
         edgeless_dataplane::core::CallRet::Reply(data) => {
-            let len = data.as_bytes().len();
+            let len = data.len();
 
             let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes()).await?;
             super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;

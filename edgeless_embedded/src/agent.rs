@@ -197,7 +197,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         })
     }
 
-    #[allow(clippy::await_holding_refcell_ref)]
+    #[allow(clippy::await_holding_refcell_ref, clippy::needless_lifetimes)]
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
@@ -215,7 +215,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         })
     }
 
-    #[allow(clippy::await_holding_refcell_ref)]
+    #[allow(clippy::await_holding_refcell_ref, clippy::needless_lifetimes)]
     async fn patch<'a>(
         &mut self,
         patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
