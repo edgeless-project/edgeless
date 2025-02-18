@@ -13,7 +13,7 @@ pub fn workflow_spec_to_request(
     for function in &workflow_spec.functions {
         if function.class_specification.function_type == "RUST_WASM" {
             if let Some(code_path_str) = &function.class_specification.code {
-                let code_path = std::path::Path::new(&code_path_str);
+                let code_path = parent_path.join(code_path_str);
                 anyhow::ensure!(code_path.exists(), "code file does not exist for '{}': {}", function.name, code_path_str);
                 anyhow::ensure!(code_path.is_file(), "code file for '{}' is not regular: {}", function.name, code_path_str);
             } else {
