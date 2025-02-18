@@ -19,7 +19,7 @@ if [ -x "$(dirname "$0")/../target/debug/edgeless_cli" ]; then
 elif [ -x "$(dirname "$0")/../target/release/edgeless_cli" ]; then
     CLI="$(dirname "$0")/../target/release/edgeless_cli"
 else
-    echo_r "edgeless_cli not found in 'target/debug' or 'target/release'. Please specify its path in the CLI environment variable."
+    echo_r "edgeless_cli not found in 'target/debug' or 'target/release'. Please build the edgeless binaries before running this script."
     exit 1
 fi
 
