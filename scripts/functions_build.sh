@@ -13,7 +13,7 @@ function echo_g(){ echo -e "${CLR_GREEN}$*${CLR_RST}"; }
 function echo_y(){ echo -e "${CLR_YELLOW}$*${CLR_RST}"; }
 # ===========================================================
 
-# edgeñess_cli path is deduced from where the script is located
+# edgeless_cli path is deduced from where the script is located
 if [ -x "$(dirname "$0")/../target/debug/edgeless_cli" ]; then
     CLI="$(dirname "$0")/../target/debug/edgeless_cli"
 elif [ -x "$(dirname "$0")/../target/release/edgeless_cli" ]; then
