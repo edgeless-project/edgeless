@@ -12,5 +12,8 @@
             ],
             "url": "./schemas/workflow_schema.json"
         }
+    ],
+    "rust-analyzer.linkedProjects": [
+        "Cargo.toml"
     ]
 }
