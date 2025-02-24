@@ -15,6 +15,8 @@ pub enum Category {
     DependencyGraph,
 }
 
+pub type PerformanceSamples = std::collections::HashMap<String, Vec<(chrono::DateTime<chrono::Utc>, f64)>>;
+
 #[async_trait::async_trait]
 pub trait Proxy: Sync + Send {
     /// Update the info on the currently actives nodes as given.
@@ -61,7 +63,7 @@ pub trait Proxy: Sync + Send {
     ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeHealthStatus>;
 
     /// Fetch the performance samples.
-    fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, std::collections::HashMap<String, Vec<(f64, f64)>>>;
+    fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, PerformanceSamples>;
 
     /// Fetch the spawn requests of active function instances.
     fn fetch_function_instance_requests(

@@ -162,10 +162,20 @@ message UpdatePeersRequest {
     optional string invocation_url      = 3;
 }
 
+// Data structure representing a sample with timestamp.
+message Sample {
+    // Number of seconds since Unix epoch.
+    int64  timestamp_sec = 1;
+    // Number of nanoseconds since the last second boundary from Unix Epoch.
+    uint32 timestamp_ns  = 2;
+    // Sample value.
+    double sample        = 3;
+}
+
 // Data structure representing samples associated with an identifier.
 message Samples {
     string          id      = 1;
-    repeated double samples = 10;
+    repeated Sample samples = 10;
 }
 
 // Node health status.

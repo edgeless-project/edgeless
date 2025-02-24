@@ -108,7 +108,7 @@ impl ProxyRedis {
     ) -> (Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>) {
         let filenames = ["performance_samples", "mapping_to_instance_id", "capabilities", "health_status"];
         let headers = [
-            "metric,identifier,value,timestamp".to_string(),
+            "metric,identifier,timestamp,value".to_string(),
             "timestamp,logical_id,node_id,physical_id".to_string(),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeCapabilities::csv_header()),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeHealthStatus::csv_header()),
@@ -417,20 +417,20 @@ impl super::proxy::Proxy for ProxyRedis {
     }
 
     fn push_performance_samples(&mut self, _node_id: &uuid::Uuid, performance_samples: edgeless_api::node_registration::NodePerformanceSamples) {
-        let timestamp = ProxyRedis::timestamp_now();
-
-        // Save to Redis.
         for (function_id, values) in performance_samples.function_execution_times {
             let key = format!("performance:function_execution_time:{}", function_id);
             for value in values {
-                let _ = redis::Cmd::rpush(&key, format!("{},{}", value, &timestamp).as_str()).exec(&mut self.connection);
+                // Save to Redis.
+                let _ = redis::Cmd::zadd(&key, value.to_string(), value.score()).exec(&mut self.connection);
 
                 // Save to dataset output.
                 if let Some(outfile) = &mut self.performance_samples_file {
                     let _ = writeln!(
                         outfile,
-                        "{},function_execution_time,{},{},{}",
-                        self.additional_fields, function_id, value, &timestamp
+                        "{},function_execution_time,{},{}",
+                        self.additional_fields,
+                        function_id,
+                        value.to_string().replacen(":", ",", 1)
                     );
                 }
             }
@@ -545,7 +545,7 @@ impl super::proxy::Proxy for ProxyRedis {
         health
     }
 
-    fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, std::collections::HashMap<String, Vec<(f64, f64)>>> {
+    fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, crate::proxy::PerformanceSamples> {
         let mut samples = std::collections::HashMap::new();
         for perf_key in self.connection.keys::<&str, Vec<String>>("performance:*").unwrap_or(vec![]) {
             let tokens: Vec<&str> = perf_key.split(':').collect();
@@ -557,14 +557,25 @@ impl super::proxy::Proxy for ProxyRedis {
 
             let entry = samples.entry(tokens[1].to_string()).or_insert(std::collections::HashMap::new());
             let sub_entry = entry.entry(tokens[2].to_string()).or_insert(vec![]);
-            if let Ok(values) = self.connection.lrange::<&str, Vec<String>>(&perf_key, 0, -1) {
+
+            if let Ok(values) = self
+                .connection
+                .zrangebyscore::<&str, f64, f64, Vec<String>>(&perf_key, f64::NEG_INFINITY, f64::INFINITY)
+            {
                 for value in values {
-                    let tokens: Vec<&str> = value.split(",").collect();
+                    let tokens: Vec<&str> = value.split(":").collect();
                     if tokens.len() != 2 {
                         continue;
                     }
-                    if let (Ok(metric), Ok(timestamp)) = (tokens[0].parse::<f64>(), tokens[1].parse::<f64>()) {
-                        sub_entry.push((metric, timestamp));
+                    let sub_tokens: Vec<&str> = tokens[0].split(".").collect();
+                    if sub_tokens.len() != 2 {
+                        continue;
+                    }
+                    if let (Ok(secs), Ok(nsecs), Ok(metric)) = (sub_tokens[0].parse::<i64>(), sub_tokens[1].parse::<u32>(), tokens[1].parse::<f64>())
+                    {
+                        if let Some(timestamp) = chrono::DateTime::from_timestamp(secs, nsecs) {
+                            sub_entry.push((timestamp, metric));
+                        }
                     }
                 }
             }
@@ -860,6 +871,16 @@ mod test {
             None => return,
         };
 
+        let mut cnt = 0;
+        let mut new_sample = |value| {
+            cnt += 2;
+            edgeless_api::node_registration::Sample {
+                timestamp_sec: cnt as i64,
+                timestamp_ns: (cnt + 1) as u32,
+                sample: value,
+            }
+        };
+
         // Check health status and performance samples.
         let health_status = edgeless_api::node_registration::NodeHealthStatus {
             mem_free: 3,
@@ -883,8 +904,10 @@ mod test {
             gpu_load_perc: 23,
             gpu_temp_cels: 24,
         };
-        let samples_1: Vec<f64> = vec![100.0, 101.0, 102.0, 103.0];
-        let samples_2: Vec<f64> = vec![200.0, 201.0];
+        let samples_1_values: Vec<f64> = vec![100.0, 101.0, 102.0, 103.0];
+        let samples_2_values: Vec<f64> = vec![200.0, 201.0];
+        let samples_1: Vec<edgeless_api::node_registration::Sample> = samples_1_values.iter().map(|x| new_sample(*x)).collect();
+        let samples_2: Vec<edgeless_api::node_registration::Sample> = samples_2_values.iter().map(|x| new_sample(*x)).collect();
         let node_id_perf = uuid::Uuid::new_v4();
         let fid_perf_1 = uuid::Uuid::new_v4();
         let fid_perf_2 = uuid::Uuid::new_v4();
@@ -904,8 +927,8 @@ mod test {
         assert_eq!(2, entry.len());
         let samples_1_res = entry.get(&fid_perf_1.to_string()).unwrap();
         let samples_2_res = entry.get(&fid_perf_2.to_string()).unwrap();
-        assert_eq!(samples_1, samples_1_res.iter().map(|x| x.0).collect::<Vec<f64>>());
-        assert_eq!(samples_2, samples_2_res.iter().map(|x| x.0).collect::<Vec<f64>>());
+        assert_eq!(samples_1_values, samples_1_res.iter().map(|x| x.1).collect::<Vec<f64>>());
+        assert_eq!(samples_2_values, samples_2_res.iter().map(|x| x.1).collect::<Vec<f64>>());
     }
 
     #[serial_test::serial]
