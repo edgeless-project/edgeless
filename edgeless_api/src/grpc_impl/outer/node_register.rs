@@ -50,7 +50,11 @@ impl NodeRegisterAPIServer {
                             log::error!("GRPC Server Failure");
                         }
                     }
+                } else {
+                    log::error!("NodeRegisterAPIServer parsing error")
                 }
+            } else {
+                log::error!("NodeRegisterAPIServer could not parse http host")
             }
 
             log::info!("Stop NodeRegisterAPIServer GRPC Server");
