@@ -1,20 +1,24 @@
 services:
   redis:
     image: redis:latest
+    container_name: redis
     ports:
       - 6379
 
   edgeless_con:
     image: edgeless_con:latest
+    container_name: edgeless_con
     ports:
       - 7001:7001
     environment:
       RUST_LOG: info
       SHOWCONF: 0
       ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
+      DOMAIN_REGISTER_ENDPOINT: edgeless_con:7002
       
   edgeless_orc:
     image: edgeless_orc:latest
+    container_name: edgeless_orc
     depends_on:
       - edgeless_con
       - redis
@@ -23,8 +27,8 @@ services:
       SHOWCONF: 0
       REDIS_ENDPOINT: redis:6379
       ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
-      INVOCATION_ENDPOINT: edgeless_orc:7102
-      AGENT_ENDPOINT: edgeless_orc:7121
+      NODE_REGISTER_ENDPOINT: edgeless_orc:7004
+      DOMAIN_REGISTER_ENDPOINT: edgeless_con:7002
     ports:
       - 7011:7011
       - 7121:7121
@@ -35,14 +39,15 @@ services:
 
   edgeless_node_file_log:
     image: edgeless_node:latest
+    container_name: edgeless_node_file_log
     depends_on:
       - edgeless_orc
     environment:
       RUST_LOG: info
       SHOWCONF: 0
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
       INVOCATION_ENDPOINT: edgeless_node_file_log:10001
       AGENT_ENDPOINT: edgeless_node_file_log:10002
+      NODE_REGISTER_URL: edgeless_orc:7004
       LABELS: '[]'
       NUM_CORES: 1
       NODE_TYPE: FILE_LOG
@@ -53,14 +58,15 @@ services:
 
   edgeless_node1:
     image: edgeless_node:latest
+    container_name: edgeless_node1
     depends_on:
       - edgeless_orc
     environment:
       RUST_LOG: info
       SHOWCONF: 0
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
       INVOCATION_ENDPOINT: edgeless_node1:10003
       AGENT_ENDPOINT: edgeless_node1:10004
+      NODE_REGISTER_URL: edgeless_orc:7004
       LABELS: '[]'
       NUM_CORES: 1
       NODE_TYPE: WASM

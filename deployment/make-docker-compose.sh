@@ -31,14 +31,15 @@ do
   
   edgeless_node$i:
     image: edgeless_node:latest
+    container_name: edgeless_node$i
     depends_on:
       - edgeless_orc
     environment:
       RUST_LOG: info
       SHOWCONF: 1
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
       INVOCATION_ENDPOINT: edgeless_node$i:$port1
       AGENT_ENDPOINT: edgeless_node$i:$port2
+      NODE_REGISTER_URL: edgeless_orc:7004
       LABELS: '["$label"]'
       NUM_CORES: $(( $RANDOM % 10 ))
       NODE_TYPE: WASM
@@ -54,20 +55,23 @@ if [ "$DDA" == "true" ] ; then
   echo "adding DDA node"
   port1=11003
   port2=11004
+  dda_port=12000
   label=${LABELS[ $RANDOM % ${#LABELS[@]} ]}
 
   cat >> $OUT_FILE << EOF
   
   edgeless_node_dda:
     image: edgeless_node:latest
+    container_name: edgeless_node_dda
     depends_on:
       - edgeless_orc
     environment:
       RUST_LOG: info
       SHOWCONF: 1
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
       INVOCATION_ENDPOINT: edgeless_node_dda:$port1
       AGENT_ENDPOINT: edgeless_node_dda:$port2
+      NODE_REGISTER_URL: edgeless_orc:7004
+      DDA_ENDPOINT: dda:$dda_port
       LABELS: '["$label"]'
       NUM_CORES: $(( $RANDOM % 10 ))
       NODE_TYPE: DDA
