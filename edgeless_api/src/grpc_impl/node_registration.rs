@@ -283,6 +283,14 @@ fn serialize_node_health_status(req: &crate::node_registration::NodeHealthStatus
     }
 }
 
+pub fn parse_sample(api_instance: &crate::grpc_impl::api::Sample) -> crate::node_registration::Sample {
+    crate::node_registration::Sample {
+        timestamp_sec: api_instance.timestamp_sec,
+        timestamp_ns: api_instance.timestamp_ns,
+        sample: api_instance.sample,
+    }
+}
+
 pub fn parse_node_performance_samples(
     api_instance: &crate::grpc_impl::api::NodePerformanceSamples,
 ) -> crate::node_registration::NodePerformanceSamples {
@@ -291,10 +299,18 @@ pub fn parse_node_performance_samples(
             .function_execution_times
             .iter()
             .filter_map(|x| match uuid::Uuid::from_str(&x.id) {
-                Ok(val) => Some((val, x.samples.clone())),
+                Ok(val) => Some((val, x.samples.iter().map(parse_sample).collect())),
                 _ => None,
             })
             .collect(),
+    }
+}
+
+fn serialize_sample(req: &crate::node_registration::Sample) -> crate::grpc_impl::api::Sample {
+    crate::grpc_impl::api::Sample {
+        timestamp_sec: req.timestamp_sec,
+        timestamp_ns: req.timestamp_ns,
+        sample: req.sample,
     }
 }
 
@@ -305,7 +321,7 @@ fn serialize_node_performance_samples(req: &crate::node_registration::NodePerfor
             .iter()
             .map(|(id, samples)| crate::grpc_impl::api::Samples {
                 id: id.to_string(),
-                samples: samples.clone(),
+                samples: samples.iter().map(serialize_sample).collect(),
             })
             .collect(),
     }
@@ -318,11 +334,22 @@ mod test {
     use crate::node_registration::NodeHealthStatus;
     use crate::node_registration::NodePerformanceSamples;
     use crate::node_registration::ResourceProviderSpecification;
+    use crate::node_registration::Sample;
     use crate::node_registration::UpdateNodeRequest;
     use crate::node_registration::UpdateNodeResponse;
 
     #[test]
     fn serialize_deserialize_update_node_request() {
+        let mut cnt = 0;
+        let mut new_sample = |value| {
+            cnt += 2;
+            Sample {
+                timestamp_sec: cnt as i64,
+                timestamp_ns: (cnt + 1) as u32,
+                sample: value,
+            }
+        };
+
         let messages = vec![UpdateNodeRequest {
             node_id: uuid::Uuid::new_v4(),
             agent_url: "http://127.0.0.1:10000".to_string(),
@@ -373,9 +400,9 @@ mod test {
             },
             performance_samples: NodePerformanceSamples {
                 function_execution_times: std::collections::HashMap::from([
-                    (uuid::Uuid::new_v4(), vec![1.0, 2.5, 3.0]),
+                    (uuid::Uuid::new_v4(), vec![new_sample(1.0), new_sample(2.5), new_sample(3.0)]),
                     (uuid::Uuid::new_v4(), vec![]),
-                    (uuid::Uuid::new_v4(), vec![0.1, 0.2, 999.0]),
+                    (uuid::Uuid::new_v4(), vec![new_sample(0.1), new_sample(0.2), new_sample(999.0)]),
                 ]),
             },
         }];
