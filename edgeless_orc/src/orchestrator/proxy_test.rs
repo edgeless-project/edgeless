@@ -38,7 +38,7 @@ impl crate::proxy::Proxy for ProxyTest {
     ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeHealthStatus> {
         std::collections::HashMap::new()
     }
-    fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, std::collections::HashMap<String, Vec<(f64, f64)>>> {
+    fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, crate::proxy::PerformanceSamples> {
         std::collections::HashMap::new()
     }
     fn fetch_function_instance_requests(

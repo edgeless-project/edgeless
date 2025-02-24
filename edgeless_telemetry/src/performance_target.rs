@@ -4,7 +4,8 @@
 use std::str::FromStr;
 
 pub struct Metrics {
-    pub function_execution_times: std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<f64>>,
+    pub function_execution_times:
+        std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::node_registration::Sample>>,
 }
 
 /// Non thread-safe data structure holding performance-related per-node metrics.
@@ -45,8 +46,13 @@ impl crate::telemetry_events::EventProcessor for PerformanceTarget {
             crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(lat) => {
                 if let Some(function_id) = event_tags.get("FUNCTION_ID") {
                     if let Ok(function_id) = uuid::Uuid::from_str(function_id) {
+                        let now = chrono::Utc::now();
                         let res = self.metrics.function_execution_times.entry(function_id).or_default();
-                        res.push(lat.as_secs_f64());
+                        res.push(edgeless_api::node_registration::Sample {
+                            timestamp_sec: now.timestamp(),
+                            timestamp_ns: now.timestamp_subsec_nanos(),
+                            sample: lat.as_secs_f64(),
+                        });
                     }
                 }
             }
@@ -133,7 +139,8 @@ mod tests {
             );
         }
         let metrics = target.get_metrics();
-        assert_eq!(Some(expected), metrics.function_execution_times.get(&fid).cloned());
+        let samples = metrics.function_execution_times.get(&fid).cloned().unwrap();
+        assert_eq!(expected, samples.iter().map(|x| x.sample).collect::<Vec<f64>>());
 
         assert!(target.get_metrics().function_execution_times.is_empty());
     }

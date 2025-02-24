@@ -173,8 +173,30 @@ impl NodeHealthStatus {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
+pub struct Sample {
+    /// Number of s since Unix epoch,
+    pub timestamp_sec: i64,
+    /// Number of ns since the last second boundary from Unix Epoch.
+    pub timestamp_ns: u32,
+    /// Sample value.
+    pub sample: f64,
+}
+
+impl Sample {
+    pub fn score(&self) -> f64 {
+        self.timestamp_sec as f64 + (self.timestamp_ns as f64) / 1e9
+    }
+}
+
+impl std::fmt::Display for Sample {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}.{}:{}", self.timestamp_sec, self.timestamp_ns, self.sample)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct NodePerformanceSamples {
-    pub function_execution_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<f64>>,
+    pub function_execution_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<Sample>>,
 }
 
 impl std::fmt::Display for NodeHealthStatus {
