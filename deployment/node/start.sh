@@ -10,7 +10,8 @@ agent_url = "http://0.0.0.0:${agent_addr_port[1]}"
 agent_url_announced = "http://$AGENT_ENDPOINT"
 invocation_url = "http://0.0.0.0:${invocation_addr_port[1]}"
 invocation_url_announced = "http://$INVOCATION_ENDPOINT"
-orchestrator_url = "http://$ORCHESTRATOR_ENDPOINT"
+node_register_url = "http://$NODE_REGISTER_URL"
+subscription_refresh_interval_sec = 2
 
 [telemetry]
 metrics_url = "http://0.0.0.0:7003"
@@ -52,7 +53,7 @@ num_cores = $NUM_CORES
 
 [resources]
 dda_provider = "dda-1"
-dda_url = "http://127.0.0.1:12000"
+dda_url = "$DDA_ENDPOINT"
 EOF
 
 else
