@@ -56,19 +56,36 @@ as a convenient alternative to reading directly from the Redis database.
 
 ### Schema
 
-| Key                                       | Value                                                                                                                                                                                                                        | Data type                              | When updated                                             |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------- |
-| domain_info:domain_id                     | Identifier of the domain managed by this ε-ORC                                                                                                                                                                               | `String`                               | At service start                                         |
-| nodes:capabilities:`node_id`              | JSON object representing the capabilities of the node with given node identifier                                                                                                                                             | `NodeCapabilities`                     | When a node joins the domain or updates its capabilities |
-| nodes:capabilities:last_update            | Last update to node:capabilities:*                                                                                                                                                                                           | Timestamp (seconds.milliseconds)       |                                                          |
-| provider:`provider_id`                    | JSON object representing the configuration of the resource provider with given identifier                                                                                                                                    | `ResourceProvider`                     | When the resource provider is announced by the node      |
-| provider:last_update                      | Last update to provider:*                                                                                                                                                                                                    | Timestamp (seconds.milliseconds)       |                                                          |
-| instance:`lid`                            | JSON object representing an active instance with logical identifier `lid`, which can be either a function or a resource, and its currently instances (each with node identifier and physical function identifier)            | `ActiveInstance`                       | When the function or resource is created or modified     |
-| instance:last_update                      | Last update to instance:*                                                                                                                                                                                                    | Timestamp (seconds.milliseconds)       |                                                          |
-| dependency:`lid`                          | JSON object representing the dependencies of the function with given logical identifier `lid` through a map of output channel names to logical function identifiers                                                          | `HashMap<Uuid, HashMap<String, Uuid>>` | When the dependency is announced or modified             |  |  |
-| dependency:last_update                    | Last update to dependency:*                                                                                                                                                                                                  | Timestamp (seconds.milliseconds)       |                                                          |
-| node:health:`node_id`                     | JSON object representing the health status of the node with given node identifier                                                                                                                                            | `NodeHealthStatus`                     | When the node refreshes its registration with the ε-ORC  |
-| performance:function_execution_time:`pid` | List of function execution times of the function with the given Physical Identifier, in fractional seconds, each associated with a timestamp with a millisecond resolution taken by the ε-ORC (format `exec_time,timestamp`) | `NodePerformanceSamples`               | When the node refreshes its registration with the ε-ORC  |
+#### Scalars
+
+| Key                          | Value                                                                                                                                                                                                             | Data type                              | When updated                                             |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------- |
+| domain_info:domain_id        | Identifier of the domain managed by this ε-ORC                                                                                                                                                                    | `String`                               | At service start                                         |
+| nodes:capabilities:`node_id` | JSON object representing the capabilities of the node with given node identifier                                                                                                                                  | `NodeCapabilities`                     | When a node joins the domain or updates its capabilities |
+| provider:`provider_id`       | JSON object representing the configuration of the resource provider with given identifier                                                                                                                         | `ResourceProvider`                     | When the resource provider is announced by the node      |
+| instance:`lid`               | JSON object representing an active instance with logical identifier `lid`, which can be either a function or a resource, and its currently instances (each with node identifier and physical function identifier) | `ActiveInstance`                       | When the function or resource is created or modified     |
+| dependency:`lid`             | JSON object representing the dependencies of the function with given logical identifier `lid` through a map of output channel names to logical function identifiers                                               | `HashMap<Uuid, HashMap<String, Uuid>>` | When the dependency is announced or modified             |
+
+The value of the following keys are updated with a timestamp when the
+corresponding data structure is updated:
+
+- `nodes:capabilities:last_update`
+- `provider:last_update           `
+- `instance:last_update           `
+- `dependency:last_update         `
+
+#### Sorted sets
+
+The values below are stored as sorted sets, with a score equal to
+the timestamp of when they have been retrieved.
+They are all updated when the node refreshes its registration with the ε-ORC.
+
+| Key                                       | Element value                                                                                                                                                       | Data type          |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| node:health:`node_id`                     | JSON object representing the health status of the node identifier specified in the key                                                                              | `NodeHealthStatus` |
+| performance:function_execution_time:`pid` | Execution time of the function with the given `pid`, in fractional seconds, each associated with the timestamp of when the function execution completed at the node | `timestamp:value`  |
+
+#### Identifiers and other types
 
 The following identifiers are represented in
 [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier) format:
@@ -81,3 +98,8 @@ The following identifiers are represented as free-text strings:
 
 - domain identifier
 - provider identifier
+
+All the timestamps are represented as `secs.nsecs` where:
+
+- `secs`: number of non-leap seconds since UNIX timestamp
+- `nsecs`: number of nanoseconds since the last second boundary
