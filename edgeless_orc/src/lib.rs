@@ -59,6 +59,8 @@ pub struct EdgelessOrcProxySettings {
     /// Type of the proxy that is used to mirror the internal data structures
     /// of the orchestrator and to receive orchestration directives.
     pub proxy_type: String,
+    /// Gargabe collection interval, in seconds. 0 means disabled.
+    pub proxy_gc_period_seconds: u64,
     /// If proxy_type is "Redis" then this is the URL of the Redis server.
     pub redis_url: Option<String>,
     /// Settings on whether/how to save events to output files.
@@ -136,6 +138,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     .await;
 
     // Create the proxy.
+    let proxy_gc_period = tokio::time::Duration::from_secs(settings.proxy.proxy_gc_period_seconds);
     let proxy = make_proxy(settings.proxy);
     proxy.lock().await.update_domain_info(&crate::domain_info::DomainInfo {
         domain_id: settings.general.domain_id.to_string(),
@@ -150,7 +153,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
 
     // Create the node register.
     let (mut node_register, node_register_task, node_register_refresh_task) =
-        node_register::NodeRegister::new(proxy, orchestrator.get_sender()).await;
+        node_register::NodeRegister::new(proxy, proxy_gc_period, orchestrator.get_sender()).await;
 
     let node_register_server = edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIServer::run(
         node_register.get_node_registration_client(),
@@ -207,6 +210,7 @@ pub fn edgeless_orc_default_conf() -> String {
         },
         proxy: EdgelessOrcProxySettings {
             proxy_type: "None".to_string(),
+            proxy_gc_period_seconds: 360,
             redis_url: Some(String::from("redis://127.0.0.1:6379")),
             dataset_settings: Some(EdgelessOrcProxyDatasetSettings::default()),
         },
