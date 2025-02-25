@@ -108,4 +108,8 @@ pub trait Proxy: Sync + Send {
 
     /// Return true if the given category has been updated since the last fetch.
     fn updated(&mut self, category: Category) -> bool;
+
+    /// Perform a garbage collection of the sorted sets removing all values
+    /// older than `period`.
+    fn garbage_collection(&mut self, period: tokio::time::Duration);
 }
