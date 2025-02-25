@@ -259,7 +259,7 @@ impl super::proxy::Proxy for ProxyRedis {
         let timestamp = ProxyRedis::timestamp_now();
 
         // update the timestamp when the nodes were updated
-        let _ = redis::Cmd::set(String::from("node:capabilities:last_update"), &timestamp).exec(&mut self.connection);
+        let _ = redis::Cmd::set(String::from("node:capabilities:last_update"), timestamp).exec(&mut self.connection);
 
         // serialize the nodes' capabilities and health status to Redis
         let mut new_node_capabilities = std::collections::HashMap::new();
@@ -324,7 +324,7 @@ impl super::proxy::Proxy for ProxyRedis {
         let timestamp = ProxyRedis::timestamp_now();
 
         // update the timestamp when the active instances were updated
-        let _ = redis::Cmd::set(String::from("instance:last_update"), &timestamp).exec(&mut self.connection);
+        let _ = redis::Cmd::set(String::from("instance:last_update"), timestamp).exec(&mut self.connection);
 
         // serialize the active instances
         let mut new_mapping_to_instance_id = std::collections::HashMap::new();
