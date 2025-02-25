@@ -129,11 +129,13 @@ fn generate_configs(
         proxy: match metrics_collector {
             true => edgeless_orc::EdgelessOrcProxySettings {
                 proxy_type: "Redis".to_string(),
+                proxy_gc_period_seconds: 360,
                 redis_url: Some(String::from("redis://127.0.0.1:6379")),
                 dataset_settings: Some(edgeless_orc::EdgelessOrcProxyDatasetSettings::default()),
             },
             false => edgeless_orc::EdgelessOrcProxySettings {
                 proxy_type: "None".to_string(),
+                proxy_gc_period_seconds: 0,
                 redis_url: None,
                 dataset_settings: None,
             },
