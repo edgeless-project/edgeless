@@ -76,4 +76,5 @@ impl super::proxy::Proxy for ProxyNone {
     fn updated(&mut self, _category: crate::proxy::Category) -> bool {
         true
     }
+    fn garbage_collection(&mut self, _period: tokio::time::Duration) {}
 }

@@ -738,6 +738,20 @@ impl super::proxy::Proxy for ProxyRedis {
         let local_timestamp = self.last_update_timestamps.entry(category).or_default();
         *local_timestamp != redis_timestamp
     }
+
+    fn garbage_collection(&mut self, period: tokio::time::Duration) {
+        let remove_timestamp = chrono::Utc::now() - period;
+        let remove_timestamp = remove_timestamp.timestamp() as f64 + remove_timestamp.timestamp_subsec_nanos() as f64 / 1e9;
+        log::debug!("proxy garbage collection: removing data until {}", remove_timestamp);
+        let key_patterns = vec!["performance:*", "node:health:*"];
+        for key_pattern in key_patterns {
+            for key in self.connection.keys::<&str, Vec<String>>(key_pattern).unwrap_or(vec![]) {
+                let _ = self
+                    .connection
+                    .zrembyscore::<&str, f64, f64, ()>(&key, f64::NEG_INFINITY, remove_timestamp);
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -953,8 +967,10 @@ mod test {
         let fid_perf_2 = uuid::Uuid::new_v4();
         redis_proxy.push_node_health(&node_id_perf, health_status.clone());
         health_status.mem_free += 1;
+        std::thread::sleep(std::time::Duration::from_millis(10));
         redis_proxy.push_node_health(&node_id_perf, health_status.clone());
         health_status.mem_free += 1;
+        std::thread::sleep(std::time::Duration::from_millis(10));
         redis_proxy.push_node_health(&node_id_perf, health_status.clone());
         redis_proxy.push_performance_samples(
             &node_id_perf,
@@ -988,6 +1004,13 @@ mod test {
         let samples_2_res = entry.get(&fid_perf_2.to_string()).unwrap();
         assert_eq!(samples_1_values, samples_1_res.iter().map(|x| x.1).collect::<Vec<f64>>());
         assert_eq!(samples_2_values, samples_2_res.iter().map(|x| x.1).collect::<Vec<f64>>());
+
+        // Purge the proxy.
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        redis_proxy.garbage_collection(tokio::time::Duration::from_millis(1));
+        assert!(redis_proxy.fetch_node_healths().is_empty());
+        assert!(redis_proxy.fetch_performance_samples().is_empty());
+        assert!(redis_proxy.fetch_node_health().is_empty());
     }
 
     #[serial_test::serial]
