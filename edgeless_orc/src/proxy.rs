@@ -16,6 +16,10 @@ pub enum Category {
 }
 
 pub type PerformanceSamples = std::collections::HashMap<String, Vec<(chrono::DateTime<chrono::Utc>, f64)>>;
+pub type NodeHealthStatuses = std::collections::HashMap<
+    edgeless_api::function_instance::NodeId,
+    Vec<(chrono::DateTime<chrono::Utc>, edgeless_api::node_registration::NodeHealthStatus)>,
+>;
 
 #[async_trait::async_trait]
 pub trait Proxy: Sync + Send {
@@ -57,10 +61,13 @@ pub trait Proxy: Sync + Send {
     /// Fetch the resource providers available.
     fn fetch_resource_providers(&mut self) -> std::collections::HashMap<String, crate::resource_provider::ResourceProvider>;
 
-    /// Fetch the nodes' health status.
+    /// Fetch the last nodes' health status.
     fn fetch_node_health(
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeHealthStatus>;
+
+    /// Fetch all the last nodes' health statuses, with timestamp.
+    fn fetch_node_healths(&mut self) -> NodeHealthStatuses;
 
     /// Fetch the performance samples.
     fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, PerformanceSamples>;
