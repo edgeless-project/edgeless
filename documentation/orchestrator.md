@@ -85,6 +85,10 @@ They are all updated when the node refreshes its registration with the ε-ORC.
 | node:health:`node_id`                     | JSON object representing the health status of the node identifier specified in the key                                                                              | `NodeHealthStatus` |
 | performance:function_execution_time:`pid` | Execution time of the function with the given `pid`, in fractional seconds, each associated with the timestamp of when the function execution completed at the node | `timestamp:value`  |
 
+Old values in the sorted sets above are periodically purged from the proxy,
+with the period configured in the ε-ORC's configuration file as
+`proxy.proxy_gc_period_seconds`.
+
 #### Identifiers and other types
 
 The following identifiers are represented in
