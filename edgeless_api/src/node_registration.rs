@@ -197,6 +197,7 @@ impl std::fmt::Display for Sample {
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NodePerformanceSamples {
     pub function_execution_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<Sample>>,
+    pub function_transfer_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<Sample>>,
 }
 
 impl std::fmt::Display for NodeHealthStatus {

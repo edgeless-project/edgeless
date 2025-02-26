@@ -8,6 +8,14 @@ use crate::core::*;
 use crate::node_local::*;
 use crate::remote_node::*;
 
+fn timestamp_utc() -> edgeless_api::function_instance::EventTimestamp {
+    let now = chrono::Utc::now();
+    edgeless_api::function_instance::EventTimestamp {
+        secs: now.timestamp(),
+        nsecs: now.timestamp_subsec_nanos(),
+    }
+}
+
 /// The main handle representing an element (identified by a `InstanceId`) across the dataplane.
 /// The dataplane might require multiple links which are processed in a chain-like fashion.
 #[derive(Clone)]
@@ -40,6 +48,7 @@ impl DataplaneHandle {
                     source_id,
                     channel_id,
                     message,
+                    created,
                 }) = receiver.next().await
                 {
                     if let Some(sender) = clone_overwrites.lock().await.temporary_receivers.remove(&channel_id) {
@@ -57,6 +66,7 @@ impl DataplaneHandle {
                             source_id,
                             channel_id,
                             message,
+                            created,
                         })
                         .await
                     {
@@ -86,6 +96,7 @@ impl DataplaneHandle {
                 source_id,
                 channel_id,
                 message,
+                created,
             }) = self.receiver.lock().await.next().await
             {
                 if std::mem::discriminant(&message) == std::mem::discriminant(&Message::Cast("".to_string()))
@@ -95,6 +106,7 @@ impl DataplaneHandle {
                         source_id,
                         channel_id,
                         message,
+                        created,
                     };
                 }
                 log::error!("Unprocesses other message");
@@ -104,7 +116,7 @@ impl DataplaneHandle {
 
     /// Send a `cast` event.
     pub async fn send(&mut self, target: edgeless_api::function_instance::InstanceId, msg: String) {
-        self.send_inner(target, Message::Cast(msg), 0).await;
+        self.send_inner(target, Message::Cast(msg), timestamp_utc(), 0).await;
     }
 
     // Send a `call` event and wait for the return event.
@@ -115,7 +127,7 @@ impl DataplaneHandle {
         self.next_id += 1;
         // Potential Leak: This is only received if a message is received (or the handle is dropped)
         self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
-        self.send_inner(target, Message::Call(msg), channel_id).await;
+        self.send_inner(target, Message::Call(msg), timestamp_utc(), channel_id).await;
         match receiver.await {
             Ok((_src, msg)) => match msg {
                 Message::CallRet(ret) => CallRet::Reply(ret),
@@ -135,15 +147,22 @@ impl DataplaneHandle {
                 CallRet::NoReply => Message::CallNoRet,
                 CallRet::Err => Message::Err,
             },
+            edgeless_api::function_instance::EventTimestamp::default(),
             channel_id,
         )
         .await;
     }
 
-    async fn send_inner(&mut self, target: edgeless_api::function_instance::InstanceId, msg: Message, channel_id: u64) {
+    async fn send_inner(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+        msg: Message,
+        created: edgeless_api::function_instance::EventTimestamp,
+        channel_id: u64,
+    ) {
         let mut lck = self.output_chain.lock().await;
         for link in &mut lck.iter_mut() {
-            if link.handle_send(&target, msg.clone(), &self.slf, channel_id).await == LinkProcessingResult::FINAL {
+            if link.handle_send(&target, msg.clone(), &self.slf, &created, channel_id).await == LinkProcessingResult::FINAL {
                 return;
             }
         }

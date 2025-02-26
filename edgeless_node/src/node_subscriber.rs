@@ -111,6 +111,7 @@ impl NodeSubscriber {
                     // The refresh deadline is set to twice the refresh period
                     // to reduce the likelihood of a race condition on the
                     // register side.
+                    let metrics = telemetry_performance_target.get_metrics();
                     let update_node_request = edgeless_api::node_registration::UpdateNodeRequest {
                         node_id,
                         invocation_url: invocation_url.clone(),
@@ -121,7 +122,8 @@ impl NodeSubscriber {
                         nonce,
                         health_status: Self::get_health_status(&mut sys, &mut networks, &mut disks, own_pid),
                         performance_samples: edgeless_api::node_registration::NodePerformanceSamples {
-                            function_execution_times: telemetry_performance_target.get_metrics().function_execution_times,
+                            function_execution_times: metrics.function_execution_times,
+                            function_transfer_times: metrics.function_transfer_times,
                         },
                     };
                     match client.node_registration_api().update_node(update_node_request).await {
