@@ -47,6 +47,7 @@ impl CoapInvocationServer {
                                 edgeless_api_core::invocation::EventData::CallNoRet => crate::invocation::EventData::CallNoRet,
                                 edgeless_api_core::invocation::EventData::Err => crate::invocation::EventData::Err,
                             },
+                            created: invocation_event.created,
                         };
 
                         let key_entry = received_tokens.entry(sender.ip());
@@ -89,6 +90,7 @@ impl crate::invocation::InvocationAPI for super::CoapClient {
                 crate::invocation::EventData::CallNoRet => edgeless_api_core::invocation::EventData::CallNoRet,
                 crate::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,
             },
+            created: event.created,
         };
 
         let mut lck = self.inner.lock().await;
