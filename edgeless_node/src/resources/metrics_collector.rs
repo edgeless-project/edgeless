@@ -27,7 +27,7 @@ impl super::resource_provider_specs::ResourceProviderSpecs for MetricsCollectorR
     }
 
     fn version(&self) -> String {
-        String::from("1.0")
+        String::from("1.1")
     }
 }
 
@@ -153,6 +153,7 @@ impl std::fmt::Display for RedisCommand {
 pub struct MetricsCollectorResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, MetricsCollectorResource>,
     sender: futures::channel::mpsc::UnboundedSender<RedisCommand>,
     _handle: tokio::task::JoinHandle<()>,
@@ -172,12 +173,14 @@ impl MetricsCollectorResource {
     // alpha is the smoothing factor of the EWMA of samples.
     async fn new(
         dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         alpha: f64,
         wf_name: String,
         sender: futures::channel::mpsc::UnboundedSender<RedisCommand>,
     ) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
         let mut sender = sender;
+        let mut telemetry_handle = telemetry_handle;
 
         let handle = tokio::spawn(async move {
             let mut timestamps = std::collections::HashMap::new();
@@ -189,6 +192,7 @@ impl MetricsCollectorResource {
                     message,
                     created,
                 } = dataplane_handle.receive_next().await;
+                let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
 
                 let mut need_reply = false;
                 let message_data = match message {
@@ -244,6 +248,8 @@ impl MetricsCollectorResource {
                         .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
                         .await;
                 }
+
+                crate::resources::observe_execution(started, &mut telemetry_handle);
             }
         });
 
@@ -254,6 +260,7 @@ impl MetricsCollectorResource {
 impl MetricsCollectorResourceProvider {
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
         redis_connection: redis::Connection,
     ) -> Self {
@@ -310,6 +317,7 @@ impl MetricsCollectorResourceProvider {
             inner: std::sync::Arc::new(tokio::sync::Mutex::new(MetricsCollectorResourceProviderInner {
                 resource_provider_id,
                 dataplane_provider,
+                telemetry_handle,
                 instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, MetricsCollectorResource>::new(),
                 sender,
                 _handle,
@@ -340,7 +348,18 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
         let wf_name = instance_specification.configuration.get("wf_name").unwrap_or(&"".to_string()).clone();
 
-        match MetricsCollectorResource::new(dataplane_handle, alpha, wf_name, lck.sender.clone()).await {
+        match MetricsCollectorResource::new(
+            dataplane_handle,
+            lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
+                "FUNCTION_ID".to_string(),
+                new_id.function_id.to_string(),
+            )])),
+            alpha,
+            wf_name,
+            lck.sender.clone(),
+        )
+        .await
+        {
             Ok(resource) => {
                 lck.instances.insert(new_id, resource);
                 return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));

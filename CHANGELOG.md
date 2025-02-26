@@ -14,6 +14,10 @@ New features:
   workflows based on a JSON template.
 - New WASM function dup: duplicates the cast payload over two output channels.
 - Add new proxy method to retrieve the domain identifier.
+- Add new telemetry metric: function transfer time, which measures the time
+  between when an event is generated and when it is handled by the intended
+  worker.
+- Add collection of execution/transfer time metrics for resources.
 
 Improvements:
 
@@ -26,6 +30,9 @@ Improvements:
   IP address of the first non-loopback interface found.
 - Proxy: add methods to fetch the dependency graph and to know if some category
   of data have been updated since the last fetch.
+- Proxy: transform the performance samples and nodes' health into sorted sets
+  to keep a history of previous values in the database, with periodic garbage
+  collection done by the ε-ORC. Period duration is configurable.
 
 API changes:
 
@@ -38,6 +45,8 @@ API changes:
 - Remove unused fields:
   - ResourceInstanceSpecification::output_mapping
   - SpawnFunctionRequest::instance_id.
+- Updated the content of the Event message in FunctionInvocation to include
+  a timestamp of when the event was created.
 
 ## [1.0.0] - 2024-11-12
 

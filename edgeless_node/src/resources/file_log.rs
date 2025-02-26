@@ -27,7 +27,7 @@ impl super::resource_provider_specs::ResourceProviderSpecs for FileLogResourceSp
     }
 
     fn version(&self) -> String {
-        String::from("1.0")
+        String::from("1.1")
     }
 }
 
@@ -39,6 +39,7 @@ pub struct FileLogResourceProvider {
 struct FileLogResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, FileLogResource>,
 }
 
@@ -55,11 +56,13 @@ impl Drop for FileLogResource {
 impl FileLogResource {
     async fn new(
         dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         filename: &str,
         add_source_id: bool,
         add_timestamp: bool,
     ) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
+        let mut telemetry_handle = telemetry_handle;
 
         let mut outfile = std::fs::OpenOptions::new().create(true).append(true).open(filename)?;
 
@@ -73,6 +76,8 @@ impl FileLogResource {
                     message,
                     created,
                 } = dataplane_handle.receive_next().await;
+                let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
+
                 let mut need_reply = false;
                 let message_data = match message {
                     Message::Call(data) => {
@@ -107,6 +112,8 @@ impl FileLogResource {
                         .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
                         .await;
                 }
+
+                crate::resources::observe_execution(started, &mut telemetry_handle);
             }
         });
 
@@ -117,12 +124,14 @@ impl FileLogResource {
 impl FileLogResourceProvider {
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {
             inner: std::sync::Arc::new(tokio::sync::Mutex::new(FileLogResourceProviderInner {
                 resource_provider_id,
                 dataplane_provider,
+                telemetry_handle,
                 instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, FileLogResource>::new(),
             })),
         }
@@ -143,6 +152,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
             match FileLogResource::new(
                 dataplane_handle,
+                lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
+                    "FUNCTION_ID".to_string(),
+                    new_id.function_id.to_string(),
+                )])),
                 filename,
                 instance_specification.configuration.contains_key("add-source-id"),
                 instance_specification.configuration.contains_key("add-timestamp"),
