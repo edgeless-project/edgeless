@@ -142,7 +142,7 @@ impl OllamaResource {
                     }
                 }
 
-                crate::resources::observe_execution(started, &mut telemetry_handle);
+                crate::resources::observe_execution(started, &mut telemetry_handle, false);
             }
         });
 

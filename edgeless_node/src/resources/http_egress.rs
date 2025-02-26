@@ -95,7 +95,7 @@ impl EgressResource {
                         }
                     }
                 });
-                crate::resources::observe_execution(started, &mut telemetry_handle);
+                crate::resources::observe_execution(started, &mut telemetry_handle, true);
             }
         });
 
