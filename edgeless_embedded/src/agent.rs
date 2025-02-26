@@ -164,6 +164,7 @@ impl crate::invocation::InvocationAPI for EmbeddedAgent {
                         edgeless_api_core::invocation::EventData::CallNoRet => edgeless_api_core::invocation::EventData::CallNoRet,
                         edgeless_api_core::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,
                     },
+                    created: event.created,
                 };
             self.upstream_sender.send(AgentEvent::Invocation(new_event)).await;
             Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)

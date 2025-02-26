@@ -419,21 +419,28 @@ impl super::proxy::Proxy for ProxyRedis {
     }
 
     fn push_performance_samples(&mut self, _node_id: &uuid::Uuid, performance_samples: edgeless_api::node_registration::NodePerformanceSamples) {
-        for (function_id, values) in performance_samples.function_execution_times {
-            let key = format!("performance:function_execution_time:{}", function_id);
-            for value in values {
-                // Save to Redis.
-                let _ = redis::Cmd::zadd(&key, value.to_string(), value.score()).exec(&mut self.connection);
+        let all_series = vec![
+            ("function_execution_time", &performance_samples.function_execution_times),
+            ("function_transfer_time", &performance_samples.function_transfer_times),
+        ];
+        for (name, series) in all_series {
+            for (function_id, values) in series {
+                let key = format!("performance:{}:{}", name, function_id);
+                for value in values {
+                    // Save to Redis.
+                    let _ = redis::Cmd::zadd(&key, value.to_string(), value.score()).exec(&mut self.connection);
 
-                // Save to dataset output.
-                if let Some(outfile) = &mut self.performance_samples_file {
-                    let _ = writeln!(
-                        outfile,
-                        "{},function_execution_time,{},{}",
-                        self.additional_fields,
-                        function_id,
-                        value.to_string().replacen(":", ",", 1)
-                    );
+                    // Save to dataset output.
+                    if let Some(outfile) = &mut self.performance_samples_file {
+                        let _ = writeln!(
+                            outfile,
+                            "{},{},{},{}",
+                            self.additional_fields,
+                            name,
+                            function_id,
+                            value.to_string().replacen(":", ",", 1)
+                        );
+                    }
                 }
             }
         }
@@ -976,6 +983,7 @@ mod test {
             &node_id_perf,
             edgeless_api::node_registration::NodePerformanceSamples {
                 function_execution_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
+                function_transfer_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
             },
         );
 
