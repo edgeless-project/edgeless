@@ -841,7 +841,7 @@ impl DDAResource {
                         continue;
                     }
                 }
-                crate::resources::observe_execution(started, &mut telemetry_handle);
+                crate::resources::observe_execution(started, &mut telemetry_handle, false);
             }
         });
         sub_tasks.push(_dda_task);

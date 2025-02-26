@@ -71,6 +71,7 @@ impl PrometheusEventTarget {
 
         registry.lock().await.register("function_count", "", function_count.clone());
         registry.lock().await.register("execution_times", "", execution_times.clone());
+        registry.lock().await.register("transfer_times", "", transfer_times.clone());
 
         let reg_clone = registry.clone();
         let socket_addr: std::net::SocketAddr = endpoint.parse().unwrap_or_else(|_| panic!("invalid endpoint: {}", &endpoint));
@@ -126,16 +127,20 @@ impl crate::telemetry_events::EventProcessor for PrometheusEventTarget {
                 }
             }
             crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(lat) => {
-                if let (Some(node_id), Some(function_id), Some(function_type), Some(invoction_type)) = (
-                    event_tags.get("NODE_ID"),
-                    event_tags.get("FUNCTION_ID"),
-                    event_tags.get("FUNCTION_TYPE"),
-                    event_tags.get("EVENT_TYPE"),
-                ) {
+                if let (Some(node_id), Some(function_id), Some(invoction_type)) =
+                    (event_tags.get("NODE_ID"), event_tags.get("FUNCTION_ID"), event_tags.get("EVENT_TYPE"))
+                {
+                    let function_type = if let Some(function_type) = event_tags.get("FUNCTION_TYPE") {
+                        function_type.to_string()
+                    } else if let Some(resource_class_type) = event_tags.get("RESOURCE_CLASS_TYPE") {
+                        resource_class_type.to_string()
+                    } else {
+                        String::default()
+                    };
                     self.execution_times
                         .get_or_create(&ExecutionLabels {
                             node_id: node_id.to_string(),
-                            function_type: function_type.to_string(),
+                            function_type,
                             function_id: function_id.to_string(),
                             invocation_type: match invoction_type.as_str() {
                                 "CALL" => InvocationType::Call,
