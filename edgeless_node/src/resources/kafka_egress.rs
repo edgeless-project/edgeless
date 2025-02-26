@@ -23,7 +23,7 @@ impl super::resource_provider_specs::ResourceProviderSpecs for KafkaEgressResour
     }
 
     fn version(&self) -> String {
-        String::from("1.0")
+        String::from("1.1")
     }
 }
 
@@ -35,6 +35,7 @@ pub struct KafkaEgressResourceProvider {
 pub struct KafkaEgressResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, KafkaEgressResource>,
 }
 
@@ -49,8 +50,14 @@ impl Drop for KafkaEgressResource {
 }
 
 impl KafkaEgressResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, kafka_brokers: &str, kafka_topic: &str) -> anyhow::Result<Self> {
+    async fn new(
+        dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        kafka_brokers: &str,
+        kafka_topic: &str,
+    ) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
+        let mut telemetry_handle = telemetry_handle;
         let kafka_brokers = kafka_brokers.to_string();
         let kafka_topic = kafka_topic.to_string();
 
@@ -64,7 +71,9 @@ impl KafkaEgressResource {
                     source_id,
                     channel_id,
                     message,
+                    created,
                 } = dataplane_handle.receive_next().await;
+                let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
 
                 let mut need_reply = false;
                 let message_data = match message {
@@ -87,6 +96,8 @@ impl KafkaEgressResource {
                         .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
                         .await;
                 }
+
+                crate::resources::observe_execution(started, &mut telemetry_handle);
             }
         });
 
@@ -97,12 +108,14 @@ impl KafkaEgressResource {
 impl KafkaEgressResourceProvider {
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {
             inner: std::sync::Arc::new(tokio::sync::Mutex::new(KafkaEgressResourceProviderInner {
                 resource_provider_id,
                 dataplane_provider,
+                telemetry_handle,
                 instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, KafkaEgressResource>::new(),
             })),
         }
@@ -122,8 +135,12 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             let mut lck = self.inner.lock().await;
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
+            let telemetry_handle = lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
+                "FUNCTION_ID".to_string(),
+                new_id.function_id.to_string(),
+            )]));
 
-            match KafkaEgressResource::new(dataplane_handle, brokers, topic).await {
+            match KafkaEgressResource::new(dataplane_handle, telemetry_handle, brokers, topic).await {
                 Ok(resource) => {
                     lck.instances.insert(new_id, resource);
                     return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
