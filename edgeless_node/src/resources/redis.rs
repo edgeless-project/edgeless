@@ -98,7 +98,7 @@ impl RedisResource {
                         .await;
                 }
 
-                crate::resources::observe_execution(started, &mut telemetry_handle);
+                crate::resources::observe_execution(started, &mut telemetry_handle, need_reply);
             }
         });
 
