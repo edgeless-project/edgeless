@@ -13,6 +13,7 @@ pub struct SqlxResourceProvider {
 pub struct SqlxResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, SqlxResource>,
 }
 
@@ -27,8 +28,14 @@ impl Drop for SqlxResource {
 }
 
 impl SqlxResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, sqlx_url: &str, workflow_id: &str) -> anyhow::Result<Self> {
+    async fn new(
+        dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        sqlx_url: &str,
+        workflow_id: &str,
+    ) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
+        let mut telemetry_handle = telemetry_handle;
         let sqlx_url = sqlx_url.to_string();
 
         let workflow_id = workflow_id.to_string();
@@ -42,6 +49,7 @@ impl SqlxResource {
                     message,
                     created,
                 } = dataplane_handle.receive_next().await;
+                let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
 
                 let mut need_reply = false;
                 let message_data = match message {
@@ -137,6 +145,7 @@ impl SqlxResource {
                 };
 
                 db.close().await;
+                crate::resources::observe_execution(started, &mut telemetry_handle);
             }
         });
 
@@ -147,12 +156,14 @@ impl SqlxResource {
 impl SqlxResourceProvider {
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {
             inner: std::sync::Arc::new(tokio::sync::Mutex::new(SqlxResourceProviderInner {
                 resource_provider_id,
                 dataplane_provider,
+                telemetry_handle,
                 instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, SqlxResource>::new(),
             })),
         }
@@ -173,8 +184,12 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             let mut lck = self.inner.lock().await;
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
+            let telemetry_handle = lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
+                "FUNCTION_ID".to_string(),
+                new_id.function_id.to_string(),
+            )]));
 
-            match SqlxResource::new(dataplane_handle, url, &workflow_id).await {
+            match SqlxResource::new(dataplane_handle, telemetry_handle, url, &workflow_id).await {
                 Ok(resource) => {
                     lck.instances.insert(new_id, resource);
                     return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
