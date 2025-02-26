@@ -3,8 +3,6 @@
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use std::fmt::format;
-
 use wasmi::AsContextMut;
 
 pub mod guest_api_binding;
@@ -62,7 +60,7 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
         let _comfig = wasmi::Config::default();
 
         let engine = wasmi::Engine::default();
-        let module = wasmi::Module::new(&engine, &code[..]).map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        let module = wasmi::Module::new(&engine, code).map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         let mut store = wasmi::Store::new(
             &engine,
             guest_api_binding::GuestAPI {
@@ -130,8 +128,8 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
                 .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("handle_stop_asm not available: {}", e)))?,
             memory: instance
                 .get_memory(&mut store, "memory")
-                .ok_or_else(|| (crate::base_runtime::FunctionInstanceError::BadCode(format!("memory not available"))))?,
-            store: store,
+                .ok_or_else(|| (crate::base_runtime::FunctionInstanceError::BadCode("memory not available".to_string())))?,
+            store,
         }))
     }
 
