@@ -13,6 +13,7 @@ pub trait DataPlaneLink: Send + Sync {
         target: &edgeless_api::function_instance::InstanceId,
         msg: Message,
         src: &edgeless_api::function_instance::InstanceId,
+        created: &edgeless_api::function_instance::EventTimestamp,
         channel_id: u64,
     ) -> LinkProcessingResult;
 }
@@ -38,6 +39,7 @@ pub struct DataplaneEvent {
     pub source_id: edgeless_api::function_instance::InstanceId,
     pub channel_id: u64,
     pub message: Message,
+    pub created: edgeless_api::function_instance::EventTimestamp,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]

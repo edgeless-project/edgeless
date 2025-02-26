@@ -303,6 +303,14 @@ pub fn parse_node_performance_samples(
                 _ => None,
             })
             .collect(),
+        function_transfer_times: api_instance
+            .function_transfer_times
+            .iter()
+            .filter_map(|x| match uuid::Uuid::from_str(&x.id) {
+                Ok(val) => Some((val, x.samples.iter().map(parse_sample).collect())),
+                _ => None,
+            })
+            .collect(),
     }
 }
 
@@ -318,6 +326,14 @@ fn serialize_node_performance_samples(req: &crate::node_registration::NodePerfor
     crate::grpc_impl::api::NodePerformanceSamples {
         function_execution_times: req
             .function_execution_times
+            .iter()
+            .map(|(id, samples)| crate::grpc_impl::api::Samples {
+                id: id.to_string(),
+                samples: samples.iter().map(serialize_sample).collect(),
+            })
+            .collect(),
+        function_transfer_times: req
+            .function_transfer_times
             .iter()
             .map(|(id, samples)| crate::grpc_impl::api::Samples {
                 id: id.to_string(),
@@ -400,6 +416,11 @@ mod test {
             },
             performance_samples: NodePerformanceSamples {
                 function_execution_times: std::collections::HashMap::from([
+                    (uuid::Uuid::new_v4(), vec![new_sample(1.0), new_sample(2.5), new_sample(3.0)]),
+                    (uuid::Uuid::new_v4(), vec![]),
+                    (uuid::Uuid::new_v4(), vec![new_sample(0.1), new_sample(0.2), new_sample(999.0)]),
+                ]),
+                function_transfer_times: std::collections::HashMap::from([
                     (uuid::Uuid::new_v4(), vec![new_sample(1.0), new_sample(2.5), new_sample(3.0)]),
                     (uuid::Uuid::new_v4(), vec![]),
                     (uuid::Uuid::new_v4(), vec![new_sample(0.1), new_sample(0.2), new_sample(999.0)]),
