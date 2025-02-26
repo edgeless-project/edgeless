@@ -166,7 +166,7 @@ message UpdatePeersRequest {
 message Sample {
     // Number of seconds since Unix epoch.
     int64  timestamp_sec = 1;
-    // Number of nanoseconds since the last second boundary from Unix Epoch.
+    // Number of nanoseconds since the last second boundary.
     uint32 timestamp_ns  = 2;
     // Sample value.
     double sample        = 3;
@@ -245,8 +245,13 @@ message NodeHealthStatus {
 message NodePerformanceSamples {
     // Function execution times.
     // The identifier is the physical component identifier.
-    // Samples are execution times, in fractional seconds.
+    // The samples are execution times, in fractional seconds.
     repeated Samples function_execution_times = 100;
+    // Function transfer times.
+    // The identifier is the physical component identifier.
+    // The samples are transfer times, in fractional seconds, from when the
+    // event was created and when it was executed.
+    repeated Samples function_transfer_times  = 110;
 }
 
 // Message to request the update of a function instance.
@@ -443,16 +448,26 @@ message EventData {
     string payload = 2;
 }
 
+// Timestamp associated with an event.
+message EventTimestamp {
+    // Number of seconds since Unix epoch.
+    int64  secs   = 1;
+    // Number of nanoseconds since the last second boundary.
+    uint32 nsecs  = 2;
+}
+
 // Event.
 message Event {
     // The function instance that is expected to handle the event (callee).
-    InstanceId target = 1;
+    InstanceId     target     = 1;
     // The function instance that generated the event (caller).
-    InstanceId source = 2;
+    InstanceId     source     = 2;
     // Ongoing transaction identifier.
-    uint64 stream_id  = 3;
+    uint64         stream_id  = 3;
     // Event data.
-    EventData msg     = 4;
+    EventData      msg        = 4;
+    // Timestamp of when the message was created.
+    EventTimestamp created    = 5;
 }
 
 // Resource provider specification.

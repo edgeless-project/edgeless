@@ -3,6 +3,7 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+pub use edgeless_api_core::event_timestamp::*;
 pub use edgeless_api_core::instance_id::*;
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]

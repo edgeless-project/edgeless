@@ -49,6 +49,7 @@ pub enum TelemetryEvent {
     FunctionInvocationCompleted(std::time::Duration),
     FunctionStop(std::time::Duration),
     FunctionExit(FunctionExitStatus),
+    FunctionTransfer(std::time::Duration),
 }
 
 #[derive(Clone)]

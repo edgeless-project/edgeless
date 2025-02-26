@@ -477,6 +477,7 @@ impl DDAResource {
                     source_id,
                     channel_id,
                     message,
+                    created,
                 } = dataplane_handle.receive_next().await;
 
                 let message: dda::DDA = match message {

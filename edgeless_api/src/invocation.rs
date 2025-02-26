@@ -30,6 +30,7 @@ pub struct Event {
     pub source: crate::function_instance::InstanceId,
     pub stream_id: u64,
     pub data: EventData,
+    pub created: crate::function_instance::EventTimestamp,
 }
 
 impl std::fmt::Display for Event {

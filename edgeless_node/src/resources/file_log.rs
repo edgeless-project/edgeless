@@ -71,6 +71,7 @@ impl FileLogResource {
                     source_id,
                     channel_id,
                     message,
+                    created,
                 } = dataplane_handle.receive_next().await;
                 let mut need_reply = false;
                 let message_data = match message {

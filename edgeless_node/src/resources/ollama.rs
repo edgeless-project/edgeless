@@ -100,6 +100,7 @@ impl OllamaResource {
                     source_id: _,
                     channel_id: _,
                     message,
+                    created,
                 } = dataplane_handle.receive_next().await;
 
                 // Ignore any non-cast messages.
