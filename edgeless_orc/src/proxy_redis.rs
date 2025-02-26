@@ -544,13 +544,10 @@ impl super::proxy::Proxy for ProxyRedis {
             assert_eq!("node", tokens[0]);
             assert_eq!("health", tokens[1]);
             if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2]) {
-                if let Ok((value, _timestamp)) = self.connection.zrangebyscore_limit_withscores::<&str, f64, f64, (String, String)>(
-                    &node_key,
-                    f64::NEG_INFINITY,
-                    f64::INFINITY,
-                    0,
-                    1,
-                ) {
+                if let Ok((value, _timestamp)) =
+                    self.connection
+                        .zrangebyscore_limit_withscores::<&str, f64, f64, (String, f64)>(&node_key, f64::NEG_INFINITY, f64::INFINITY, 0, 1)
+                {
                     if let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(&value) {
                         health.insert(node_id, val);
                     }
@@ -571,17 +568,12 @@ impl super::proxy::Proxy for ProxyRedis {
             if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2]) {
                 if let Ok(values) =
                     self.connection
-                        .zrangebyscore_withscores::<&str, f64, f64, Vec<(String, String)>>(&node_key, f64::NEG_INFINITY, f64::INFINITY)
+                        .zrangebyscore_withscores::<&str, f64, f64, Vec<(String, f64)>>(&node_key, f64::NEG_INFINITY, f64::INFINITY)
                 {
                     for (value, timestamp) in values {
-                        let tokens: Vec<&str> = timestamp.split('.').collect();
-                        if tokens.len() == 2 {
-                            if let (Ok(secs), Ok(nsecs)) = (tokens[0].parse::<i64>(), tokens[1].parse::<u32>()) {
-                                if let Some(timestamp) = chrono::DateTime::from_timestamp(secs, nsecs) {
-                                    if let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(&value) {
-                                        health_history.push((timestamp, val));
-                                    }
-                                }
+                        if let Some(timestamp) = chrono::DateTime::from_timestamp(timestamp as i64, (timestamp.fract() * 1e9) as u32) {
+                            if let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(&value) {
+                                health_history.push((timestamp, val));
                             }
                         }
                     }
