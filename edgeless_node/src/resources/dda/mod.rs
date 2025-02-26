@@ -38,7 +38,7 @@ impl super::resource_provider_specs::ResourceProviderSpecs for DdaResourceSpec {
     }
 
     fn version(&self) -> String {
-        String::from("1.0")
+        String::from("1.1")
     }
 }
 
@@ -65,11 +65,16 @@ pub struct DDAResourceProvider {
 }
 
 impl DDAResourceProvider {
-    pub async fn new(dataplane_provider: edgeless_dataplane::handle::DataplaneProvider, resource_provider_id: InstanceId) -> Self {
+    pub async fn new(
+        dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        resource_provider_id: InstanceId,
+    ) -> Self {
         Self {
             inner: Arc::new(Mutex::new(DDAResourceProviderInner {
                 resource_provider_id,
                 dataplane_provider,
+                telemetry_handle,
                 instances: HashMap::<Uuid, DDAResource>::new(),
                 // TODO: inner hashmap should be mapped to a vector of
                 // InstanceIDs -> in case we decide that multiple functions can
@@ -106,6 +111,10 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
             let dda_res = match DDAResource::new(
                 self.clone(),
                 dataplane_handle,
+                lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
+                    "FUNCTION_ID".to_string(),
+                    new_id.function_id.to_string(),
+                )])),
                 dda_url.clone(),
                 dda_com_subscription_mapping.clone(),
                 dda_com_publication_mapping.clone(),
@@ -157,6 +166,7 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
 struct DDAResourceProviderInner {
     resource_provider_id: InstanceId, // resource provider is the edgeless node
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     // there is a single DDA Sidecar per edgeless_node, but there can be any
     // number of workflows that use separate DDA resources to work
     instances: HashMap<Uuid, DDAResource>,
@@ -204,11 +214,13 @@ impl DDAResource {
     async fn new(
         provider: DDAResourceProvider,
         dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         dda_url: String,
         dda_com_subscription_mapping: String,
         dda_com_publication_mapping: String,
         self_id: Uuid,
     ) -> anyhow::Result<Self> {
+        let mut telemetry_handle = telemetry_handle;
         // Parse the configuration of action / event / query bindings to functions
         let dcs: Result<Vec<DDAComSubscription>, Error> = serde_json::from_str(&dda_com_subscription_mapping);
         let dps: Result<Vec<DDAComPublication>, Error> = serde_json::from_str(&dda_com_publication_mapping);
@@ -479,7 +491,7 @@ impl DDAResource {
                     message,
                     created,
                 } = dataplane_handle.receive_next().await;
-
+                let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
                 let message: dda::DDA = match message {
                     edgeless_dataplane::core::Message::Call(data) => {
                         // all calls to DDA resource must be Calls with
@@ -829,6 +841,7 @@ impl DDAResource {
                         continue;
                     }
                 }
+                crate::resources::observe_execution(started, &mut telemetry_handle);
             }
         });
         sub_tasks.push(_dda_task);

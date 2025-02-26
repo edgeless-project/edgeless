@@ -13,6 +13,12 @@ impl WasmiRuntime {
     }
 }
 
+impl Default for WasmiRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl crate::base_runtime::runtime::GuestAPIHostRegister for WasmiRuntime {
     fn needs_to_register(&mut self) -> bool {
         false
