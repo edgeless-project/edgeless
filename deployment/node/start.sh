@@ -11,6 +11,9 @@ agent_url_announced = "http://$AGENT_ENDPOINT"
 invocation_url = "http://0.0.0.0:${invocation_addr_port[1]}"
 invocation_url_announced = "http://$INVOCATION_ENDPOINT"
 orchestrator_url = "http://$ORCHESTRATOR_ENDPOINT"
+node_register_url = "http://edgeless_orc:7004"
+subscription_refresh_interval_sec = 2
+
 
 [telemetry]
 metrics_url = "http://0.0.0.0:7003"
