@@ -2,6 +2,9 @@
 
 cat > controller.toml << EOF
 controller_url = "http://0.0.0.0:7001"
+domain_register_url = "http://0.0.0.0:7002"
+
+
 orchestrators = [
     { domain_id = "domain-1", orchestrator_url="http://$ORCHESTRATOR_ENDPOINT" }
 ]

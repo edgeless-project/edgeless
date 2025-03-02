@@ -1,16 +1,16 @@
-FROM rust:1.77
+FROM rust:1.81
 
 WORKDIR /usr/src/myapp
 
 RUN apt-get update -y
 RUN apt-get install protobuf-compiler -y
-
 RUN git clone https://github.com/edgeless-project/edgeless.git
 WORKDIR /usr/src/myapp/edgeless/
 WORKDIR /usr/src/myapp/edgeless/edgeless_orc
 RUN git fetch -p
 RUN git branch -lr
 RUN cargo build --release
+EXPOSE 7001 7002 7004
 
 ADD start.sh /
 RUN chmod +x /start.sh

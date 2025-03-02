@@ -13,7 +13,9 @@ agent_url = "http://0.0.0.0:${agent_addr_port[1]}"
 agent_url_announced = "http://$AGENT_ENDPOINT"
 invocation_url = "http://0.0.0.0:${invocation_addr_port[1]}"
 invocation_url_announced = "http://$INVOCATION_ENDPOINT"
-
+domain_register_url = "http://edgeless_con:7002"
+node_register_url = "http://0.0.0.0:7004"
+subscription_refresh_interval_sec = 2
 [baseline]
 orchestration_strategy = "Random"
 keep_alive_interval_secs = 2

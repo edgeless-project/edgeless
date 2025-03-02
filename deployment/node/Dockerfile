@@ -1,4 +1,4 @@
-FROM rust:1.77
+FROM rust:1.81
 
 WORKDIR /usr/src/myapp
 
@@ -11,7 +11,7 @@ WORKDIR /usr/src/myapp/edgeless/edgeless_node
 RUN git fetch -p
 RUN git branch -lr
 RUN cargo build --release
-
+EXPOSE 7001 7002 7004
 ADD start.sh /
 RUN chmod +x /start.sh
 

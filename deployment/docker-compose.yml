@@ -1,6 +1,7 @@
 services:
   redis:
     image: redis:latest
+    command: redis-server --notify-keyspace-events KEA
     ports:
       - 6379
 
@@ -11,7 +12,7 @@ services:
     environment:
       RUST_LOG: info
       SHOWCONF: 0
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
+      ORCHESTRATOR_ENDPOINT: edgeless_orc:7001
       
   edgeless_orc:
     image: edgeless_orc:latest
@@ -22,11 +23,11 @@ services:
       RUST_LOG: info
       SHOWCONF: 0
       REDIS_ENDPOINT: redis:6379
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
+      ORCHESTRATOR_ENDPOINT: edgeless_orc:7001
       INVOCATION_ENDPOINT: edgeless_orc:7102
       AGENT_ENDPOINT: edgeless_orc:7121
     ports:
-      - 7011:7011
+      # - 7001:7001
       - 7121:7121
       - 7102:7102
     extra_hosts:
@@ -40,7 +41,7 @@ services:
     environment:
       RUST_LOG: info
       SHOWCONF: 0
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
+      ORCHESTRATOR_ENDPOINT: edgeless_orc:7001
       INVOCATION_ENDPOINT: edgeless_node_file_log:10001
       AGENT_ENDPOINT: edgeless_node_file_log:10002
       LABELS: '[]'
@@ -58,7 +59,7 @@ services:
     environment:
       RUST_LOG: info
       SHOWCONF: 0
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
+      ORCHESTRATOR_ENDPOINT: edgeless_orc:7001
       INVOCATION_ENDPOINT: edgeless_node1:10003
       AGENT_ENDPOINT: edgeless_node1:10004
       LABELS: '[]'
@@ -67,3 +68,51 @@ services:
     ports:
       - 10003:10003
       - 10004:10004
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.1.0
+    container_name: elasticsearch
+    environment:
+      # log.level: warn
+      discovery.type: single-node  
+      ES_JAVA_OPTS: -Xmx1g -Xms1g  # Adjust Java heap size
+      ELASTIC_PASSWORD: edgeless  # Set the Elasticsearch password
+      xpack.security.enabled: false  
+      xpack.security.http.ssl.enabled: false  
+    ports:
+      - 9200:9200
+      - 9300:9300  
+
+  es-midware:
+    build: '/Users/sceptum/Desktop/aegis/projects/edgeless/ES-middleware'
+    container_name: es-midware
+    working_dir: /usr/src/app
+    environment:
+      NODE_ENV: development
+      ELASTICSEARCH_HOST: 'http://elasticsearch:9200'
+      ELASTICSEARCH_USERNAME: 'elastic'
+      ELASTICSEARCH_PASSWORD: 'edgeless'
+    ports:
+      - '3000:3000'
+    depends_on:
+      - elasticsearch
+    command: "npm run dev"
+
+  redis_adapter:
+    build: redis_adapter/
+    container_name: redis_adapter
+    depends_on:
+      - redis
+      - elasticsearch
+    environment:
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ELASTICSEARCH_HOST: http://elasticsearch:9200
+      ELASTICSEARCH_USER: elastic
+      ELASTICSEARCH_PASSWORD: edgeless
+    entrypoint: >
+      sh -c "echo 'Waiting for Elasticsearch...';
+            until curl -s http://elasticsearch:9200/_cluster/health | grep -q '\"status\":\"green\"' || grep -q '\"status\":\"yellow\"'; do
+              sleep 5;
+            done;
+            echo 'Elasticsearch is up!';
+            python /app/multithread.py"
