@@ -1,0 +1,20 @@
+
+services:
+  express_server:
+    image: 'es-midware'
+    container_name: edgeless_express_server
+    working_dir: /usr/src/app
+    volumes:
+      - .:/usr/src/app
+      - ./package.json:/usr/src/app/package.json
+      - ./package-lock.json:/usr/src/app/package-lock.json
+    environment:
+      NODE_ENV: development
+      ELASTICSEARCH_HOST: 'https://edgeless1.iit.cnr.it:9200'
+      ELASTICSEARCH_USERNAME: 'elastic'
+      ELASTICSEARCH_PASSWORD: 'clJMa57d1VG3wLQBk8=Z'
+    ports:
+      - '3000:3000'
+    command: "npm run dev"
+
+

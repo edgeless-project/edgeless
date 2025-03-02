@@ -3,6 +3,7 @@ import logging
 import json
 import redis
 import os
+import time
 from datetime import datetime
 from elasticsearch import Elasticsearch
 
@@ -24,12 +25,14 @@ es = Elasticsearch(
     verify_certs=True,
     ssl_show_warn=True
 )
+# Get the log level from the environment, default to INFO if not set
+log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+
 logging.basicConfig(
-    level=logging.WARNING,  # Change to DEBUG for more details
+    level=getattr(logging, log_level, logging.INFO),  # Set the log level dynamically
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[
         logging.StreamHandler()  # Log to console
-
     ]
 )
 
@@ -40,23 +43,7 @@ domain_info_value = None
 domain_info_ready = threading.Event()
 index_counter = 0
 
-# def fetch_domain_info():
-#     """Thread 1: Fetch domain_info from Redis and set the flag"""
-#     global domain_info_value
-#     logging.info("Fetching domain_info from Redis...")
-#     logging.warning((hasattr(redis_client, "get"))) # Should print True
-#     while domain_info_value is None:
-#         domain_info_value = redis_client.get("domain_info:domain_id")
-#         if domain_info_value:
-#             logging.info(f"✅ domain_info retrieved: {domain_info_value}")
-#             domain_info_ready.set()  # Set the flag so other thread can proceed
-#         else:
-#             logging.warning("Waiting for domain_info...")
-#             threading.Event().wait(2)  # Wait 2 seconds and retry
-#             # logging.debug(f"domain_info: {domain_info_value}")
-
 def fetch_domain_info():
-    """Thread 1: Fetch domain_info from Redis and set the flag"""
     global domain_info_value
     logging.info("Fetching domain_info from Redis...")
     while domain_info_value is None:
@@ -69,9 +56,6 @@ def fetch_domain_info():
             threading.Event().wait(1)  # Wait 2 seconds and retry
 
 def index_node_health(key, value):
-    """
-    Index a node_health entry into Elasticsearch.
-    """
     global index_counter
     global domain_info_value
     try:
@@ -290,7 +274,6 @@ def index_existing_entries():
             break
 
 def listen_for_new_entries():
-    """Thread 2: Listen for new Redis entries and index them"""
     pubsub = redis_client.pubsub()
     pubsub.psubscribe('__key*__:*')
 
@@ -313,23 +296,35 @@ def listen_for_new_entries():
 
 
 def check_redis_connection():
-    """Checks if Redis is reachable."""
+    logging.info("Checking Redis connection...")
+    time.sleep(5)  # Wait for Redis to start
     try:
         redis_client.ping()  # Test connection
         logging.info("✅ Redis connection successful")
     except redis.ConnectionError as e:
         logging.error(f"❌ Redis connection failed: {e}")
 
-def check_elasticsearch_connection():
-    """Checks if Elasticsearch is reachable."""
-    try:
-        es = Elasticsearch([ELASTICSEARCH_HOST])
-        if es.ping():
-            logging.info("✅ Elasticsearch connection successful")
-        else:
-            logging.warning("❌ Elasticsearch is unreachable")
-    except Exception as e:
-        logging.error(f"❌ Elasticsearch connection failed: {e}")
+def check_elasticsearch_connection(max_attempts=10, delay=2):
+    logging.info("Checking Elasticsearch connection...")
+    time.sleep(5)  # Wait for Elasticsearch to start
+    attempt = 0
+    while attempt < max_attempts:
+        try:
+            es = Elasticsearch([ELASTICSEARCH_HOST])
+            if es.ping():
+                logging.info("✅ Elasticsearch connection successful")
+                return
+            else:
+                logging.warning("❌ Elasticsearch is unreachable")
+        except Exception as e:
+            logging.error(f"❌ Elasticsearch connection failed: {e}")
+        
+        attempt += 1
+        if attempt < max_attempts:
+            logging.info(f"⏳ Retrying... Attempt {attempt + 1} of {max_attempts}")
+            time.sleep(delay) 
+    
+    logging.error("❌ Elasticsearch connection failed after 10 attempts")
 
 
 if __name__ == "__main__":
