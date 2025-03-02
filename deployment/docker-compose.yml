@@ -83,7 +83,7 @@ services:
       - 9300:9300  
 
   es-midware:
-    build: es-midware/
+    build: es_middleware/
     container_name: es-midware
     working_dir: /usr/src/app
     environment:
