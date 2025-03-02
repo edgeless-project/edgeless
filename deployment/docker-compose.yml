@@ -83,7 +83,7 @@ services:
       - 9300:9300  
 
   es-midware:
-    build: '/Users/sceptum/Desktop/aegis/projects/edgeless/ES-middleware'
+    build: es-midware/
     container_name: es-midware
     working_dir: /usr/src/app
     environment:
@@ -104,15 +104,10 @@ services:
       - redis
       - elasticsearch
     environment:
+      LOG_LEVEL: INFO  # DEBUG, INFO, WARNING
       REDIS_HOST: redis
       REDIS_PORT: 6379
       ELASTICSEARCH_HOST: http://elasticsearch:9200
       ELASTICSEARCH_USER: elastic
       ELASTICSEARCH_PASSWORD: edgeless
-    entrypoint: >
-      sh -c "echo 'Waiting for Elasticsearch...';
-            until curl -s http://elasticsearch:9200/_cluster/health | grep -q '\"status\":\"green\"' || grep -q '\"status\":\"yellow\"'; do
-              sleep 5;
-            done;
-            echo 'Elasticsearch is up!';
-            python /app/multithread.py"
+

@@ -16,3 +16,4 @@ secrets/
 *.swp
 symbols.json
 .*bkp
+deployment/es_middleware/node_modules/
