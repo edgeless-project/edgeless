@@ -1,3 +1,4 @@
+# NOTE: used to generate docker compose templates for larger edgeless clusters automatically
 services:
   redis:
     image: redis:latest
@@ -6,7 +7,13 @@ services:
       - 6379
 
   edgeless_con:
+<<<<<<< Updated upstream:deployment/docker-compose.yml
     image: edgeless_con:latest
+||||||| Stash base:deployment/docker-compose.yml
+    image: edgeless_con:latest
+=======
+    image: ghcr.io/edgeless-project/edgeless_con:v1.0.0 
+>>>>>>> Stashed changes:scripts/template-docker-compose.yml
     container_name: edgeless_con
     ports:
       - 7001:7001
@@ -17,7 +24,13 @@ services:
       DOMAIN_REGISTER_ENDPOINT: edgeless_con:7002
       
   edgeless_orc:
+<<<<<<< Updated upstream:deployment/docker-compose.yml
     image: edgeless_orc:latest
+||||||| Stash base:deployment/docker-compose.yml
+    image: edgeless_orc:latest
+=======
+    image: ghcr.io/edgeless-project/edgeless_orc:v1.0.0 
+>>>>>>> Stashed changes:scripts/template-docker-compose.yml
     container_name: edgeless_orc
     depends_on:
       - edgeless_con
@@ -38,7 +51,13 @@ services:
 
 
   edgeless_node_file_log:
+<<<<<<< Updated upstream:deployment/docker-compose.yml
     image: edgeless_node:latest
+||||||| Stash base:deployment/docker-compose.yml
+    image: edgeless_node:latest
+=======
+    image: ghcr.io/edgeless-project/edgeless_node:v1.0.0 
+>>>>>>> Stashed changes:scripts/template-docker-compose.yml
     container_name: edgeless_node_file_log
     depends_on:
       - edgeless_orc
@@ -54,6 +73,7 @@ services:
     ports:
       - 10001:10001
       - 10002:10002
+<<<<<<< Updated upstream:deployment/docker-compose.yml
 
 
   edgeless_node1:
@@ -73,3 +93,24 @@ services:
     ports:
       - 10003:10003
       - 10004:10004
+||||||| Stash base:deployment/docker-compose.yml
+
+
+  edgeless_node1:
+    image: edgeless_node:latest
+    depends_on:
+      - edgeless_orc
+    environment:
+      RUST_LOG: info
+      SHOWCONF: 0
+      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
+      INVOCATION_ENDPOINT: edgeless_node1:10003
+      AGENT_ENDPOINT: edgeless_node1:10004
+      LABELS: '[]'
+      NUM_CORES: 1
+      NODE_TYPE: WASM
+    ports:
+      - 10003:10003
+      - 10004:10004
+=======
+>>>>>>> Stashed changes:scripts/template-docker-compose.yml
