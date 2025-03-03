@@ -12,13 +12,18 @@ if [[ $NUM_NODES -le 1 ]] ; then
     exit 1
 fi
 
-if [ ! -r docker-compose.yml ] ; then
-    echo "file docker-compose.yml not found"
+if [ ! -r template-docker-compose.yml ] ; then
+    echo "file template-docker-compose.yml not found"
     exit 1
 fi
 
-OUT_FILE=docker-compose-$NUM_NODES.yml
-head -n 51 docker-compose.yml > $OUT_FILE
+if [ "$DDA" == "true" ] ; then
+    OUT_FILE=docker-compose-$NUM_NODES+dda.yml
+else
+    OUT_FILE=docker-compose-$NUM_NODES.yml
+fi
+head -n 56 template-docker-compose.yml > $OUT_FILE
+sed -i '' "1 s/.*/\# generated through a tool, do not modify/" $OUT_FILE
 
 # start the WASM nodes
 for (( i = 1 ; i <= $NUM_NODES ; i++ )) ; 
@@ -30,15 +35,22 @@ do
   cat >> $OUT_FILE << EOF
   
   edgeless_node$i:
+<<<<<<< Updated upstream:deployment/make-docker-compose.sh
     image: edgeless_node:latest
+||||||| Stash base:deployment/make-docker-compose.sh
+    image: edgeless_node:latest
+=======
+    image: ghcr.io/edgeless-project/edgeless_node:v1.0.0
+>>>>>>> Stashed changes:scripts/make-docker-compose.sh
+    container_name: edgeless_node$i
     depends_on:
       - edgeless_orc
     environment:
       RUST_LOG: info
       SHOWCONF: 1
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
       INVOCATION_ENDPOINT: edgeless_node$i:$port1
       AGENT_ENDPOINT: edgeless_node$i:$port2
+      NODE_REGISTER_URL: edgeless_orc:7004
       LABELS: '["$label"]'
       NUM_CORES: $(( $RANDOM % 10 ))
       NODE_TYPE: WASM
@@ -54,20 +66,29 @@ if [ "$DDA" == "true" ] ; then
   echo "adding DDA node"
   port1=11003
   port2=11004
+  dda_port=12000
   label=${LABELS[ $RANDOM % ${#LABELS[@]} ]}
 
   cat >> $OUT_FILE << EOF
   
   edgeless_node_dda:
+<<<<<<< Updated upstream:deployment/make-docker-compose.sh
     image: edgeless_node:latest
+    container_name: edgeless_node_dda
+||||||| Stash base:deployment/make-docker-compose.sh
+    image: edgeless_node:latest
+=======
+    image: ghcr.io/edgeless-project/edgeless_node:v1.0.0
+>>>>>>> Stashed changes:scripts/make-docker-compose.sh
     depends_on:
       - edgeless_orc
     environment:
       RUST_LOG: info
       SHOWCONF: 1
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
       INVOCATION_ENDPOINT: edgeless_node_dda:$port1
       AGENT_ENDPOINT: edgeless_node_dda:$port2
+      NODE_REGISTER_URL: edgeless_orc:7004
+      DDA_ENDPOINT: dda:$dda_port
       LABELS: '["$label"]'
       NUM_CORES: $(( $RANDOM % 10 ))
       NODE_TYPE: DDA

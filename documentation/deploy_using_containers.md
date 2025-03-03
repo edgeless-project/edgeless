@@ -1,6 +1,9 @@
 # Edgeless Deployment with Docker containers
 
-This document provides instructions for deploying the Edgeless system components: Controller, Orchestrator and Node using Docker images. It includes guidance on setting up the necessary environment variables and accessing the container images from GitHub Packages.
+This document provides instructions for deploying the Edgeless system
+components: Controller, Orchestrator, Node and DDA using Docker images. It
+includes guidance on setting up the necessary environment variables and
+accessing the container images from GitHub Packages.
 
 
 ## Overview
@@ -13,15 +16,22 @@ The Edgeless system consists of three primary components:
 
 ## Container Images
 
-Docker images for each Edgeless component are hosted on GitHub Packages. The following links provide access to the respective images:
+Docker images for each Edgeless component are hosted on GitHub Packages. The
+following links provide access to the respective images:
 
-- **Controller**: [edgeless_con](https://github.com/edgeless-project/edgeless/pkgs/container/edgeless_con)
-- **Orchestrator**: [edgeless_orc](https://github.com/edgeless-project/edgeless/pkgs/container/edgeless_orc)
-- **Node**: [edgeless_node](https://github.com/edgeless-project/edgeless/pkgs/container/edgeless_node)
+- **Controller**:
+  [edgeless_con](https://github.com/edgeless-project/edgeless/pkgs/container/edgeless_con)
+- **Orchestrator**:
+  [edgeless_orc](https://github.com/edgeless-project/edgeless/pkgs/container/edgeless_orc)
+- **Node**:
+  [edgeless_node](https://github.com/edgeless-project/edgeless/pkgs/container/edgeless_node)
+
+Alternatively, you can build your own containers locally.
 
 ## Environment Variables
 
-Each component requires specific environment variables for configuration. Default values are provided, but these can be overridden as needed.
+Each component requires specific environment variables for configuration.
+Default values are provided, but these can be overridden as needed.
 
 ### Controller
 
@@ -43,7 +53,8 @@ Each component requires specific environment variables for configuration. Defaul
 - `NODE_REGISTER_PORT`: Default `7004`
 - `ORCHESTRATION_STRATEGY`: Default `Random`
 - `PROXY_TYPE`: Default `None`
-- `REDIS_URL`, `DATASET_PATH`, `APPEND`, `ADDITIONAL_FIELDS`, `ADDITIONAL_HEADER`: No defaults
+- `REDIS_URL`, `DATASET_PATH`, `APPEND`, `ADDITIONAL_FIELDS`,
+  `ADDITIONAL_HEADER`: No defaults
 
 ### Node
 
@@ -65,7 +76,9 @@ Each component requires specific environment variables for configuration. Defaul
 
 ## Launching Containers
 
-To deploy the Edgeless components (Controller, Orchestrator, and Node) and configure them to communicate with each other with a minimun configuration, follow the steps below. 
+To deploy the Edgeless components (Controller, Orchestrator, and Node) and
+configure them to communicate with each other with a minimun configuration,
+follow the steps below. 
 
 ### Step 1: Create a Docker Network
 
@@ -88,7 +101,8 @@ uses by default to accept commands from a client.
 
 ### Step 3: Deploy the Orchestrator
 
-Deploy the Orchestrator, ensuring it connects to the Controller using the network:
+Deploy the Orchestrator, ensuring it connects to the Controller using the
+network:
 
 ```bash
 docker run --name edgeless_orc --network edgeless-network  -e DOMAIN_REGISTER_HOST=edgeless_con -e ORCHESTRATOR_URL_ANNOUNCED=http://edgeless_orc:7003 ghcr.io/edgeless-project/edgeless_orc:v1.0.0
@@ -96,7 +110,8 @@ docker run --name edgeless_orc --network edgeless-network  -e DOMAIN_REGISTER_HO
 
 ### Step 4: Deploy a Node
 
-Finally, deploy a Node, configuring it to communicate with the Orchestrator, and itself for agent communication:
+Finally, deploy a Node, configuring it to communicate with the Orchestrator, and
+itself for agent communication:
 
 ```bash
 docker run --name edgeless_node_1 --network edgeless-network \
@@ -113,8 +128,8 @@ If you have a local copy of EDGELESS you can try your new deployment straight
 away.
 
 If you don't have a local copy, get it from
-[GitHub](https://github.com/edgeless-project/edgeless/) and follow the
-build instructions.
+[GitHub](https://github.com/edgeless-project/edgeless/) and follow the build
+instructions.
 
 Let's assume in the following that you have `edgeless_cli` executable in the
 current working directory.
@@ -144,4 +159,25 @@ The list of active workflows should be empty:
 ```
 
 But you can try to add new workflows by looking under `/examples` in the
-[EDGELESS GitHub](https://github.com/edgeless-project/edgeless/tree/main/examples).
+[EDGELESS
+GitHub](https://github.com/edgeless-project/edgeless/tree/main/examples).
+
+## Launching a cluster with N e-nodes using docker compose
+
+We also provide tooling to quickly launch a cluster of N nodes. Navigate to
+scripts and launch:
+```shell
+NUM_NODES=2 DDA=true ./make-docker-compose.sh
+``` 
+
+NOTE: DDA=true instructs the script to start an additional node with DDA
+resource, which also starts an additional DDA sidecar container and an MQTT
+broker required for its operation.
+
+to create a docker compose file that can be used to launch all of the
+containers. Once the script finishes executing, copy the resulting
+docker-compose-$NUM_NODES.yml file to your directory of choice, navigate there
+and run:
+```shell
+docker compose --file $DOCKER_COMPOSE_FILE up
+```
