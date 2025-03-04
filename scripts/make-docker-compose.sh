@@ -24,7 +24,6 @@ else
     echo "generated template will not contain a dedicated DDA node"
     OUT_FILE=docker-compose-$NUM_NODES.yml
 fi
-# TODO: what's the length now
 head -n 71 template-docker-compose.yml > $OUT_FILE
 
 # start the WASM nodes
@@ -33,7 +32,14 @@ do
   port1=$(( 10003 + (i - 1) * 2 ))
   port2=$(( 10004 + (i - 1) * 2 ))
   label=${LABELS[ $RANDOM % ${#LABELS[@]} ]}
-  uuid=$(cat /proc/sys/kernel/random/uuid)
+  OS=$(uname)
+
+  if [[ "$OS" == "Linux" ]]; then
+    uuid=$(cat /proc/sys/kernel/random/uuid)
+  elif [[ "$OS" == "Darwin" ]]; then
+    uuid=$(uuidgen)
+  fi
+
   node_name=edgeless_node_$i
 
   cat >> $OUT_FILE << EOF
@@ -66,8 +72,6 @@ done
 
 # conditionally add a DDA if an env variable is set to true. Also add an mqtt
 # broker for that purpose.
-# TODO: adding dda requires the docker compose to be started from this dir, as
-# the dda/config.toml is available only here
 if [ "$DDA" == "true" ] ; then
   echo "adding a DDA node"
   port1=11003
