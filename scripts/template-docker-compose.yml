@@ -3,114 +3,68 @@ services:
   redis:
     image: redis:latest
     container_name: redis
-    ports:
-      - 6379
 
   edgeless_con:
-<<<<<<< Updated upstream:deployment/docker-compose.yml
-    image: edgeless_con:latest
-||||||| Stash base:deployment/docker-compose.yml
-    image: edgeless_con:latest
-=======
     image: ghcr.io/edgeless-project/edgeless_con:v1.0.0 
->>>>>>> Stashed changes:scripts/template-docker-compose.yml
     container_name: edgeless_con
-    ports:
-      - 7001:7001
     environment:
       RUST_LOG: info
-      SHOWCONF: 0
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
-      DOMAIN_REGISTER_ENDPOINT: edgeless_con:7002
+      CONTROLLER_HOST: 0.0.0.0
+      CONTROLLER_PORT: 7001
+      DOMAIN_REGISTER_HOST: 0.0.0.0
+      DOMAIN_REGISTER_PORT: 7002
+    ports:
+      - 7001:7001 # needed for the cli
       
   edgeless_orc:
-<<<<<<< Updated upstream:deployment/docker-compose.yml
-    image: edgeless_orc:latest
-||||||| Stash base:deployment/docker-compose.yml
-    image: edgeless_orc:latest
-=======
     image: ghcr.io/edgeless-project/edgeless_orc:v1.0.0 
->>>>>>> Stashed changes:scripts/template-docker-compose.yml
     container_name: edgeless_orc
     depends_on:
       - edgeless_con
       - redis
     environment:
       RUST_LOG: info
-      SHOWCONF: 0
-      REDIS_ENDPOINT: redis:6379
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
-      NODE_REGISTER_ENDPOINT: edgeless_orc:7004
-      DOMAIN_REGISTER_ENDPOINT: edgeless_con:7002
-    ports:
-      - 7011:7011
-      - 7121:7121
-      - 7102:7102
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-
+      DOMAIN_REGISTER_HOST: edgeless_con
+      DOMAIN_REGISTER_PORT: 7002
+      SUBSCRIPTION_REFRESH_INTERVAL_SEC: 2
+      DOMAIN_ID: domain-1
+      ORCHESTRATOR_HOST: 0.0.0.0
+      ORCHESTRATOR_PORT: 7003
+      NODE_REGISTER_HOST: 0.0.0.0
+      NODE_REGISTER_PORT: 7004
+      ORCHESTRATION_STRATEGY: Random
+      PROXY_TYPE: None
+      REDIS_URL: redis://redis:6379
+      DATASET_PATH: /dataset
+      APPEND: true
 
   edgeless_node_file_log:
-<<<<<<< Updated upstream:deployment/docker-compose.yml
-    image: edgeless_node:latest
-||||||| Stash base:deployment/docker-compose.yml
-    image: edgeless_node:latest
-=======
     image: ghcr.io/edgeless-project/edgeless_node:v1.0.0 
->>>>>>> Stashed changes:scripts/template-docker-compose.yml
     container_name: edgeless_node_file_log
     depends_on:
       - edgeless_orc
     environment:
       RUST_LOG: info
-      SHOWCONF: 0
-      INVOCATION_ENDPOINT: edgeless_node_file_log:10001
-      AGENT_ENDPOINT: edgeless_node_file_log:10002
-      NODE_REGISTER_URL: edgeless_orc:7004
-      LABELS: '[]'
-      NUM_CORES: 1
-      NODE_TYPE: FILE_LOG
-    ports:
-      - 10001:10001
-      - 10002:10002
-<<<<<<< Updated upstream:deployment/docker-compose.yml
-
-
-  edgeless_node1:
-    image: edgeless_node:latest
-    container_name: edgeless_node1
-    depends_on:
-      - edgeless_orc
-    environment:
-      RUST_LOG: info
-      SHOWCONF: 0
-      INVOCATION_ENDPOINT: edgeless_node1:10003
-      AGENT_ENDPOINT: edgeless_node1:10004
-      NODE_REGISTER_URL: edgeless_orc:7004
-      LABELS: '[]'
-      NUM_CORES: 1
-      NODE_TYPE: WASM
-    ports:
-      - 10003:10003
-      - 10004:10004
-||||||| Stash base:deployment/docker-compose.yml
-
-
-  edgeless_node1:
-    image: edgeless_node:latest
-    depends_on:
-      - edgeless_orc
-    environment:
-      RUST_LOG: info
-      SHOWCONF: 0
-      ORCHESTRATOR_ENDPOINT: edgeless_orc:7011
-      INVOCATION_ENDPOINT: edgeless_node1:10003
-      AGENT_ENDPOINT: edgeless_node1:10004
-      LABELS: '[]'
-      NUM_CORES: 1
-      NODE_TYPE: WASM
-    ports:
-      - 10003:10003
-      - 10004:10004
-=======
->>>>>>> Stashed changes:scripts/template-docker-compose.yml
+      NODE_ID: 19e80bc9-4ebe-43dc-a2d9-60505c0388ba
+      AGENT_HOST: 0.0.0.0
+      AGENT_PORT: 7005
+      AGENT_URL_ANNOUNCED: http://edgeless_node_file_log:7005
+      INVOCATION_HOST: 0.0.0.0
+      INVOCATION_PORT: 7002
+      INVOCATION_URL_ANNOUNCED: http://edgeless_node_file_log:7002
+      NODE_REGISTER_URL: http://edgeless_orc:7004
+      SUBSCRIPTION_REFRESH_INTERVAL_SEC: 2
+      TELEMETRY_METRICS_HOST: 0.0.0.0
+      TELEMETRY_METRICS_PORT: 7003
+      TELEMETRY_LOG_LEVEL: info
+      TELEMETRY_PERFORMANCE_SAMPLES: true
+      WASM_RUNTIME_ENABLED: true
+      CONTAINER_RUNTIME_ENABLED: false
+      HTTP_INGRESS_HOST: 0.0.0.0
+      HTTP_INGRESS_PORT: 7035
+      HTTP_INGRESS_PROVIDER: http-ingress-1
+      HTTP_EGRESS_PROVIDER: http-egress-1
+      FILE_LOG_PROVIDER: file-log-1
+      REDIS_PROVIDER: redis-1
+      DDA_PROVIDER: dda-1
+      KAFKA_EGRESS_PROVIDER: kafa-egress-1
