@@ -11,18 +11,12 @@ pull:
 	docker pull $(IMAGE_ORC)
 	docker pull $(IMAGE_CON)
 
-run:
+run-wli:
 	docker run -d --name edgeless_node $(IMAGE_NODE)
 	docker run -d --name edgeless_orc $(IMAGE_ORC)
 	docker run -d --name edgeless_con $(IMAGE_CON)
 
-run-bck:
-	docker compose -f docker-compose-bck.yml down
-	docker compose -f docker-compose-bck.yml build
-	docker compose -f docker-compose-bck.yml up
-
-
-restart:
+run:
 	docker compose down
 	docker compose build
 	docker compose up
