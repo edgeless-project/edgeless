@@ -87,4 +87,4 @@ tokio-modbus = "0.16.1"
 opentelemetry = { workspace = true }
 
 [build-dependencies]
-tonic-build = {version = "0.13.1", features = ["prost"]}
+tonic-build = { version = "0.13.1", features = ["prost"] }

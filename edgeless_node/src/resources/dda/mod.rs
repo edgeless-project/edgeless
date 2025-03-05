@@ -8,7 +8,7 @@ use edgeless_api::function_instance::InstanceId;
 use edgeless_api::resource_configuration::ResourceConfigurationAPI;
 use serde::Deserialize;
 use serde_json::Error;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -271,20 +271,31 @@ impl DDAResource {
             }
         }
         let dda_pub_map: HashMap<String, DDAComPublication> = dda_pub_array.into_iter().map(|p| (p.alias.clone(), p)).collect();
+        // reuse a single http/2 connection and enable keep alive
+        let channel = tonic::transport::Channel::from_shared(dda_url.clone())
+            .expect("could not connect to dda sidecar")
+            .keep_alive_while_idle(true)
+            .http2_keep_alive_interval(std::time::Duration::from_secs(5))
+            .keep_alive_timeout(std::time::Duration::from_secs(10))
+            .connect()
+            .await?;
 
         // always connect all clients to the sidecar, because the function can
         // use any of the subsystems
-        let mut dda_com_client = dda_com::com_service_client::ComServiceClient::connect(dda_url.clone())
-            .await
-            .expect("dda sidecar: com connection failed");
+        let mut dda_com_client = dda_com::com_service_client::ComServiceClient::new(channel.clone());
+        let mut dda_state_client = dda_state::state_service_client::StateServiceClient::new(channel.clone());
+        let mut dda_store_client = dda_store::store_service_client::StoreServiceClient::new(channel);
+        // let mut dda_com_client = dda_com::com_service_client::ComServiceClient::connect(dda_url.clone())
+        //     .await
+        //     .expect("dda sidecar: com connection failed");
 
-        let mut dda_state_client = dda_state::state_service_client::StateServiceClient::connect(dda_url.clone())
-            .await
-            .expect("dda sidecar: state connection failed");
+        // let mut dda_state_client = dda_state::state_service_client::StateServiceClient::connect(dda_url.clone())
+        //     .await
+        //     .expect("dda sidecar: state connection failed");
 
-        let mut dda_store_client = dda_store::store_service_client::StoreServiceClient::connect(dda_url.clone())
-            .await
-            .expect("dda sidecar: store connection failed");
+        // let mut dda_store_client = dda_store::store_service_client::StoreServiceClient::connect(dda_url.clone())
+        //     .await
+        //     .expect("dda sidecar: store connection failed");
 
         // subscribe to configured dda topics
         let mut sub_tasks: Vec<tokio::task::JoinHandle<()>> = vec![];
@@ -325,7 +336,6 @@ impl DDAResource {
                         }
                         "call" => {
                             panic!("do not use calls - they will probably be removed later on");
-                            // let _ = handle.call(target_function_id, encoded_event).await;
                         }
                         _ => {
                             panic!("Unexpected method used in DDA mapping");
@@ -516,11 +526,21 @@ impl DDAResource {
                 };
 
                 let mut handle = dataplane_handle.clone();
+                let start = tokio::time::Instant::now();
+                let id = uuid::Uuid::new_v4();
                 let respond = {
                     move |msg: edgeless_dataplane::core::CallRet| async move {
+                        let duration = start.elapsed();
+                        log::warn!("{} total {} ms", id.clone(), duration.as_millis());
                         let _ = handle.reply(source_id, channel_id, msg, &metadata).await;
                     }
                 };
+                // // TODO: to test where the indeterminism is
+                // tokio::time::sleep(Duration::from_millis(40)).await;
+                // let res = dda::DDA::ComSubscribeActionResult(vec![]);
+                // let r = serde_json::to_string(&res).expect("wrong");
+                // respond(edgeless_dataplane::core::CallRet::Reply(r)).await;
+                // continue;
 
                 match message {
                     dda::DDA::ComPublishEvent(alias, data) => {
@@ -569,6 +589,8 @@ impl DDAResource {
                             params: data,
                             ..Default::default()
                         };
+                        let duration = start.elapsed();
+                        log::warn!("{} creation {} ms", id.clone(), duration.as_millis());
 
                         // wait for an action response (currently 1)
                         match dda_com_client.publish_action(action).await {
@@ -576,6 +598,8 @@ impl DDAResource {
                                 let mut stream = res.into_inner();
                                 match stream.message().await {
                                     Ok(response) => {
+                                        let duration = start.elapsed();
+                                        log::warn!("{} result {} ms", id.clone(), duration.as_millis());
                                         let action_result = response.expect("expected an action result!").data;
                                         let res = dda::DDA::ComSubscribeActionResult(action_result);
                                         let r = serde_json::to_string(&res).expect("wrong");

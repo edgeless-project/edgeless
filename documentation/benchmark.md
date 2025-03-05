@@ -64,6 +64,30 @@ The output files are overwritten unless the `--append` option is provided.
 
 For the ε-ORC configuration see the
 [dedicated documentation page](./orchestrator.md).
+For the ε-ORC, a Redis proxy must be enabled, and an additional optional
+section `[proxy.dataset_settings]` must be added, whose fields have the same
+meaning as the corresponding `edgeless_benchmark` command-line options above
+(see step-by-step example below).
+
+The dataset files produced are the following:
+
+| Filename                   | Format                                         | Produced by          |
+| -------------------------- | ---------------------------------------------- | -------------------- |
+| health_status.csv          | timestamp,node_id,node_health_status           | ε-ORC                |
+| capabilities.csv           | timestamp,node_id,node_capabilities            | ε-ORC                |
+| mapping_to_instance_id.csv | timestamp,logical_id,node_id1,physical_id1,... | ε-ORC                |
+| performance_samples.csv    | metric,identifier,value,timestamp              | ε-ORC                |
+| application_metrics.csv    | entity,identifier,value,timestamp              | `edgeless_benchmark` |
+
+Notes:
+
+- The timestamp format is always A.B, where A is the Unix epoch in seconds and
+  B the fractional part in nanoseconds.
+- All the identifiers (node_id, logical_id, and physical_id) are UUID.
+- The field entity in the application metrics can be `f` (function) or `w`
+  (workflow).
+- Check the difference between application metrics and performance samples
+  in the [orchestration documentation](./local_orchestration.md).
 
 ### Step by step example
 

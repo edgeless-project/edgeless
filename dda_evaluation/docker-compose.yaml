@@ -1,0 +1,59 @@
+services:
+  node:
+    container_name: node
+    image: dda_node:latest
+    environment:
+      RUST_LOG: info 
+    depends_on:
+      - orc
+
+  orc:
+    container_name: orc
+    image: dda_orc:latest
+    environment:
+      RUST_LOG: info 
+    depends_on:
+      - con
+
+  con:
+    container_name: con
+    image: dda_con:latest
+    environment:
+      RUST_LOG: info 
+    depends_on:
+      - redis
+      - mqtt_broker
+      - dda
+    ports:
+      - 7001:7001
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+     - 6379:6379
+
+  mqtt_broker:
+    container_name: mqtt_broker
+    image: eclipse-mosquitto:latest
+    command: mosquitto -c /mosquitto-no-auth.conf
+    ports:
+      - 1883:1883
+
+  dda:
+    image: ghcr.io/coatyio/dda:latest
+    container_name: dda
+    volumes:
+      - ./dda/:/dda 
+    ports:
+     - 12000:12000
+    depends_on:
+      - mqtt_broker
+
+  actor:
+    image: actor
+    container_name: actor
+    depends_on:
+      - mqtt_broker
+
+  # TODO: add the sensor, every 5ms a reading - maybe configurable here as env variable?

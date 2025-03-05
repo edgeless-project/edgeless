@@ -1,0 +1,5 @@
+{
+    "min_chain_length": 5,
+    "max_chain_length": 5,
+    "function_wasm_path": "dda_evaluation/functions/dda_chain/dda_chain.wasm"
+}
