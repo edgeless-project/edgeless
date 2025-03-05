@@ -76,6 +76,8 @@ impl Engine {
             }
         };
 
+        log::info!("start_workflow");
+
         match &self.wf_type {
             WorkflowType::None => {}
             WorkflowType::Single(path_json, path_wasm) => {
@@ -332,11 +334,58 @@ impl Engine {
             }
             WorkflowType::JsonSpec(data) => {
                 let spec_string = data.spec_string.replace("@WF_ID", self.wf_id.to_string().as_str());
-                let workflow_spec: edgeless_api::workflow_instance::SpawnWorkflowRequest = serde_json::from_str(&spec_string).unwrap();
-                let mut workflow = edgeless_cli::workflow_spec_to_request(workflow_spec, &data.parent_path)?;
-                std::mem::swap(&mut workflow.functions, &mut functions);
-                std::mem::swap(&mut workflow.resources, &mut resources);
+                let workflow_spec: edgeless_cli::workflow_spec::WorkflowSpec = serde_json::from_str(&spec_string).unwrap();
+                let mut workflow =
+                    edgeless_cli::workflow_spec_to_request(workflow_spec, &data.parent_path).expect("could not create a correct workflow");
+                std::mem::swap(&mut workflow.workflow_functions, &mut functions);
+                std::mem::swap(&mut workflow.workflow_resources, &mut resources);
                 std::mem::swap(&mut workflow.annotations, &mut annotations);
+            }
+            WorkflowType::DDAChain(ddachain_data) => {
+                // TODO(dda): fix this
+                // let chain_size = draw(ddachain_data.max_chain_length, ddachain_data.max_chain_length);
+
+                // for i in 0..chain_size {
+                //     let name = match i {
+                //         0 => "client".to_string(),
+                //         i => format!("f{}", i - 1),
+                //     };
+                //     let next_func_name = match chain_size - i - 1 {
+                //         0 => "client".to_string(),
+                //         i => format!("f{}", chain_size - i - 1),
+                //     };
+
+                //     let mut output_mapping = std::collections::HashMap::from([("out".to_string(), next_func_name)]);
+                //     output_mapping.insert("metric".to_string(), "metrics-collector".to_string());
+
+                //     let annotations = std::collections::HashMap::from([(
+                //         "init-payload".to_string(),
+                //         format!(
+                //             "is_client={};{}",
+                //             i,
+                //             match i {
+                //                 0 => "true",
+                //                 _ => "false",
+                //             },
+                //         )
+                //         .to_string(),
+                //     )]);
+
+                //     functions.push(WorkflowFunction {
+                //         name,
+                //         function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                //             function_class_id: "vector_mul".to_string(),
+                //             function_class_type: "RUST_WASM".to_string(),
+                //             function_class_version: "0.1".to_string(),
+                //             function_class_code: std::fs::read(&ddachain_data.function_wasm_path).unwrap(),
+                //             function_class_outputs: vec!["metric".to_string(), "out".to_string()],
+                //         },
+                //         output_mapping,
+                //         annotations,
+                //     });
+                // }
+
+                // log::info!("wf{}, chain size {}, input size {}", self.wf_id, chain_size, input_size);
             }
         };
 
@@ -357,6 +406,19 @@ impl Engine {
         };
         self.csv_dumper
             .add("workflow:request", &wf_name, serde_json::to_string(&req).unwrap_or_default().as_str());
+
+        log::info!(
+            "spawning a new workflow: {}",
+            serde_json::to_string_pretty(&req).expect("cannot serialize request")
+        );
+
+        // TODO: fix this
+        // self.client
+        //     .set(format!("workflow:{}:begin", wf_name).as_str(), &crate::utils::timestamp_now());
+        // self.client.set(
+        //     format!("workflow:{}:request", wf_name).as_str(),
+        //     serde_json::to_string(&req).unwrap_or_default().as_str(),
+        // );
 
         // Request the creation of the workflow.
         let res = self.client.start(req).await;

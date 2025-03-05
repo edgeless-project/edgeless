@@ -1,0 +1,15 @@
+FROM debian:latest
+ARG BIN
+
+WORKDIR /usr/src/myapp
+
+ADD ${BIN}/edgeless_node_d .
+# add all node configs, the one used is decided by the env variable
+ADD cfg/node.toml .
+
+EXPOSE 10003
+EXPOSE 10004
+
+ENV NODE_CONFIG="node.toml"
+
+CMD ./edgeless_node_d -c $NODE_CONFIG

@@ -1923,6 +1923,7 @@ dependencies = [
  "prost-build",
  "serde",
  "serde_json",
+ "wasm-timer",
 ]
 
 [[package]]
@@ -2181,8 +2182,7 @@ dependencies = [
  "env_logger 0.10.2",
  "futures 0.3.31",
  "log",
- "openssl",
- "rand 0.8.5",
+ "rand",
  "rand_distr",
  "rand_pcg",
  "redis",
@@ -2206,8 +2206,7 @@ dependencies = [
  "futures 0.3.31",
  "log",
  "mailparse",
- "openssl",
- "rand 0.8.5",
+ "rand",
  "rand_distr",
  "rand_pcg",
  "reqwest 0.11.27",
@@ -3040,7 +3039,7 @@ checksum = "1d930c203dd0b6ff06e0201a4a2fe9149b43c684fd4420555b26d21b1a02956f"
 dependencies = [
  "futures-core",
  "lock_api",
- "parking_lot",
+ "parking_lot 0.12.3",
 ]
 
 [[package]]
@@ -3531,7 +3530,7 @@ dependencies = [
  "gix-utils",
  "libc",
  "once_cell",
- "parking_lot",
+ "parking_lot 0.12.3",
  "prodash",
  "sha1_smol",
  "thiserror 1.0.69",
@@ -3600,7 +3599,7 @@ checksum = "7ddf80e16f3c19ac06ce415a38b8591993d3f73aede049cb561becb5b3a8e242"
 dependencies = [
  "gix-hash",
  "hashbrown 0.14.5",
- "parking_lot",
+ "parking_lot 0.12.3",
 ]
 
 [[package]]
@@ -3716,7 +3715,7 @@ dependencies = [
  "gix-pack",
  "gix-path",
  "gix-quote",
- "parking_lot",
+ "parking_lot 0.12.3",
  "tempfile",
  "thiserror 1.0.69",
 ]
@@ -3736,7 +3735,7 @@ dependencies = [
  "gix-path",
  "gix-tempfile",
  "memmap2",
- "parking_lot",
+ "parking_lot 0.12.3",
  "smallvec",
  "thiserror 1.0.69",
 ]
@@ -3801,7 +3800,7 @@ checksum = "7a7822afc4bc9c5fbbc6ce80b00f41c129306b7685cac3248dbfa14784960594"
 dependencies = [
  "gix-command",
  "gix-config-value",
- "parking_lot",
+ "parking_lot 0.12.3",
  "rustix 0.38.42",
  "thiserror 2.0.9",
 ]
@@ -3935,7 +3934,7 @@ dependencies = [
  "gix-fs",
  "libc",
  "once_cell",
- "parking_lot",
+ "parking_lot 0.12.3",
  "tempfile",
 ]
 
@@ -5066,7 +5065,7 @@ checksum = "c0ff37bd590ca25063e35af745c343cb7a0271906fb7b37e4813e8f79f00268d"
 dependencies = [
  "bitflags 2.6.0",
  "libc",
- "redox_syscall",
+ "redox_syscall 0.5.8",
 ]
 
 [[package]]
@@ -5666,9 +5665,9 @@ checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
 
 [[package]]
 name = "openssl-src"
-version = "300.4.1+3.4.0"
+version = "300.4.2+3.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "faa4eac4138c62414b5622d1b31c5c304f34b406b013c079c2bbc652fdd6678c"
+checksum = "168ce4e058f975fe43e89d9ccf78ca668601887ae736090aacc23ae353c298e2"
 dependencies = [
  "cc",
 ]
@@ -5761,12 +5760,37 @@ checksum = "f38d5652c16fde515bb1ecef450ab0f6a219d619a7274976324d5e377f7dceba"
 
 [[package]]
 name = "parking_lot"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d17b78036a60663b797adeaee46f5c9dfebb86948d1255007a1d6be0271ff99"
+dependencies = [
+ "instant",
+ "lock_api",
+ "parking_lot_core 0.8.6",
+]
+
+[[package]]
+name = "parking_lot"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1bf18183cf54e8d6059647fc3063646a1801cf30896933ec2311622cc4b9a27"
 dependencies = [
  "lock_api",
- "parking_lot_core",
+ "parking_lot_core 0.9.10",
+]
+
+[[package]]
+name = "parking_lot_core"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "60a2cfe6f0ad2bfc16aefa463b497d5c7a5ecd44a23efa72aa342d90177356dc"
+dependencies = [
+ "cfg-if",
+ "instant",
+ "libc",
+ "redox_syscall 0.2.16",
+ "smallvec",
+ "winapi 0.3.9",
 ]
 
 [[package]]
@@ -5777,7 +5801,7 @@ checksum = "1e401f977ab385c9e4e3ab30627d6f26d00e2c73eef317493c4ec6d468726cf8"
 dependencies = [
  "cfg-if",
  "libc",
- "redox_syscall",
+ "redox_syscall 0.5.8",
  "smallvec",
  "windows-targets 0.52.6",
 ]
@@ -6026,7 +6050,7 @@ version = "28.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "744a264d26b88a6a7e37cbad97953fa233b94d585236310bcbc88474b4092d79"
 dependencies = [
- "parking_lot",
+ "parking_lot 0.12.3",
 ]
 
 [[package]]
@@ -6037,7 +6061,7 @@ checksum = "3c99afa9a01501019ac3a14d71d9f94050346f55ca471ce90c799a15c58f61e2"
 dependencies = [
  "dtoa",
  "itoa",
- "parking_lot",
+ "parking_lot 0.12.3",
  "prometheus-client-derive-encode",
 ]
 
@@ -6362,6 +6386,15 @@ dependencies = [
  "sha1_smol",
  "socket2 0.5.8",
  "url",
+]
+
+[[package]]
+name = "redox_syscall"
+version = "0.2.16"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fb5a58c1855b4b6819d59012155603f0b22ad30cad752600aadfcb695265519a"
+dependencies = [
+ "bitflags 1.3.2",
 ]
 
 [[package]]
@@ -7077,7 +7110,7 @@ dependencies = [
  "futures 0.3.31",
  "log",
  "once_cell",
- "parking_lot",
+ "parking_lot 0.12.3",
  "scc",
  "serial_test_derive",
 ]
@@ -7789,7 +7822,7 @@ dependencies = [
  "io-uring",
  "libc",
  "mio",
- "parking_lot",
+ "parking_lot 0.12.3",
  "pin-project-lite",
  "signal-hook-registry",
  "slab",
@@ -8718,6 +8751,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "wasm-timer"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be0ecb0db480561e9a7642b5d3e4187c128914e58aa84330b9493e3eb68c5e7f"
+dependencies = [
+ "futures",
+ "js-sys",
+ "parking_lot 0.11.2",
+ "pin-utils",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
 name = "wasmi"
 version = "0.31.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9438,7 +9486,7 @@ version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "372d5b87f58ec45c384ba03563b03544dc5fadc3983e434b286913f5b4a9bb6d"
 dependencies = [
- "redox_syscall",
+ "redox_syscall 0.5.8",
  "wasite",
 ]
 

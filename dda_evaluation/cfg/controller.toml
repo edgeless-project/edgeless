@@ -1,0 +1,2 @@
+controller_url = "http://0.0.0.0:7001"
+domain_register_url = "http://0.0.0.0:7002"

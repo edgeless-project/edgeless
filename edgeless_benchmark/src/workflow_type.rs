@@ -6,6 +6,23 @@ use std::io::Read;
 use anyhow::anyhow;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct DDAChainData {
+    pub min_chain_length: u32,
+    pub max_chain_length: u32,
+    pub function_wasm_path: String,
+}
+
+impl Default for DDAChainData {
+    fn default() -> Self {
+        Self {
+            min_chain_length: 1,
+            max_chain_length: 3,
+            function_wasm_path: "dda_evaluation/functions/dda_chain/dda_chain.wasm".to_string(),
+        }
+    }
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
 
 pub struct MatrixMulChainData {
     pub min_chain_length: u32,
@@ -125,6 +142,8 @@ pub enum WorkflowType {
     // A workflow provided in a JSON spec file in the path given.
     // The string @WFID is substituted with the workflow counter.
     JsonSpec(JsonSpecData),
+
+    DDAChain(DDAChainData),
 }
 
 impl WorkflowType {
@@ -212,6 +231,7 @@ impl WorkflowType {
             WorkflowType::JsonSpec(data) => {
                 anyhow::ensure!(!data.spec_string.is_empty(), "empty workflow specification file");
             }
+            WorkflowType::DDAChain(data) => {}
         }
         Ok(self)
     }

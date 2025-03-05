@@ -18,3 +18,5 @@ symbols.json
 .*bkp
 *.save
 build_functions.log
+dataset/
+plots/

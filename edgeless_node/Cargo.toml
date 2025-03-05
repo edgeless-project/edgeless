@@ -92,4 +92,4 @@ opentelemetry = { workspace = true }
 rustls = { version = "0.23.29", features = ["ring"] }
 
 [build-dependencies]
-tonic-build = {version = "0.13.1", features = ["prost"]}
+tonic-build = { version = "0.13.1", features = ["prost"] }
