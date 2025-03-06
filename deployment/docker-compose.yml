@@ -81,6 +81,8 @@ services:
     ports:
       - 9200:9200
       - 9300:9300  
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
 
   es-midware:
     build: es_middleware/
@@ -110,4 +112,8 @@ services:
       ELASTICSEARCH_HOST: http://elasticsearch:9200
       ELASTICSEARCH_USER: elastic
       ELASTICSEARCH_PASSWORD: edgeless
+
+volumes:
+  elasticsearch-data:
+    driver: local
 
