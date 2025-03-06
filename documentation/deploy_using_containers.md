@@ -179,5 +179,5 @@ containers. Once the script finishes executing, copy the resulting
 docker-compose-$NUM_NODES.yml file to your directory of choice, navigate there
 and run:
 ```shell
-docker compose --file $DOCKER_COMPOSE_FILE up
+docker-compose --file $DOCKER_COMPOSE_FILE up
 ```

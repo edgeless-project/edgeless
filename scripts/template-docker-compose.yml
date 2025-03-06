@@ -33,7 +33,7 @@ services:
       NODE_REGISTER_HOST: 0.0.0.0
       NODE_REGISTER_PORT: 7004
       ORCHESTRATION_STRATEGY: Random
-      PROXY_TYPE: None
+      PROXY_TYPE: Redis
       REDIS_URL: redis://redis:6379
       DATASET_PATH: /dataset
       APPEND: true
@@ -67,4 +67,4 @@ services:
       FILE_LOG_PROVIDER: file-log-1
       REDIS_PROVIDER: redis-1
       DDA_PROVIDER: dda-1
-      KAFKA_EGRESS_PROVIDER: kafa-egress-1
+      KAFKA_EGRESS_PROVIDER: kafka-egress-1
