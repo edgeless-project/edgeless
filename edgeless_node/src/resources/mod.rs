@@ -24,7 +24,7 @@ fn observe_transfer(
         edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionTransfer(elapsed),
         std::collections::BTreeMap::new(),
     );
-    created
+    now
 }
 
 fn observe_execution(
