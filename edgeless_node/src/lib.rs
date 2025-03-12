@@ -284,6 +284,7 @@ async fn fill_resources(
     node_id: uuid::Uuid,
     settings: &Option<EdgelessNodeResourceSettings>,
     provider_specifications: &mut Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
+    telemetry_provider: &edgeless_telemetry::telemetry_events::TelemetryProcessor,
 ) -> std::collections::HashMap<String, agent::ResourceDesc> {
     let mut ret = std::collections::HashMap::<String, agent::ResourceDesc>::new();
 
@@ -323,6 +324,11 @@ async fn fill_resources(
                         client: Box::new(
                             resources::http_egress::EgressResourceProvider::new(
                                 data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
                                 edgeless_api::function_instance::InstanceId::new(node_id),
                             )
                             .await,
@@ -348,6 +354,11 @@ async fn fill_resources(
                         client: Box::new(
                             resources::file_log::FileLogResourceProvider::new(
                                 data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
                                 edgeless_api::function_instance::InstanceId::new(node_id),
                             )
                             .await,
@@ -373,6 +384,11 @@ async fn fill_resources(
                         client: Box::new(
                             resources::redis::RedisResourceProvider::new(
                                 data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
                                 edgeless_api::function_instance::InstanceId::new(node_id),
                             )
                             .await,
@@ -396,8 +412,16 @@ async fn fill_resources(
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
                         client: Box::new(
-                            resources::dda::DDAResourceProvider::new(data_plane.clone(), edgeless_api::function_instance::InstanceId::new(node_id))
-                                .await,
+                            resources::dda::DDAResourceProvider::new(
+                                data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
+                                edgeless_api::function_instance::InstanceId::new(node_id),
+                            )
+                            .await,
                         ),
                     },
                 );
@@ -427,6 +451,11 @@ async fn fill_resources(
                         client: Box::new(
                             resources::ollama::OllamaResourceProvider::new(
                                 data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), settings.provider.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
                                 edgeless_api::function_instance::InstanceId::new(node_id),
                                 &settings.host,
                                 settings.port,
@@ -458,6 +487,11 @@ async fn fill_resources(
                             client: Box::new(
                                 resources::kafka_egress::KafkaEgressResourceProvider::new(
                                     data_plane.clone(),
+                                    Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                        ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                        ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                        ("NODE_ID".to_string(), node_id.to_string()),
+                                    ]))),
                                     edgeless_api::function_instance::InstanceId::new(node_id),
                                 )
                                 .await,
@@ -499,6 +533,11 @@ async fn fill_resources(
                                                 client: Box::new(
                                                     resources::metrics_collector::MetricsCollectorResourceProvider::new(
                                                         data_plane.clone(),
+                                                        Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                                            ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                                            ("RESOURCE_PROVIDER_ID".to_string(), settings.provider.clone()),
+                                                            ("NODE_ID".to_string(), node_id.to_string()),
+                                                        ]))),
                                                         edgeless_api::function_instance::InstanceId::new(node_id),
                                                         redis_connection,
                                                     )
@@ -539,8 +578,16 @@ async fn fill_resources(
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
                         client: Box::new(
-                            resources::sqlx::SqlxResourceProvider::new(data_plane.clone(), edgeless_api::function_instance::InstanceId::new(node_id))
-                                .await,
+                            resources::sqlx::SqlxResourceProvider::new(
+                                data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
+                                edgeless_api::function_instance::InstanceId::new(node_id),
+                            )
+                            .await,
                         ),
                     },
                 );
@@ -685,6 +732,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         settings.general.node_id,
         &settings.resources,
         &mut resource_provider_specifications,
+        &telemetry_provider,
     )
     .await;
 
