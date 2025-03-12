@@ -17,7 +17,7 @@ specifications in a JSON format.
 For example, to build the `noop` function:
 
 ```shell
-target/debug/edgeless_cli function build ../../functions/noop/function.json
+target/debug/edgeless_cli function build functions/noop/function.json
 ```
 
 This build mode does not require any live EDGELESS component.

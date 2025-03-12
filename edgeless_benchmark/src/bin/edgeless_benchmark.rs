@@ -17,7 +17,7 @@ struct Args {
     /// URL of the controller
     #[arg(short, long, default_value_t = String::from("http://127.0.0.1:7001"))]
     controller_url: String,
-    /// Arrival model, one of {poisson, incremental, incr-and-keep, single}
+    /// Arrival model, one of {poisson, incremental, incr-and-keep, single, trace}
     #[arg(long, default_value_t = String::from("poisson"))]
     arrival_model: String,
     /// Warmup duration, in s

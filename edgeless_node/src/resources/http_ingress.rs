@@ -28,7 +28,7 @@ impl super::resource_provider_specs::ResourceProviderSpecs for HttpIngressResour
     }
 
     fn version(&self) -> String {
-        String::from("1.0")
+        String::from("1.1")
     }
 }
 

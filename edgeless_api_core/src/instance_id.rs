@@ -29,7 +29,7 @@ impl<C> minicbor::Encode<C> for InstanceId {
 
 impl<C> minicbor::CborLen<C> for InstanceId {
     fn cbor_len(&self, _ctx: &mut C) -> usize {
-        34
+        34 // TODO: shouldn't this be 64 instead?
     }
 }
 

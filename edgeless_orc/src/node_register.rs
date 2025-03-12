@@ -30,8 +30,20 @@ struct NodeRegisterEntry {
 }
 
 impl NodeRegister {
+    /// Create a new node register.
+    ///
+    /// - `proxy`: the proxy to which run-time measurements, such as node's
+    ///   health data and performance samples from nodes' telemetry, are sent
+    /// - `proxy_gc_period`: the interval at which a garbage collection
+    ///   procedure is called on the proxy to remove data that are too old;
+    ///   if this value is, e.g., 15 minutes, then the procedure is triggered
+    ///   every 15 minutes and will clean all values with an associated
+    ///   timestamp older than 15 minutes ago
+    /// - `orchestrator_sender`: a channel to send commands to the orchestrator
+    ///
     pub async fn new(
         proxy: std::sync::Arc<tokio::sync::Mutex<dyn super::proxy::Proxy>>,
+        proxy_gc_period: tokio::time::Duration,
         orchestrator_sender: futures::channel::mpsc::UnboundedSender<super::orchestrator::OrchestratorRequest>,
     ) -> (
         Self,
@@ -42,7 +54,7 @@ impl NodeRegister {
         let (internal_sender, internal_receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, internal_receiver, proxy, orchestrator_sender).await;
+            Self::main_task(receiver, internal_receiver, proxy, proxy_gc_period, orchestrator_sender).await;
         });
 
         let refresh_task = Box::pin(async move {
@@ -62,6 +74,7 @@ impl NodeRegister {
         receiver: futures::channel::mpsc::UnboundedReceiver<NodeRegisterRequest>,
         internal_receiver: futures::channel::mpsc::UnboundedReceiver<InternalRequest>,
         proxy: std::sync::Arc<tokio::sync::Mutex<dyn super::proxy::Proxy>>,
+        proxy_gc_period: tokio::time::Duration,
         orchestrator_sender: futures::channel::mpsc::UnboundedSender<super::orchestrator::OrchestratorRequest>,
     ) {
         let mut receiver = receiver;
@@ -69,6 +82,7 @@ impl NodeRegister {
         let mut orchestrator_sender = orchestrator_sender;
 
         let mut registered: collections::HashMap<uuid::Uuid, NodeRegisterEntry> = std::collections::HashMap::new();
+        let mut next_gc_time = tokio::time::Instant::now() + proxy_gc_period;
 
         // main loop that reacts to events on the receiver channels
         loop {
@@ -91,6 +105,15 @@ impl NodeRegister {
                             registered.remove(&stale_node);
 
                             let _ = orchestrator_sender.send(super::orchestrator::OrchestratorRequest::DelNode(stale_node)).await;
+                        }
+
+                        // Perform garbage collection in the proxy, if needed.
+                        if ! proxy_gc_period.is_zero()  {
+                            let now = tokio::time::Instant::now();
+                            if now >= next_gc_time {
+                                proxy.lock().await.garbage_collection(proxy_gc_period);
+                                next_gc_time = now + proxy_gc_period;
+                             }
                         }
 
                         let _ = reply_sender.send(());
