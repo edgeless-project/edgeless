@@ -2,6 +2,7 @@ import time
 import json
 import random
 import os
+import re
 import redis
 import pandas as pd
 import schedule
@@ -27,7 +28,8 @@ node_health_columns = [
     "gpu_load_perc", "gpu_temp_cels"
 ]
 function_performance_columns = [
-    "timestamp", "physical_uuid", "type", "duration"
+    "timestamp", "type", "duration", "physical_uuid",
+    "node_uuid", "logical_uuid", "workflow_uuid", "class_id"
 ]
 
 ### Aux function to extract UUIDs from a redis key
@@ -45,6 +47,78 @@ def function_performance_parse(entry):
     except ValueError:
         return None, None
 
+def get_functions_info(redis_client):
+    """
+    Retrieves function information from Redis and organizes it into a dictionary.
+    """
+    functions_info = {}
+
+    try:
+        if not (function_keys := redis_client.keys("instance:*")):
+            print("ERROR: No instance:* keys found. Exiting...")
+            return functions_info  # Empty dictionary
+
+        for key in function_keys:
+            logical_uuid = key.split(":")[-1]
+
+            # Skip last_update entry
+            if "last_update" in logical_uuid:
+                continue
+              
+            json_data = redis_client.get(key)
+
+            if not json_data:
+                print(f"ERROR: No data found for key {key}")
+                continue
+
+            try:
+                decoded_json = json.loads(json_data)
+            except json.JSONDecodeError:
+                print(f"ERROR: Failed to decode JSON for {key}")
+                continue
+
+            # Skip 'resource' instances
+            if "Function" not in decoded_json:
+                print(f"Skipping key {key}, does not contain 'Function'")
+                continue
+
+            original_data = decoded_json["Function"]
+            if not original_data or len(original_data) < 2:
+                print(f"ERROR: Unexpected structure in function data for key {key}")
+                continue
+
+            metadata = original_data[0]
+            instance_info = original_data[1]
+
+            if not isinstance(instance_info, list) or not instance_info:
+                print(f"ERROR: Missing instance information for key {key}")
+                continue
+
+            # Extract node_id and function_id using regex
+            match = re.search(r"node_id:\s*([\w-]+), function_id:\s*([\w-]+)", instance_info[0])
+            if not match:
+                print(f"ERROR: Failed to extract IDs from instance string: {instance_info[0]}")
+                continue
+            node_uuid, physical_uuid = match.groups()
+
+
+            workflow_uuid = metadata.get("workflow_id", "unknown")
+            class_id = metadata.get("code", {}).get("function_class_id", "unknown")
+
+            functions_info[physical_uuid] = {
+                "node_uuid": node_uuid,
+                "logical_uuid": logical_uuid,
+                "workflow_uuid": workflow_uuid,
+                "class_id": class_id
+            }
+
+        print("Function info dictionary created successfully.")
+        return functions_info
+
+    except Exception as e:
+        print(f"ERROR: An unexpected error occurred while fetching function info: {e}")
+        return {}
+    
 
 ### Fetch metrics from Redis and generate the dataFrame for node health
 def get_df_node_health(redis_client):
@@ -77,7 +151,7 @@ def get_df_node_health(redis_client):
 
 
 ### Fetch metrics from Redis and generate the dataFrame for function performance
-def get_df_function_performance(redis_client):
+def get_df_function_performance(redis_client, functions_info):
 
     function_performance_dataframe = pd.DataFrame({col: [] for col in function_performance_columns})
 
@@ -92,17 +166,18 @@ def get_df_function_performance(redis_client):
     # Iterate the function execution times
     for function in execution_time_keys:
         execution_entries = []
-        function_uuid = extract_uuid(function)
+        physical_uuid = extract_uuid(function)
         execution_times = redis_client.zrangebyscore(function, (present_timestamp - TIME_WINDOW), present_timestamp, withscores=True)
 
         for entry, timestamp in execution_times:
             duration = function_performance_parse(entry)
             row = {
                 "timestamp": timestamp,
-                "physical_uuid": function_uuid,
                 "type": "execution_time",
-                "duration": duration
+                "duration": duration,
+                "physical_uuid": physical_uuid
             }
+            row.update(functions_info.get(physical_uuid, {}))
             execution_entries.append(row)
         
         function_performance_dataframe = pd.concat([function_performance_dataframe, pd.DataFrame(execution_entries)], ignore_index=True)
@@ -110,17 +185,18 @@ def get_df_function_performance(redis_client):
     # Iterate the function transfer times
     for function in transfer_time_keys:
         transfer_entries = []
-        function_uuid = extract_uuid(function)
+        physical_uuid = extract_uuid(function)
         transfer_times = redis_client.zrangebyscore(function, (present_timestamp - TIME_WINDOW), present_timestamp, withscores=True)
 
         for entry, timestamp in transfer_times:
             duration = function_performance_parse(entry)
             row = {
                 "timestamp": timestamp,
-                "physical_uuid": function_uuid,
                 "type": "transfer_time",
-                "duration": duration
+                "duration": duration,
+                "physical_uuid": physical_uuid
             }
+            row.update(functions_info.get(physical_uuid, {}))
             transfer_entries.append(row)
 
         function_performance_dataframe = pd.concat([function_performance_dataframe, pd.DataFrame(transfer_entries)], ignore_index=True)
@@ -146,8 +222,9 @@ def loop_function(redis_client):
  
     os.system('clear') if CLEAN_CLI else None
 
+    functions_info = get_functions_info(redis_client)
     df_node_health = get_df_node_health(redis_client) if MONITOR_NODE_HEALTH else None
-    df_function_performance = get_df_function_performance(redis_client) if MONITOR_FUNCTION_PERFORMANCE else None
+    df_function_performance = get_df_function_performance(redis_client, functions_info) if MONITOR_FUNCTION_PERFORMANCE else None
 
     anomaly_detection(redis_client, df_node_health, df_function_performance)
 
