@@ -70,9 +70,9 @@ The value of the following keys are updated with a timestamp when the
 corresponding data structure is updated:
 
 - `nodes:capabilities:last_update`
-- `provider:last_update           `
-- `instance:last_update           `
-- `dependency:last_update         `
+- `provider:last_update`
+- `instance:last_update`
+- `dependency:last_update`
 
 #### Sorted sets
 
@@ -80,14 +80,31 @@ The values below are stored as sorted sets, with a score equal to
 the timestamp of when they have been retrieved.
 They are all updated when the node refreshes its registration with the ε-ORC.
 
-| Key                                       | Element value                                                                                                                                                       | Data type          |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| node:health:`node_id`                     | JSON object representing the health status of the node identifier specified in the key                                                                              | `NodeHealthStatus` |
-| performance:function_execution_time:`pid` | Execution time of the function with the given `pid`, in fractional seconds, each associated with the timestamp of when the function execution completed at the node | `timestamp:value`  |
+| Key                                       | Element value                                                                                                                                                                         | Data type          |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| node:health:`node_id`                     | JSON object representing the health status of the node identifier specified in the key                                                                                                | `NodeHealthStatus` |
+| performance:function_execution_time:`pid` | Execution time of the function/resource with the given `pid`, in fractional seconds, each associated with the timestamp of when the function/resource execution completed at the node | `timestamp:value`  |
+| performance:function_transfer_time:`pid`  | Transfer time of the function/resource with the given `pid`, in fractional seconds, each associated with the timestamp of when the function/resource execution began at the node      | `timestamp:value`  |
 
 Old values in the sorted sets above are periodically purged from the proxy,
 with the period configured in the ε-ORC's configuration file as
 `proxy.proxy_gc_period_seconds`.
+
+
+##### Function execution vs. transfer time
+
+For every event handled by a function or resource, the node tracks the time it
+takes to handle it (_execution time_) and the time needed for the event to
+reach the handler, including both the network latency and the time spent by the
+event in queue if there are other events currently being handled by the same
+instance (_transfer time_).
+This is illustrated in the following diagram, which shows function _f()_
+invoking its successor function _g()_.
+
+![](diagrams-function_metrics.png)
+
+_Note that the transfer time is only accurate if the two nodes involved in the
+invocation are synchronized in time_.
 
 #### Identifiers and other types
 
