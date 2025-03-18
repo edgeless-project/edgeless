@@ -148,6 +148,7 @@ macro_rules! export_x86a {
             };
 
             if let(Some((output_ptr, output_len))) = output_params {
+                //let leaked_data = 
                 *out_ptr_ptr = output_ptr;
                 *out_len_ptr = output_len
             }
@@ -175,7 +176,7 @@ macro_rules! export_x86a {
             $fun::handle_stop()
         }
 
-        #[no_mangle]
+        /*#[no_mangle]
         pub unsafe extern "C" fn telemetry_log_asm (
             level: usize, 
             target_ptr: *const u8, 
@@ -189,8 +190,81 @@ macro_rules! export_x86a {
             let msg: &str = std::str::from_utf8(core::slice::from_raw_parts(msg_ptr, msg_len)).unwrap();
 
             //edgeless_node::guest_api::telemetry_log(level, target, msg);
-            println!("Target: {} msg: {}", target, msg);
+            println!("Log: Target: {} msg: {}", target, msg);
+
             
+        }*/
+
+        #[no_mangle]
+        pub unsafe extern "C" fn sync_asm (
+
+        ) {
+            println!("Sync_asm called");
         }
-    };
+        
+
+
+        /*use futures::channel::mpsc;
+        use futures::SinkExt;
+        use futures::StreamExt;
+        use tokio::task;
+
+        use tokio::runtime::Runtime;
+
+        use edgeless_node::native_runtime::native_runtime;
+
+        #[no_mangle]
+        pub extern "C" fn send_data(mut tx: mpsc::UnboundedSender<native_runtime::NativeRuntimeRequest>) { 
+            
+            let rt = Runtime::new().unwrap();
+
+            println!("send data started");
+            
+            let sender = rt.block_on(async move {
+                
+                
+                for i in 5..10 {
+                let message = TelemetryLogEvent {
+                    target: String::from("target"),
+                    msg: String::from("message"),
+                };
+
+                let sync_data: String = "sync_data".to_owned();
+                let message1 = SyncData {
+                    serialized_data: sync_data.into_bytes(),
+                };
+
+                    //let message = format!("Sending message from client {}", i);
+                    //if let Err(_) = tx.unbounded_send(message) {
+                    //    println!("Failed to send message {}", i);
+                    //    return;
+                    //}
+
+                    //match tx.send(message).await {
+                    //    Ok(_) => Ok(()),
+                    //    Err(err) => Ok(()),
+                    //}
+                    
+                    //tx.send(message).await.unwrap();
+                    if let Err(e) = tx.send(NativeRuntimeRequest::TELEMETRYLOG(message)).await {
+                        println!("Failed to send {}.", i);
+                        return;
+                    }
+
+                    if let Err(e) = tx.send(NativeRuntimeRequest::SYNC(message1)).await {
+                        println!("Failed to send sync data {}", i);
+                        return;
+                    }
+                    println!("Message sent {}", i);
+
+
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
+
+                tx.close_channel();
+            });
+            println!("Sender finished");
+        
+        }*/
+    }
 }

@@ -6,3 +6,5 @@
 pub mod function_instance;
 
 pub mod runtime;
+
+pub mod native_runtime;

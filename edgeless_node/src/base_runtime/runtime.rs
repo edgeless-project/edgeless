@@ -35,7 +35,7 @@ pub struct RuntimeTask<FunctionInstanceType: super::FunctionInstance> {
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
     slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
-    functions: std::collections::HashMap<uuid::Uuid, super::function_instance_runner::FunctionInstanceRunner<FunctionInstanceType>>,
+    pub functions: std::collections::HashMap<uuid::Uuid, super::function_instance_runner::FunctionInstanceRunner<FunctionInstanceType>>,
 }
 
 pub enum RuntimeRequest {

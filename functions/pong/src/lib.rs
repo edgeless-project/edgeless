@@ -23,4 +23,9 @@ impl EdgeFunction for PongerFun {
         log::info!("Ponger: 'Stop' called");
     }
 }
+
+#[cfg(target_arch = "wasm32")]
 edgeless_function::export!(PongerFun);
+
+#[cfg(target_arch = "x86_64")]
+edgeless_function::export_x86a!(PongerFun);

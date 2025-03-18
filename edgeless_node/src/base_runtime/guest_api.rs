@@ -48,7 +48,7 @@ impl GuestAPIHost {
             return self.call_raw(target, msg).await;
             // return Ok(self.data_plane.call(target.clone(), msg.to_string()).await);
         } else {
-            log::warn!("Unknown alias.");
+            log::warn!("Unknown alias {}.", alias);
             Err(GuestAPIError::UnknownAlias)
         }
     }
@@ -88,7 +88,7 @@ impl GuestAPIHost {
         } else if let Some(targted_id) = self.callback_table.get_mapping(target_alias).await {
             targted_id
         } else {
-            log::warn!("Unknown alias.");
+            log::warn!("Unknown alias {}.", target_alias);
             return Err(GuestAPIError::UnknownAlias);
         };
 

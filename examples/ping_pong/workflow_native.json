@@ -1,0 +1,42 @@
+{
+    "functions": [
+        {
+            "name": "ponger",
+            "class_specification": {
+                "id": "ponger",
+                "function_type": "RUST_NATIVE",
+                "version": "0.1",
+                "code": "../../functions/pong/pong.so",
+                "outputs": [
+                    "ping"
+                ]
+            },
+            "output_mapping": {
+                "ping": "pinger"
+            },
+            "annotations": {
+              "init-payload": "ponger"
+            }
+        },
+        {
+            "name": "pinger",
+            "class_specification": {
+                "id": "pinger",
+                "function_type": "RUST_NATIVE",
+                "version": "0.1",
+                "code": "../../functions/ping/ping.so",
+                "outputs": [
+                    "ponger"
+                ]
+            },
+            "output_mapping": {
+                "ponger": "ponger"
+            },
+            "annotations": {
+              "init-payload": "pinger"
+            }
+        }
+    ],
+    "resources": [],
+    "annotations": {}
+}

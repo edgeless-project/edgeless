@@ -7,6 +7,15 @@ mod workflow_spec;
 
 use clap::Parser;
 use edgeless_api::{controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
+use reqwest::header::ACCEPT;
+use std::fs;
+use toml;
+
+use reqwest::{multipart, Body, Client};
+use std::collections::HashMap;
+use std::concat;
+use tokio::fs::File;
+use tokio_util::codec::{BytesCodec, FramedRead};
 
 use mailparse::{parse_content_disposition, parse_header};
 use reqwest::header::ACCEPT;
@@ -16,7 +25,6 @@ use std::io::Cursor;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
 use toml; // for parse
-use std::fs;
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
@@ -31,8 +39,6 @@ enum FunctionCommands {
         spec_file: String,
         #[arg(short, long, default_value_t = String::from("wasm"))]
         architecture: String,
-        #[arg(short, long, default_value_t = String::from("release"))]
-        build_profile: String,
     },
     Invoke {
         event_type: String,
@@ -41,6 +47,10 @@ enum FunctionCommands {
         function_id: String,
         payload: String,
     },
+<<<<<<< HEAD
+    Push {
+        file_name: String,
+=======
     Get {
         function_name: String,
     },
@@ -50,6 +60,7 @@ enum FunctionCommands {
     Push {
         binary_name: String,
         function_type: String,
+>>>>>>> main
     },
 }
 
@@ -82,28 +93,6 @@ struct CLiConfig {
     pub repository_url: String,
     pub repository_basic_auth_user: String,
     pub repository_basic_auth_pass: String,
-}
-
-enum BuildProfile {
-    RELEASE,
-    DEBUG,
-}
-
-impl BuildProfile {
-    fn from_string(profile: &str) -> Self {
-        match profile {
-            "release" => Self::RELEASE,
-            "debug" => Self::DEBUG,
-            _ => Self::RELEASE,
-        }
-    }
-
-    fn name(&self) -> String {
-        match self {
-            Self::RELEASE => String::from("release"),
-            Self::DEBUG => String::from("debug"),
-        }
-    }
 }
 
 enum Platform {
@@ -275,7 +264,7 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
             Commands::Function { function_command } => match function_command {
-                FunctionCommands::Build { spec_file, architecture, build_profile } => {
+                FunctionCommands::Build { spec_file, architecture } => {
                     let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
                     let cargo_project_path = spec_file_path.parent().unwrap().to_path_buf();
                     let cargo_manifest = cargo_project_path.join("Cargo.toml");
@@ -291,15 +280,10 @@ async fn main() -> anyhow::Result<()> {
 
                     let platform = Platform::from_string(architecture.as_str());
 
-                    let profile = BuildProfile::from_string(build_profile.as_str());
-
-                    println!("Building profile {} for architecture {} using {} target.", profile.name(), platform.name(), platform.target());
+                    println!("Building for architecture {} using {} target.", platform.name(), platform.target());
 
                     let lib_name = match pack.library() {
-                        Some(val) => match platform {
-                            Platform::WASM => val.name().to_string(),
-                            _ => format!("lib{}", val.name()), 
-                        }
+                        Some(val) => val.name(),
                         None => {
                             return Err(anyhow::anyhow!("Cargo package does not contain library."));
                         }
@@ -313,11 +297,7 @@ async fn main() -> anyhow::Result<()> {
                         &vec![platform.target()],
                         cargo::core::compiler::CompileMode::Build,
                     )?;
-
-                    match profile {
-                        BuildProfile::RELEASE => build_config.requested_profile = cargo::util::interning::InternedString::new("release"),
-                        _ => (),
-                    }
+                    build_config.requested_profile = cargo::util::interning::InternedString::new("release");
 
                     let compile_options = cargo::ops::CompileOptions {
                         build_config: build_config,
@@ -336,7 +316,7 @@ async fn main() -> anyhow::Result<()> {
                     cargo::ops::compile(&ws, &compile_options)?;
 
                     let raw_result = build_dir
-                        .join(format!("{}/{}/{}.{}", platform.target(), profile.name(), lib_name, platform.suffix()))
+                        .join(format!("{}/release/lib{}.{}", platform.target(), lib_name, platform.suffix()))
                         .to_str()
                         .unwrap()
                         .to_string();
@@ -345,7 +325,7 @@ async fn main() -> anyhow::Result<()> {
                         .to_str()
                         .unwrap()
                         .to_string();
-                    println!("src {} dst {}", raw_result, out_file); 
+                    
                     match platform {
                         Platform::WASM => println!(
                             "{:?}",
@@ -386,7 +366,31 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
 
+<<<<<<< HEAD
+                FunctionCommands::Push {
+                    //toml file specify the function
+                    file_name,
+                } => {
+                    let filename = file_name;
+                    //read end point and credentials in a file
+                    let contents = fs::read_to_string(filename).expect("Failed to read file, please make sure the file exist and in .toml");
+                    // println!("contents {}", contents); //
+                    let repo_endpoint: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
 
+                    // Print out the values to `stdout`.
+                    println!("Url {}", repo_endpoint.url.name); //
+                    println!("username {}", repo_endpoint.credential.basic_auth_user); //
+                    println!("passwd {}", repo_endpoint.credential.basic_auth_pass); //
+                                                                                     //create a curl request as follow
+                                                                                     // curl -X 'POST' \
+                                                                                     //    'https://function-repository.edgeless.wlilab.eu/api/admin/function/upload' \
+                                                                                     //    -H 'accept: application/json' \
+                                                                                     //    -H 'Content-Type: multipart/form-data' \
+                                                                                     //    -F 'file=@function_x86'
+                                                                                     //use multipart
+                    let client = Client::new();
+                    let file = File::open(repo_endpoint.binary.name).await?;
+=======
                 FunctionCommands::Get { function_name } => {
                     if std::fs::metadata(&args.config_file).is_err() {
                         return Err(anyhow::anyhow!(
@@ -463,22 +467,32 @@ async fn main() -> anyhow::Result<()> {
 
                     let client = Client::new();
                     let file = File::open(&binary_name).await?;
+>>>>>>> main
 
                     // read file body stream
                     let stream = FramedRead::new(file, BytesCodec::new());
                     let file_body = Body::wrap_stream(stream);
 
                     //make form part of file
-
+<<<<<<< HEAD
+                    let some_file = multipart::Part::stream(file_body).file_name("function_x86"); // this is in curl -F "function_x86" in "file=@function_x86"
+=======
                     let some_file = multipart::Part::stream(file_body).file_name("binary"); // this is in curl -F "function_x86" in "file=@function_x86"
+>>>>>>> main
 
                     //create the multipart form
                     let form = multipart::Form::new().part("file", some_file); // this is in curl -F "file"
 
                     let response = client
+<<<<<<< HEAD
+                        .post(repo_endpoint.url.name.to_string() + "/api/admin/function/upload")
+                        .header(ACCEPT, "application/json")
+                        .basic_auth(repo_endpoint.credential.basic_auth_user, Some(repo_endpoint.credential.basic_auth_pass))
+=======
                         .post(conf.repository_url.to_string() + "/api/admin/function/upload")
                         .header(ACCEPT, "application/json")
                         .basic_auth(conf.repository_basic_auth_user, Some(conf.repository_basic_auth_pass))
+>>>>>>> main
                         .multipart(form)
                         .send()
                         .await
@@ -487,11 +501,35 @@ async fn main() -> anyhow::Result<()> {
                     let json = response.json::<HashMap<String, String>>().await?;
                     println!("receive code_file_id {:?}", json);
 
+<<<<<<< HEAD
+                    //post to /api/admin/function
+                    //example
+                    // curl -X 'POST' \
+                    //   'https://function-repository.edgeless.wlilab.eu/api/admin/function' \
+                    //   -H 'accept: application/json' \
+                    //   -H 'Content-Type: application/json' \
+                    //   -d '{
+                    //   "function_type": "RUST_WASM",
+                    //   "id": "http_requestor",
+                    //   "version": "0.1",
+                    //   "code_file_id": "652faf54465c2e7ec15facce",
+                    //   "outputs": [
+                    //     "success_cb",
+                    //     "failure_cb"
+                    //   ]
+                    // }'
+
+                    let r = serde_json::json!({
+
+                        "function_type": "RUST_WASM",
+                        "id": repo_endpoint.binary.id,
+=======
                     let internal_id = &binary_name;
                     let r = serde_json::json!({
 
                         "function_type": function_type,
                         "id": internal_id,
+>>>>>>> main
                         "version": "0.1",
                         "code_file_id": json.get("id"), //get the id
                         "outputs": [  "success_cb",
@@ -499,6 +537,16 @@ async fn main() -> anyhow::Result<()> {
                                    ],
                     });
 
+<<<<<<< HEAD
+                    let repo_endpoint_new: workflow_spec::RepoEndpoint = toml::from_str(&contents).expect("invalid config");
+                    let post_response = client
+                        .post(repo_endpoint_new.url.name.to_string() + "/api/admin/function")
+                        .header(ACCEPT, "application/json")
+                        .basic_auth(
+                            repo_endpoint_new.credential.basic_auth_user,
+                            Some(repo_endpoint_new.credential.basic_auth_pass),
+                        )
+=======
                     if std::fs::metadata(&args.config_file).is_err() {
                         return Err(anyhow::anyhow!(
                             "configuration file does not exist or cannot be accessed: {}",
@@ -512,6 +560,7 @@ async fn main() -> anyhow::Result<()> {
                         .post(conf_new.repository_url.to_string() + "/api/admin/function")
                         .header(ACCEPT, "application/json")
                         .basic_auth(conf_new.repository_basic_auth_user, Some(conf_new.repository_basic_auth_pass))
+>>>>>>> main
                         .json(&r)
                         .send()
                         .await
@@ -520,6 +569,10 @@ async fn main() -> anyhow::Result<()> {
                         .await
                         .expect("failed to get body");
                     println!("post_response body: {:?}", post_response);
+<<<<<<< HEAD
+                    println!("Post function successfully!");
+=======
+>>>>>>> main
                 }
             },
         },
