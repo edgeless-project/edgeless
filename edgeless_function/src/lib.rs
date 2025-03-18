@@ -44,6 +44,22 @@ pub struct InstanceId {
     pub component_id: [u8; 16],
 }
 
+impl core::fmt::Display for InstanceId {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let node_id = match std::str::from_utf8(&self.node_id) {
+            Ok(s) => s,
+            Err(_) => "invalid"
+        };
+
+        let component_id = match std::str::from_utf8(&self.component_id) {
+            Ok(s) => s,
+            Err(_) => "invalid"
+        };
+
+        write!(f, "InstanceId(node_id: {}, component_id: {})", node_id, component_id)
+    }
+}
+
 pub trait EdgeFunction {
     fn handle_cast(src: InstanceId, encoded_message: &[u8]);
     fn handle_call(src: InstanceId, encoded_message: &[u8]) -> CallRet;

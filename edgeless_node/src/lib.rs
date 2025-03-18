@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use std::path::PathBuf;
+
 use edgeless_api::orc::OrchestratorAPI;
 
 pub mod agent;
@@ -492,6 +494,10 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let native_runtime_task = match settings.native_runtime {
         Some(native_runtime_settings) => match native_runtime_settings.enabled {
             true => {
+                let (native_runtime, native_runtime_task, native_runtime_api) = native_runner::native_runtime::NativeRuntime::new(
+                    std::collections::HashMap::new()
+                );
+
                 let (native_runtime_client, mut native_runtime_task_s) = 
                     base_runtime::runtime::create::<native_runner::function_instance::NativeFunctionInstance>(
                         data_plane.clone(),
@@ -503,6 +509,12 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                         ]))),
                         std::sync::Arc::new(tokio::sync::Mutex::new(Box::new(crate::native_runner::runtime::NativeRuntime::new()))),
                     );
+                    /*for (function_id, mut function) in native_runtime_task_s.functions.clone().into_iter() {
+                        log::info!("Adding native runtime api to function {}", function_id);
+                        //function.code_file_path = PathBuf();
+                        //function.function_instance.native_runtime_api = native_runtime_api;
+                    } */
+
                     runners.insert("RUST_NATIVE".to_string(), Box::new(native_runtime_client.clone()));
                     runners_ft.insert(edgeless_api::function_instance::FunctionType::from_string("RUST_NATIVE"), Box::new(native_runtime_client.clone()));
                     tokio::spawn(async move{

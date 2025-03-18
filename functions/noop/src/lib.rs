@@ -43,6 +43,10 @@ impl EdgeFunction for NoopFunction {
         println!("Noop initialized, payload: {:?}", payload);
         edgeless_function::init_logger();
         log::info!("Noop initialized, payload: {:?}", payload);
+        let id = slf();
+        println!("Noop id: {}", id);
+        //log::info!("Noop log id: {}", std::str::from_utf8(&id.node_id).unwrap());
+        telemetry_log(1, "slf", "Noop telemtry log");
     }
 
     fn handle_stop() {
@@ -51,11 +55,11 @@ impl EdgeFunction for NoopFunction {
     }
 }
 
-//#[cfg(target_arch = "wasm")]
-//edgeless_function::export!(NoopFunction);
+#[cfg(target_arch = "wasm32")]
+edgeless_function::export!(NoopFunction);
 
 //#[cfg(target_arch = "x86_64")]
 //edgeless_function::export_x86!(NoopFunction, NoopFunction::default);
 
-//#[cfg(target_arch = "x86_64")]
+#[cfg(target_arch = "x86_64")]
 edgeless_function::export_x86a!(NoopFunction);

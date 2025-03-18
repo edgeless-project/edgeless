@@ -1,0 +1,20 @@
+{
+    "functions": [
+        {
+            "name": "noop",
+            "class_specification": {
+                "id": "noop",
+                "function_type": "RUST_NATIVE",
+                "version": "0.1",
+                "code": "../../functions/noop/noop.so",
+                "outputs": []
+            },
+            "output_mapping": {},
+            "annotations": {
+                "init-payload": "nothing interesting"
+            }
+        }
+    ],
+    "resources": [],
+    "annotations": {}
+}
