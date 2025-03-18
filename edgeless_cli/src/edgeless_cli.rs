@@ -386,7 +386,6 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
 
-
                 FunctionCommands::Get { function_name } => {
                     if std::fs::metadata(&args.config_file).is_err() {
                         return Err(anyhow::anyhow!(
