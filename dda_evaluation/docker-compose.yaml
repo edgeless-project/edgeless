@@ -1,7 +1,31 @@
 services:
-  # # TODO: finish
-  # edgeless_in_a_box:
-  #   image:
+  node:
+    container_name: node
+    image: dda_node:latest
+    environment:
+      RUST_LOG: info 
+    depends_on:
+      - orc
+
+  orc:
+    container_name: orc
+    image: dda_orc:latest
+    environment:
+      RUST_LOG: info 
+    depends_on:
+      - con
+
+  con:
+    container_name: con
+    image: dda_con:latest
+    environment:
+      RUST_LOG: info 
+    depends_on:
+      - redis
+      - mqtt_broker
+      - dda
+    ports:
+      - 7001:7001
 
   redis:
     image: redis:latest
