@@ -116,6 +116,7 @@ impl Orchestrator {
         let refresh_sender = sender.clone();
         let refresh_task = Box::pin(async move {
             let mut refresh_sender = refresh_sender;
+            // NOTE: every 1 seconds refresh
             loop {
                 let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
                 let _ = refresh_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;

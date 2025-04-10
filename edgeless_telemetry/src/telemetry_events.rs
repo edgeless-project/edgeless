@@ -111,7 +111,15 @@ impl EventLogger {
 
 impl EventProcessor for EventLogger {
     fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult {
-        log::log!(self.log_level, "Event: {:?} , tags: {:?}", event, event_tags);
+        // log::log!(self.log_level, "Event: {:?} , tags: {:?}", event,
+        // event_tags);
+        if let TelemetryEvent::FunctionLogEntry(_, _, msg) = event {
+            if let Some(function_id) = event_tags.get("FUNCTION_ID") {
+                if let Some(node_id) = event_tags.get("NODE_ID") {
+                    log::log!(self.log_level, "Function log, node_id=({:?}), function_id=({:?}): {:?}", node_id, function_id, msg)
+                }
+            }
+        }
         TelemetryProcessingResult::PROCESSED
     }
 }

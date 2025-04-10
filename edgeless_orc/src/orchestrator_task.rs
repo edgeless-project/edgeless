@@ -117,7 +117,7 @@ impl OrchestratorTask {
                     self.refresh().await;
                 }
                 crate::orchestrator::OrchestratorRequest::Refresh(reply_sender) => {
-                    log::debug!("Orchestrator Refresh");
+                    log::info!("Orchestrator Refresh");
                     self.refresh().await;
                     let _ = reply_sender.send(());
                 }
