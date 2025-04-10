@@ -38,6 +38,7 @@ pub struct RuntimeTask<FunctionInstanceType: super::FunctionInstance> {
     guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
     slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
     functions: std::collections::HashMap<uuid::Uuid, super::function_instance_runner::FunctionInstanceRunner<FunctionInstanceType>>,
+    function_names: std::collections::HashMap<uuid::Uuid, String>,
 }
 
 pub enum RuntimeRequest {
@@ -89,6 +90,7 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
             guest_api_host_register,
             slf_channel,
             functions: std::collections::HashMap::new(),
+            function_names: std::collections::HashMap::new(),
         }
     }
 
@@ -117,7 +119,8 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         instance_id: edgeless_api::function_instance::InstanceId,
         spawn_request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) {
-        log::info!("Start Function {:?}", instance_id);
+        let start_time = std::time::Instant::now();
+        // log::info!("Start Function {:?}, {:?}", spawn_request.code.function_class_id, instance_id);
         let cloned_req = spawn_request.clone();
         let data_plane = self.data_plane_provider.get_handle_for(instance_id).await;
         let instance = super::function_instance_runner::FunctionInstanceRunner::new(
@@ -136,6 +139,12 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         )
         .await;
         self.functions.insert(instance_id.function_id, instance);
+        log::info!(
+            "Start Function {:?}, {:?}, took {:?}",
+            spawn_request.code.function_class_id,
+            instance_id,
+            start_time.elapsed()
+        );
     }
 
     async fn stop_function(&mut self, instance_id: edgeless_api::function_instance::InstanceId) {

@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 /// Struct representing the updatable callbacks/aliases of a function instance.
 /// Shared between a function instance's host and guest.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AliasMapping {
     mapping: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<String, edgeless_api::function_instance::InstanceId>>>,
 }

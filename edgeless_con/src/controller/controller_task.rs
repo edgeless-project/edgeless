@@ -288,6 +288,7 @@ impl ControllerTask {
             },
         );
 
+        let current_time = std::time::SystemTime::now();
         let active_workflow = self.active_workflows.get(wf_id).unwrap().clone();
 
         // Keep the last error.
@@ -299,22 +300,37 @@ impl ControllerTask {
 
         // Start the functions on the orchestration domain.
         for function in &spawn_workflow_request.workflow_functions {
+            let function_start = std::time::SystemTime::now();
             if res.is_err() {
                 log::error!("Could not start a function {}", res.clone().unwrap_err());
                 break;
             }
 
+            // NOTE(lukasz): we start functions sequentially as defined in the workflow
+            // - maybe a topological sort?
             res = self.start_workflow_function_in_domain(wf_id, function, target_domain).await;
+            log::info!(
+                "Function {} started in {} ms",
+                function.name,
+                function_start.elapsed().unwrap().as_millis()
+            );
         }
 
         // Start the resources on the orchestration domain.
         for resource in &spawn_workflow_request.workflow_resources {
+            let resource_start = std::time::SystemTime::now();
             if res.is_err() {
                 log::error!("Could not start a resource {}", res.clone().unwrap_err());
                 break;
             }
 
+            // NOTE(lukasz): we start resources also sequentially
             res = self.start_workflow_resource_in_domain(wf_id, resource, target_domain).await;
+            log::info!(
+                "Resource {} started in {} ms",
+                resource.name,
+                resource_start.elapsed().unwrap().as_millis()
+            );
         }
 
         //
@@ -357,6 +373,12 @@ impl ControllerTask {
             log::error!("Workflow start failed, stopping");
             self.stop_workflow(wf_id).await;
         }
+
+        log::info!(
+            "Workflow {} started in {} ms",
+            wf_id.to_string(),
+            current_time.elapsed().unwrap().as_millis()
+        );
 
         let reply = match res {
             Ok(_) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(
@@ -630,7 +652,7 @@ impl ControllerTask {
     }
 
     async fn refresh(&mut self) {
-        log::debug!("Checking domains");
+        log::info!("Checking domains: refresh");
 
         // Find all domains that are stale, i.e., which have not been
         // refreshed by their own indicated deadline.

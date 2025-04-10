@@ -355,6 +355,8 @@ async fn main() -> anyhow::Result<()> {
                             .unwrap()
                             .to_string();
 
+                        // check if wasm-opt is installed
+
                         println!(
                             "{:?}",
                             std::process::Command::new("wasm-opt")

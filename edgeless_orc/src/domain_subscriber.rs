@@ -57,6 +57,7 @@ impl DomainSubscriber {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(subscription_refresh_interval_sec));
         loop {
             interval.tick().await;
+            log::info!("refreshing orchestrator!");
             let _ = sender.send(DomainSubscriberRequest::Refresh()).await;
         }
     }

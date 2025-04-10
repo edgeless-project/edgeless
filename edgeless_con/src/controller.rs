@@ -90,7 +90,7 @@ impl Controller {
                 let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
                 let _ = sender.send(InternalRequest::Refresh(reply_sender)).await;
                 let _ = reply_receiver.await;
-                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
             }
         });
 

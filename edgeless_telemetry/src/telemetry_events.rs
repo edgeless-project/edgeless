@@ -112,13 +112,13 @@ struct EventLogger {}
 
 impl EventProcessor for EventLogger {
     fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult {
-        match event {
-            TelemetryEvent::FunctionLogEntry(log_level, target, msg) => {
-                log::log!(to_log_level(log_level), "{}: {}", target, msg);
+        if let TelemetryEvent::FunctionLogEntry(_, _, msg) = event {
+            if let Some(function_id) = event_tags.get("FUNCTION_ID") {
+                if let Some(node_id) = event_tags.get("NODE_ID") {
+                    log::info!("Function log, node_id=({:?}), function_id=({:?}): {:?}", node_id, function_id, msg)
+                }
             }
-            _ => log::info!("Event: {:?} , tags: {:?}", event, event_tags),
         }
-
         TelemetryProcessingResult::PROCESSED
     }
 }
