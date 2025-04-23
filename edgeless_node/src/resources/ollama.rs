@@ -3,9 +3,9 @@
 
 use futures::{SinkExt, StreamExt};
 
-pub struct OllamasResourceSpec {}
+pub struct OllamaResourceSpec {}
 
-impl super::resource_provider_specs::ResourceProviderSpecs for OllamasResourceSpec {
+impl super::resource_provider_specs::ResourceProviderSpecs for OllamaResourceSpec {
     fn class_type(&self) -> String {
         String::from("ollama")
     }
@@ -80,12 +80,11 @@ impl Drop for OllamaResource {
 impl OllamaResource {
     /// Create a new Ollama resource.
     ///
-    /// - `resource_provider`: the resource provider.
-    /// - `dataplane_handle`: gives access to the EDGELESS dataplane.
-    /// - `telemetry_handle`: gives access to the node's telemetry subsystem.
-    /// - `model_name`: name of the AI model to use.
-    /// - `instance_id`: identifier of this resource instance.
-    /// - `sender`: channel to send commands to the resource task.
+    /// - `dataplane_provider`: handle to the EDGELESS data plane
+    /// - `telemetry_hangle`: handle to the node's telemetry sub-system
+    /// - `model_name`: name of the AI model to use
+    /// - `instance_id`: identifier of this resource instance
+    /// - `sender`: channel to send commands to the resource task
     async fn new(
         dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
@@ -154,6 +153,7 @@ impl OllamaResourceProvider {
     /// Create an Ollama resource provider:
     ///
     /// - `dataplane_provider`: handle to the EDGELESS data plane
+    /// - `telemetry_hangle`: handle to the node's telemetry sub-system
     /// - `resource_provider_id`: identifier of this resource provider,
     ///    also containing the identifier of the node hosting it
     /// - `ollama_host`: address of the ollama server

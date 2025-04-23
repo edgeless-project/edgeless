@@ -113,6 +113,8 @@ pub struct EdgelessNodeResourceSettings {
     pub dda_provider: Option<String>,
     /// The ollama resource provider settings.
     pub ollama_provider: Option<OllamaProviderSettings>,
+    /// The container resource provider settings.
+    pub container_provider: Vec<ContainerProviderSettings>,
     /// If not empty, a kafka-egress resource provider with that name is created.
     /// The resource will connect to a remote Kafka server to stream the
     /// messages received on a given topic.
@@ -143,6 +145,16 @@ impl Default for OllamaProviderSettings {
             provider: String::default(),
         }
     }
+}
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
+pub struct ContainerProviderSettings {
+    /// The name of the container image, possibly with tag, to be started.
+    /// It it assumed that the image is available to a local Docker.
+    pub image_name: String,
+    /// Container function configuration.
+    pub init_payload: String,
+    /// If not empty, a container resource provider with that name is created.
+    pub provider: String,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -443,7 +455,7 @@ async fn fill_resources(
                     settings.port,
                     settings.messages_number_limit
                 );
-                let class_type = resources::ollama::OllamasResourceSpec {}.class_type();
+                let class_type = resources::ollama::OllamaResourceSpec {}.class_type();
                 ret.insert(
                     settings.provider.clone(),
                     agent::ResourceDesc {
@@ -469,7 +481,45 @@ async fn fill_resources(
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id: settings.provider.clone(),
                     class_type,
-                    outputs: resources::ollama::OllamasResourceSpec {}.outputs(),
+                    outputs: resources::ollama::OllamaResourceSpec {}.outputs(),
+                });
+            }
+        }
+
+        for settings in &settings.container_provider {
+            if !settings.image_name.is_empty() && !settings.provider.is_empty() {
+                log::info!(
+                    "Creating container resource provider '{}' with image '{}' (init-payload: '{}')",
+                    settings.provider,
+                    settings.image_name,
+                    settings.init_payload
+                );
+                let class_type = format!("container-{}", settings.image_name);
+                ret.insert(
+                    settings.provider.clone(),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::container::ContainerResourceProvider::new(
+                                data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), settings.provider.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
+                                edgeless_api::function_instance::InstanceId::new(node_id),
+                                settings.image_name.clone(),
+                                settings.init_payload.clone(),
+                            )
+                            .await,
+                        ),
+                    },
+                );
+
+                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id: settings.provider.clone(),
+                    class_type,
+                    outputs: resources::ollama::OllamaResourceSpec {}.outputs(),
                 });
             }
         }
@@ -790,6 +840,7 @@ pub fn edgeless_node_default_conf() -> String {
             redis_provider: Some("redis-1".to_string()),
             dda_provider: Some("dda-1".to_string()),
             ollama_provider: Some(OllamaProviderSettings::default()),
+            container_provider: vec![ContainerProviderSettings::default()],
             kafka_egress_provider: Some(String::default()),
             metrics_collector_provider: Some(MetricsCollectorProviderSettings::default()),
             sqlx_provider: Some(String::from("sqlite://sqlite.db")),
