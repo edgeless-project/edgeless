@@ -6,7 +6,7 @@ use std::path::Path;
 
 use clap::Parser;
 use edgeless_node::{
-    EdgelessNodeContainerRuntimeSettings, EdgelessNodeGeneralSettings, EdgelessNodeResourceSettings, EdgelessNodeSettings,
+    ContainerProviderSettings, EdgelessNodeContainerRuntimeSettings, EdgelessNodeGeneralSettings, EdgelessNodeResourceSettings, EdgelessNodeSettings,
     EdgelessNodeTelemetrySettings, MetricsCollectorProviderSettings, OllamaProviderSettings,
 };
 use std::fs;
@@ -199,6 +199,7 @@ fn generate_configs(
                     false => None,
                 },
                 ollama_provider: Some(OllamaProviderSettings::default()),
+                container_provider: vec![ContainerProviderSettings::default()],
                 kafka_egress_provider: Some(String::default()),
                 metrics_collector_provider: Some(MetricsCollectorProviderSettings::default()),
                 sqlx_provider: match counter == 0 {
@@ -240,6 +241,7 @@ fn generate_configs(
                 redis_provider: None,
                 dda_provider: None,
                 ollama_provider: None,
+                container_provider: vec![],
                 kafka_egress_provider: None,
                 metrics_collector_provider: Some(edgeless_node::MetricsCollectorProviderSettings {
                     collector_type: String::from("Redis"),

@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+pub mod container;
 pub mod dda;
 pub mod file_log;
 pub mod http_egress;
