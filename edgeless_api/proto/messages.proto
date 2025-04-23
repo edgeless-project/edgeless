@@ -550,7 +550,7 @@ message CallReturn {
     // Return type.
     CallRetType type  = 1;
 
-    // Reply message. Can only be empty with type = Type::REPLY.
+    // Reply message. Can only be non-empty with type = Type::REPLY.
     bytes msg        = 2;
 }
 
