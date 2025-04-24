@@ -145,13 +145,29 @@ impl NodeRegister {
                             }
                         };
                         if add_node {
-                            if let Ok(client_desc) = crate::client_desc::ClientDesc::from(&request).await {
+                            match crate::client_desc::ClientDesc::from(&request).await {
+                                Ok(client_desc) => {
                                 let _ = orchestrator_sender.send(crate::orchestrator::OrchestratorRequest::AddNode(
                                     request.node_id,
                                     client_desc,
                                     request.resource_providers
                                 )).await;
+                            },
+                            Err(err) => {
+                                registered.remove(&request.node_id);
+                                log::warn!("could not add node {}: {}", request.node_id, err);
+                                if let Err(err) = reply_channel.send(Ok(edgeless_api::node_registration::UpdateNodeResponse::ResponseError(
+                                    edgeless_api::common::ResponseError {
+                                        summary: "invalid node configuration".to_string(),
+                                        detail: Some(err.to_string())
+                                }
+                                ))){
+                            log::error!("NodeRegister channel error in UpdateNode: {:?}", err);
+                        }
+
+                                continue;
                             }
+                        }
                         }
 
                         // Push the dynamic data to the proxy.
