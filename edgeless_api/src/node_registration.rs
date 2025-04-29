@@ -195,9 +195,34 @@ impl std::fmt::Display for Sample {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
+pub struct FunctionLogEntry {
+    /// Number of s since Unix epoch,
+    pub timestamp_sec: i64,
+    /// Number of ns since the last second boundary from Unix Epoch.
+    pub timestamp_ns: u32,
+    /// Target specified in the log.
+    pub target: String,
+    /// Message specified in the log.
+    pub message: String,
+}
+
+impl FunctionLogEntry {
+    pub fn score(&self) -> f64 {
+        self.timestamp_sec as f64 + (self.timestamp_ns as f64) / 1e9
+    }
+}
+
+impl std::fmt::Display for FunctionLogEntry {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}.{}:{}:{}", self.timestamp_sec, self.timestamp_ns, self.target, self.message)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct NodePerformanceSamples {
     pub function_execution_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<Sample>>,
     pub function_transfer_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<Sample>>,
+    pub function_log_entries: std::collections::HashMap<crate::function_instance::ComponentId, Vec<FunctionLogEntry>>,
 }
 
 impl std::fmt::Display for NodeHealthStatus {

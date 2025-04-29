@@ -434,16 +434,54 @@ impl super::proxy::Proxy for ProxyRedis {
     }
 
     fn push_performance_samples(&mut self, _node_id: &uuid::Uuid, performance_samples: edgeless_api::node_registration::NodePerformanceSamples) {
-        let all_series = vec![
-            ("function_execution_time", &performance_samples.function_execution_times),
-            ("function_transfer_time", &performance_samples.function_transfer_times),
+        let all_series: Vec<(&str, Vec<(String, Vec<(f64, String)>)>)> = vec![
+            (
+                "function_execution_time",
+                performance_samples
+                    .function_execution_times
+                    .iter()
+                    .map(|(function_id, samples)| {
+                        (
+                            function_id.to_string(),
+                            samples.iter().map(|sample| (sample.score(), sample.to_string())).collect(),
+                        )
+                    })
+                    .collect(),
+            ),
+            (
+                "function_transfer_times",
+                performance_samples
+                    .function_transfer_times
+                    .iter()
+                    .map(|(function_id, samples)| {
+                        (
+                            function_id.to_string(),
+                            samples.iter().map(|sample| (sample.score(), sample.to_string())).collect(),
+                        )
+                    })
+                    .collect(),
+            ),
+            (
+                "function_log_entries",
+                performance_samples
+                    .function_log_entries
+                    .iter()
+                    .map(|(function_id, samples)| {
+                        (
+                            function_id.to_string(),
+                            samples.iter().map(|log_entry| (log_entry.score(), log_entry.to_string())).collect(),
+                        )
+                    })
+                    .collect(),
+            ),
         ];
+
         for (name, series) in all_series {
             for (function_id, values) in series {
                 let key = format!("performance:{}:{}", name, function_id);
-                for value in values {
+                for (score, value) in values {
                     // Save to Redis.
-                    let _ = redis::Cmd::zadd(&key, value.to_string(), value.score()).exec(&mut self.connection);
+                    let _ = redis::Cmd::zadd(&key, &value, score).exec(&mut self.connection);
 
                     // Save to dataset output.
                     if let Some(outfile) = &mut self.performance_samples_file {
@@ -453,7 +491,7 @@ impl super::proxy::Proxy for ProxyRedis {
                             self.additional_fields,
                             name,
                             function_id,
-                            value.to_string().replacen(":", ",", 1)
+                            value.replacen(":", ",", 1)
                         );
                     }
                 }
@@ -939,13 +977,24 @@ mod test {
             None => return,
         };
 
-        let mut cnt = 0;
+        let mut sample_cnt = 0;
         let mut new_sample = |value| {
-            cnt += 2;
+            sample_cnt += 2;
             edgeless_api::node_registration::Sample {
-                timestamp_sec: cnt as i64,
-                timestamp_ns: (cnt + 1) as u32,
+                timestamp_sec: sample_cnt as i64,
+                timestamp_ns: (sample_cnt + 1) as u32,
                 sample: value,
+            }
+        };
+
+        let mut log_cnt = 0;
+        let mut new_log = |value| {
+            log_cnt += 2;
+            edgeless_api::node_registration::FunctionLogEntry {
+                timestamp_sec: log_cnt as i64,
+                timestamp_ns: (log_cnt + 1) as u32,
+                target: String::from("target"),
+                message: format!("value={}", value),
             }
         };
 
@@ -976,6 +1025,10 @@ mod test {
         let samples_2_values: Vec<f64> = vec![200.0, 201.0];
         let samples_1: Vec<edgeless_api::node_registration::Sample> = samples_1_values.iter().map(|x| new_sample(*x)).collect();
         let samples_2: Vec<edgeless_api::node_registration::Sample> = samples_2_values.iter().map(|x| new_sample(*x)).collect();
+        let log_1_values: Vec<f64> = vec![100.0, 101.0, 102.0, 103.0];
+        let log_2_values: Vec<f64> = vec![200.0, 201.0];
+        let log_1: Vec<edgeless_api::node_registration::FunctionLogEntry> = log_1_values.iter().map(|x| new_log(*x)).collect();
+        let log_2: Vec<edgeless_api::node_registration::FunctionLogEntry> = log_2_values.iter().map(|x| new_log(*x)).collect();
         let node_id_perf = uuid::Uuid::new_v4();
         let fid_perf_1 = uuid::Uuid::new_v4();
         let fid_perf_2 = uuid::Uuid::new_v4();
@@ -991,6 +1044,7 @@ mod test {
             edgeless_api::node_registration::NodePerformanceSamples {
                 function_execution_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
                 function_transfer_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
+                function_log_entries: std::collections::HashMap::from([(fid_perf_1, log_1.clone()), (fid_perf_2, log_2.clone())]),
             },
         );
 
