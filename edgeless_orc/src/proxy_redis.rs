@@ -114,18 +114,32 @@ impl ProxyRedis {
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeCapabilities::csv_header()),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeHealthStatus::csv_header()),
         ];
+
         let mut outfiles = vec![];
         for (filename, header) in filenames.iter().zip(headers.iter()) {
             let filename = format!("{}{}.csv", dataset_path, filename);
-            match ProxyRedis::open_file(filename.as_str(), append, header, &additional_header) {
-                Ok(outfile) => outfiles.push(Some(outfile)),
-                Err(err) => {
-                    log::error!("could not open '{}' for writing: {}", filename, err);
-                    outfiles.push(None);
+
+            // create the path to write the file, if needed
+            let path = std::path::Path::new(&filename);
+            let mut ancestors = path.ancestors();
+            ancestors.next();
+            let base_dir = ancestors.next().unwrap();
+            let res = if let Err(err) = std::fs::create_dir_all(base_dir) {
+                log::warn!("could not create the directory where to dump the dataset '{}': {}", filename, err);
+                None
+            } else {
+                match ProxyRedis::open_file(filename.as_str(), append, header, &additional_header) {
+                    Ok(outfile) => Some(outfile),
+                    Err(err) => {
+                        log::error!("could not open '{}' for writing: {}", filename, err);
+                        None
+                    }
                 }
             };
+            outfiles.push(res);
         }
         assert_eq!(4, outfiles.len());
+
         (
             outfiles.pop().unwrap(),
             outfiles.pop().unwrap(),
