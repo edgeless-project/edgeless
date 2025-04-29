@@ -104,6 +104,8 @@ pub trait Proxy: Sync + Send {
     /// Fetch all the dependecies of logical function/resource instances.
     fn fetch_dependency_graph(&mut self) -> std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>;
 
+    /// Fetch the mapping between logical function/resource identifiers and
+    /// workflow identifiers.
     fn fetch_logical_id_to_workflow_id(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, String>;
 
     /// Return true if the given category has been updated since the last fetch.
