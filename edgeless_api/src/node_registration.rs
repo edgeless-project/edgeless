@@ -214,7 +214,7 @@ impl FunctionLogEntry {
 
 impl std::fmt::Display for FunctionLogEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}.{}:{}:{}", self.timestamp_sec, self.timestamp_ns, self.target, self.message)
+        write!(f, "{}.{}:{}", self.timestamp_sec, self.timestamp_ns, self.message)
     }
 }
 
