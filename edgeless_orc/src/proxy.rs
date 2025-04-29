@@ -15,7 +15,7 @@ pub enum Category {
     DependencyGraph,
 }
 
-pub type PerformanceSamples = std::collections::HashMap<String, Vec<(chrono::DateTime<chrono::Utc>, f64)>>;
+pub type PerformanceSamples = std::collections::HashMap<String, Vec<(chrono::DateTime<chrono::Utc>, String)>>;
 pub type NodeHealthStatuses = std::collections::HashMap<
     edgeless_api::function_instance::NodeId,
     Vec<(chrono::DateTime<chrono::Utc>, edgeless_api::node_registration::NodeHealthStatus)>,

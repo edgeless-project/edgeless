@@ -434,54 +434,16 @@ impl super::proxy::Proxy for ProxyRedis {
     }
 
     fn push_performance_samples(&mut self, _node_id: &uuid::Uuid, performance_samples: edgeless_api::node_registration::NodePerformanceSamples) {
-        let all_series: Vec<(&str, Vec<(String, Vec<(f64, String)>)>)> = vec![
-            (
-                "function_execution_time",
-                performance_samples
-                    .function_execution_times
-                    .iter()
-                    .map(|(function_id, samples)| {
-                        (
-                            function_id.to_string(),
-                            samples.iter().map(|sample| (sample.score(), sample.to_string())).collect(),
-                        )
-                    })
-                    .collect(),
-            ),
-            (
-                "function_transfer_times",
-                performance_samples
-                    .function_transfer_times
-                    .iter()
-                    .map(|(function_id, samples)| {
-                        (
-                            function_id.to_string(),
-                            samples.iter().map(|sample| (sample.score(), sample.to_string())).collect(),
-                        )
-                    })
-                    .collect(),
-            ),
-            (
-                "function_log_entries",
-                performance_samples
-                    .function_log_entries
-                    .iter()
-                    .map(|(function_id, samples)| {
-                        (
-                            function_id.to_string(),
-                            samples.iter().map(|log_entry| (log_entry.score(), log_entry.to_string())).collect(),
-                        )
-                    })
-                    .collect(),
-            ),
+        let all_sample_series = vec![
+            ("function_execution_time", &performance_samples.function_execution_times),
+            ("function_transfer_time", &performance_samples.function_transfer_times),
         ];
-
-        for (name, series) in all_series {
+        for (name, series) in all_sample_series {
             for (function_id, values) in series {
-                let key = format!("performance:{}:{}", name, function_id);
-                for (score, value) in values {
+                let key = format!("performance:{}:{}", function_id, name);
+                for value in values {
                     // Save to Redis.
-                    let _ = redis::Cmd::zadd(&key, &value, score).exec(&mut self.connection);
+                    let _ = redis::Cmd::zadd(&key, value.to_string(), value.score()).exec(&mut self.connection);
 
                     // Save to dataset output.
                     if let Some(outfile) = &mut self.performance_samples_file {
@@ -489,11 +451,32 @@ impl super::proxy::Proxy for ProxyRedis {
                             outfile,
                             "{},{},{},{}",
                             self.additional_fields,
-                            name,
                             function_id,
-                            value.replacen(":", ",", 1)
+                            name,
+                            value.to_string().replacen(":", ",", 1)
                         );
                     }
+                }
+            }
+        }
+
+        for (function_id, log_entries) in &performance_samples.function_log_entries {
+            for log_entry in log_entries {
+                let key = format!("performance:{}:{}", function_id, log_entry.target);
+
+                // Save to Redis.
+                let _ = redis::Cmd::zadd(&key, log_entry.to_string(), log_entry.score()).exec(&mut self.connection);
+
+                // Save to dataset output.
+                if let Some(outfile) = &mut self.performance_samples_file {
+                    let _ = writeln!(
+                        outfile,
+                        "{},{},{},{}",
+                        self.additional_fields,
+                        function_id,
+                        log_entry.target,
+                        log_entry.to_string().replacen(":", ",", 1)
+                    );
                 }
             }
         }
@@ -663,10 +646,9 @@ impl super::proxy::Proxy for ProxyRedis {
                     if sub_tokens.len() != 2 {
                         continue;
                     }
-                    if let (Ok(secs), Ok(nsecs), Ok(metric)) = (sub_tokens[0].parse::<i64>(), sub_tokens[1].parse::<u32>(), tokens[1].parse::<f64>())
-                    {
+                    if let (Ok(secs), Ok(nsecs)) = (sub_tokens[0].parse::<i64>(), sub_tokens[1].parse::<u32>()) {
                         if let Some(timestamp) = chrono::DateTime::from_timestamp(secs, nsecs) {
-                            sub_entry.push((timestamp, metric));
+                            sub_entry.push((timestamp, tokens[1].to_string()));
                         }
                     }
                 }
@@ -1067,12 +1049,42 @@ mod test {
 
         // Performance samples
         let samples = redis_proxy.fetch_performance_samples();
-        let entry = samples.get("function_execution_time").unwrap();
-        assert_eq!(2, entry.len());
-        let samples_1_res = entry.get(&fid_perf_1.to_string()).unwrap();
-        let samples_2_res = entry.get(&fid_perf_2.to_string()).unwrap();
-        assert_eq!(samples_1_values, samples_1_res.iter().map(|x| x.1).collect::<Vec<f64>>());
-        assert_eq!(samples_2_values, samples_2_res.iter().map(|x| x.1).collect::<Vec<f64>>());
+
+        let entry = samples.get(&fid_perf_1.to_string()).unwrap();
+        assert_eq!(3, entry.len());
+        let actual_values = entry.get("function_execution_time").unwrap();
+        assert_eq!(
+            samples_1_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+        let actual_values = entry.get("function_transfer_time").unwrap();
+        assert_eq!(
+            samples_1_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+        let actual_values = entry.get("target").unwrap();
+        assert_eq!(
+            log_1_values.iter().map(|x| format!("value={}", x)).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+
+        let entry = samples.get(&fid_perf_2.to_string()).unwrap();
+        assert_eq!(3, entry.len());
+        let actual_values = entry.get("function_execution_time").unwrap();
+        assert_eq!(
+            samples_2_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+        let actual_values = entry.get("function_transfer_time").unwrap();
+        assert_eq!(
+            samples_2_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+        let actual_values = entry.get("target").unwrap();
+        assert_eq!(
+            log_2_values.iter().map(|x| format!("value={}", x)).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
 
         // Purge the proxy.
         std::thread::sleep(std::time::Duration::from_millis(10));
