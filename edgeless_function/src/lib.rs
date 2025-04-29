@@ -88,6 +88,11 @@ pub fn arg_to_bool(key: &str, arguments: &std::collections::HashMap<&str, &str>)
 }
 
 #[cfg(feature = "std")]
+pub fn arg_to_u64(key: &str, arguments: &std::collections::HashMap<&str, &str>) -> u64 {
+    arguments.get(key).unwrap_or(&"0").parse::<u64>().unwrap_or(0)
+}
+
+#[cfg(feature = "std")]
 pub fn arg_to_vec<T>(key: &str, pat: &str, arguments: &std::collections::HashMap<&str, &str>) -> Vec<T>
 where
     T: std::str::FromStr,

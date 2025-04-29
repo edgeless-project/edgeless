@@ -48,6 +48,7 @@ pub enum LinkProcessingResult {
     FINAL,
     PROCESSED,
     PASSED,
+    // TIMED_OUT,
 }
 
 #[async_trait::async_trait]

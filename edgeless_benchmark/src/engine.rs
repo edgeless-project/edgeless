@@ -422,6 +422,7 @@ impl Engine {
                 serde_json::to_string(&req).unwrap_or_default().as_str(),
             );
         }
+        log::info!("wf{}: {:?}", wf_name, serde_json::to_string_pretty(&req).unwrap());
 
         // Request the creation of the workflow.
         let res = self.client.start(req).await;

@@ -125,8 +125,10 @@ impl DataplaneHandle {
         let (sender, receiver) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
         let channel_id = self.next_id;
         self.next_id += 1;
+
         // Potential Leak: This is only received if a message is received (or the handle is dropped)
         self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
+        log::info!("dataplane, call - overwrote the receiver to handle the msg before it is sent to the receive_next function");
         self.send_inner(target, Message::Call(msg), timestamp_utc(), channel_id).await;
         match receiver.await {
             Ok((_src, msg)) => match msg {
@@ -160,6 +162,7 @@ impl DataplaneHandle {
         created: edgeless_api::function_instance::EventTimestamp,
         channel_id: u64,
     ) {
+        log::info!("send_inner");
         let mut lck = self.output_chain.lock().await;
         for link in &mut lck.iter_mut() {
             if link.handle_send(&target, msg.clone(), &self.slf, &created, channel_id).await == LinkProcessingResult::FINAL {
