@@ -110,7 +110,7 @@ impl ProxyRedis {
         let filenames = ["performance_samples", "mapping_to_instance_id", "capabilities", "health_status"];
         let headers = [
             "metric,identifier,timestamp,value".to_string(),
-            "timestamp,logical_id,node_id,physical_id".to_string(),
+            "timestamp,logical_id,workflow_id,node_id,physical_id".to_string(),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeCapabilities::csv_header()),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeHealthStatus::csv_header()),
         ];
@@ -357,10 +357,11 @@ impl super::proxy::Proxy for ProxyRedis {
                 if write {
                     let _ = writeln!(
                         outfile,
-                        "{},{},{},{}",
+                        "{},{},{},{},{}",
                         self.additional_fields,
                         timestamp,
                         lid,
+                        active_instance.workflow_id(),
                         new_instance_ids
                             .iter()
                             .map(|x| format!("{},{}", x.node_id, x.function_id))
