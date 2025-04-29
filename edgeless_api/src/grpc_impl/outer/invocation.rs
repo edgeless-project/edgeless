@@ -85,7 +85,7 @@ impl InvocationAPIClient {
                     let client = client.max_decoding_message_size(usize::MAX);
                     return Self { client };
                 }
-                Err(_) => {
+                Err(e) => {
                     log::debug!("Waiting for InvocationAPI");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 }
@@ -125,7 +125,10 @@ impl crate::grpc_impl::api::function_invocation_server::FunctionInvocation for I
         let res = self.root_api.lock().await.handle(parsed_request).await;
         match res {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(_) => Err(tonic::Status::internal("Server Error")),
+            Err(_) => {
+                panic!("error response");
+                Err(tonic::Status::internal("Server Error"))
+            }
         }
     }
 }
@@ -153,9 +156,11 @@ impl InvocationAPIServer {
                     {
                         Ok(_) => {
                             log::debug!("Clean Exit");
+                            panic!("clean exit");
                         }
-                        Err(_) => {
-                            log::error!("GRPC Server Failure");
+                        Err(e) => {
+                            log::error!("GRPC Server Failure {:?}", e);
+                            panic!("grpc server failure");
                         }
                     }
                 }

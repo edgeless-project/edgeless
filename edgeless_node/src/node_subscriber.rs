@@ -127,7 +127,7 @@ impl NodeSubscriber {
         while let Some(req) = receiver.next().await {
             match req {
                 NodeSubscriberRequest::Refresh() => {
-                    log::debug!("Node Subscriber Refresh");
+                    log::info!("Node Subscriber Refresh");
                     // The refresh deadline is set to twice the refresh period
                     // to reduce the likelihood of a race condition on the
                     // register side.

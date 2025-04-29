@@ -4,6 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use futures::FutureExt;
 use tokio::sync::Mutex;
@@ -55,6 +56,17 @@ impl GuestAPIHost {
             self.call_raw(self.instance_id, msg).await
             // return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
+            log::info!("call_alias");
+            futures::select! {
+                res = Box::pin(self.call_raw(target, msg)).fuse() => {
+                    log::info!("call worked");
+                    return res
+                },
+                e = Box::pin(tokio::time::sleep(Duration::from_millis(100))).fuse() => {
+                    log::info!("timeout; dataplane will hang now");
+                    return Err(GuestAPIError::UnknownAlias)
+                }
+            }
             return self.call_raw(target, msg).await;
             // return Ok(self.data_plane.call(target.clone(), msg.to_string()).await);
         } else {

@@ -23,6 +23,7 @@ impl DataPlaneLink for RemoteLink {
         stream_id: u64,
         metadata: &edgeless_api::function_instance::EventMetadata,
     ) -> LinkProcessingResult {
+        log::info!("handle_send");
         return self
             .remotes
             .lock()
@@ -75,9 +76,14 @@ impl edgeless_api::invocation::InvocationAPI for InvocationEventHandler {
 #[async_trait::async_trait]
 impl edgeless_api::invocation::InvocationAPI for RemoteRouter {
     async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
+        // get the correct receiver from the list of registered receivers
         if let Some(node_client) = self.receivers.get_mut(&event.target.node_id) {
+            log::info!("handle - finally sending to the client");
             if let Err(err) = node_client.handle(event).await {
+                log::info!("node_client.handle(event) has errored out");
                 log::warn!("Error in handling event: {}", err);
+            } else {
+                log::info!("node_client.handle(event) has worked")
             }
             Ok(edgeless_api::invocation::LinkProcessingResult::FINAL)
         } else {
