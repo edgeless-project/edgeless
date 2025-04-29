@@ -116,7 +116,6 @@ static STATE: std::sync::OnceLock<std::sync::Mutex<State>> = std::sync::OnceLock
 ///
 /// Outputs:
 ///
-/// - `metric`: where the first and last elements trace the workflow latency
 /// - `err`: errors are sent here as human-readable string messages
 /// - `out-x`: the output channel to which the event is generated
 ///
@@ -151,7 +150,7 @@ impl EdgeFunction for BenchMapReduce {
         };
 
         if conf.is_first {
-            cast("metric", format!("workflow:begin:{}", state.transaction_id).as_bytes());
+            telemetry_log(4, "tbegin", &state.transaction_id.to_string());
             message.transaction_id = state.transaction_id;
             state.transaction_id += 1;
             for output in &conf.outputs {
@@ -183,11 +182,11 @@ impl EdgeFunction for BenchMapReduce {
             state.pending.retain(|_, m| m.transaction_id == last_transaction_id);
 
             // If the transaction is complete:
-            // - last element: save the end of the transaction to metric;
+            // - last element: log the end of the transaction;
             // - otherwise: sum the vectors and invoke the downstream outputs.
             if state.pending.len() == conf.inputs.len() {
                 if conf.is_last {
-                    cast("metric", format!("workflow:end:{}", last_transaction_id).as_bytes());
+                    telemetry_log(4, "tend", &last_transaction_id.to_string());
                 } else {
                     // Reduce.
                     let mut iter = state.pending.iter_mut();
