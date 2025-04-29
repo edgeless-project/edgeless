@@ -124,6 +124,7 @@ impl NodeSubscriber {
                         performance_samples: edgeless_api::node_registration::NodePerformanceSamples {
                             function_execution_times: metrics.function_execution_times,
                             function_transfer_times: metrics.function_transfer_times,
+                            function_log_entries: metrics.function_log_entries,
                         },
                     };
                     match client.node_registration_api().update_node(update_node_request).await {

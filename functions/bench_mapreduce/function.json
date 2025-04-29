@@ -1,10 +1,9 @@
 {
     "id": "bench_mapreduce",
     "function_type": "RUST_WASM",
-    "version": "0.1",
+    "version": "0.2",
     "build": "Cargo.toml",
     "outputs": [
-        "metric",
         "err",
         "out-0",
         "out-1",

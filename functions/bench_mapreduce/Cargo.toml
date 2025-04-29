@@ -15,7 +15,7 @@ strip = true
 
 [package]
 name = "bench_mapreduce"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it>"]
 edition = "2021"
 
