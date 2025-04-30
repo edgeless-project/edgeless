@@ -109,7 +109,7 @@ impl ProxyRedis {
     ) -> (Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>) {
         let filenames = ["performance_samples", "mapping_to_instance_id", "capabilities", "health_status"];
         let headers = [
-            "metric,identifier,timestamp,value".to_string(),
+            "identifier,metric,timestamp,value".to_string(),
             "timestamp,logical_id,workflow_id,node_id,physical_id".to_string(),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeCapabilities::csv_header()),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeHealthStatus::csv_header()),
@@ -642,13 +642,11 @@ impl super::proxy::Proxy for ProxyRedis {
                     if tokens.len() != 2 {
                         continue;
                     }
-                    let sub_tokens: Vec<&str> = tokens[0].split(".").collect();
-                    if sub_tokens.len() != 2 {
-                        continue;
-                    }
-                    if let (Ok(secs), Ok(nsecs)) = (sub_tokens[0].parse::<i64>(), sub_tokens[1].parse::<u32>()) {
-                        if let Some(timestamp) = chrono::DateTime::from_timestamp(secs, nsecs) {
-                            sub_entry.push((timestamp, tokens[1].to_string()));
+                    if let Ok(timestamp) = tokens[0].parse::<f64>() {
+                        let secs = timestamp as i64;
+                        let nsecs = (timestamp.fract() * 1e9) as u32;
+                        if let Some(date_time) = chrono::DateTime::from_timestamp(secs, nsecs) {
+                            sub_entry.push((date_time, tokens[1].to_string()));
                         }
                     }
                 }
