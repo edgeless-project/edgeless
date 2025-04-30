@@ -190,7 +190,7 @@ impl Sample {
 
 impl std::fmt::Display for Sample {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}.{}:{}", self.timestamp_sec, self.timestamp_ns, self.sample)
+        write!(f, "{}:{}", self.score(), self.sample)
     }
 }
 
@@ -214,7 +214,7 @@ impl FunctionLogEntry {
 
 impl std::fmt::Display for FunctionLogEntry {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}.{}:{}", self.timestamp_sec, self.timestamp_ns, self.message)
+        write!(f, "{}:{}", self.score(), self.message)
     }
 }
 
