@@ -20,12 +20,16 @@ impl super::resource_provider_specs::ResourceProviderSpecs for RedisResourceSpec
     fn configurations(&self) -> std::collections::HashMap<String, String> {
         std::collections::HashMap::from([
             (String::from("url"), String::from("URL of the Redis server to use")),
-            (String::from("key"), String::from("Key to set")),
+            (String::from("key"), String::from("Key for SET operations (optional)")),
+            (
+                String::from("add-workflow-id"),
+                String::from("If present, add the workflow identifier to the key"),
+            ),
         ])
     }
 
     fn version(&self) -> String {
-        String::from("1.1")
+        String::from("1.2")
     }
 }
 
@@ -51,16 +55,35 @@ impl Drop for RedisResource {
     }
 }
 
+/// The redis resource can be used to access a Redis KVS.
+/// Each resource instance has its own connection at the Redis URL specified
+/// in the resource configuration.
+/// The same resource can be used to GET or SET keys.
+///
+/// The GET operation is done on an arbitrary key that is specified as the
+/// message of the call() operation.
+///
+/// The SET operation is done via a cast() on the key, if specified in the
+/// resource configuration.
+///
+/// Optionally, the key can be prepended by the workflow identifier and a
+/// semicolon.
 impl RedisResource {
     async fn new(
         dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         redis_url: &str,
-        redis_key: &str,
+        redis_key: Option<&String>,
+        workflow_id: Option<String>,
     ) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
         let mut telemetry_handle = telemetry_handle;
-        let redis_key = redis_key.to_string();
+        let workflow_id_header = if let Some(workflow_id) = workflow_id {
+            format!("{}:", workflow_id)
+        } else {
+            String::default()
+        };
+        let redis_key = redis_key.cloned().and_then(|k| Some(format!("{}{}", workflow_id_header, k)));
 
         let mut connection = redis::Client::open(redis_url)?.get_connection()?;
 
@@ -76,29 +99,47 @@ impl RedisResource {
                 } = dataplane_handle.receive_next().await;
                 let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
 
-                let mut need_reply = false;
-                let message_data = match message {
-                    Message::Call(data) => {
-                        need_reply = true;
-                        data
-                    }
-                    Message::Cast(data) => data,
+                let (get_operation, message_data) = match message {
+                    Message::Call(data) => (true, data),
+                    Message::Cast(data) => (false, data),
                     _ => {
                         continue;
                     }
                 };
 
-                if let Err(e) = connection.set::<&str, &str, std::string::String>(&redis_key, &message_data) {
-                    log::error!("Could not set key '{}' to value '{}': {}", redis_key, &message_data, e);
+                if get_operation {
+                    // GET
+                    let redis_key = format!("{}{}", workflow_id_header, message_data);
+                    match connection.get::<&str, std::string::String>(&redis_key) {
+                        Ok(res) => {
+                            dataplane_handle
+                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(res))
+                                .await
+                        }
+                        Err(err) => {
+                            log::error!("Could not get key '{}' from redis resource: {}", redis_key, err);
+                            dataplane_handle
+                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
+                                .await
+                        }
+                    };
+                } else {
+                    // SET
+                    if let Some(redis_key) = &redis_key {
+                        if let Err(err) = connection.set::<&str, &str, std::string::String>(redis_key, &message_data) {
+                            log::error!(
+                                "Could not set key '{}' to value '{}' via redis resource: {}",
+                                redis_key,
+                                &message_data,
+                                err
+                            );
+                        }
+                    } else {
+                        log::warn!("Invalid SET operation requested on a redis resource without a 'key' specified in the configuration");
+                    }
                 }
 
-                if need_reply {
-                    dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
-                        .await;
-                }
-
-                crate::resources::observe_execution(started, &mut telemetry_handle, need_reply);
+                crate::resources::observe_execution(started, &mut telemetry_handle, get_operation);
             }
         });
 
@@ -129,10 +170,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
-        if let (Some(url), Some(key)) = (
-            instance_specification.configuration.get("url"),
-            instance_specification.configuration.get("key"),
-        ) {
+        if let Some(url) = instance_specification.configuration.get("url") {
             let mut lck = self.inner.lock().await;
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
@@ -141,7 +179,18 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                 new_id.function_id.to_string(),
             )]));
 
-            match RedisResource::new(dataplane_handle, telemetry_handle, url, key).await {
+            match RedisResource::new(
+                dataplane_handle,
+                telemetry_handle,
+                url,
+                instance_specification.configuration.get("key"),
+                instance_specification
+                    .configuration
+                    .contains_key("add-workflow-id")
+                    .then(|| instance_specification.workflow_id),
+            )
+            .await
+            {
                 Ok(resource) => {
                     lck.instances.insert(new_id, resource);
                     return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
@@ -160,7 +209,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         Ok(edgeless_api::common::StartComponentResponse::ResponseError(
             edgeless_api::common::ResponseError {
                 summary: "Invalid resource configuration".to_string(),
-                detail: Some("One of the fields 'url' or 'key' is missing".to_string()),
+                detail: Some("Missing Redis URL".to_string()),
             },
         ))
     }
