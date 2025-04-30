@@ -10,7 +10,8 @@
                 "outputs": []
             },
             "output_mapping": {
-                "output": "redis"
+                "output": "redis-out",
+                "redis": "redis-state"
             },
             "annotations": {
                 "init-payload": "42"
@@ -19,12 +20,21 @@
     ],
     "resources": [
         {
-            "name": "redis",
+            "name": "redis-out",
             "class_type": "redis",
             "output_mapping": {},
             "configurations": {
                 "url": "redis://127.0.0.1:6379/",
                 "key": "example-redis"
+            }
+        },
+        {
+            "name": "redis-state",
+            "class_type": "redis",
+            "output_mapping": {},
+            "configurations": {
+                "url": "redis://127.0.0.1:6379/",
+                "key": "last_counter"
             }
         }
     ],
