@@ -24,7 +24,8 @@
             "output_mapping": {},
             "configurations": {
                 "url": "redis://127.0.0.1:6379/",
-                "key": "example-redis"
+                "key": "example-redis",
+                "add-workflow-id": "true"
             }
         }
     ],
