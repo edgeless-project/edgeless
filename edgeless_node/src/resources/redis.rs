@@ -78,6 +78,14 @@ impl RedisResource {
     ) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
         let mut telemetry_handle = telemetry_handle;
+
+        log::info!(
+            "RedisResource created, url {}, key {:?}, workflow_id {:?}",
+            redis_url,
+            redis_key,
+            workflow_id
+        );
+
         let workflow_id_header = if let Some(workflow_id) = workflow_id {
             format!("{}:", workflow_id)
         } else {
@@ -86,8 +94,6 @@ impl RedisResource {
         let redis_key = redis_key.cloned().and_then(|k| Some(format!("{}{}", workflow_id_header, k)));
 
         let mut connection = redis::Client::open(redis_url)?.get_connection()?;
-
-        log::info!("RedisResource created, URL: {}", redis_url);
 
         let handle = tokio::spawn(async move {
             loop {
