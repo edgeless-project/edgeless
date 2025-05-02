@@ -311,8 +311,8 @@ impl Engine {
                     let outputs: Vec<u32> = if last { vec![] } else { (0..breadth).collect() };
                     breadths.push(outputs.len());
                     let mut output_mapping = std::collections::HashMap::new();
-                    if self.redis_client.is_some() && (first || last) {
-                        output_mapping.insert("metric".to_string(), "metrics-collector".to_string());
+                    if first || last {
+                        output_mapping.insert("redis".to_string(), "redis".to_string());
                     }
                     for out in &outputs {
                         output_mapping.insert(format!("out-{}", out), format!("p{}-{}", stage, out));
@@ -327,7 +327,8 @@ impl Engine {
                         annotations: std::collections::HashMap::from([(
                             "init-payload".to_string(),
                             format!(
-                                "is_first={},is_last={},use_base64=true,inputs={},outputs={}",
+                                "init_id_from_redis={},is_first={},is_last={},use_base64=true,inputs={},outputs={}",
+                                to_true_false(!data.redis_url.is_empty()),
                                 to_true_false(first),
                                 to_true_false(last),
                                 inputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(":"),
@@ -359,6 +360,18 @@ impl Engine {
 
                     inputs = outputs;
                 }
+
+                resources.push(edgeless_api::workflow_instance::WorkflowResource {
+                    name: "redis".to_string(),
+                    class_type: "redis".to_string(),
+                    output_mapping: std::collections::HashMap::new(),
+                    configurations: std::collections::HashMap::from([
+                        ("url".to_string(), data.redis_url.clone()),
+                        ("key".to_string(), "last_transaction_id".to_string()),
+                        ("add-workflow-id".to_string(), "true".to_string()),
+                    ]),
+                });
+
                 log::info!(
                     "wf{}, average interval {} ms, input size {}, num stages {}, breadths [{}], fibonacci [{}], allocate [{}]",
                     self.wf_id,

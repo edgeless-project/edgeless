@@ -4,6 +4,7 @@
     "version": "0.2",
     "build": "Cargo.toml",
     "outputs": [
+        "redis",
         "err",
         "out-0",
         "out-1",
