@@ -9,19 +9,23 @@ mod controller;
 pub struct EdgelessConSettings {
     pub controller_url: String,
     pub domain_register_url: String,
+    pub persistence_filename: String,
 }
 
 pub async fn edgeless_con_main(settings: EdgelessConSettings) {
-    log::info!("Starting Edgeless Controller at {}", settings.controller_url);
+    log::info!(
+        "Starting Edgeless Controller at {}, persistence at {}",
+        settings.controller_url,
+        settings.persistence_filename
+    );
     log::debug!("Settings: {:?}", settings);
 
-    let (mut controller, controller_task, refresh_task) = controller::Controller::new();
+    let (mut controller, controller_task, refresh_task) = controller::Controller::new(settings.persistence_filename);
 
     let workflow_instance_server_task = edgeless_api::grpc_impl::outer::controller::WorkflowInstanceAPIServer::run(
         controller.get_workflow_instance_client(),
         settings.controller_url,
     );
-
     let domain_register_server_task = edgeless_api::grpc_impl::outer::domain_register::DomainRegistrationAPIServer::run(
         controller.get_domain_register_client(),
         settings.domain_register_url,
@@ -34,6 +38,7 @@ pub fn edgeless_con_default_conf() -> String {
     let con_conf = EdgelessConSettings {
         controller_url: String::from("http://127.0.0.1:7001"),
         domain_register_url: String::from("http://127.0.0.1:7002"),
+        persistence_filename: String::from("controller.save"),
     };
 
     toml::to_string(&con_conf).expect("Wrong")

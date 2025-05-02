@@ -5,6 +5,7 @@
 
 use futures::StreamExt;
 use rand::{seq::SliceRandom, SeedableRng};
+use std::{io::Write, str::FromStr};
 
 pub struct OrchestratorDesc {
     pub client: Box<dyn edgeless_api::outer::orc::OrchestratorAPI>,
@@ -16,6 +17,7 @@ pub struct OrchestratorDesc {
 }
 
 pub struct ControllerTask {
+    persistence_filename: String,
     workflow_instance_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
     domain_registration_receiver: futures::channel::mpsc::UnboundedReceiver<super::DomainRegisterRequest>,
     internal_receiver: futures::channel::mpsc::UnboundedReceiver<super::InternalRequest>,
@@ -25,19 +27,29 @@ pub struct ControllerTask {
     rng: rand::rngs::StdRng,
 }
 
+type PersistedWorkflows = Vec<(String, edgeless_api::workflow_instance::SpawnWorkflowRequest)>;
+
+#[derive(Default, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+struct PersistedState {
+    workflows: PersistedWorkflows,
+}
+
 impl ControllerTask {
     pub fn new(
+        persistence_filename: String,
         workflow_instance_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
         domain_registration_receiver: futures::channel::mpsc::UnboundedReceiver<super::DomainRegisterRequest>,
         internal_receiver: futures::channel::mpsc::UnboundedReceiver<super::InternalRequest>,
     ) -> Self {
+        let orphan_workflows = ControllerTask::load_persistence(&persistence_filename);
         Self {
+            persistence_filename,
             workflow_instance_receiver,
             domain_registration_receiver,
             internal_receiver,
             orchestrators: std::collections::HashMap::new(),
             active_workflows: std::collections::HashMap::new(),
-            orphan_workflows: std::collections::BTreeMap::new(),
+            orphan_workflows,
             rng: rand::rngs::StdRng::from_entropy(),
         }
     }
@@ -50,6 +62,7 @@ impl ControllerTask {
         orchestrators: std::collections::HashMap<String, OrchestratorDesc>,
     ) -> Self {
         Self {
+            persistence_filename: String::default(),
             workflow_instance_receiver,
             domain_registration_receiver,
             internal_receiver,
@@ -57,6 +70,86 @@ impl ControllerTask {
             active_workflows: std::collections::HashMap::new(),
             orphan_workflows: std::collections::BTreeMap::new(),
             rng: rand::rngs::StdRng::from_entropy(),
+        }
+    }
+
+    fn load_persistence(
+        filename: &str,
+    ) -> std::collections::BTreeMap<edgeless_api::workflow_instance::WorkflowId, edgeless_api::workflow_instance::SpawnWorkflowRequest> {
+        let mut ret = std::collections::BTreeMap::new();
+
+        if filename.is_empty() {
+            return ret;
+        }
+
+        let file = match std::fs::File::open(filename) {
+            Ok(file) => file,
+            Err(err) => {
+                log::warn!("could not load from persistence file '{}': {}", filename, err);
+                return ret;
+            }
+        };
+        let reader = std::io::BufReader::new(file);
+        let data: PersistedState = match serde_json::from_reader(reader) {
+            Ok(data) => data,
+            Err(err) => {
+                log::warn!("invalid content found in persistence file '{}': {}", filename, err);
+                return ret;
+            }
+        };
+
+        for (uuid, request) in data.workflows {
+            let workflow_id = match uuid::Uuid::from_str(&uuid) {
+                Ok(uuid) => uuid,
+                Err(err) => {
+                    log::warn!("invalid workflow UUID found in persistence file '{}': {}", filename, err);
+                    return ret;
+                }
+            };
+            ret.insert(edgeless_api::workflow_instance::WorkflowId { workflow_id }, request);
+        }
+
+        ret
+    }
+
+    /// Save the currently active/orphan workflows to a file.
+    /// Do nothing if the name of the persistence file is empty.
+    fn persist(&self) {
+        if self.persistence_filename.is_empty() {
+            return;
+        }
+
+        let mut persistence = match std::fs::OpenOptions::new()
+            .write(true)
+            .append(false)
+            .create(true)
+            .truncate(true)
+            .open(&self.persistence_filename)
+        {
+            Ok(file) => file,
+            Err(err) => {
+                log::warn!("could not open the persistence file '{}': {}", self.persistence_filename, err);
+                return;
+            }
+        };
+
+        // Copy all the workflow information into the data structure to be
+        // serialized.
+        let mut persisted_state = PersistedState::default();
+        for (wid, active_workflow) in &self.orphan_workflows {
+            persisted_state.workflows.push((wid.to_string(), active_workflow.clone()));
+        }
+        for (wid, active_workflow) in &self.active_workflows {
+            persisted_state.workflows.push((wid.to_string(), active_workflow.desired_state.clone()));
+        }
+
+        match serde_json::to_string(&persisted_state) {
+            Ok(serialized) => {
+                if let Err(err) = write!(&mut persistence, "{}", serialized) {
+                    log::warn!("error saving the persistence state to '{}': {}", self.persistence_filename, err)
+                }
+            }
+            Err(err) => log::warn!("error serializing the persistence state: {}", err),
         }
     }
 
@@ -84,14 +177,21 @@ impl ControllerTask {
                         super::ControllerRequest::Start(spawn_workflow_request, reply_sender) => {
                             let reply = match self.start_workflow(spawn_workflow_request).await {
                                 Ok(val) => Ok(val),
-                                Err(_) => Err(anyhow::anyhow!(""))
+                                Err(spawn_req) => Err(anyhow::anyhow!("could not start workflow: {:?}", spawn_req))
                             };
+                            if let Ok(reply) = &reply {
+                                if matches!(reply, edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_)) {
+                                    self.persist();
+                                }
+                            }
                             if let Err(err) = reply_sender.send(reply) {
                                 log::error!("Unhandled: {:?}", err);
                             }
                         }
                         super::ControllerRequest::Stop(wf_id) => {
-                            self.stop_workflow(&wf_id).await;
+                            if self.stop_workflow(&wf_id).await.is_some() {
+                                self.persist();
+                            }
                         }
                         super::ControllerRequest::List(reply_sender) => {
                             let reply = self.list();
@@ -750,5 +850,53 @@ impl ControllerTask {
 
     fn resource_client(&mut self, domain: &str) -> Option<Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<uuid::Uuid>>> {
         Some(self.orchestrators.get_mut(domain)?.client.resource_configuration_api())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use edgeless_api::workflow_instance::SpawnWorkflowRequest;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn test_serialize_deserialize_controller_task_state() {
+        let mut expected_state = PersistedState { workflows: vec![] };
+
+        let serialized = serde_json::to_string(&expected_state).unwrap();
+        let actual_state: PersistedState = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(expected_state, actual_state);
+
+        for i in 0..10 {
+            let workflow_functions = vec![edgeless_api::workflow_instance::WorkflowFunction {
+                name: format!("f{}", i),
+                function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                    function_class_id: "test".to_string(),
+                    function_class_type: "RUST_WASM".to_string(),
+                    function_class_version: "0.1".to_string(),
+                    function_class_code: include_bytes!("../../../functions/system_test/system_test.wasm").to_vec(),
+                    function_class_outputs: vec!["out1".to_string(), "out2".to_string(), "err".to_string(), "log".to_string()],
+                },
+                output_mapping: std::collections::HashMap::new(),
+                annotations: std::collections::HashMap::new(),
+            }];
+            let workflow_resources = vec![edgeless_api::workflow_instance::WorkflowResource {
+                name: "log".to_string(),
+                class_type: "file-log".to_string(),
+                output_mapping: std::collections::HashMap::new(),
+                configurations: std::collections::HashMap::from([("filename".to_string(), "example.log".to_string())]),
+            }];
+            let annotations = std::collections::HashMap::from([("ann1".to_string(), "val1".to_string())]);
+            let request = SpawnWorkflowRequest {
+                workflow_functions,
+                workflow_resources,
+                annotations,
+            };
+            expected_state.workflows.push((uuid::Uuid::new_v4().to_string(), request));
+        }
+
+        let serialized = serde_json::to_string(&expected_state).unwrap();
+        let actual_state: PersistedState = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(expected_state, actual_state);
     }
 }
