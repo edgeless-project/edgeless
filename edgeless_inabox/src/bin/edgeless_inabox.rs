@@ -146,6 +146,7 @@ fn generate_configs(
     let con_conf = edgeless_con::EdgelessConSettings {
         controller_url,
         domain_register_url,
+        persistence_filename: "controller.save".to_string(),
     };
 
     // Nodes

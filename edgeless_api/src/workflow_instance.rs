@@ -50,7 +50,7 @@ pub struct WorkflowInstance {
     pub domain_mapping: Vec<WorkflowFunctionMapping>,
 }
 
-#[derive(Clone, Debug, serde::Serialize, PartialEq)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct WorkflowResource {
     pub name: String,
     pub class_type: String,
@@ -58,7 +58,7 @@ pub struct WorkflowResource {
     pub configurations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Clone, Debug, serde::Serialize, PartialEq)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct WorkflowFunction {
     pub name: String,
     pub function_class_specification: crate::function_instance::FunctionClassSpecification,
@@ -66,7 +66,7 @@ pub struct WorkflowFunction {
     pub annotations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SpawnWorkflowRequest {
     pub workflow_functions: Vec<WorkflowFunction>,
     pub workflow_resources: Vec<WorkflowResource>,

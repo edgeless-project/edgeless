@@ -37,7 +37,6 @@ pub struct FunctionClassSpecification {
     /// Function class version.
     pub function_class_version: String,
     /// Inline function's code (if present).
-    #[serde(skip)]
     pub function_class_code: Vec<u8>,
     /// Output channels in which the function may generate new. Can be empty.
     pub function_class_outputs: Vec<String>,
