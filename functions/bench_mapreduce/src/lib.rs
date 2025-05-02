@@ -90,6 +90,7 @@ impl Message {
 }
 
 struct Conf {
+    init_id_from_redis: bool,
     is_first: bool,
     is_last: bool,
     use_base64: bool,
@@ -116,11 +117,16 @@ static STATE: std::sync::OnceLock<std::sync::Mutex<State>> = std::sync::OnceLock
 ///
 /// Outputs:
 ///
+/// - `redis`: the last element saves the identifier of the last message
+///   correctly received, which is read from the first element during the
+///   initialization phase, if this feature is enabled
 /// - `err`: errors are sent here as human-readable string messages
 /// - `out-x`: the output channel to which the event is generated
 ///
 /// Init-payload: a comma-separated list of K=V values, with the following keys:
 ///
+/// - init_id_from_redis: true if the transaction identifier of the first
+///   element is retrieved from a redis resource
 /// - is_first: true if this is the first element of the workflow
 /// - is_last: true if this is the last element of the workflow
 /// - use_base64: true if the messages are base64-encoded/decoded
@@ -187,6 +193,9 @@ impl EdgeFunction for BenchMapReduce {
             if state.pending.len() == conf.inputs.len() {
                 if conf.is_last {
                     telemetry_log(4, "tend", &last_transaction_id.to_string());
+                    if conf.init_id_from_redis {
+                        cast("redis", format!("{}", last_transaction_id).as_bytes())
+                    }
                 } else {
                     // Reduce.
                     let mut iter = state.pending.iter_mut();
@@ -221,6 +230,7 @@ impl EdgeFunction for BenchMapReduce {
 
         // parse initialization string
         let arguments = edgeless_function::init_payload_to_args(payload);
+        let init_id_from_redis = edgeless_function::arg_to_bool("init_id_from_redis", &arguments);
         let is_first = edgeless_function::arg_to_bool("is_first", &arguments);
         let is_last = edgeless_function::arg_to_bool("is_last", &arguments);
         let use_base64 = edgeless_function::arg_to_bool("use_base64", &arguments);
@@ -246,6 +256,7 @@ impl EdgeFunction for BenchMapReduce {
 
         // save configuration
         let _ = CONF.set(Conf {
+            init_id_from_redis,
             is_first,
             is_last,
             use_base64,
@@ -253,8 +264,21 @@ impl EdgeFunction for BenchMapReduce {
             outputs,
         });
 
+        // read the first transaction identifier from a Redis resource, if used
+        let transaction_id = if init_id_from_redis && is_first {
+            match call("redis", "last_transaction_id".as_bytes()) {
+                CallRet::Reply(owned_byte_buff) => core::str::from_utf8(&owned_byte_buff)
+                    .unwrap_or_default()
+                    .parse::<u32>()
+                    .unwrap_or_default(),
+                _ => 0,
+            }
+        } else {
+            0
+        };
+
         let _ = STATE.set(std::sync::Mutex::new(State {
-            transaction_id: 0,
+            transaction_id,
             pending: std::collections::HashMap::new(),
         }));
     }
