@@ -140,6 +140,19 @@ impl EdgeFunction for BenchMapReduce {
         let conf = CONF.get().unwrap();
         let mut state = STATE.get().unwrap().lock().unwrap();
 
+        // If we are the first element and this is the very first invocation,
+        // then we try to read the initial transaction identifier from a
+        // Redis resource, if requested
+        if conf.is_first && conf.init_id_from_redis && state.transaction_id == 0 {
+            state.transaction_id = match call("redis", "last_transaction_id".as_bytes()) {
+                CallRet::Reply(owned_byte_buff) => core::str::from_utf8(&owned_byte_buff)
+                    .unwrap_or_default()
+                    .parse::<u32>()
+                    .unwrap_or_default(),
+                _ => 0,
+            };
+        }
+
         // Decode the message:
         // - first element: the entire payload is assumed as data input;
         // - otherwise: a structured Message is expected.
@@ -264,21 +277,8 @@ impl EdgeFunction for BenchMapReduce {
             outputs,
         });
 
-        // read the first transaction identifier from a Redis resource, if used
-        let transaction_id = if init_id_from_redis && is_first {
-            match call("redis", "last_transaction_id".as_bytes()) {
-                CallRet::Reply(owned_byte_buff) => core::str::from_utf8(&owned_byte_buff)
-                    .unwrap_or_default()
-                    .parse::<u32>()
-                    .unwrap_or_default(),
-                _ => 0,
-            }
-        } else {
-            0
-        };
-
         let _ = STATE.set(std::sync::Mutex::new(State {
-            transaction_id,
+            transaction_id: 0,
             pending: std::collections::HashMap::new(),
         }));
     }
