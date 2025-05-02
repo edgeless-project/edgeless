@@ -18,6 +18,10 @@ New features:
   between when an event is generated and when it is handled by the intended
   worker.
 - Add collection of execution/transfer time metrics for resources.
+- ε-CON: Implement persistence across restarts of active workflows
+- CLI: add workflow stop all, workflow inspect all, and domain inspect all
+  commands
+- Add telemetry event logs to the data transmitted by the nodes to the ε-ORC.
 
 Improvements:
 
@@ -33,6 +37,8 @@ Improvements:
 - Proxy: transform the performance samples and nodes' health into sorted sets
   to keep a history of previous values in the database, with periodic garbage
   collection done by the ε-ORC. Period duration is configurable.
+- ε-ORC: reject nodes with empty host in invocation/agent URLs.
+- Redis resource provider: add the option to read values from a Redis server.
 
 API changes:
 
