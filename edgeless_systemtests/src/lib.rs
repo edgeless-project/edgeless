@@ -122,6 +122,7 @@ mod system_tests {
         let (task, abort_handle_controller) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
             controller_url: controller_url.clone(),
             domain_register_url: domain_register_url.clone(),
+            persistence_filename: String::default(),
         }));
         tokio::spawn(task);
 
