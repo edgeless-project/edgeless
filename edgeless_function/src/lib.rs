@@ -36,6 +36,7 @@ pub use output_api::*;
 pub enum CallRet {
     NoReply,
     Reply(owned_data::OwnedByteBuff),
+    // TODO: add error string as owned_data buffer, copied to the vm
     Err,
 }
 

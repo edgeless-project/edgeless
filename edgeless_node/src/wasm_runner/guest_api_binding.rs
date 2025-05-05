@@ -110,9 +110,18 @@ pub async fn cast(
 
     match caller.data_mut().host.cast_alias(&target, &payload).await {
         Ok(_) => {}
-        Err(_) => {
-            // We ignore casts to unknown targets.
-            log::warn!("Cast to unknown target: {}", target);
+        Err(failure) => {
+            match failure {
+                crate::base_runtime::guest_api::GuestAPIError::UnknownAlias => {
+                    // We ignore casts to unknown targets
+                    // TODO: the behavior should be unified with call
+                    log::warn!("Cast to unknown target: {}", target);
+                    // Err(anyhow::Error::msg("Unknown alias").into())
+                }
+                // TODO: add logging here maybe?
+                crate::base_runtime::guest_api::GuestAPIError::Timeout => (),
+                crate::base_runtime::guest_api::GuestAPIError::PoisonPill => (),
+            }
         }
     };
 
@@ -141,6 +150,8 @@ pub async fn call(
 
     // the question mark here made the call just propagate the error back to the
     // caller, instead of ever returning from the call
+    // NOTE: if Ok is returned, this indicates a recoverable error, Err makes
+    // the function stop
     match call_ret {
         Ok(success) => match success {
             // NOTE: I guess the integers 0-2 are a convention for how the
@@ -165,7 +176,6 @@ pub async fn call(
             crate::base_runtime::guest_api::GuestAPIError::UnknownAlias => Err(anyhow::Error::msg("Unknown alias").into()),
             crate::base_runtime::guest_api::GuestAPIError::Timeout => {
                 // as in above todo
-                log::error!("timout, returning Ok(2)");
                 Ok(2)
             }
             crate::base_runtime::guest_api::GuestAPIError::PoisonPill => Err(anyhow::Error::msg("Poison pill").into()),

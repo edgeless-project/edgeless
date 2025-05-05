@@ -109,7 +109,8 @@ impl DataplaneHandle {
                         created,
                     };
                 }
-                log::error!("Unprocesses other message");
+                // TODO: what does this mean?``
+                // log::error!("Unprocesses other message");
             }
         }
     }
@@ -134,7 +135,7 @@ impl DataplaneHandle {
                 Message::CallRet(ret) => CallRet::Reply(ret),
                 Message::CallNoRet => CallRet::NoReply,
                 Message::Err(err_msg) => CallRet::Err(err_msg),
-                _ => CallRet::Err("incompatible response to a call (cast or call)".to_owned())
+                _ => CallRet::Err("incompatible response to a call (cast or call)".to_owned()),
             },
             Err(_) => CallRet::Err("Cancelled receiver for call".to_owned()),
         }

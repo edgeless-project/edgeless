@@ -36,7 +36,11 @@ pub fn call_raw(target: crate::InstanceId, msg: &[u8]) -> crate::CallRet {
         match call_ret_type {
             0 => crate::CallRet::NoReply,
             1 => crate::CallRet::Reply(crate::owned_data::OwnedByteBuff::new(out_ptr_ptr, out_len_ptr)),
-            _ => crate::CallRet::Err,
+            2 => crate::CallRet::Err,
+            _ => {
+                log::error!("Unknown error type");
+                crate::CallRet::Err
+            }
         }
     }
 }
@@ -57,7 +61,11 @@ pub fn call(name: &str, msg: &[u8]) -> crate::CallRet {
         match call_ret_type {
             0 => crate::CallRet::NoReply,
             1 => crate::CallRet::Reply(crate::owned_data::OwnedByteBuff::new(out_ptr_ptr, out_len_ptr)),
-            _ => crate::CallRet::Err,
+            2 => crate::CallRet::Err,
+            _ => {
+                log::error!("Unknown error type");
+                crate::CallRet::Err
+            }
         }
     }
 }
