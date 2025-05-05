@@ -108,15 +108,23 @@ pub async fn cast(
     let target = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
 
-    match caller.data_mut().host.cast_alias(&target, &payload).await {
-        Ok(_) => {}
-        Err(_) => {
-            // We ignore casts to unknown targets.
-            log::debug!("Cast to unknown target: {}", target);
-        }
+    return match caller.data_mut().host.cast_alias(&target, &payload).await {
+        Ok(_) => Ok(()),
+        Err(failure) => match failure {
+            crate::base_runtime::guest_api::GuestAPIError::UnknownAlias => {
+                log::warn!("GuestAPI: Cast to unknown target: {}", target);
+                Err(anyhow::Error::msg("Unknown alias").into())
+            }
+            crate::base_runtime::guest_api::GuestAPIError::Timeout => {
+                log::warn!("GuestAPI: timeout: {}", target);
+                Err(anyhow::Error::msg(format!("GuestAPI: timeout: {}", target)).into())
+            }
+            crate::base_runtime::guest_api::GuestAPIError::PoisonPill => {
+                log::warn!("GuestAPI: poison pill: {}", target);
+                Err(anyhow::Error::msg(format!("GuestAPI: poison pill: {}", target)).into())
+            }
+        },
     };
-
-    Ok(())
 }
 
 pub async fn call(
@@ -141,6 +149,8 @@ pub async fn call(
 
     // the question mark here made the call just propagate the error back to the
     // caller, instead of ever returning from the call
+    // NOTE: if Ok is returned, this indicates a recoverable error, Err makes
+    // the function stop
     match call_ret {
         Ok(success) => match success {
             // NOTE: I guess the integers 0-2 are a convention for how the
@@ -165,7 +175,6 @@ pub async fn call(
             crate::base_runtime::guest_api::GuestAPIError::UnknownAlias => Err(anyhow::Error::msg("Unknown alias").into()),
             crate::base_runtime::guest_api::GuestAPIError::Timeout => {
                 // as in above todo
-                log::error!("timout, returning Ok(2)");
                 Ok(2)
             }
             crate::base_runtime::guest_api::GuestAPIError::PoisonPill => Err(anyhow::Error::msg("Poison pill").into()),

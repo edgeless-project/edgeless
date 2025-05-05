@@ -87,6 +87,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             .func_wrap4_async("env", "cast_asm", |store, target_ptr, target_len, payload_ptr, payload_len| {
                 Box::new(super::guest_api_binding::cast(store, target_ptr, target_len, payload_ptr, payload_len))
             })
+            // TODO: this should be explicit, instead of propagating in a wild way...
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         linker
             .func_wrap6_async(

@@ -31,7 +31,8 @@ pub enum GuestAPIError {
     PoisonPill,
 }
 
-static DATAPLANE_TIMEOUT: u64 = 100;
+// NOTE: set to granularity of our emulation
+static DATAPLANE_TIMEOUT: u64 = 1000;
 
 impl GuestAPIHost {
     pub async fn cast_alias(&mut self, alias: &str, msg: &str) -> Result<(), GuestAPIError> {
@@ -41,17 +42,13 @@ impl GuestAPIHost {
             self.data_plane.send(self.instance_id, msg.to_string(), &metadata).await;
             Ok(())
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            let timeout = async {
-                tokio::time::sleep(Duration::from_millis(DATAPLANE_TIMEOUT)).await;
-                ()
-            };
-            // casts can also time out
             tokio::select! {
-                _ = self.data_plane.send(target, msg.to_string()) => {
+                _ = self.data_plane.send(target, msg.to_string(), &metadata) => {
+                    // log::info!("cast_alias: call okay {:?}", res);
                     Ok(())
                 },
-                _ = timeout => {
-                    log::error!("cast_alias has timed out");
+                _ = tokio::time::sleep(Duration::from_millis(DATAPLANE_TIMEOUT)) => {
+                    log::warn!("cast_alias: timeout elapsed of {:?}ms", DATAPLANE_TIMEOUT);
                     Err(GuestAPIError::Timeout)
                 }
 
@@ -73,16 +70,15 @@ impl GuestAPIHost {
         if alias == "self" {
             self.call_raw(self.instance_id, msg).await
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            // TODO: change to tokio::select!
-            futures::select! {
-                res = Box::pin(self.call_raw(target, msg)).fuse() => {
-                    log::info!("call_alias: call okay {:?}", res);
+            tokio::select! {
+                res = self.call_raw(target, msg) => {
+                    // log::info!("call_alias: call okay {:?}", res);
                     return res
                 },
-                e = Box::pin(tokio::time::sleep(Duration::from_millis(DATAPLANE_TIMEOUT))).fuse() => {
-                    log::error!("call_alias: timeout elapsed {:?}", e);
+                _ = tokio::time::sleep(Duration::from_millis(DATAPLANE_TIMEOUT)) => {
+                    log::warn!("call_alias: timeout elapsed of {:?}ms", DATAPLANE_TIMEOUT);
                     // TODO: clean up the receiver in the DataplaneHandle in case this gets
-                    // dropped due to timeout
+                    // dropped due to timeout - for now not that relevant
                     return Err(GuestAPIError::Timeout)
                 }
             }
