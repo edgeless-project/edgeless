@@ -528,13 +528,13 @@ impl DDAResource {
                             Some(al) => al,
                             None => {
                                 log::error!("Alias not found! Outgoing message will be ignored!");
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                                 continue;
                             }
                         };
                         if p.pattern != "event" {
                             log::warn!("wrong publication type");
-                            respond(edgeless_dataplane::core::CallRet::Err).await;
+                            respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             continue;
                         }
                         let event = dda_com::Event {
@@ -552,13 +552,13 @@ impl DDAResource {
                             Some(p) => p,
                             None => {
                                 log::warn!("attempting to publish an action using an alias which is not mapped!");
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                                 continue;
                             }
                         };
                         if p.pattern != "action" {
                             log::warn!("wrong publication type");
-                            respond(edgeless_dataplane::core::CallRet::Err).await;
+                            respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             continue;
                         }
                         // construct the Action
@@ -583,13 +583,13 @@ impl DDAResource {
                                     }
                                     Err(status) => {
                                         log::error!("could not retrieve an action result {:?}", status);
-                                        respond(edgeless_dataplane::core::CallRet::Err).await;
+                                        respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                                     }
                                 }
                             }
                             Err(status) => {
                                 log::error!("gRPC call to sidecar failed {:?}", status);
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                                 continue;
                             }
                         };
@@ -599,13 +599,13 @@ impl DDAResource {
                             Some(p) => p,
                             None => {
                                 log::warn!("attempting to publish a query using an alias which is not mapped!");
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                                 continue;
                             }
                         };
                         if p.pattern != "query" {
                             log::warn!("can not publish a query using alias={:?}. Mapping specifies: {:?}", alias, p.pattern);
-                            respond(edgeless_dataplane::core::CallRet::Err).await;
+                            respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             continue;
                         }
                         // construct the Query
@@ -631,13 +631,13 @@ impl DDAResource {
                                     }
                                     Err(status) => {
                                         log::error!("could not get any result for a query{:?}", status);
-                                        respond(edgeless_dataplane::core::CallRet::Err).await;
+                                        respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                                     }
                                 }
                             }
                             Err(status) => {
                                 log::error!("gRPC call to sidecar failed {:?}", status);
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         };
                     }
@@ -655,7 +655,7 @@ impl DDAResource {
                             Ok(_) => respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await,
                             Err(status) => {
                                 log::error!("publishing action result failed: {:?}", status);
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         }
                     }
@@ -673,7 +673,7 @@ impl DDAResource {
                             Ok(_) => respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await,
                             Err(status) => {
                                 log::error!("publishing query result failed: {:?}", status.message());
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         }
                     }
@@ -689,7 +689,7 @@ impl DDAResource {
                             }
                             Err(e) => {
                                 log::error!("DDA: StatePublishSet: {:?}", e.message());
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         }
                     }
@@ -705,7 +705,7 @@ impl DDAResource {
                             }
                             Err(e) => {
                                 log::error!("DDA: StatePublishDelete: {:?}", e.message());
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         }
                     }
@@ -723,7 +723,7 @@ impl DDAResource {
                             },
                             Err(e) => {
                                 log::error!("DDA: StoreGet: {:?}", e.message());
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         };
                     }
@@ -735,7 +735,7 @@ impl DDAResource {
                             }
                             Err(e) => {
                                 log::error!("DDA: StoreSet: {:?}", e.message());
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         };
                     }
@@ -747,7 +747,7 @@ impl DDAResource {
                             }
                             Err(e) => {
                                 log::error!("DDA: StoreDelete: {:?}", e.message());
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         }
                     }
@@ -759,7 +759,7 @@ impl DDAResource {
                             }
                             Err(e) => {
                                 log::error!("DDA: StoreDeleteAll: {:?}", e.message());
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         }
                     }
@@ -771,7 +771,7 @@ impl DDAResource {
                             }
                             Err(e) => {
                                 log::error!("DDA: StoreDeletePrefix: {:?}", e.message());
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         }
                     }
@@ -783,7 +783,7 @@ impl DDAResource {
                             }
                             Err(e) => {
                                 log::error!("DDA: StoreDeleteRange: {:?}", e.message());
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         }
                     }
@@ -807,13 +807,13 @@ impl DDAResource {
                                     }
                                     Err(status) => {
                                         log::error!("could not get any result for a query{:?}", status);
-                                        respond(edgeless_dataplane::core::CallRet::Err).await;
+                                        respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                                     }
                                 };
                             }
                             Err(e) => {
                                 log::error!("DDA: StoreScanPrefix: {:?}", e.message());
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         }
                     }
@@ -835,13 +835,13 @@ impl DDAResource {
                                     }
                                     Err(status) => {
                                         log::error!("could not get any result for a query{:?}", status);
-                                        respond(edgeless_dataplane::core::CallRet::Err).await;
+                                        respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                                     }
                                 };
                             }
                             Err(e) => {
                                 log::error!("DDA: StoreScanRange: {:?}", e.message());
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
+                                respond(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())).await;
                             }
                         }
                     }

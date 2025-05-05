@@ -27,7 +27,11 @@ pub struct GuestAPIHost {
 #[derive(Debug)]
 pub enum GuestAPIError {
     UnknownAlias,
+    Timeout,
+    PoisonPill,
 }
+
+static DATAPLANE_TIMEOUT: u64 = 100;
 
 impl GuestAPIHost {
     pub async fn cast_alias(&mut self, alias: &str, msg: &str) -> Result<(), GuestAPIError> {
@@ -37,8 +41,21 @@ impl GuestAPIHost {
             self.data_plane.send(self.instance_id, msg.to_string(), &metadata).await;
             Ok(())
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            self.data_plane.send(target, msg.to_string(), &metadata).await;
-            Ok(())
+            let timeout = async {
+                tokio::time::sleep(Duration::from_millis(DATAPLANE_TIMEOUT)).await;
+                ()
+            };
+            // casts can also time out
+            tokio::select! {
+                _ = self.data_plane.send(target, msg.to_string()) => {
+                    Ok(())
+                },
+                _ = timeout => {
+                    log::error!("cast_alias has timed out");
+                    Err(GuestAPIError::Timeout)
+                }
+
+            }
         } else {
             Err(GuestAPIError::UnknownAlias)
         }
@@ -52,29 +69,30 @@ impl GuestAPIHost {
     }
 
     pub async fn call_alias(&mut self, alias: &str, msg: &str) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
+        log::info!("call_alias");
         if alias == "self" {
             self.call_raw(self.instance_id, msg).await
-            // return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            log::info!("call_alias");
+            // TODO: change to tokio::select!
             futures::select! {
                 res = Box::pin(self.call_raw(target, msg)).fuse() => {
-                    log::info!("call worked");
+                    log::info!("call_alias: call okay {:?}", res);
                     return res
                 },
-                e = Box::pin(tokio::time::sleep(Duration::from_millis(100))).fuse() => {
-                    log::info!("timeout; dataplane will hang now");
-                    return Err(GuestAPIError::UnknownAlias)
+                e = Box::pin(tokio::time::sleep(Duration::from_millis(DATAPLANE_TIMEOUT))).fuse() => {
+                    log::error!("call_alias: timeout elapsed {:?}", e);
+                    // TODO: clean up the receiver in the DataplaneHandle in case this gets
+                    // dropped due to timeout
+                    return Err(GuestAPIError::Timeout)
                 }
             }
-            return self.call_raw(target, msg).await;
-            // return Ok(self.data_plane.call(target.clone(), msg.to_string()).await);
         } else {
-            log::warn!("Unknown alias. alias={:?}, callback_table={:?}", alias, self.callback_table);
+            log::error!("call_alias: Unknown alias. alias={:?}, callback_table={:?}", alias, self.callback_table);
             Err(GuestAPIError::UnknownAlias)
         }
     }
 
+    // NOTE: just does the raw calling, with possibility of a poison pill
     pub async fn call_raw(
         &mut self,
         target: edgeless_api::function_instance::InstanceId,

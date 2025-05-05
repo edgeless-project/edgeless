@@ -23,7 +23,6 @@ impl DataPlaneLink for RemoteLink {
         stream_id: u64,
         metadata: &edgeless_api::function_instance::EventMetadata,
     ) -> LinkProcessingResult {
-        log::info!("handle_send");
         return self
             .remotes
             .lock()
@@ -37,7 +36,7 @@ impl DataPlaneLink for RemoteLink {
                     Message::Cast(data) => edgeless_api::invocation::EventData::Cast(data),
                     Message::CallRet(data) => edgeless_api::invocation::EventData::CallRet(data),
                     Message::CallNoRet => edgeless_api::invocation::EventData::CallNoRet,
-                    Message::Err => edgeless_api::invocation::EventData::Err,
+                    Message::Err(_) => edgeless_api::invocation::EventData::Err,
                 },
                 created: *created,
                 metadata: metadata.clone(),

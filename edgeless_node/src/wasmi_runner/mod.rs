@@ -80,7 +80,10 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         linker
             .define("env", "call_asm", wasmi::Func::wrap(&mut store, guest_api_binding::call))
-            .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+            .map_err(|e| {
+                log::error!("call_asm error wasmi_runner {:?}", e);
+                crate::base_runtime::FunctionInstanceError::InternalError
+            })?;
         linker
             .define(
                 "env",

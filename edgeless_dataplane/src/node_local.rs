@@ -38,7 +38,7 @@ impl DataPlaneLink for NodeLocalLink {
                         Message::Cast(data) => edgeless_api::invocation::EventData::Cast(data),
                         Message::CallRet(data) => edgeless_api::invocation::EventData::CallRet(data),
                         Message::CallNoRet => edgeless_api::invocation::EventData::CallNoRet,
-                        Message::Err => edgeless_api::invocation::EventData::Err,
+                        Message::Err(_) => edgeless_api::invocation::EventData::Err,
                     },
                     created: *created,
                     metadata: metadata.clone(),
@@ -65,7 +65,7 @@ impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
                 edgeless_api::invocation::EventData::Cast(data) => Message::Cast(data),
                 edgeless_api::invocation::EventData::CallRet(data) => Message::CallRet(data),
                 edgeless_api::invocation::EventData::CallNoRet => Message::CallNoRet,
-                edgeless_api::invocation::EventData::Err => Message::Err,
+                edgeless_api::invocation::EventData::Err => Message::Err("edgeless_api invocation error".to_owned()),
             };
             match sender
                 .send(DataplaneEvent {

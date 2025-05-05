@@ -147,9 +147,10 @@ impl DataplaneHandle {
             Ok((_src, msg)) => match msg {
                 Message::CallRet(ret) => CallRet::Reply(ret),
                 Message::CallNoRet => CallRet::NoReply,
-                _ => CallRet::Err,
+                Message::Err(err_msg) => CallRet::Err(err_msg),
+                _ => CallRet::Err("incompatible response to a call (cast or call)".to_owned()),
             },
-            Err(_) => CallRet::Err,
+            Err(_) => CallRet::Err("Cancelled receiver for call".to_owned()),
         }
     }
 
@@ -166,7 +167,7 @@ impl DataplaneHandle {
             match msg {
                 CallRet::Reply(msg) => Message::CallRet(msg),
                 CallRet::NoReply => Message::CallNoRet,
-                CallRet::Err => Message::Err,
+                CallRet::Err(err_msg) => Message::Err(err_msg),
             },
             edgeless_api::function_instance::EventTimestamp::default(),
             channel_id,

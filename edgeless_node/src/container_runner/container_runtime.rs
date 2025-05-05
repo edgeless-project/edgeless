@@ -141,7 +141,7 @@ impl ContainerRuntime {
                                     edgeless_dataplane::core::CallRet::Reply(msg) => {
                                         edgeless_api::guest_api_function::CallReturn::Reply(msg.as_bytes().to_vec())
                                     }
-                                    edgeless_dataplane::core::CallRet::Err => edgeless_api::guest_api_function::CallReturn::Err,
+                                    edgeless_dataplane::core::CallRet::Err(_) => edgeless_api::guest_api_function::CallReturn::Err,
                                 }
                             }
                             Err(_) => {
@@ -173,7 +173,7 @@ impl ContainerRuntime {
                                     edgeless_dataplane::core::CallRet::Reply(msg) => {
                                         edgeless_api::guest_api_function::CallReturn::Reply(msg.as_bytes().to_vec())
                                     }
-                                    edgeless_dataplane::core::CallRet::Err => edgeless_api::guest_api_function::CallReturn::Err,
+                                    edgeless_dataplane::core::CallRet::Err(_) => edgeless_api::guest_api_function::CallReturn::Err,
                                 }
                             }
                             Err(_) => {

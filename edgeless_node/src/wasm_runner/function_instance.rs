@@ -121,6 +121,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                     ))
                 },
             )
+            // TODO: this should be explicit, instead of propagating in a wild way...
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         linker
             .func_wrap5_async("env", "telemetry_log_asm", |store, level, target_ptr, target_len, msg_ptr, msg_len| {
@@ -280,7 +281,10 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
             self.edgefunctione_handle_cast
                 .call_async(&mut self.store, (node_id_ptr, component_id_ptr, payload_ptr, payload_len as i32))
                 .await
-                .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: call_async {}", e)))?;
+                .map_err(|e| {
+                    log::info!("edgefunctione_handle_cast.call_async has returned an error {:?}", e);
+                    crate::base_runtime::FunctionInstanceError::BadCode(format!("cast failed: call_async {}", e))
+                })?;
             Ok(())
         };
 
@@ -376,7 +380,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
                 let out = unsafe { std::string::String::from_utf8_unchecked(out_raw) };
                 Ok(edgeless_dataplane::core::CallRet::Reply(out))
             }
-            _ => Ok(edgeless_dataplane::core::CallRet::Err),
+            _ => Ok(edgeless_dataplane::core::CallRet::Err("TODO".to_owned())),
         };
 
         self.edgeless_mem_free

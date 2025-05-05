@@ -23,7 +23,8 @@ pub trait DataPlaneLink: Send + Sync {
 pub enum CallRet {
     NoReply,
     Reply(String),
-    Err,
+    // Error can be anything that happens on the application level of the dataplane
+    Err(String),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -32,7 +33,7 @@ pub enum Message {
     Call(String),
     CallRet(String),
     CallNoRet,
-    Err,
+    Err(String),
 }
 
 #[derive(Clone, Debug)]

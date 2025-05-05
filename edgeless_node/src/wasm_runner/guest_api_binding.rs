@@ -91,7 +91,8 @@ pub async fn call_raw(
 
             Ok(1)
         }
-        edgeless_dataplane::core::CallRet::Err => Ok(2),
+        // TODO: copy the error string into the function
+        edgeless_dataplane::core::CallRet::Err(_) => Ok(2),
     }
 }
 
@@ -127,30 +128,48 @@ pub async fn call(
     out_ptr_ptr: i32,
     out_len_ptr: i32,
 ) -> wasmtime::Result<i32> {
+    log::info!("guest_api_binding::call");
     let mem = get_memory(&mut caller)?;
     let alloc = get_alloc(&mut caller)?;
 
+    // ? should only be used for functions that have nothing to do with the
+    // dataplane (e.g. copy to vm etc.) - dataplane errors should be handled explicitly!
+
     let target = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, target_ptr, target_len)?;
     let payload = super::helpers::load_string_from_vm(&mut caller.as_context_mut(), &mem, payload_ptr, payload_len)?;
+    let call_ret = caller.data_mut().host.call_alias(&target, &payload).await;
 
-    let call_ret = caller
-        .data_mut()
-        .host
-        .call_alias(&target, &payload)
-        .await
-        .map_err(|_| wasmtime::Error::msg("call error"))?;
+    // the question mark here made the call just propagate the error back to the
+    // caller, instead of ever returning from the call
     match call_ret {
-        edgeless_dataplane::core::CallRet::NoReply => Ok(0),
-        edgeless_dataplane::core::CallRet::Reply(data) => {
-            let len = data.len();
+        Ok(success) => match success {
+            // NOTE: I guess the integers 0-2 are a convention for how the
+            // results are returned to the wasm module
+            edgeless_dataplane::core::CallRet::NoReply => Ok(0),
+            edgeless_dataplane::core::CallRet::Reply(data) => {
+                let len = data.len();
 
-            let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes()).await?;
-            super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
-            super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_len_ptr, &len.to_le_bytes())?;
+                let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes()).await?;
+                super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
+                super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_len_ptr, &len.to_le_bytes())?;
 
-            Ok(1)
-        }
-        edgeless_dataplane::core::CallRet::Err => Ok(2),
+                Ok(1)
+            }
+            // TODO: copy the error string to the function like in CallRet::Reply
+            edgeless_dataplane::core::CallRet::Err(_) => Ok(2), // Err(anyhow::Error::msg("Dataplane CallRet:Err").into()),
+        },
+        // NOTE: very verbose and explicit error matching
+        // NOTE: anyhow errors will result in InternalError -> BadCode, which
+        // will stop the function; timeout will not stop the function
+        Err(failure) => match failure {
+            crate::base_runtime::guest_api::GuestAPIError::UnknownAlias => Err(anyhow::Error::msg("Unknown alias").into()),
+            crate::base_runtime::guest_api::GuestAPIError::Timeout => {
+                // as in above todo
+                log::error!("timout, returning Ok(2)");
+                Ok(2)
+            }
+            crate::base_runtime::guest_api::GuestAPIError::PoisonPill => Err(anyhow::Error::msg("Poison pill").into()),
+        },
     }
 }
 
