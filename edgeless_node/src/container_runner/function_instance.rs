@@ -162,7 +162,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
                 edgeless_api::guest_api_function::CallReturn::Reply(msg) => {
                     Ok(edgeless_dataplane::core::CallRet::Reply(String::from_utf8(msg).unwrap_or_default()))
                 }
-                edgeless_api::guest_api_function::CallReturn::Err => Ok(edgeless_dataplane::core::CallRet::Err),
+                edgeless_api::guest_api_function::CallReturn::Err => Ok(edgeless_dataplane::core::CallRet::Err("nothing here".to_owned())),
             },
             Err(_) => Err(crate::base_runtime::FunctionInstanceError::InternalError),
         }

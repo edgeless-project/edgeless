@@ -128,15 +128,15 @@ impl DataplaneHandle {
 
         // Potential Leak: This is only received if a message is received (or the handle is dropped)
         self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
-        log::info!("dataplane, call - overwrote the receiver to handle the msg before it is sent to the receive_next function");
         self.send_inner(target, Message::Call(msg), timestamp_utc(), channel_id).await;
         match receiver.await {
             Ok((_src, msg)) => match msg {
                 Message::CallRet(ret) => CallRet::Reply(ret),
                 Message::CallNoRet => CallRet::NoReply,
-                _ => CallRet::Err,
+                Message::Err(err_msg) => CallRet::Err(err_msg),
+                _ => CallRet::Err("incompatible response to a call (cast or call)".to_owned())
             },
-            Err(_) => CallRet::Err,
+            Err(_) => CallRet::Err("Cancelled receiver for call".to_owned()),
         }
     }
 
@@ -147,7 +147,7 @@ impl DataplaneHandle {
             match msg {
                 CallRet::Reply(msg) => Message::CallRet(msg),
                 CallRet::NoReply => Message::CallNoRet,
-                CallRet::Err => Message::Err,
+                CallRet::Err(err_msg) => Message::Err(err_msg),
             },
             edgeless_api::function_instance::EventTimestamp::default(),
             channel_id,

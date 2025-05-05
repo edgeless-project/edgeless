@@ -140,7 +140,7 @@ impl SqlxResource {
                 } else {
                     log::info!("Unknow operation in state management");
                     dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
+                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err("TODO".to_owned()))
                         .await;
                 };
 

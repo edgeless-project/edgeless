@@ -74,7 +74,7 @@ impl EgressResource {
                     Ok(val) => val,
                     Err(_) => {
                         dataplane_handle
-                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
+                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err("TODO".to_owned()))
                             .await;
                         continue;
                     }
@@ -90,7 +90,7 @@ impl EgressResource {
                         }
                         Err(_) => {
                             cloned_dataplane
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
+                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err("TODO".to_owned()))
                                 .await;
                         }
                     }

@@ -488,7 +488,7 @@ async fn messaging_call_raw_input_err() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
     let ret = test_peer_handle.call(instance_id, "test_err".to_string()).await;
-    assert_eq!(ret, CallRet::Err);
+    assert_eq!(ret, CallRet::Err("TODO".to_owned()));
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
     assert!(is_telemetry_event_invocation_complete(&mut telemetry_mock_receiver).await);
