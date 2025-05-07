@@ -113,6 +113,7 @@ mod system_tests {
                         sqlx_provider: None,
                     }),
                     user_node_capabilities: None,
+                    power_info: None,
                 }));
                 tokio::spawn(task);
                 abort_handles_nodes.insert(node_id, handle);

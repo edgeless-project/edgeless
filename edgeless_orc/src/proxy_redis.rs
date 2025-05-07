@@ -580,12 +580,15 @@ impl super::proxy::Proxy for ProxyRedis {
             assert_eq!("node", tokens[0]);
             assert_eq!("health", tokens[1]);
             if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2]) {
-                if let Ok((value, _timestamp)) =
-                    self.connection
-                        .zrangebyscore_limit_withscores::<&str, f64, f64, (String, f64)>(&node_key, f64::NEG_INFINITY, f64::INFINITY, 0, 1)
-                {
-                    if let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(&value) {
-                        health.insert(node_id, val);
+                if let Ok(values) = self.connection.zrange::<&str, Vec<String>>(&node_key, -1, -1) {
+                    assert!(
+                        values.len() <= 1,
+                        "Invalid number of elements for ZRANGE command that should return 0 or 1 elements"
+                    );
+                    if let Some(value) = values.first() {
+                        if let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(value) {
+                            health.insert(node_id, val);
+                        }
                     }
                 }
             }
@@ -1000,6 +1003,7 @@ mod test {
             disk_tot_writes: 22,
             gpu_load_perc: 23,
             gpu_temp_cels: 24,
+            active_power: 25,
         };
         let samples_1_values: Vec<f64> = vec![100.0, 101.0, 102.0, 103.0];
         let samples_2_values: Vec<f64> = vec![200.0, 201.0];
