@@ -10,6 +10,7 @@ pub mod base_runtime;
 pub mod container_runner;
 pub mod gpu_info;
 pub mod node_subscriber;
+pub mod power_info;
 pub mod resources;
 pub mod state_management;
 #[cfg(feature = "wasmtime")]
@@ -31,6 +32,8 @@ pub struct EdgelessNodeSettings {
     pub resources: Option<EdgelessNodeResourceSettings>,
     /// User-specific capabilities.
     pub user_node_capabilities: Option<NodeCapabilitiesUser>,
+    /// Power information settings.
+    pub power_info: Option<EdgelessNodePowerInfoSettings>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -176,6 +179,14 @@ impl Default for MetricsCollectorProviderSettings {
             provider: String::default(),
         }
     }
+}
+
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+pub struct EdgelessNodePowerInfoSettings {
+    /// The endpoint IP:port of the Modbus server.
+    pub modbus_endpoint: String,
+    /// The index of the PDU outlet to query.
+    pub outlet_number: u16,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -797,6 +808,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         settings.general,
         resource_provider_specifications.clone(),
         get_capabilities(runtimes, settings.user_node_capabilities.unwrap_or(NodeCapabilitiesUser::empty())),
+        settings.power_info,
         telemetry_performance_target,
     )
     .await;
@@ -846,6 +858,7 @@ pub fn edgeless_node_default_conf() -> String {
             sqlx_provider: Some(String::from("sqlite://sqlite.db")),
         }),
         user_node_capabilities: Some(NodeCapabilitiesUser::default()),
+        power_info: None,
     };
     toml::to_string(&node_conf).expect("Wrong")
 }

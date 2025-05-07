@@ -257,6 +257,9 @@ message NodeHealthStatus {
     int32 gpu_load_perc = 80;
     // GPU instantaneous temp in Celsius multiplied by 1000
     int32 gpu_temp_cels = 81;
+
+    // Active power measured, in mW.
+    int32 active_power = 90;
 }
 
 // Node performance samples.

@@ -20,6 +20,7 @@ impl NodeSubscriber {
         settings: crate::EdgelessNodeGeneralSettings,
         resource_providers: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
         capabilities: edgeless_api::node_registration::NodeCapabilities,
+        power_info: Option<crate::EdgelessNodePowerInfoSettings>,
         telemetry_performance_target: edgeless_telemetry::performance_target::PerformanceTargetInner,
     ) -> (
         Self,
@@ -33,7 +34,16 @@ impl NodeSubscriber {
 
         let subscription_refresh_interval_sec = settings.subscription_refresh_interval_sec;
         let main_task = Box::pin(async move {
-            Self::main_task(settings, resource_providers, capabilities, nonce, receiver, telemetry_performance_target).await;
+            Self::main_task(
+                settings,
+                resource_providers,
+                capabilities,
+                power_info,
+                nonce,
+                receiver,
+                telemetry_performance_target,
+            )
+            .await;
         });
 
         let refresh_task = Box::pin(async move {
@@ -56,6 +66,7 @@ impl NodeSubscriber {
         settings: crate::EdgelessNodeGeneralSettings,
         resource_providers: Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
         capabilities: edgeless_api::node_registration::NodeCapabilities,
+        power_info: Option<crate::EdgelessNodePowerInfoSettings>,
         nonce: u64,
         receiver: futures::channel::mpsc::UnboundedReceiver<NodeSubscriberRequest>,
         telemetry_performance_target: edgeless_telemetry::performance_target::PerformanceTargetInner,
@@ -104,6 +115,15 @@ impl NodeSubscriber {
         let mut disks = sysinfo::Disks::new();
         let own_pid = sysinfo::Pid::from_u32(std::process::id());
 
+        // Optional power info.
+        let mut power_info = if let Some(settings) = power_info {
+            crate::power_info::PowerInfo::new(&settings.modbus_endpoint, settings.outlet_number)
+                .await
+                .ok()
+        } else {
+            None
+        };
+
         while let Some(req) = receiver.next().await {
             match req {
                 NodeSubscriberRequest::Refresh() => {
@@ -120,7 +140,7 @@ impl NodeSubscriber {
                         capabilities: capabilities.clone(),
                         refresh_deadline: std::time::SystemTime::now() + std::time::Duration::from_secs(subscription_refresh_interval_sec * 2),
                         nonce,
-                        health_status: Self::get_health_status(&mut sys, &mut networks, &mut disks, own_pid),
+                        health_status: Self::get_health_status(&mut sys, &mut networks, &mut disks, own_pid, &mut power_info).await,
                         performance_samples: edgeless_api::node_registration::NodePerformanceSamples {
                             function_execution_times: metrics.function_execution_times,
                             function_transfer_times: metrics.function_transfer_times,
@@ -140,11 +160,12 @@ impl NodeSubscriber {
         }
     }
 
-    fn get_health_status(
+    async fn get_health_status(
         sys: &mut sysinfo::System,
         networks: &mut sysinfo::Networks,
         disks: &mut sysinfo::Disks,
         own_pid: sysinfo::Pid,
+        power_info: &mut Option<crate::power_info::PowerInfo>,
     ) -> edgeless_api::node_registration::NodeHealthStatus {
         // Refresh system/process information.
         sys.refresh_all();
@@ -181,6 +202,11 @@ impl NodeSubscriber {
             .iter()
             .map(|x| (x.name().to_str().unwrap_or_default(), x.total_space()))
             .collect::<std::collections::BTreeMap<&str, u64>>();
+        let active_power = if let Some(power_info) = power_info {
+            (power_info.active_power().await * 1000.0).floor() as i32
+        } else {
+            -1
+        };
         edgeless_api::node_registration::NodeHealthStatus {
             mem_free: to_kb(sys.free_memory()),
             mem_used: to_kb(sys.used_memory()),
@@ -202,6 +228,7 @@ impl NodeSubscriber {
             disk_tot_writes,
             gpu_load_perc: crate::gpu_info::get_gpu_load(),
             gpu_temp_cels: (crate::gpu_info::get_gpu_temp() * 1000.0) as i32,
+            active_power,
         }
     }
 
