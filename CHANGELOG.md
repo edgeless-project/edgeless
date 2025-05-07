@@ -18,10 +18,11 @@ New features:
   between when an event is generated and when it is handled by the intended
   worker.
 - Add collection of execution/transfer time metrics for resources.
-- ε-CON: Implement persistence across restarts of active workflows
-- CLI: add workflow stop all, workflow inspect all, and domain inspect all
-  commands
+- Implement persistence across restarts of active workflows in ε-CON.
+- Add CLI commands: workflow stop/inspect all, and domain inspect all.
 - Add telemetry event logs to the data transmitted by the nodes to the ε-ORC.
+- Add active power measurement to nodes from Modbus/TCP server intended for
+  Raritan PDUS.
 
 Improvements:
 
@@ -53,6 +54,7 @@ API changes:
   - SpawnFunctionRequest::instance_id.
 - Updated the content of the Event message in FunctionInvocation to include
   a timestamp of when the event was created.
+- Add active_power to node health status
 
 ## [1.0.0] - 2024-11-12
 

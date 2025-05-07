@@ -139,15 +139,16 @@ pub struct NodeHealthStatus {
     pub disk_tot_writes: i64,
     pub gpu_load_perc: i32,
     pub gpu_temp_cels: i32,
+    pub active_power: i32,
 }
 
 impl NodeHealthStatus {
     pub fn csv_header() -> String {
-        "mem_free,mem_used,mem_available,proc_cpu_usage,proc_memory,proc_vmemory,load_avg_1,load_avg_5,load_avg_15,tot_rx_bytes,tot_rx_pkts,tot_rx_errs,tot_tx_bytes,tot_tx_pkts,tot_tx_errs,disk_free_space,disk_tot_reads,disk_tot_writes,gpu_load_perc,gpu_temp_cels".to_string()
+        "mem_free,mem_used,mem_available,proc_cpu_usage,proc_memory,proc_vmemory,load_avg_1,load_avg_5,load_avg_15,tot_rx_bytes,tot_rx_pkts,tot_rx_errs,tot_tx_bytes,tot_tx_pkts,tot_tx_errs,disk_free_space,disk_tot_reads,disk_tot_writes,gpu_load_perc,gpu_temp_cels,active_power".to_string()
     }
     pub fn to_csv(&self) -> String {
         format!(
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             self.mem_free,
             self.mem_used,
             self.mem_available,
@@ -168,6 +169,7 @@ impl NodeHealthStatus {
             self.disk_tot_writes,
             self.gpu_load_perc,
             (self.gpu_temp_cels as f32 / 1000.0),
+            self.active_power
         )
     }
 }
@@ -229,7 +231,7 @@ impl std::fmt::Display for NodeHealthStatus {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
-            "memory free {} kb, used {} kb, available {} kb, process cpu usage {:.1}%, memory {} kb, vmemory {} kb, load avg 1 minute {}% 5 minutes {}% 15 minutes {}%, network tot rx {} bytes ({} pkts) {} errs, tot tx {} bytes ({} pkts) {} errs, disk available {} bytes, tot disk reads {} writes {}, gpu_load_perc {}%, gpu_temp_cels {:.2}°",
+            "memory free {} kb, used {} kb, available {} kb, process cpu usage {:.1}%, memory {} kb, vmemory {} kb, load avg 1 minute {}% 5 minutes {}% 15 minutes {}%, network tot rx {} bytes ({} pkts) {} errs, tot tx {} bytes ({} pkts) {} errs, disk available {} bytes, tot disk reads {} writes {}, gpu_load_perc {}%, gpu_temp_cels {:.2}°, active_power {} mW",
             self.mem_free,
             self.mem_used,
             self.mem_available,
@@ -249,7 +251,8 @@ impl std::fmt::Display for NodeHealthStatus {
             self.disk_tot_reads,
             self.disk_tot_writes,
             self.gpu_load_perc,
-            (self.gpu_temp_cels as f32 / 1000.0)
+            (self.gpu_temp_cels as f32 / 1000.0),
+            self.active_power
         )
     }
 }
@@ -277,6 +280,7 @@ impl NodeHealthStatus {
             disk_tot_writes: -1,
             gpu_load_perc: -1,
             gpu_temp_cels: -1,
+            active_power: -1,
         }
     }
 }

@@ -209,6 +209,7 @@ fn generate_configs(
                 },
             }),
             user_node_capabilities: Some(edgeless_node::NodeCapabilitiesUser::default()),
+            power_info: None,
         });
     }
 
@@ -252,6 +253,7 @@ fn generate_configs(
                 sqlx_provider: None,
             }),
             user_node_capabilities: None,
+            power_info: None,
         });
     }
 
