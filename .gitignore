@@ -1,5 +1,6 @@
 target/
 *.wasm
+*.so
 function_state/
 /balancer.toml
 /controller.toml

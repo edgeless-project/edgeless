@@ -40,6 +40,7 @@ edgeless_api = {path = "../edgeless_api", features = ["grpc_impl"]}
 edgeless_telemetry = { path = "../edgeless_telemetry" }
 edgeless_dataplane = { path = "../edgeless_dataplane" }
 edgeless_http = {path = "../edgeless_http", features = ["hyper"]}
+edgeless_function = { path = "../edgeless_function" }
 hyper = { version = "1.2", features = ["full"]}
 hyper-util = { version = "0.1", features = ["tokio"]}
 reqwest = { version = "0.11" }

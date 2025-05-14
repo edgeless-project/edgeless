@@ -108,6 +108,7 @@ macro_rules! export_x86a {
             serialized_state_ptr: *mut u8,
             serialized_state_len: usize,
         ) {
+            println!("handle_init_asm paylen {} serlen {}", payload_len, serialized_state_len);
             let payload: Option<&[u8]> = if payload_len > 0 {
                 Some(core::slice::from_raw_parts(payload_ptr, payload_len))
             } else {
@@ -148,7 +149,7 @@ macro_rules! export_x86a {
             };
 
             if let(Some((output_ptr, output_len))) = output_params {
-                //let leaked_data = 
+                //let leaked_data = output_ptr
                 *out_ptr_ptr = output_ptr;
                 *out_len_ptr = output_len
             }
