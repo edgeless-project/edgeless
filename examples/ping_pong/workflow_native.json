@@ -3,7 +3,7 @@
         {
             "name": "ponger",
             "class_specification": {
-                "id": "ponger",
+                "id": "pong",
                 "function_type": "RUST_NATIVE",
                 "version": "0.1",
                 "code": "../../functions/pong/pong.so",
@@ -21,7 +21,7 @@
         {
             "name": "pinger",
             "class_specification": {
-                "id": "pinger",
+                "id": "ping",
                 "function_type": "RUST_NATIVE",
                 "version": "0.1",
                 "code": "../../functions/ping/ping.so",

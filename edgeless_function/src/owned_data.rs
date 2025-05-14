@@ -4,6 +4,7 @@
 pub struct OwnedByteBuff {
     pub(crate) data: *mut u8,
     pub(crate) size: usize,
+    //pub(crate) real_data: u8, 
 }
 
 impl core::ops::Deref for OwnedByteBuff {
@@ -43,7 +44,7 @@ impl OwnedByteBuff {
 
     pub unsafe fn consume(self) -> (*mut u8, usize) {
         let res = (self.data, self.size);
-        core::mem::drop(self);
+        core::mem::forget(self);
         res
     }
 }

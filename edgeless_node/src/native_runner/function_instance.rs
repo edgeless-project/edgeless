@@ -3,15 +3,21 @@
 
 //extern crate libloading;
 
+use chrono::ParseWeekdayError;
 //use std::collections::HashMap;
 use libloading::{Library, Symbol};
 use std::fs::File;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::io::prelude::*;
+use futures::TryFutureExt;
+
+use crate::base_runtime::guest_api::GuestAPIError;
+use edgeless_function::memory;
 
 //type HandleInitFun = fn (&str, &str);
-type HandleInitFun = fn (&str, usize,  &str, usize);
+//type HandleInitFun = fn (&str, usize,  &str, usize);
+type HandleInitFun = fn (*mut u8, usize,  *mut u8, usize);
 //type HandleInitFun = fn (&[u8], usize,  &[u8], usize);
 type HandleCallFun = fn (*mut u8, *mut u8, *mut u8, usize, *mut *const u8, *mut usize) -> i32;
 type HandleCastFun = fn (*mut u8, *mut u8, *mut u8, usize);
@@ -117,11 +123,21 @@ impl crate::base_runtime::FunctionInstance for NativeFunctionInstance {
     }
 
     async fn init(&mut self, init_payload: Option<&str>, serialized_state: Option<&str>) -> Result<(), crate::base_runtime::FunctionInstanceError> {
-        log::info!(
-            "Native RT (init): payload: {}, serialized_state {} bytes", 
+        /*log::info!(
+            "Native RT (init): payload: {}, serialized_state {}, {} bytes", 
             init_payload.unwrap_or_default(), 
+            serialized_state.unwrap_or_default(),
             serialized_state.unwrap_or_default().len()
-        );
+        );*/
+
+        let init_payload_str = init_payload.unwrap_or_default();
+        let init_payload_str_len = init_payload_str.len();
+        let init_payload_str_ptr = init_payload_str.as_ptr();
+
+        let serialized_state_str = serialized_state.unwrap_or_default();
+        let serialized_state_str_len = serialized_state_str.len();
+        let serialized_state_str_ptr = serialized_state_str.as_ptr();
+
         unsafe {
             let set_guest_api_host_pointer: Symbol<SetGuestAPIHostPointer> = self.library.get(b"set_guest_api_host_pointer").unwrap();
             let ptr = self as *const NativeFunctionInstance as usize;
@@ -130,8 +146,13 @@ impl crate::base_runtime::FunctionInstance for NativeFunctionInstance {
 
             let handle_init_fun: Symbol<HandleInitFun> = self.library.get(b"handle_init_asm").unwrap();
             //handle_init_fun(init_payload.unwrap_or(&""), serialized_state.unwrap_or_default());
-            handle_init_fun(init_payload.unwrap_or(&""), init_payload.unwrap_or(&"").len(), 
-            serialized_state.unwrap_or_default(), serialized_state.unwrap_or_default().len());
+            println!("paylen {} serlen {}", init_payload_str_len, serialized_state_str_len);
+            handle_init_fun(init_payload_str_ptr as *mut u8, init_payload_str_len, 
+                serialized_state_str_ptr as *mut u8, serialized_state_str_len);
+                
+            //init_payload.unwrap_or(&""), init_payload.unwrap_or(&"").len(), 
+            //serialized_state.unwrap_or_default(), serialized_state.unwrap_or_default().len());
+            //serialized_state.unwrap_or(&""), serialized_state.unwrap_or(&"").len());
         }
         /*let (init_payload_ptr, init_payload_len) = match init_payload {
             Some(payload) => {
@@ -152,7 +173,7 @@ impl crate::base_runtime::FunctionInstance for NativeFunctionInstance {
         msg: &str
     ) -> Result<edgeless_dataplane::core::CallRet, crate::base_runtime::FunctionInstanceError> {
 
-        return Ok(edgeless_dataplane::core::CallRet::NoReply);
+        //return Ok(edgeless_dataplane::core::CallRet::NoReply);
 
         let payload_len = msg.as_bytes().len();
 
@@ -179,6 +200,9 @@ impl crate::base_runtime::FunctionInstance for NativeFunctionInstance {
                 1 => {
                     let reply_raw = std::slice::from_raw_parts(out_ptr_ptr, out_len_ptr);
                     let reply = std::string::String::from_utf8_unchecked(reply_raw.to_vec()); 
+                    // deallocate the memory that was allocated inside the called function
+                    // not sure we can actually do it as data are just converted to slice, not copied
+                    edgeless_function::memory::edgeless_mem_free(out_ptr_ptr as *mut u8, out_len_ptr);
                     Ok(edgeless_dataplane::core::CallRet::Reply(reply))
                 }
                 _ => Ok(edgeless_dataplane::core::CallRet::Err),
@@ -249,9 +273,26 @@ impl NativeFunctionInstance {
         &mut self, 
         instance_node_id_ptr: *const u8, 
         instance_component_id_ptr: *const u8, 
-        payload_ptr: *const u8, payload_len: usize
+        payload_ptr: *const u8, 
+        payload_len: usize
     ) {
+        let mut node_id: [u8; 16] = [0; 16];
+        let mut component_id: [u8; 16] = [0; 16];
+        unsafe {
+            std::ptr::copy_nonoverlapping(instance_node_id_ptr, node_id.as_mut_ptr(), 16);
+            std::ptr::copy_nonoverlapping(instance_component_id_ptr, component_id.as_mut_ptr(), 16);
+        }
+        
+        let instance_id = edgeless_api::function_instance::InstanceId{
+            node_id: uuid::Uuid::from_bytes(node_id),
+            function_id: uuid::Uuid::from_bytes(component_id)
+        };
 
+        let payload: &str = std::str::from_utf8(core::slice::from_raw_parts(payload_ptr, payload_len)).unwrap();
+
+        let handle = tokio::runtime::Handle::current();
+        let _ = handle.enter();
+        futures::executor::block_on(self.guest_api_host.call_raw(instance_id, payload));
     }
 
     #[no_mangle]
@@ -282,6 +323,38 @@ impl NativeFunctionInstance {
         out_ptr_ptr: *mut *mut u8,
         out_len_ptr: *mut usize,
     ) -> i32 {
+        let mut node_id: [u8; 16] = [0; 16];
+        let mut component_id: [u8; 16] = [0; 16];
+        unsafe {
+            std::ptr::copy_nonoverlapping(instance_node_id_ptr, node_id.as_mut_ptr(), 16);
+            std::ptr::copy_nonoverlapping(instance_component_id_ptr, component_id.as_mut_ptr(), 16);
+        }
+        
+        let instance_id = edgeless_api::function_instance::InstanceId{
+            node_id: uuid::Uuid::from_bytes(node_id),
+            function_id: uuid::Uuid::from_bytes(component_id)
+        };
+
+        let payload: &str = std::str::from_utf8(core::slice::from_raw_parts(payload_ptr, payload_len)).unwrap();
+
+        let callret_type = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                self.guest_api_host
+                    .call_raw(instance_id, payload,
+                    ).await  
+            })
+        });
+
+        match callret_type {
+            Ok(ret) => match ret {
+                edgeless_dataplane::core::CallRet::NoReply => { log::info!("Native RT Reply no data"); 0 },
+                edgeless_dataplane::core::CallRet::Reply(data) => { log::info!("Native RT Reply data: {}", data); 1 }
+                edgeless_dataplane::core::CallRet::Err => { log::info!("Native RT Reply Err"); 2 },
+
+            },
+            Err(GuestAPIError) => { log::info!("Native RT Call Raw GuestAPIError"); 3 },
+        };
+
         0
     }
 
@@ -300,11 +373,62 @@ impl NativeFunctionInstance {
 
         println!("Native RT: Call: Target: {} Payload: {}", target, payload);
         
-        let handle = tokio::runtime::Handle::current();
-        let _ = handle.enter();
-        let call_res = futures::executor::block_on(self.guest_api_host.call_alias(target, payload));
+        //let handle = tokio::runtime::Handle::current();
+        //let _ = handle.enter();
+        //let call_res = futures::executor::block_on(self.guest_api_host.call_alias(target, payload));
         
-        0
+        let callret_type = tokio::task::block_in_place(|| {
+            //let rt = tokio::runtime::Runtime::new().unwrap();
+            //rt.block_on(
+            tokio::runtime::Handle::current().block_on( async {
+            self.guest_api_host
+                .call_alias(
+                    target,
+                    payload,
+                ).await
+            //)
+            })
+        });
+
+        /*let ret = match tokio::runtime::Handle::try_current() {
+            Ok(handle) => handle.block_on(async {callret_type.await}),
+            Err(_) => { log::info!("Native RT cannot get handle"); 
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(async {callret_type.await})
+            }
+        };*/
+        //let ret = match callret_type {
+        
+        /*let ret = futures::executor::block_on(async {callret_type.await} );
+
+        match ret {
+            Ok(edgeless_dataplane::core::CallRet::NoReply) => { log::info!("Native RT Reply with no data"); 0 },
+            Ok(edgeless_dataplane::core::CallRet::Reply(data)) => { log::info!("Native RT Reply with data"); 1 },
+            Ok(edgeless_dataplane::core::CallRet::Err) => { log::info!("Native RT Reply with err"); 2 },
+            Err(GuestAPIError) => { log::info!("Native RT GuesAPIError"); 3 },
+        };*/
+        
+        
+        match callret_type {
+            Ok(ret) => match ret { 
+                edgeless_dataplane::core::CallRet::NoReply => { log::info!("Native RT Reply with no data"); 0 },
+                edgeless_dataplane::core::CallRet::Reply(mut data) => { 
+                    log::info!("Native RT Reply with data: {}", data);
+                    let leaked_data = data.clone().leak();
+                    
+                    //let reply_raw = std::slice::from_raw_parts(out_ptr_ptr, out_len_ptr);
+                    //let reply = std::string::String::from_utf8_unchecked(reply_raw.to_vec()); 
+                    let data_ptr = leaked_data.as_mut_ptr();
+                    *out_ptr_ptr = data_ptr;
+                    *out_len_ptr = data.len();
+                    1
+                },
+                edgeless_dataplane::core::CallRet::Err => { log::info!("Native RT Reply with err"); 2 },
+            },
+            Err(GuestAPIError) => { log::info!("Native RT GuesAPIError"); 3 },
+        }
+
+         
     }
 
     #[no_mangle] 
@@ -380,8 +504,14 @@ impl NativeFunctionInstance {
     unsafe extern "C" fn sync_asm(
         &mut self, 
         data_ptr: *const u8, 
-        data_len: u32
+        data_len: usize
     ) {
+        let state: &str = std::str::from_utf8(core::slice::from_raw_parts(data_ptr, data_len)).unwrap();
+
+        log::info!("Native RT: state: {}", state);
+        let handle = tokio::runtime::Handle::current();
+        let _ = handle.enter();
+        futures::executor::block_on(self.guest_api_host.sync(state));
 
     }
 }
