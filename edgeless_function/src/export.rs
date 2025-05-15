@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 /// Export Macro generating the functions that are exported by the WASM module and call into an instance of `EdgeFunction`.
+#[cfg(target_arch = "wasm32")]
 #[macro_export]
 macro_rules! export {
     ( $fun:ident ) => {
@@ -75,30 +76,9 @@ macro_rules! export {
     };
 }
 
-/// Declare an EdgeFunction type and its constructor.
-///
-/// # Notes
-///
-/// This works by automatically generating an `extern "C"` function with a
-/// pre-defined signature and symbol name. Therefore you will only be able to
-/// declare one plugin per library.
+#[cfg(target_arch = "x86_64")]
 #[macro_export]
-macro_rules! export_x86 {
-    ($plugin_type:ty, $constructor:path) => {
-        #[no_mangle]
-        pub unsafe extern "C" fn _plugin_create() -> *mut $crate::EdgeFunction {
-            // make sure the constructor is the correct type.
-            let constructor: fn() -> $plugin_type = $constructor;
-
-            let object = constructor();
-            let boxed: Box<$crate::EdgeFunction> = Box::new(object);
-            Box::into_raw(boxed)
-        }
-    };
-}
-
-#[macro_export]
-macro_rules! export_x86a {
+macro_rules! export {
     ( $fun:ident ) => {
 
         #[no_mangle]
@@ -115,7 +95,7 @@ macro_rules! export_x86a {
                 None
             };
 
-            let serialized_state = if serialized_state_len > 0 {
+            let serialized_state: Option<&[u8]> = if serialized_state_len > 0 {
                 Some(core::slice::from_raw_parts(serialized_state_ptr, serialized_state_len))
             } else {
                 None
@@ -176,96 +156,5 @@ macro_rules! export_x86a {
         pub extern "C" fn handle_stop_asm() {
             $fun::handle_stop()
         }
-
-        /*#[no_mangle]
-        pub unsafe extern "C" fn telemetry_log_asm (
-            level: usize, 
-            target_ptr: *const u8, 
-            target_len: usize, 
-            msg_ptr: *const u8, 
-            msg_len: usize,
-        ) {
-            //let target: String = String::from_utf8_lossy(core::slice::from_raw_parts(target_ptr, target_len)).into_owned();
-            //let msg: String = String::from_utf8_lossy(core::slice::from_raw_parts(msg_ptr, msg_len)).into_owned();
-            let target: &str = std::str::from_utf8(core::slice::from_raw_parts(target_ptr, target_len)).unwrap();
-            let msg: &str = std::str::from_utf8(core::slice::from_raw_parts(msg_ptr, msg_len)).unwrap();
-
-            //edgeless_node::guest_api::telemetry_log(level, target, msg);
-            println!("Log: Target: {} msg: {}", target, msg);
-
-            
-        }*/
-
-        #[no_mangle]
-        pub unsafe extern "C" fn sync_asm (
-
-        ) {
-            println!("Sync_asm called");
-        }
-        
-
-
-        /*use futures::channel::mpsc;
-        use futures::SinkExt;
-        use futures::StreamExt;
-        use tokio::task;
-
-        use tokio::runtime::Runtime;
-
-        use edgeless_node::native_runtime::native_runtime;
-
-        #[no_mangle]
-        pub extern "C" fn send_data(mut tx: mpsc::UnboundedSender<native_runtime::NativeRuntimeRequest>) { 
-            
-            let rt = Runtime::new().unwrap();
-
-            println!("send data started");
-            
-            let sender = rt.block_on(async move {
-                
-                
-                for i in 5..10 {
-                let message = TelemetryLogEvent {
-                    target: String::from("target"),
-                    msg: String::from("message"),
-                };
-
-                let sync_data: String = "sync_data".to_owned();
-                let message1 = SyncData {
-                    serialized_data: sync_data.into_bytes(),
-                };
-
-                    //let message = format!("Sending message from client {}", i);
-                    //if let Err(_) = tx.unbounded_send(message) {
-                    //    println!("Failed to send message {}", i);
-                    //    return;
-                    //}
-
-                    //match tx.send(message).await {
-                    //    Ok(_) => Ok(()),
-                    //    Err(err) => Ok(()),
-                    //}
-                    
-                    //tx.send(message).await.unwrap();
-                    if let Err(e) = tx.send(NativeRuntimeRequest::TELEMETRYLOG(message)).await {
-                        println!("Failed to send {}.", i);
-                        return;
-                    }
-
-                    if let Err(e) = tx.send(NativeRuntimeRequest::SYNC(message1)).await {
-                        println!("Failed to send sync data {}", i);
-                        return;
-                    }
-                    println!("Message sent {}", i);
-
-
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                }
-
-                tx.close_channel();
-            });
-            println!("Sender finished");
-        
-        }*/
     }
 }

@@ -1,11 +1,16 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
-use once_cell::sync::OnceCell;
-use core::sync::atomic::{AtomicPtr, Ordering};
+#[cfg(target_arch = "x86_64")]
+use {
+    once_cell::sync::OnceCell,
+    core::sync::atomic::{AtomicPtr, Ordering},
+};
 
+#[cfg(target_arch = "x86_64")]
 static GUEST_API_HOST: OnceCell<AtomicPtr<usize>> = OnceCell::new();
 
+#[cfg(target_arch = "x86_64")]
 #[no_mangle]
 pub extern "C" fn set_guest_api_host_pointer(ptr: *const usize) {
     println!("Setting the GUEST_API_HOST pointer to: {:p}", ptr);
@@ -14,6 +19,7 @@ pub extern "C" fn set_guest_api_host_pointer(ptr: *const usize) {
     GUEST_API_HOST.set(atomic_ptr).unwrap();
 }
 
+#[cfg(target_arch = "x86_64")]
 fn get_guest_api_host_pointer() -> *const usize {
     let ptr = GUEST_API_HOST.get().expect("Guest API Host not set up");
     ptr.load(Ordering::SeqCst)
@@ -177,7 +183,6 @@ pub fn telemetry_log(level: usize, target: &str, msg: &str) {
 pub fn telemetry_log(level: usize, target: &str, msg: &str) {
     unsafe {
         let ptr = get_guest_api_host_pointer();
-        println!("Telemetry log using pointer {:p}", ptr);
 
         crate::imports::telemetry_log_asm(
             ptr, 
