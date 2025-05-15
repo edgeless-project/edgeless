@@ -88,7 +88,6 @@ macro_rules! export {
             serialized_state_ptr: *mut u8,
             serialized_state_len: usize,
         ) {
-            println!("handle_init_asm paylen {} serlen {}", payload_len, serialized_state_len);
             let payload: Option<&[u8]> = if payload_len > 0 {
                 Some(core::slice::from_raw_parts(payload_ptr, payload_len))
             } else {
