@@ -13,7 +13,7 @@ static GUEST_API_HOST: OnceCell<AtomicPtr<usize>> = OnceCell::new();
 #[cfg(target_arch = "x86_64")]
 #[no_mangle]
 pub extern "C" fn set_guest_api_host_pointer(ptr: *const usize) {
-    println!("Setting the GUEST_API_HOST pointer to: {:p}", ptr);
+    log::debug!("Setting the GUEST_API_HOST pointer to: {:p}", ptr);
     
     let atomic_ptr = AtomicPtr::new(ptr as *mut usize);
     GUEST_API_HOST.set(atomic_ptr).unwrap();

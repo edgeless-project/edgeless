@@ -4,7 +4,6 @@
 pub struct OwnedByteBuff {
     pub(crate) data: *mut u8,
     pub(crate) size: usize,
-    //pub(crate) real_data: u8, 
 }
 
 impl core::ops::Deref for OwnedByteBuff {

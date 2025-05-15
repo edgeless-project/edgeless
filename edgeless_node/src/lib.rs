@@ -494,9 +494,9 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let native_runtime_task = match settings.native_runtime {
         Some(native_runtime_settings) => match native_runtime_settings.enabled {
             true => {
-                let (native_runtime, native_runtime_task, native_runtime_api) = native_runner::native_runtime::NativeRuntime::new(
-                    std::collections::HashMap::new()
-                );
+                //let (native_runtime, native_runtime_task, native_runtime_api) = native_runner::native_runtime::NativeRuntime::new(
+                //    std::collections::HashMap::new()
+                //);
 
                 let (native_runtime_client, mut native_runtime_task_s) = 
                     base_runtime::runtime::create::<native_runner::function_instance::NativeFunctionInstance>(
