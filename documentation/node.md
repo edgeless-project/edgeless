@@ -34,3 +34,31 @@ The node has the following interfaces, also illustrated in the diagram below:
 | Invocation            | `invocation_url`       |
 
 ![](diagrams-node.png)
+
+## Configuration
+
+The node configuration file has the following sections.
+
+- general:
+  - node_id: UUID of the node, which identifies it uniquely within the cluster
+  - agent_url/agent_url_announced: URL exposed by the node to the 
+  - invocation_url/invocation_url_announced: URL of the node's local dataplane
+  - node_register_url: URL of the ε-ORC, needed for registration
+  - subscription_refresh_interval_sec: interval, in s, at which the node
+    refreshes its registration with the ε-ORC, also providing it with health
+    information and local telemetry samples
+- telemetry: defines the local telemetry
+- wasm_runtime: enable/disable and configure the WebAssembly run-time
+- container_runtime: enable/disable and configure the container run-time
+- resources: adds and configures the node's resources
+- user_node_capabilities: defines the node's capabilities exposed to the ε-ORC;
+  most of the capabilities are automatically detected (but can be overridden),
+  expect the following:
+  - labels: defines string labels attached with the node that can be used to
+    guide the allocation of functions/resources to nodes by the ε-ORC depending
+    of the workflow's annotations. One label is automatically set as
+    `hostname:<hostname of the node>`
+  - is_tee_running: Boolean that specifies if the node is running in a Trusted
+    Execution Environment, such as Intel SGX
+  - has_tpm: Boolean that specifies if the node has a Trusted Platform Module
+    that is used for authenticated registration with the ε-ORC

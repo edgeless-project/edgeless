@@ -107,7 +107,7 @@ mod system_tests {
                         redis_provider: None,
                         dda_provider: None,
                         ollama_provider: None,
-                        container_provider: vec![],
+                        serverless_provider: None,
                         kafka_egress_provider: None,
                         metrics_collector_provider: None,
                         sqlx_provider: None,
