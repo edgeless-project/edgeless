@@ -122,8 +122,9 @@ pub struct EdgelessNodeResourceSettings {
     /// The resource will connect to a remote Kafka server to stream the
     /// messages received on a given topic.
     pub kafka_egress_provider: Option<String>,
-    /// The metrics collector settings.
+    /// The metrics collector resource provider settings.
     pub metrics_collector_provider: Option<MetricsCollectorProviderSettings>,
+    /// The sqlx resource provider.
     pub sqlx_provider: Option<String>,
 }
 
@@ -151,12 +152,13 @@ impl Default for OllamaProviderSettings {
 }
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
 pub struct ServerlessProviderSettings {
-    /// The name of the container image, possibly with tag, to be started.
-    /// It it assumed that the image is available to a local Docker.
-    pub image_name: String,
-    /// Container function configuration.
-    pub init_payload: String,
-    /// If not empty, a container resource provider with that name is created.
+    /// The resource provider class type.
+    pub class_type: String,
+    /// The resource provider version.
+    pub version: String,
+    /// The serverless function entry point as an HTTP URL.
+    pub function_url: String,
+    /// The resource provider name, if not empty.
     pub provider: String,
 }
 
@@ -505,29 +507,34 @@ async fn fill_resources(
 
         if let Some(serverless_providers) = &settings.serverless_provider {
             for settings in serverless_providers {
-                if !settings.image_name.is_empty() && !settings.provider.is_empty() {
+                let mut is_function_url_valid = false;
+                if let Ok((proto, address, _port)) = edgeless_api::util::parse_http_host(&settings.function_url) {
+                    if !address.is_empty() && proto == edgeless_api::util::Proto::HTTP || proto == edgeless_api::util::Proto::HTTPS {
+                        is_function_url_valid = true;
+                    }
+                }
+                if is_function_url_valid && !settings.provider.is_empty() {
                     log::info!(
-                        "Creating container resource provider '{}' with image '{}' (init-payload: '{}')",
+                        "Creating '{}' (version {}) serverless resource provider '{}' at HTTP URL '{}'",
+                        settings.class_type,
+                        settings.version,
                         settings.provider,
-                        settings.image_name,
-                        settings.init_payload
+                        settings.function_url
                     );
-                    let class_type = format!("container-{}", settings.image_name);
                     ret.insert(
                         settings.provider.clone(),
                         agent::ResourceDesc {
-                            class_type: class_type.clone(),
+                            class_type: settings.class_type.clone(),
                             client: Box::new(
-                                resources::container::ContainerResourceProvider::new(
+                                resources::serverless::ServerlessResourceProvider::new(
                                     data_plane.clone(),
                                     Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                        ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                        ("RESOURCE_CLASS_TYPE".to_string(), settings.class_type.clone()),
                                         ("RESOURCE_PROVIDER_ID".to_string(), settings.provider.clone()),
                                         ("NODE_ID".to_string(), node_id.to_string()),
                                     ]))),
                                     edgeless_api::function_instance::InstanceId::new(node_id),
-                                    settings.image_name.clone(),
-                                    settings.init_payload.clone(),
+                                    settings.function_url.clone(),
                                 )
                                 .await,
                             ),
@@ -536,7 +543,7 @@ async fn fill_resources(
 
                     provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                         provider_id: settings.provider.clone(),
-                        class_type,
+                        class_type: settings.class_type.clone(),
                         outputs: resources::ollama::OllamaResourceSpec {}.outputs(),
                     });
                 }

@@ -3,30 +3,41 @@
 
 use futures::{SinkExt, StreamExt};
 
-// XXX
-// pub struct ContainerResourceSpec {}
+pub struct ServerlessResourceProviderSpec {
+    class_type: String,
+    version: String,
+}
 
-// impl super::resource_provider_specs::ResourceProviderSpecs for ContainerResourceSpec {
-//     fn class_type(&self) -> String {
-//         String::from("container")
-//     }
+impl ServerlessResourceProviderSpec {
+    pub fn new(class_type: &str, version: &str) -> Self {
+        Self {
+            class_type: class_type.to_string(),
+            version: version.to_string(),
+        }
+    }
+}
 
-//     fn outputs(&self) -> Vec<String> {
-//         vec![String::from("new_request")]
-//     }
+impl super::resource_provider_specs::ResourceProviderSpecs for ServerlessResourceProviderSpec {
+    fn class_type(&self) -> String {
+        self.class_type.clone()
+    }
 
-//     fn configurations(&self) -> std::collections::HashMap<String, String> {
-//         std::collections::HashMap::from([(String::from("model"), String::from("Model to be used for chatting"))])
-//     }
+    fn outputs(&self) -> Vec<String> {
+        vec![]
+    }
 
-//     fn version(&self) -> String {
-//         String::from("1.1")
-//     }
-// }
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::new()
+    }
+
+    fn version(&self) -> String {
+        self.version.clone()
+    }
+}
 
 #[derive(Clone)]
-pub struct ContainerResourceProvider {
-    inner: std::sync::Arc<tokio::sync::Mutex<ContainerResourceProviderInner>>,
+pub struct ServerlessResourceProvider {
+    inner: std::sync::Arc<tokio::sync::Mutex<ServerlessResourceProviderInner>>,
 }
 
 #[derive(Debug)]
@@ -42,27 +53,27 @@ enum ContainerCommand {
     Patch(edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::InstanceId),
 }
 
-pub struct ContainerResourceProviderInner {
+pub struct ServerlessResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    instances: std::collections::HashMap<edgeless_api::function_instance::ComponentId, ContainerResource>,
+    instances: std::collections::HashMap<edgeless_api::function_instance::ComponentId, ServerlessResource>,
     sender: futures::channel::mpsc::UnboundedSender<ContainerCommand>,
     _handle: tokio::task::JoinHandle<()>,
 }
 
-pub struct ContainerResource {
+pub struct ServerlessResource {
     join_handle: tokio::task::JoinHandle<()>,
 }
 
-impl Drop for ContainerResource {
+impl Drop for ServerlessResource {
     fn drop(&mut self) {
         self.join_handle.abort();
     }
 }
 
-impl ContainerResource {
-    /// Create a new container resource.
+impl ServerlessResource {
+    /// Create a new serverless resource.
     ///
     /// - `dataplane_provider`: handle to the EDGELESS data plane
     /// - `telemetry_hangle`: handle to the node's telemetry sub-system
@@ -128,23 +139,19 @@ impl ContainerResource {
     }
 }
 
-impl ContainerResourceProvider {
+impl ServerlessResourceProvider {
     /// Create a container resource provider:
     ///
     /// - `dataplane_provider`: handle to the EDGELESS data plane
     /// - `telemetry_hangle`: handle to the node's telemetry sub-system
     /// - `resource_provider_id`: identifier of this resource provider,
     ///    also containing the identifier of the node hosting it
-    /// - `image_name`: name of the container image, which must be locally
-    ///    available
-    /// - `init_payload`: string to call the init() handle of the container
-    ///    function
+    /// - `function_url`: the serverless function entry point as an HTTP URL
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
-        image_name: String,
-        init_payload: String,
+        function_url: String,
     ) -> Self {
         // Create a channel for:
         // - single receiver: the loop in the task below
@@ -189,7 +196,7 @@ impl ContainerResourceProvider {
             }
         });
         Self {
-            inner: std::sync::Arc::new(tokio::sync::Mutex::new(ContainerResourceProviderInner {
+            inner: std::sync::Arc::new(tokio::sync::Mutex::new(ServerlessResourceProviderInner {
                 resource_provider_id,
                 dataplane_provider,
                 telemetry_handle,
@@ -202,7 +209,7 @@ impl ContainerResourceProvider {
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for ContainerResourceProvider {
+impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for ServerlessResourceProvider {
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
@@ -215,7 +222,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             new_id.function_id.to_string(),
         )]));
 
-        match ContainerResource::new(dataplane_handle, telemetry_handle, new_id, lck.sender.clone()).await {
+        match ServerlessResource::new(dataplane_handle, telemetry_handle, new_id, lck.sender.clone()).await {
             Ok(resource) => {
                 lck.instances.insert(new_id.function_id, resource);
                 return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));

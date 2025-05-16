@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-pub mod container;
 pub mod dda;
 pub mod file_log;
 pub mod http_egress;
@@ -12,6 +11,7 @@ pub mod metrics_collector;
 pub mod ollama;
 pub mod redis;
 pub mod resource_provider_specs;
+pub mod serverless;
 pub mod sqlx;
 
 fn observe_transfer(
