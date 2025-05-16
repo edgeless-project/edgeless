@@ -116,8 +116,8 @@ pub struct EdgelessNodeResourceSettings {
     pub dda_provider: Option<String>,
     /// The ollama resource provider settings.
     pub ollama_provider: Option<OllamaProviderSettings>,
-    /// The container resource provider settings.
-    pub container_provider: Vec<ContainerProviderSettings>,
+    /// The serverless resource provider settings.
+    pub serverless_provider: Option<Vec<ServerlessProviderSettings>>,
     /// If not empty, a kafka-egress resource provider with that name is created.
     /// The resource will connect to a remote Kafka server to stream the
     /// messages received on a given topic.
@@ -150,7 +150,7 @@ impl Default for OllamaProviderSettings {
     }
 }
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
-pub struct ContainerProviderSettings {
+pub struct ServerlessProviderSettings {
     /// The name of the container image, possibly with tag, to be started.
     /// It it assumed that the image is available to a local Docker.
     pub image_name: String,
@@ -281,13 +281,19 @@ fn get_capabilities(runtimes: Vec<String>, user_node_capabilities: NodeCapabilit
         log::debug!("CPUs have different frequencies, using: {}", clock_freq_cpu);
     }
 
+    // Retrieve user labels and add default ones, if not already present.
+    let mut labels = user_node_capabilities.labels.unwrap_or_default();
+    labels.push(format!("hostname={}", sysinfo::System::host_name().unwrap_or_default()));
+    labels.sort();
+    labels.dedup();
+
     edgeless_api::node_registration::NodeCapabilities {
         num_cpus: user_node_capabilities.num_cpus.unwrap_or(sys.cpus().len() as u32),
         model_name_cpu: user_node_capabilities.model_name_cpu.unwrap_or(model_name_cpu),
         clock_freq_cpu: user_node_capabilities.clock_freq_cpu.unwrap_or(clock_freq_cpu),
         num_cores: user_node_capabilities.num_cores.unwrap_or(sys.physical_core_count().unwrap_or(1) as u32),
         mem_size: user_node_capabilities.mem_size.unwrap_or((sys.total_memory() / (1024 * 1024)) as u32),
-        labels: user_node_capabilities.labels.unwrap_or_default(),
+        labels,
         is_tee_running: user_node_capabilities.is_tee_running.unwrap_or(false),
         has_tpm: user_node_capabilities.has_tpm.unwrap_or(false),
         runtimes,
@@ -497,41 +503,43 @@ async fn fill_resources(
             }
         }
 
-        for settings in &settings.container_provider {
-            if !settings.image_name.is_empty() && !settings.provider.is_empty() {
-                log::info!(
-                    "Creating container resource provider '{}' with image '{}' (init-payload: '{}')",
-                    settings.provider,
-                    settings.image_name,
-                    settings.init_payload
-                );
-                let class_type = format!("container-{}", settings.image_name);
-                ret.insert(
-                    settings.provider.clone(),
-                    agent::ResourceDesc {
-                        class_type: class_type.clone(),
-                        client: Box::new(
-                            resources::container::ContainerResourceProvider::new(
-                                data_plane.clone(),
-                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
-                                    ("RESOURCE_PROVIDER_ID".to_string(), settings.provider.clone()),
-                                    ("NODE_ID".to_string(), node_id.to_string()),
-                                ]))),
-                                edgeless_api::function_instance::InstanceId::new(node_id),
-                                settings.image_name.clone(),
-                                settings.init_payload.clone(),
-                            )
-                            .await,
-                        ),
-                    },
-                );
+        if let Some(serverless_providers) = &settings.serverless_provider {
+            for settings in serverless_providers {
+                if !settings.image_name.is_empty() && !settings.provider.is_empty() {
+                    log::info!(
+                        "Creating container resource provider '{}' with image '{}' (init-payload: '{}')",
+                        settings.provider,
+                        settings.image_name,
+                        settings.init_payload
+                    );
+                    let class_type = format!("container-{}", settings.image_name);
+                    ret.insert(
+                        settings.provider.clone(),
+                        agent::ResourceDesc {
+                            class_type: class_type.clone(),
+                            client: Box::new(
+                                resources::container::ContainerResourceProvider::new(
+                                    data_plane.clone(),
+                                    Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                        ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                        ("RESOURCE_PROVIDER_ID".to_string(), settings.provider.clone()),
+                                        ("NODE_ID".to_string(), node_id.to_string()),
+                                    ]))),
+                                    edgeless_api::function_instance::InstanceId::new(node_id),
+                                    settings.image_name.clone(),
+                                    settings.init_payload.clone(),
+                                )
+                                .await,
+                            ),
+                        },
+                    );
 
-                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                    provider_id: settings.provider.clone(),
-                    class_type,
-                    outputs: resources::ollama::OllamaResourceSpec {}.outputs(),
-                });
+                    provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                        provider_id: settings.provider.clone(),
+                        class_type,
+                        outputs: resources::ollama::OllamaResourceSpec {}.outputs(),
+                    });
+                }
             }
         }
 
@@ -852,7 +860,7 @@ pub fn edgeless_node_default_conf() -> String {
             redis_provider: Some("redis-1".to_string()),
             dda_provider: Some("dda-1".to_string()),
             ollama_provider: Some(OllamaProviderSettings::default()),
-            container_provider: vec![ContainerProviderSettings::default()],
+            serverless_provider: Some(vec![ServerlessProviderSettings::default()]),
             kafka_egress_provider: Some(String::default()),
             metrics_collector_provider: Some(MetricsCollectorProviderSettings::default()),
             sqlx_provider: Some(String::from("sqlite://sqlite.db")),

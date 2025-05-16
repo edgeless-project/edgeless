@@ -23,6 +23,7 @@ New features:
 - Add telemetry event logs to the data transmitted by the nodes to the ε-ORC.
 - Add active power measurement to nodes from Modbus/TCP server intended for
   Raritan PDUS.
+- Automatically add a label hostname:HOSTNAME to the node's capabilities.
 
 Improvements:
 
