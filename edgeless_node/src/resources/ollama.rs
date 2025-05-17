@@ -11,7 +11,7 @@ impl super::resource_provider_specs::ResourceProviderSpecs for OllamaResourceSpe
     }
 
     fn outputs(&self) -> Vec<String> {
-        vec![String::from("new_request")]
+        vec![String::from("out")]
     }
 
     fn configurations(&self) -> std::collections::HashMap<String, String> {
