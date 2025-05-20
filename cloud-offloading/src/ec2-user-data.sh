@@ -7,7 +7,7 @@
 EDGELESS_DIR=/home/ubuntu/edgeless
 
 # Orchestrator URL (Without http://)
-ORCHESTRATOR_URL=3.253.97.217
+ORCHESTRATOR_URL=__ORCHESTRATOR_URL_PLACEHOLDER__
 
 # Obtain EC2 instance Public IPv4 DNS (NODE_URL)
 
