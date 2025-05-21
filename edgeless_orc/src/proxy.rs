@@ -15,6 +15,12 @@ pub enum Category {
     DependencyGraph,
 }
 
+pub type PerformanceSamples = std::collections::HashMap<String, Vec<(chrono::DateTime<chrono::Utc>, f64)>>;
+pub type NodeHealthStatuses = std::collections::HashMap<
+    edgeless_api::function_instance::NodeId,
+    Vec<(chrono::DateTime<chrono::Utc>, edgeless_api::node_registration::NodeHealthStatus)>,
+>;
+
 #[async_trait::async_trait]
 pub trait Proxy: Sync + Send {
     /// Update the info on the currently actives nodes as given.
@@ -55,13 +61,16 @@ pub trait Proxy: Sync + Send {
     /// Fetch the resource providers available.
     fn fetch_resource_providers(&mut self) -> std::collections::HashMap<String, crate::resource_provider::ResourceProvider>;
 
-    /// Fetch the nodes' health status.
+    /// Fetch the last nodes' health status.
     fn fetch_node_health(
         &mut self,
     ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeHealthStatus>;
 
+    /// Fetch all the last nodes' health statuses, with timestamp.
+    fn fetch_node_healths(&mut self) -> NodeHealthStatuses;
+
     /// Fetch the performance samples.
-    fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, std::collections::HashMap<String, Vec<(f64, f64)>>>;
+    fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, PerformanceSamples>;
 
     /// Fetch the spawn requests of active function instances.
     fn fetch_function_instance_requests(
@@ -99,4 +108,8 @@ pub trait Proxy: Sync + Send {
 
     /// Return true if the given category has been updated since the last fetch.
     fn updated(&mut self, category: Category) -> bool;
+
+    /// Perform a garbage collection of the sorted sets removing all values
+    /// older than `period`.
+    fn garbage_collection(&mut self, period: tokio::time::Duration);
 }

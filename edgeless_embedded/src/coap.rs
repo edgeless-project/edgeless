@@ -138,6 +138,7 @@ impl CoapMultiplexer {
         }
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn incoming_resource_start<'a>(
         &mut self,
         sender: smoltcp::wire::IpEndpoint,
@@ -224,6 +225,7 @@ impl CoapMultiplexer {
         }
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn incoming_resource_patch<'a>(
         &mut self,
         sender: smoltcp::wire::IpEndpoint,
@@ -319,6 +321,7 @@ impl CoapMultiplexer {
                     edgeless_api_core::invocation::EventData::CallNoRet => edgeless_api_core::invocation::EventData::CallNoRet,
                     edgeless_api_core::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,
                 },
+                created: event.created,
             };
 
             let ((data, endpoint), _tail) =

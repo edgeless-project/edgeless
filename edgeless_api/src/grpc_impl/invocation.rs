@@ -18,6 +18,7 @@ impl InvocationConverters {
             source: CommonConverters::parse_instance_id(api_event.source.as_ref().unwrap())?,
             stream_id: api_event.stream_id,
             data: Self::parse_api_event_data(api_event.msg.as_ref().unwrap())?,
+            created: CommonConverters::parse_event_timestamp(api_event.created.as_ref().unwrap())?,
         })
     }
 
@@ -37,6 +38,7 @@ impl InvocationConverters {
             source: Some(CommonConverters::serialize_instance_id(&crate_event.source)),
             stream_id: crate_event.stream_id,
             msg: Some(Self::encode_crate_event_data(&crate_event.data)),
+            created: Some(CommonConverters::serialize_event_timestamp(&crate_event.created)),
         }
     }
 

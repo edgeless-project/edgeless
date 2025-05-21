@@ -25,6 +25,8 @@ pub struct Event<T> {
     pub stream_id: u64,
     #[n(3)]
     pub data: EventData<T>,
+    #[n(4)]
+    pub created: crate::event_timestamp::EventTimestamp,
 }
 
 #[derive(Debug, PartialEq, Eq)]
