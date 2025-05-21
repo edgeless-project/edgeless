@@ -99,7 +99,7 @@ impl RedisResource {
         } else {
             String::default()
         };
-        let redis_key = redis_key.cloned().and_then(|k| Some(format!("{}{}", workflow_id_header, k)));
+        let redis_key = redis_key.cloned().map(|k| format!("{}{}", workflow_id_header, k));
 
         let mut connection = redis::Client::open(redis_url)?.get_connection()?;
 
@@ -201,7 +201,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                 instance_specification
                     .configuration
                     .contains_key("add-workflow-id")
-                    .then(|| instance_specification.workflow_id),
+                    .then_some(instance_specification.workflow_id),
             )
             .await
             {
