@@ -19,5 +19,5 @@ members = [
     "edgeless_orc",
     "edgeless_systemtests",
     "edgeless_telemetry",
-    "cloud-offloading",
+    "edgeless_cloud_offloading",
 ]

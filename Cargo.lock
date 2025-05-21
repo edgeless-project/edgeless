@@ -1147,15 +1147,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f46ad14479a25103f283c0f10005961cf086d8dc42205bb44c46ac563475dca6"
 
 [[package]]
-name = "cloud-offloading"
+name = "cloud_offloading"
 version = "0.1.0"
 dependencies = [
  "aws-config",
  "aws-sdk-ec2",
+ "base64 0.22.1",
+ "env_logger",
+ "log",
  "rand",
  "serde",
  "tokio",
- "toml 0.5.11",
+ "toml 0.7.8",
 ]
 
 [[package]]
