@@ -23,7 +23,7 @@ impl super::resource_provider_specs::ResourceProviderSpecs for ServerlessResourc
     }
 
     fn outputs(&self) -> Vec<String> {
-        vec!["out".to_string()]
+        vec!["err".to_string(), "out".to_string()]
     }
 
     fn configurations(&self) -> std::collections::HashMap<String, String> {
@@ -44,13 +44,14 @@ pub struct ServerlessResourceProvider {
 struct CallCommand {
     msg: String,
     resource_id: edgeless_api::function_instance::ComponentId,
-    reply_sender: tokio::sync::oneshot::Sender<anyhow::Result<(edgeless_api::function_instance::InstanceId, String)>>,
+    reply_sender: tokio::sync::oneshot::Sender<anyhow::Result<(Option<edgeless_api::function_instance::InstanceId>, String)>>,
 }
 
 enum ServerlessCommand {
     Call(CallCommand),
     // resource_id, target
-    Patch(edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::InstanceId),
+    PatchOut(edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::InstanceId),
+    PatchErr(edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::InstanceId),
 }
 
 pub struct ServerlessResourceProviderInner {
@@ -108,7 +109,7 @@ impl ServerlessResource {
                 };
 
                 let (reply_sender, reply_receiver) =
-                    tokio::sync::oneshot::channel::<anyhow::Result<(edgeless_api::function_instance::InstanceId, String)>>();
+                    tokio::sync::oneshot::channel::<anyhow::Result<(Option<edgeless_api::function_instance::InstanceId>, String)>>();
                 let _ = sender
                     .send(ServerlessCommand::Call(CallCommand {
                         msg,
@@ -120,7 +121,9 @@ impl ServerlessResource {
                 match reply_receiver.await {
                     Ok(response) => match response {
                         Ok((target, response)) => {
-                            let _ = dataplane_handle.send(target, response).await;
+                            if let Some(target) = target {
+                                let _ = dataplane_handle.send(target, response).await;
+                            }
                         }
                         Err(err) => {
                             log::warn!("Error from serverless resource provider: {}", err)
@@ -162,46 +165,55 @@ impl ServerlessResourceProvider {
         let client = reqwest::Client::new();
 
         let _handle = tokio::spawn(async move {
-            let mut targets = std::collections::HashMap::new();
+            let mut targets_out = std::collections::HashMap::new();
+            let mut targets_err = std::collections::HashMap::new();
             while let Some(command) = receiver.next().await {
                 match command {
                     ServerlessCommand::Call(cmd) => {
-                        if let Some(target) = targets.get(&cmd.resource_id) {
-                            let client = client.request(reqwest::Method::POST, function_url.clone()).body(cmd.msg);
-                            let response = match client.send().await {
-                                Ok(ret) => {
-                                    if ret.status() == reqwest::StatusCode::OK {
-                                        match ret.text().await {
-                                            Ok(body) => Ok((*target, body)),
-                                            Err(err) => anyhow::Result::Err(anyhow::anyhow!(
+                        let target_out = targets_out.get(&cmd.resource_id).cloned();
+                        let target_err = targets_err.get(&cmd.resource_id).cloned();
+                        let client = client.request(reqwest::Method::POST, function_url.clone()).body(cmd.msg);
+                        let response = match client.send().await {
+                            Ok(ret) => {
+                                if ret.status() == reqwest::StatusCode::OK {
+                                    match ret.text().await {
+                                        Ok(body) => Ok((target_out, body)),
+                                        Err(err) => Ok((
+                                            target_err,
+                                            format!(
                                                 "error when calling serverless function at {} for resource {}: {}",
-                                                function_url,
-                                                cmd.resource_id,
-                                                err,
-                                            )),
-                                        }
-                                    } else {
-                                        anyhow::Result::Err(anyhow::anyhow!(
+                                                function_url, cmd.resource_id, err,
+                                            ),
+                                        )),
+                                    }
+                                } else {
+                                    Ok((
+                                        target_err,
+                                        format!(
                                             "error when calling serverless function at {} for resource {}: status {} returned",
                                             function_url,
                                             cmd.resource_id,
                                             ret.status()
-                                        ))
-                                    }
+                                        ),
+                                    ))
                                 }
-                                Err(err) => anyhow::Result::Err(anyhow::anyhow!(
+                            }
+                            Err(err) => Ok((
+                                target_err,
+                                format!(
                                     "error when calling serverless function at {} for resource {}: {}",
-                                    function_url,
-                                    cmd.resource_id,
-                                    err,
-                                )),
-                            };
+                                    function_url, cmd.resource_id, err,
+                                ),
+                            )),
+                        };
 
-                            let _ = cmd.reply_sender.send(response);
-                        }
+                        let _ = cmd.reply_sender.send(response);
                     }
-                    ServerlessCommand::Patch(resource_id, target) => {
-                        targets.insert(resource_id, target);
+                    ServerlessCommand::PatchOut(resource_id, target) => {
+                        targets_out.insert(resource_id, target);
+                    }
+                    ServerlessCommand::PatchErr(resource_id, target) => {
+                        targets_err.insert(resource_id, target);
                     }
                 };
             }
@@ -255,23 +267,24 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
-        // Find the target component to which we have to send events
-        // generated on the "out" output channel.
-        let target = match update.output_mapping.get("out") {
-            Some(val) => *val,
-            None => {
-                anyhow::bail!("Missing mapping of channel: out");
-            }
-        };
-
         // Check that the resource to be patched is active.
         let mut lck = self.inner.lock().await;
         if !lck.instances.contains_key(&update.function_id) {
             anyhow::bail!("Patching a non-existing resource: {}", update.function_id);
         }
 
-        // Add/update the mapping of the resource provider to the target.
-        let _ = lck.sender.send(ServerlessCommand::Patch(update.function_id, target)).await;
+        // Find the target component to which we have to send events
+        // generated on the "out" or "err" output channel.
+        //
+        // The mapping of both output channels is optional.
+        //
+        // Other mappings are silently ignored.
+        if let Some(target) = update.output_mapping.get("out") {
+            let _ = lck.sender.send(ServerlessCommand::PatchOut(update.function_id, *target)).await;
+        }
+        if let Some(target) = update.output_mapping.get("err") {
+            let _ = lck.sender.send(ServerlessCommand::PatchErr(update.function_id, *target)).await;
+        }
 
         Ok(())
     }

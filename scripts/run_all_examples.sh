@@ -13,15 +13,15 @@ function echo_g(){ echo -e "${CLR_GREEN}$*${CLR_RST}"; }
 function echo_y(){ echo -e "${CLR_YELLOW}$*${CLR_RST}"; }
 # =========================================================== 
 
-logs="build.log build_functions.log edgeless_bal.log edgeless_con.log edgeless_orc.log edgeless_node.log my-local-file.log reading-errors.log"
+artifacts="build.log build_functions.log edgeless_bal.log edgeless_con.log edgeless_orc.log edgeless_node.log my-local-file.log reading-errors.log skipped.log err.log metric.log sqlite.db"
 confs="balancer.toml controller.toml orchestrator.toml node.toml cli.toml"
-specialized_workflows="container dda_demo dda_test esp32_resources redis vector_mul matrix_mul ollama kafka_egress"
+specialized_workflows="container dda_demo dda_test esp32_resources redis vector_mul matrix_mul ollama kafka_egress serverless"
 
 echo_y "> Checking for existing files"
 existing_files=""
-for log in $logs ; do
-    if [ -r $log ] ; then
-        existing_files="$existing_files $log"
+for artifact in $artifacts ; do
+    if [ -r $artifact ] ; then
+        existing_files="$existing_files $artifact"
     fi
 done
 for conf in $confs ; do
@@ -33,7 +33,7 @@ if [ "$existing_files" != "" ] ; then
     echo "The following files exist and will be overwritten if you continue: $existing_files"
     read -s -n 1 -p "Hit Ctrl+C to abort or press any key to continue"
     echo ""
-    rm $logs $confs 2> /dev/null
+    rm $artifacts $confs 2> /dev/null
 fi
 
 echo
@@ -75,7 +75,7 @@ pids+=($!)
 echo -n "waiting for the cluster to be ready"
 while (true) ; do
     echo -n "."
-    out=$(target/debug/edgeless_cli domain inspect domain-1 | grep "1 node")
+    out=$(target/debug/edgeless_cli domain inspect domain-7000 | grep "1 node")
     if [ "$out" != "" ] ; then
         break
     fi
@@ -83,7 +83,8 @@ while (true) ; do
 done
 echo "done"
 
-echo "starting workflows"
+echo
+echo_y "> Starting workflows"
 for workflow in $(find examples -type f -name "workflow*.json") ; do
     name=$(basename $(dirname $workflow))
     if [ "$RUN_SPECIALIZED_WORKFLOWS" != "1" ] ; then
@@ -95,7 +96,7 @@ for workflow in $(find examples -type f -name "workflow*.json") ; do
             fi
         done
         if [ $specialized -eq 1 ] ; then
-            echo "skipping specialized workflow '$workflow', use RUN_SPECIALIZED_WORKFLOWS=1 to run everything"
+            echo $workflow >> skipped.log
             continue
         fi
     fi
@@ -118,13 +119,17 @@ for workflow in $(find examples -type f -name "workflow*.json") ; do
 done
 
 echo
+echo_y "> Skipped workflows (use RUN_SPECIALIZED_WORKFLOWS=1 to run them):"
+cat skipped.log
+
+echo
 echo_y "> Cleaning up"
 for pid in "${pids[@]}" ; do
     echo "killing $pid"
-    kill $pid
+    kill $pid >& /dev/null
 done
 wait
 
 read -s -n 1 -p "press any key to remove all conf&log files (Ctrl+C if you want to keep them)"
 echo ""
-rm $logs $confs 2> /dev/null
+rm $artifacts $confs 2> /dev/null

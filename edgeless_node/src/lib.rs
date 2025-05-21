@@ -514,6 +514,7 @@ async fn fill_resources(
                     }
                 }
                 if is_function_url_valid && !settings.provider.is_empty() {
+                    let provider_spec = resources::serverless::ServerlessResourceProviderSpec::new(&settings.class_type, &settings.version);
                     log::info!(
                         "Creating '{}' (version {}) serverless resource provider '{}' at HTTP URL '{}'",
                         settings.class_type,
@@ -544,7 +545,7 @@ async fn fill_resources(
                     provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                         provider_id: settings.provider.clone(),
                         class_type: settings.class_type.clone(),
-                        outputs: resources::ollama::OllamaResourceSpec {}.outputs(),
+                        outputs: provider_spec.outputs(),
                     });
                 }
             }
