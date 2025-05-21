@@ -22,6 +22,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for ServerlessResourc
         self.class_type.clone()
     }
 
+    fn description(&self) -> String {
+        r"Call an external OpenFaaS-compatible function at an URL -- see https://www.openfaas.com/".to_string()
+    }
+
     fn outputs(&self) -> Vec<String> {
         vec!["err".to_string(), "out".to_string()]
     }
