@@ -22,12 +22,18 @@ impl EdgeFunction for PingerFun {
             let id = STATE.get().unwrap().lock().unwrap().count;
 
             STATE.get().unwrap().lock().unwrap().count += 1;
-            //sync(&serde_json::to_string(STATE.get().unwrap().lock().unwrap().deref()).unwrap().as_bytes());
+            sync(&serde_json::to_string(STATE.get().unwrap().lock().unwrap().deref()).unwrap().as_bytes());
 
             let res = call("ponger", &format!("PING-{}", id).as_bytes());
-            if let CallRet::Reply(_msg) = res {
-                log::info!("Got Reply");
+            match res {
+                CallRet::Reply(msg) => { if let Ok(msg) = std::str::from_utf8(&msg) { log::info!("Got Reply: {}", msg); }  },
+                CallRet::NoReply => { log::info!("Got NoReply"); },
+                CallRet::Err => { log::info!("Got Reply Error"); },
             }
+
+            //if let CallRet::Reply(_msg) = res {
+            //    log::info!("Got Reply");
+            //}
 
             delayed_cast(1000, "self", b"wakeup");
         }
@@ -42,8 +48,7 @@ impl EdgeFunction for PingerFun {
         edgeless_function::init_logger();
         log::info!("Pinger: 'Init' called");
         
-        STATE.set(std::sync::Mutex::new(PingerState { count: 0})).unwrap();
-        /*if let Some(serialized) = serialized_state {
+        if let Some(serialized) = serialized_state {
             STATE
                 .set(std::sync::Mutex::new(
                     serde_json::from_str(core::str::from_utf8(serialized).unwrap()).unwrap(),
@@ -51,7 +56,7 @@ impl EdgeFunction for PingerFun {
                 .unwrap();
         } else {
             STATE.set(std::sync::Mutex::new(PingerState { count: 0 })).unwrap();
-        }*/
+        }
 
         cast("self", b"wakeup");
     }
@@ -61,8 +66,4 @@ impl EdgeFunction for PingerFun {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 edgeless_function::export!(PingerFun);
-
-#[cfg(target_arch = "x86_64")]
-edgeless_function::export_x86a!(PingerFun);
