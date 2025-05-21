@@ -16,3 +16,4 @@ secrets/
 *.swp
 symbols.json
 .*bkp
+*.save

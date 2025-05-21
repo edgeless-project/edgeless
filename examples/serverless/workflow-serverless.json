@@ -22,16 +22,26 @@
             "name": "double",
             "class_type": "double",
             "output_mapping": {
-                "out": "my-log"
+                "out": "my-out-log",
+                "err": "my-err-log"
             },
             "configurations": {}
         },
         {
-            "name": "my-log",
+            "name": "my-out-log",
             "class_type": "file-log",
             "output_mapping": {},
             "configurations": {
-                "filename": "my-local-file-2.log",
+                "filename": "my-out.log",
+                "add-timestamp": "true"
+            }
+        },
+        {
+            "name": "my-err-log",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "my-err.log",
                 "add-timestamp": "true"
             }
         }
