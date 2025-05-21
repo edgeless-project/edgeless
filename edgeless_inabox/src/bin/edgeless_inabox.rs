@@ -129,11 +129,13 @@ fn generate_configs(
         proxy: match metrics_collector {
             true => edgeless_orc::EdgelessOrcProxySettings {
                 proxy_type: "Redis".to_string(),
+                proxy_gc_period_seconds: 360,
                 redis_url: Some(String::from("redis://127.0.0.1:6379")),
                 dataset_settings: Some(edgeless_orc::EdgelessOrcProxyDatasetSettings::default()),
             },
             false => edgeless_orc::EdgelessOrcProxySettings {
                 proxy_type: "None".to_string(),
+                proxy_gc_period_seconds: 0,
                 redis_url: None,
                 dataset_settings: None,
             },
@@ -199,6 +201,10 @@ fn generate_configs(
                 ollama_provider: Some(OllamaProviderSettings::default()),
                 kafka_egress_provider: Some(String::default()),
                 metrics_collector_provider: Some(MetricsCollectorProviderSettings::default()),
+                sqlx_provider: match counter == 0 {
+                    true => Some("sqlx-1".to_string()),
+                    false => None,
+                },
             }),
             user_node_capabilities: Some(edgeless_node::NodeCapabilitiesUser::default()),
         });
@@ -240,6 +246,7 @@ fn generate_configs(
                     redis_url: Some(String::from("redis://127.0.0.1:6379")),
                     provider: String::from("metrics-collector-1"),
                 }),
+                sqlx_provider: None,
             }),
             user_node_capabilities: None,
         });

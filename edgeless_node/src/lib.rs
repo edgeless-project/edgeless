@@ -119,6 +119,7 @@ pub struct EdgelessNodeResourceSettings {
     pub kafka_egress_provider: Option<String>,
     /// The metrics collector settings.
     pub metrics_collector_provider: Option<MetricsCollectorProviderSettings>,
+    pub sqlx_provider: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -283,6 +284,7 @@ async fn fill_resources(
     node_id: uuid::Uuid,
     settings: &Option<EdgelessNodeResourceSettings>,
     provider_specifications: &mut Vec<edgeless_api::node_registration::ResourceProviderSpecification>,
+    telemetry_provider: &edgeless_telemetry::telemetry_events::TelemetryProcessor,
 ) -> std::collections::HashMap<String, agent::ResourceDesc> {
     let mut ret = std::collections::HashMap::<String, agent::ResourceDesc>::new();
 
@@ -322,6 +324,11 @@ async fn fill_resources(
                         client: Box::new(
                             resources::http_egress::EgressResourceProvider::new(
                                 data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
                                 edgeless_api::function_instance::InstanceId::new(node_id),
                             )
                             .await,
@@ -347,6 +354,11 @@ async fn fill_resources(
                         client: Box::new(
                             resources::file_log::FileLogResourceProvider::new(
                                 data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
                                 edgeless_api::function_instance::InstanceId::new(node_id),
                             )
                             .await,
@@ -372,6 +384,11 @@ async fn fill_resources(
                         client: Box::new(
                             resources::redis::RedisResourceProvider::new(
                                 data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
                                 edgeless_api::function_instance::InstanceId::new(node_id),
                             )
                             .await,
@@ -395,8 +412,16 @@ async fn fill_resources(
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
                         client: Box::new(
-                            resources::dda::DDAResourceProvider::new(data_plane.clone(), edgeless_api::function_instance::InstanceId::new(node_id))
-                                .await,
+                            resources::dda::DDAResourceProvider::new(
+                                data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
+                                edgeless_api::function_instance::InstanceId::new(node_id),
+                            )
+                            .await,
                         ),
                     },
                 );
@@ -426,6 +451,11 @@ async fn fill_resources(
                         client: Box::new(
                             resources::ollama::OllamaResourceProvider::new(
                                 data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), settings.provider.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
                                 edgeless_api::function_instance::InstanceId::new(node_id),
                                 &settings.host,
                                 settings.port,
@@ -457,6 +487,11 @@ async fn fill_resources(
                             client: Box::new(
                                 resources::kafka_egress::KafkaEgressResourceProvider::new(
                                     data_plane.clone(),
+                                    Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                        ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                        ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                        ("NODE_ID".to_string(), node_id.to_string()),
+                                    ]))),
                                     edgeless_api::function_instance::InstanceId::new(node_id),
                                 )
                                 .await,
@@ -498,6 +533,11 @@ async fn fill_resources(
                                                 client: Box::new(
                                                     resources::metrics_collector::MetricsCollectorResourceProvider::new(
                                                         data_plane.clone(),
+                                                        Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                                            ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                                            ("RESOURCE_PROVIDER_ID".to_string(), settings.provider.clone()),
+                                                            ("NODE_ID".to_string(), node_id.to_string()),
+                                                        ]))),
                                                         edgeless_api::function_instance::InstanceId::new(node_id),
                                                         redis_connection,
                                                     )
@@ -526,6 +566,36 @@ async fn fill_resources(
                         log::error!("unknown  metrics collector type");
                     }
                 }
+            }
+        }
+
+        if let Some(provider_id) = &settings.sqlx_provider {
+            if !provider_id.is_empty() {
+                log::info!("Creating resource '{}'", provider_id);
+                let class_type = "sqlx".to_string();
+                ret.insert(
+                    provider_id.clone(),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::sqlx::SqlxResourceProvider::new(
+                                data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
+                                edgeless_api::function_instance::InstanceId::new(node_id),
+                            )
+                            .await,
+                        ),
+                    },
+                );
+                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id: provider_id.clone(),
+                    class_type,
+                    outputs: vec![],
+                });
             }
         }
     }
@@ -662,6 +732,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
         settings.general.node_id,
         &settings.resources,
         &mut resource_provider_specifications,
+        &telemetry_provider,
     )
     .await;
 
@@ -721,9 +792,9 @@ pub fn edgeless_node_default_conf() -> String {
             ollama_provider: Some(OllamaProviderSettings::default()),
             kafka_egress_provider: Some(String::default()),
             metrics_collector_provider: Some(MetricsCollectorProviderSettings::default()),
+            sqlx_provider: Some(String::from("sqlite://sqlite.db")),
         }),
         user_node_capabilities: Some(NodeCapabilitiesUser::default()),
     };
-
     toml::to_string(&node_conf).expect("Wrong")
 }

@@ -75,13 +75,13 @@ pub fn parse(encoded_msg: &[u8]) -> DDA {
 }
 
 fn decode(msg: OwnedByteBuff) -> DDA {
-    return match serde_json::from_slice::<DDA>(msg.to_vec().as_slice()) {
+    match serde_json::from_slice::<DDA>(msg.to_vec().as_slice()) {
         Ok(x) => x,
         Err(e) => {
             log::error!("could not encode the DDA struct: {:?}", e);
             panic!("unrecoverable!");
         }
-    };
+    }
 }
 
 fn encode(msg: DDA) -> Vec<u8> {

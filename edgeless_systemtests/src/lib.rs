@@ -56,11 +56,13 @@ mod system_tests {
                 proxy: match redis_url {
                     None => edgeless_orc::EdgelessOrcProxySettings {
                         proxy_type: "None".to_string(),
+                        proxy_gc_period_seconds: 0,
                         redis_url: None,
                         dataset_settings: None,
                     },
                     Some(url) => edgeless_orc::EdgelessOrcProxySettings {
                         proxy_type: "Redis".to_string(),
+                        proxy_gc_period_seconds: 0,
                         redis_url: Some(url.to_string()),
                         dataset_settings: None,
                     },
@@ -107,6 +109,7 @@ mod system_tests {
                         ollama_provider: None,
                         kafka_egress_provider: None,
                         metrics_collector_provider: None,
+                        sqlx_provider: None,
                     }),
                     user_node_capabilities: None,
                 }));
