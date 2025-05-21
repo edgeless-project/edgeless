@@ -45,6 +45,8 @@ Improvements:
   collection done by the ε-ORC. Period duration is configurable.
 - ε-ORC: reject nodes with empty host in invocation/agent URLs.
 - Redis resource provider: add the option to read values from a Redis server.
+- Add a flag to the resource providers' section of the node's configuration
+  to prepend automatically the hostname to the resource providers' name.
 
 API changes:
 
