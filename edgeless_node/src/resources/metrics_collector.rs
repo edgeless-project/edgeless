@@ -12,6 +12,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for MetricsCollectorR
         String::from("metrics-collector")
     }
 
+    fn description(&self) -> String {
+        r"Collect app-level samples from functions -- DEPRECATED".to_string()
+    }
+
     fn outputs(&self) -> Vec<String> {
         vec![]
     }

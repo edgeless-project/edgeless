@@ -5,6 +5,30 @@ use edgeless_dataplane::core::Message;
 use sqlx::{migrate::MigrateDatabase, FromRow, Sqlite, SqlitePool};
 use tokio;
 
+pub struct SqlxResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for SqlxResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("sqlx")
+    }
+
+    fn description(&self) -> String {
+        r"Perform operations on an SQLite database".to_string()
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([(String::from("url"), String::from("URL of the SQLite database"))])
+    }
+
+    fn version(&self) -> String {
+        String::from("1.1")
+    }
+}
+
 #[derive(Clone)]
 pub struct SqlxResourceProvider {
     inner: std::sync::Arc<tokio::sync::Mutex<SqlxResourceProviderInner>>,

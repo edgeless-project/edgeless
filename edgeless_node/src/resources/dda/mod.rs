@@ -19,6 +19,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for DdaResourceSpec {
         String::from("dda")
     }
 
+    fn description(&self) -> String {
+        r"Interact with a Data Distribution Agent -- see https://github.com/coatyio/dda".to_string()
+    }
+
     fn outputs(&self) -> Vec<String> {
         vec![String::from("out")]
     }
