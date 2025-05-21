@@ -24,6 +24,10 @@ New features:
 - Add active power measurement to nodes from Modbus/TCP server intended for
   Raritan PDUS.
 - Automatically add a label hostname:HOSTNAME to the node's capabilities.
+- Add a serverless resource provider, which allows a node to offer resource
+  instances that connect to an OpenFaaS-compatible function via an URL
+  specified in the node's configuration. The resource has two output channels:
+  "out" for the result of the function and "err" for functon execution errors.
 
 Improvements:
 
