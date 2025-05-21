@@ -13,6 +13,14 @@ impl super::resource_provider_specs::ResourceProviderSpecs for RedisResourceSpec
         String::from("redis")
     }
 
+    fn description(&self) -> String {
+        r"Perform SET and GET operations on a Redis server -- https://redis.io/
+
+A SET operation is performed with a cast() on the key specified in the 'key' configuration parameter of the resource.
+A GET operation is performed with a call(), with the key specified in the message body."
+            .to_string()
+    }
+
     fn outputs(&self) -> Vec<String> {
         vec![]
     }

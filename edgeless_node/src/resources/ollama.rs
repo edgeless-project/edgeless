@@ -10,6 +10,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for OllamaResourceSpe
         String::from("ollama")
     }
 
+    fn description(&self) -> String {
+        r"Interact via an LLM ChatBot deployed on an external Ollama server -- see https://ollama.com/".to_string()
+    }
+
     fn outputs(&self) -> Vec<String> {
         vec![String::from("out")]
     }

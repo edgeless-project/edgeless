@@ -15,6 +15,7 @@ use edgeless_node::resources::redis::RedisResourceSpec;
 use edgeless_node::resources::resource_provider_specs::ResourceProviderSpecOutput;
 use edgeless_node::resources::resource_provider_specs::ResourceProviderSpecs;
 use edgeless_node::resources::serverless::ServerlessResourceProviderSpec;
+use edgeless_node::resources::sqlx::SqlxResourceSpec;
 
 #[derive(Debug, clap::Parser)]
 #[command(long_about = None)]
@@ -60,9 +61,10 @@ fn main() -> anyhow::Result<()> {
             Box::new(FileLogResourceSpec {}),
             Box::new(HttpEgressResourceSpec {}),
             Box::new(HttpIngressResourceSpec {}),
+            Box::new(MetricsCollectorResourceSpec {}),
             Box::new(OllamaResourceSpec {}),
             Box::new(RedisResourceSpec {}),
-            Box::new(MetricsCollectorResourceSpec {}),
+            Box::new(SqlxResourceSpec {}),
         ];
         #[cfg(feature = "rdkafka")]
         specs.push(Box::new(KafkaEgressResourceSpec {}));
@@ -84,6 +86,7 @@ fn main() -> anyhow::Result<()> {
             );
         } else {
             for spec in specs {
+                println!("----------");
                 println!("class_type: {}", spec.class_type());
                 println!("version: {}", spec.version());
                 println!("outputs: [{}]", spec.outputs().join(","));
@@ -98,6 +101,7 @@ fn main() -> anyhow::Result<()> {
                             .join("\n")
                     )
                 }
+                println!("description:\n{}", spec.description());
                 println!();
             }
         }
