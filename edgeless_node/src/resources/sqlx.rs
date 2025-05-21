@@ -200,11 +200,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
-        if let (Some(url), Some(_key), workflow_id) = (
-            instance_specification.configuration.get("url"),
-            instance_specification.configuration.get("key"),
-            instance_specification.workflow_id,
-        ) {
+        if let (Some(url), workflow_id) = (instance_specification.configuration.get("url"), instance_specification.workflow_id) {
             let mut lck = self.inner.lock().await;
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
