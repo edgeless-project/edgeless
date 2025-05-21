@@ -175,6 +175,7 @@ fn generate_configs(
             wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
             container_runtime: Some(EdgelessNodeContainerRuntimeSettings::default()),
             resources: Some(EdgelessNodeResourceSettings {
+                prepend_hostname: true,
                 http_ingress_url: match counter == 0 {
                     true => Some(next_url(false)),
                     false => None,
@@ -236,6 +237,7 @@ fn generate_configs(
             wasm_runtime: None,
             container_runtime: None,
             resources: Some(EdgelessNodeResourceSettings {
+                prepend_hostname: true,
                 http_ingress_url: None,
                 http_ingress_provider: None,
                 http_egress_provider: None,

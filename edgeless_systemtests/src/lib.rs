@@ -100,6 +100,7 @@ mod system_tests {
                     wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
                     container_runtime: None,
                     resources: Some(edgeless_node::EdgelessNodeResourceSettings {
+                        prepend_hostname: true,
                         http_ingress_url: None,
                         http_ingress_provider: None,
                         http_egress_provider: None,
