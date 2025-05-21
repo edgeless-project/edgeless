@@ -13,6 +13,9 @@
 Before using the EDGELESS Cloud Offloading package, ensure you have the following:
 
 - An AWS account and appropriate permissions to create and manage EC2 instances.
+- An AWS EC2 Image (AMI) ID for the region you are working in, with EDGELESS installed.
+- A security group that allows inbound traffic for the TCP ports used by EDGELESS (default ports in range 7000-7200).
+- An EDGELESS orchestrator running and accessible from the internet.
 
 ## AWS Credentials Configuration
 
@@ -40,10 +43,19 @@ export AWS_ACCESS_KEY_ID=YOUR_ACCESS_KEY
 export AWS_SECRET_ACCESS_KEY=YOUR_SECRET_KEY
 ```
 
-## Configuration of AWS Region
+## Configuration of AWS Region and other settings
 
-To specify the AWS region for your operations, you can use a `config.toml` file located in the root directory of this package. This file should look like the following:
+To specify the AWS region for your operations and other configurations, you can use a `config.toml` file located in the root directory of this package.
+
+This file should look like the following:
 
 ```toml
 [aws]
 region = "eu-west-1"
+ami_id = "ami-035085b5449b0383a"
+instance_type = "t2.micro"
+security_group_id = "sg-09dcfc636643d2868"
+
+[orchestrator]
+url = "3.253.97.217"
+```
