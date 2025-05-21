@@ -1,5 +1,6 @@
 use std::time::Duration;
 use tokio::time::sleep;
+use log;
 
 use cloud_offloading::CloudNodeInputData;
 use cloud_offloading::create_cloud_node;
@@ -8,6 +9,7 @@ use cloud_offloading::delete_cloud_node;
 #[tokio::main]
 // This is used for testing purposes only
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
 
     let cloud_input_data = CloudNodeInputData {
         aws_region: "eu-west-1".to_string(),
@@ -21,7 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cloud_node = create_cloud_node(cloud_input_data).await?;
 
     // Pause to check the status
-    println!("Pausing for 600 seconds...");
+    log::info!("Pausing for 600 seconds...");
     sleep(Duration::from_secs(600)).await;
 
     // Delete the cloud node

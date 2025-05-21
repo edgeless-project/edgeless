@@ -3,6 +3,7 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use aws_sdk_ec2::types::{InstanceType, Tag};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
+use log;
 
 pub struct CloudNodeInputData {
     pub aws_region: String,
@@ -50,24 +51,23 @@ pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNo
         .max_count(1)
         .send()
         .await?;
-
-    if run_instances.instances().is_empty() {
-        println!("Failed to create instance");
-        return Err(("Failed to create instance").into());
-    }
+        if run_instances.instances().is_empty() {
+            log::error!("Failed to create instance");
+            return Err(("Failed to create instance").into());
+        }
 
     let instance_id = run_instances.instances()[0].instance_id().unwrap();
 
     // Define a name for the instance
     let instance_name = generate_instance_name();
-    let response = client
+    let _response = client
         .create_tags()
         .resources(instance_id)
         .tags(Tag::builder().key("Name").value(&instance_name).build())
         .send()
         .await?;
 
-    println!("EDGELESS Node deployed on AWS Instance: {instance_id}, with name: {instance_name} has been created.");
+    log::info!("EDGELESS Node deployed on AWS Instance: {instance_id}, with name: {instance_name} has been created.");
 
     // Build the CloudNode struct
     let cloud_node = CloudNodeData {
@@ -90,7 +90,7 @@ pub async fn delete_cloud_node(cloud_node: CloudNodeData) -> Result<String, Box<
     // Terminate the EC2 instance
     client.terminate_instances().instance_ids(instance_id).send().await?;
 
-    println!("EDGELESS Node deployed on AWS Instance: {instance_id}, with name: {instance_name} has been deleted.");
+    log::info!("EDGELESS Node deployed on AWS Instance: {instance_id}, with name: {instance_name} has been deleted.");
 
     Ok(instance_id.to_string())
 }
