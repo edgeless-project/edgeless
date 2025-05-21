@@ -43,7 +43,7 @@ impl PowerInfo {
     }
 
     /// Convert bytes to an IEEE-754 floating point.
-    fn parse_f32(data: &Vec<u16>) -> f32 {
+    fn parse_f32(data: &[u16]) -> f32 {
         let bytes: Vec<u8> = data.iter().fold(vec![], |mut x, elem| {
             x.push((elem >> 8) as u8);
             x.push((elem & 0xff) as u8);
