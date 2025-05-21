@@ -1,35 +1,30 @@
 use aws_config::Region;
-use base64::{engine::general_purpose::STANDARD, Engine as _};
 use aws_sdk_ec2::types::{InstanceType, Tag};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use log;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use log;
 
 pub struct CloudNodeInputData {
     pub aws_region: String,
     pub aws_ami_id: String,
     pub aws_instance_type: String,
     pub aws_security_group_id: String,
-    pub orchestrator_url: String
+    pub orchestrator_url: String,
 }
 
 pub struct CloudNodeData {
     aws_region: String,
     instance_id: String,
-    instance_name: String
+    instance_name: String,
 }
 
 fn generate_instance_name() -> String {
-    let random_string: String = thread_rng()
-        .sample_iter(&Alphanumeric)
-        .take(8)
-        .map(char::from)
-        .collect();
+    let random_string: String = thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
     format!("EDGELESS-Node-{}", random_string)
 }
 
 pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNodeData, Box<dyn std::error::Error>> {
-
     // Config for AWS SDK
     let config = aws_config::from_env().region(Region::new(input_data.aws_region.clone())).load().await;
     let client = aws_sdk_ec2::Client::new(&config);
@@ -51,10 +46,10 @@ pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNo
         .max_count(1)
         .send()
         .await?;
-        if run_instances.instances().is_empty() {
-            log::error!("Failed to create instance");
-            return Err(("Failed to create instance").into());
-        }
+    if run_instances.instances().is_empty() {
+        log::error!("Failed to create instance");
+        return Err(("Failed to create instance").into());
+    }
 
     let instance_id = run_instances.instances()[0].instance_id().unwrap();
 
@@ -73,7 +68,7 @@ pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNo
     let cloud_node = CloudNodeData {
         aws_region: input_data.aws_region,
         instance_id: instance_id.to_string(),
-        instance_name
+        instance_name,
     };
 
     Ok(cloud_node)
