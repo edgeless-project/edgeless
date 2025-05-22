@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
 #[derive(Clone)]
@@ -29,6 +30,7 @@ pub struct Event {
     pub source: crate::function_instance::InstanceId,
     pub stream_id: u64,
     pub data: EventData,
+    pub created: crate::function_instance::EventTimestamp,
 }
 
 impl std::fmt::Display for Event {

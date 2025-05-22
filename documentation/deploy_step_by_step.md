@@ -6,7 +6,6 @@
     - [Deploying the orchestrator (ε-ORC)](#deploying-the-orchestrator-ε-orc)
     - [Deploying a node](#deploying-a-node)
   - [Building and executing a simple function](#building-and-executing-a-simple-function)
-  - [Where to go next](#where-to-go-next)
 
 # A step-by-step guide to deploying a minimal EDGELESS system
 
@@ -157,7 +156,8 @@ In another shell, create the default configuration of the node:
 ./edgeless_node_d -t node.toml
 ```
 
-The configuration file is the following:
+The configuration file is the following (`node_id` is random and will
+_almost certainly_ be different for you)):
 
 ```toml
 [general]
@@ -277,7 +277,7 @@ The simplest workflow consists of a single function, which does not interact wit
                 "id": "noop",
                 "function_type": "RUST_WASM",
                 "version": "0.1",
-                "code": "./noop_function/noop.wasm",
+                "code": "../../functions/noop/noop.wasm",
                 "outputs": []
             },
             "output_mapping": {},
@@ -291,9 +291,9 @@ The simplest workflow consists of a single function, which does not interact wit
 }
 ```
 
-This workflow creates a function called `noop`, whose bytecode is assumed to be in the local file `./noop_function/noop.wasm`.
+This workflow creates a function called `noop`, whose bytecode is assumed to be in the local file `noop.wasm`.
 
-If we want to start this workflow, we must build the `noop.wasm` function first. Such a function is bundled with the EDGELESS repository [here](../examples/noop/noop_function/src/lib.rs):
+If we want to start this workflow, we must build the `noop.wasm` function first. Such a function is bundled with the EDGELESS repository [here](../functions/noop/src/lib.rs):
 
 ```rust
 impl Edgefunction for NoopFunction {
@@ -328,10 +328,10 @@ These four handlers are the basic programming model of EDGELESS functions:
 The WebAssembly bytecode can be built with the following command:
 
 ```bash
-./edgeless_cli function build ../../examples/noop/noop_function/function.json
+./edgeless_cli function build ../../functions/noop/function.json
 ```
 
-which produces the file `../../examples/noop/noop_function/noop.wasm` that is needed by our workflow.
+which produces the file `../../functions/noop/noop.wasm` that is needed by our workflow.
 
 We can now create the default CLI configuration:
 
@@ -377,12 +377,3 @@ Finally, the workflow can be stopped with the following command:
 ```bash
 ./edgeless_cli workflow stop $UUID
 ```
-
-## Where to go next
-
-- [Repository layout](documentation/repository_layout.md)
-- [How to create a new function](documentation/rust_functions.md)
-  ([YouTube tutorial](https://youtu.be/1JnQIM9VTLk?si=o34YKRRJXNz0H54f))
-- [How to compose a new workflow](documentation/workflows.md)
-  ([YouTube tutorial](https://youtu.be/kc4Ku5p5Nrw?si=ZRxx0kmsIuAYLie1))
-- [Examples shipped with the repository](../examples/README.md)

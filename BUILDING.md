@@ -37,12 +37,25 @@ Install the dependencies:
 
 ```bash
 source "$HOME/.cargo/env"
-sudo apt update && sudo apt install gcc libssl-dev pkg-config protobuf-compiler make g++ -y
+sudo apt update && sudo apt install gcc libssl-dev pkg-config unzip make g++ -y
 rustup target add wasm32-unknown-unknown
 cargo install wasm-opt
 ```
+Install a modern release of the Protocol Buffers binaries (v28.2 is the latest stable release as of 22/10/2024)
+The available binaries in the default ubuntu repositories have proven to be too old for some EDGELESS crates.
 
-Clone the repo and build the system:
+```bash
+wget https://github.com/protocolbuffers/protobuf/releases/download/v28.2/protoc-28.2-linux-x86_64.zip
+cd /usr/local
+unzip $OLDPWD/protoc-28.2-linux-x86_64.zip
+rm -f readme.txt
+cd -
+rm protoc-28.2-linux-x86_64.zip
+```
+
+At this point you may have to logout/login to let your shell know of the new executable, just try `protoc --version` to see if it works.
+
+Finally clone the repo and build the system:
 
 ```bash
 git clone https://github.com/edgeless-project/edgeless.git

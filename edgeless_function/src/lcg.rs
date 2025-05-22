@@ -1,4 +1,4 @@
-// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
 use std::num::Wrapping;
@@ -59,6 +59,6 @@ mod test {
         let mut lcg = Lcg::new(42);
         let matrix = random_matrix(&mut lcg, 1000);
         assert_eq!(1000 * 1000, matrix.len());
-        assert_ne!(0.0 as f32, matrix.iter().sum());
+        assert_ne!(0.0_f32, matrix.iter().sum());
     }
 }

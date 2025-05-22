@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
 use futures::FutureExt;
@@ -8,8 +9,8 @@ pub mod agent;
 pub mod function_instance;
 pub mod invocation;
 pub mod node_management;
+pub mod node_register;
 pub mod node_registration;
-pub mod orchestration;
 pub mod resource_configuration;
 
 #[derive(Clone)]
@@ -22,6 +23,7 @@ pub struct CoapClient {
 struct CoapClientInner {
     endpoint: std::net::SocketAddrV4,
     next_token: u8,
+    #[allow(clippy::type_complexity)]
     active_requests: std::collections::HashMap<u8, tokio::sync::oneshot::Sender<Result<Vec<u8>, Vec<u8>>>>,
 }
 
@@ -30,7 +32,7 @@ impl CoapClient {
         let sock = tokio::net::UdpSocket::bind("0.0.0.0:0").await.unwrap();
 
         let inner = std::sync::Arc::new(tokio::sync::Mutex::new(CoapClientInner {
-            endpoint: peer.clone(),
+            endpoint: peer,
             next_token: 0,
             active_requests: std::collections::HashMap::new(),
         }));
@@ -54,7 +56,7 @@ impl CoapClient {
         mut outgoing_receiver: tokio::sync::mpsc::UnboundedReceiver<Vec<u8>>,
     ) {
         loop {
-            let mut buffer = vec![0 as u8; 5000];
+            let mut buffer = vec![0_u8; 5000];
 
             futures::select! {
                 msg = sock.recv_from(&mut buffer).fuse() => {
@@ -100,7 +102,7 @@ impl CoapClient {
         }
     }
 
-    async fn call_with_reply<'a>(
+    async fn call_with_reply(
         &mut self,
         encode_request: impl Fn(u8, std::net::SocketAddrV4, &mut [u8]) -> ((&mut [u8], std::net::SocketAddrV4), &mut [u8]),
     ) -> Result<Vec<u8>, Vec<u8>> {
@@ -116,7 +118,7 @@ impl CoapClient {
         };
 
         for i in 0..3 {
-            let mut buffer = vec![0 as u8; 5000];
+            let mut buffer = vec![0_u8; 5000];
             let ((packet, _addr), _tail) = encode_request(token, endpoint, &mut buffer);
             if self.outgoing_sender.send(Vec::from(packet)).is_err() {
                 log::warn!("Sender could not send on iteration {}", i);

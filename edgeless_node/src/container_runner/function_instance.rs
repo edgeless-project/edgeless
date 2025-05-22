@@ -1,13 +1,14 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use edgeless_api::container_function::ContainerFunctionAPI;
+use edgeless_api::outer::container_function::ContainerFunctionAPI;
 
 /// FunctionInstance implementation allowing to execute functions defined
 /// as computational containers through a gRPC API.
 pub struct ContainerFunctionInstance {
     /// gRPC function client to interact with the container function.
-    _function_client: edgeless_api::grpc_impl::container_function::ContainerFunctionAPIClient,
+    _function_client: edgeless_api::grpc_impl::outer::container_function::ContainerFunctionAPIClient,
     /// Protocol-neutral API to interact with the container function.
     function_client_api: Box<dyn edgeless_api::guest_api_function::GuestAPIFunction>,
     /// ID of the Docker container created.
@@ -32,7 +33,10 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
         if let Some((fun_type, fun_addr)) = fun_spec.split_once(':') {
             if fun_type != "grpc" && fun_type != "container" {
                 log::error!("container function type not implemented: {}", fun_type);
-                return Err(crate::base_runtime::FunctionInstanceError::BadCode);
+                return Err(crate::base_runtime::FunctionInstanceError::BadCode(format!(
+                    "container function type not implemented: {}",
+                    fun_type,
+                )));
             }
 
             let mut grpc_address = fun_addr.to_string();
@@ -61,8 +65,11 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
 
             // TODO(ccicconetti) timeout is hard-coded to 30 seconds, which might
             // not be enough with big containers
-            match edgeless_api::grpc_impl::container_function::ContainerFunctionAPIClient::new(&grpc_address, std::time::Duration::from_secs(30))
-                .await
+            match edgeless_api::grpc_impl::outer::container_function::ContainerFunctionAPIClient::new(
+                &grpc_address,
+                std::time::Duration::from_secs(30),
+            )
+            .await
             {
                 Ok(mut _function_client) => {
                     let mut function_client_api = _function_client.guest_api_function();
@@ -74,7 +81,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
                                 match function_client_api
                                     .boot(edgeless_api::guest_api_function::BootData {
                                         guest_api_host_endpoint: url.clone(),
-                                        instance_id: instance_id.clone(),
+                                        instance_id: *instance_id,
                                     })
                                     .await
                                 {
@@ -109,7 +116,10 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
             }
         } else {
             log::error!("invalid container function specifier: {}", fun_spec);
-            Err(crate::base_runtime::FunctionInstanceError::BadCode)
+            Err(crate::base_runtime::FunctionInstanceError::BadCode(format!(
+                "invalid container function specifier: {}",
+                fun_spec
+            )))
         }
     }
 
@@ -121,8 +131,8 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
         );
         self.function_client_api
             .init(edgeless_api::guest_api_function::FunctionInstanceInit {
-                init_payload: init_payload.unwrap_or(&"").to_string(),
-                serialized_state: serialized_state.unwrap_or(&"").as_bytes().to_vec(),
+                init_payload: init_payload.unwrap_or("").to_string(),
+                serialized_state: serialized_state.unwrap_or("").as_bytes().to_vec(),
             })
             .await
             .or(Err(crate::base_runtime::FunctionInstanceError::InternalError))
@@ -131,10 +141,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
     async fn cast(&mut self, src: &edgeless_api::function_instance::InstanceId, msg: &str) -> Result<(), crate::base_runtime::FunctionInstanceError> {
         log::debug!("container run-time: cast, src {}, msg {} bytes", src, msg.len());
         self.function_client_api
-            .cast(edgeless_api::guest_api_function::InputEventData {
-                src: src.clone(),
-                msg: msg.into(),
-            })
+            .cast(edgeless_api::guest_api_function::InputEventData { src: *src, msg: msg.into() })
             .await
             .or(Err(crate::base_runtime::FunctionInstanceError::InternalError))
     }
@@ -147,10 +154,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
         log::debug!("container run-time: call, src {}, msg {} bytes", src, msg.len());
         match self
             .function_client_api
-            .call(edgeless_api::guest_api_function::InputEventData {
-                src: src.clone(),
-                msg: msg.into(),
-            })
+            .call(edgeless_api::guest_api_function::InputEventData { src: *src, msg: msg.into() })
             .await
         {
             Ok(ret) => match ret {

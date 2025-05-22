@@ -1,7 +1,9 @@
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
+// SPDX-License-Identifier: MIT
 use core::str::FromStr;
 
-// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
-// SPDX-License-Identifier: MIT
 pub struct EPaperDisplayInstanceConfiguration {
     header_text: Option<[u8; 128]>,
 }
@@ -18,6 +20,7 @@ pub struct EPaperDisplay {
 }
 
 impl EPaperDisplay {
+    #[allow(clippy::needless_lifetimes)] // not needless
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<EPaperDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
@@ -29,7 +32,7 @@ impl EPaperDisplay {
                     let mut i: usize = 0;
                     for b in val.bytes() {
                         header_data[i] = b;
-                        i = i + 1;
+                        i += 1;
                         if i == 128 {
                             break;
                         }
@@ -40,25 +43,25 @@ impl EPaperDisplay {
 
             Ok(EPaperDisplayInstanceConfiguration { header_text: config })
         } else {
-            return Err(edgeless_api_core::common::ErrorResponse {
+            Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Wrong Resource ProviderId",
                 detail: None,
-            });
+            })
         }
     }
 }
 
 impl crate::resource::Resource for EPaperDisplay {
     fn provider_id(&self) -> &'static str {
-        return "epaper-display-1";
+        "epaper-display-1"
     }
 
     fn resource_class(&self) -> &'static str {
-        return "epaper-display";
+        "epaper-display"
     }
 
     fn outputs(&self) -> &'static [&'static str] {
-        return &[];
+        &[]
     }
 
     async fn has_instance(&self, id: &edgeless_api_core::instance_id::InstanceId) -> bool {
@@ -84,6 +87,7 @@ pub async fn display_writer(
 }
 
 impl EPaperDisplay {
+    #[allow(clippy::new_ret_no_self)]
     pub async fn new(
         sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>,
     ) -> &'static mut dyn crate::resource::ResourceDyn {
@@ -128,6 +132,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
         }
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
@@ -143,7 +148,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
             });
         }
 
-        self.instance_id = Some(edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone()));
+        self.instance_id = Some(edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID));
 
         self.header = instance_specification.header_text;
 
@@ -162,7 +167,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
 
     async fn patch(
         &mut self,
-        resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
+        _resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         Ok(())
     }

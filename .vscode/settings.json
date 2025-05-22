@@ -1,0 +1,19 @@
+{
+    "json.schemas": [
+        {
+            "fileMatch": [
+                "**/function.json"
+            ],
+            "url": "./schemas/function_class_schema.json"
+        },
+        {
+            "fileMatch": [
+                "**/workflow.json"
+            ],
+            "url": "./schemas/workflow_schema.json"
+        }
+    ],
+    "rust-analyzer.linkedProjects": [
+        "Cargo.toml"
+    ]
+}

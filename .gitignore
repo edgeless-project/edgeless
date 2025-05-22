@@ -15,3 +15,5 @@ secrets/
 .venv
 .DS_Store
 *.swp
+symbols.json
+.*bkp

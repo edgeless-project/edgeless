@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
 #![cfg_attr(not(feature = "std"), no_std)]
@@ -86,6 +88,31 @@ pub fn parse_init_payload(payload: &str) -> std::collections::HashMap<&str, &str
     arguments
 }
 
+#[cfg(feature = "std")]
+pub fn init_payload_to_args(payload: Option<&[u8]>) -> std::collections::HashMap<&str, &str> {
+    if let Some(payload) = payload {
+        let str_payload = core::str::from_utf8(payload).unwrap();
+        parse_init_payload(str_payload)
+    } else {
+        std::collections::HashMap::new()
+    }
+}
+
+#[cfg(feature = "std")]
+pub fn arg_to_bool(key: &str, arguments: &std::collections::HashMap<&str, &str>) -> bool {
+    arguments.get(key).unwrap_or(&"false").to_lowercase() == "true"
+}
+
+#[cfg(feature = "std")]
+pub fn arg_to_vec<T>(key: &str, pat: &str, arguments: &std::collections::HashMap<&str, &str>) -> Vec<T>
+where
+    T: std::str::FromStr,
+{
+    let value = arguments.get(key).unwrap_or(&"");
+    let tokens = value.split(pat);
+    tokens.into_iter().filter_map(|x| x.parse::<T>().ok()).collect::<Vec<T>>()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -109,5 +136,48 @@ mod test {
         );
 
         assert!(parse_init_payload(",,,a,s,s,,42,").is_empty());
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_arg_to_bool() {
+        let arguments = std::collections::HashMap::from([
+            ("non-bool-key", "val1"),
+            ("bool-key-false", "false"),
+            ("bool-key-true-1", "true"),
+            ("bool-key-true-2", "True"),
+            ("bool-key-true-3", "TRUE"),
+        ]);
+
+        assert!(!arg_to_bool("non-bool-key", &arguments));
+        assert!(!arg_to_bool("bool-key-false", &arguments));
+        assert!(arg_to_bool("bool-key-true-1", &arguments));
+        assert!(arg_to_bool("bool-key-true-2", &arguments));
+        assert!(arg_to_bool("bool-key-true-3", &arguments));
+        assert!(!arg_to_bool("non-existing-key", &arguments));
+        assert!(!arg_to_bool("", &arguments));
+    }
+
+    #[cfg(feature = "std")]
+    #[test]
+    fn test_arg_to_vec() {
+        let arguments = std::collections::HashMap::from([
+            ("vec1", "1:2:3:4:5"),
+            ("vec2", "1@2@3@4@5"),
+            ("vec3", "3.4:6.8"),
+            ("vec4", "1:-2:3:-4:5"),
+            ("vec5", "1:two:3:four:5"),
+        ]);
+
+        assert_eq!(vec![1, 2, 3, 4, 5], arg_to_vec::<usize>("vec1", ":", &arguments));
+        assert!(arg_to_vec::<usize>("vec1", "@", &arguments).is_empty());
+        assert_eq!(vec![1, 2, 3, 4, 5], arg_to_vec::<u32>("vec1", ":", &arguments));
+        assert_eq!(vec![1, 2, 3, 4, 5], arg_to_vec::<i32>("vec1", ":", &arguments));
+        assert_eq!(vec![1, 2, 3, 4, 5], arg_to_vec::<usize>("vec2", "@", &arguments));
+        assert_eq!(vec![3.4, 6.8], arg_to_vec::<f32>("vec3", ":", &arguments));
+        assert_eq!(vec![1, 3, 5], arg_to_vec::<usize>("vec4", ":", &arguments));
+        assert_eq!(vec![1, -2, 3, -4, 5], arg_to_vec::<i32>("vec4", ":", &arguments));
+        assert_eq!(vec![1, 3, 5], arg_to_vec::<usize>("vec5", ":", &arguments));
+        assert!(arg_to_vec::<usize>("non-existing", "@", &arguments).is_empty());
     }
 }

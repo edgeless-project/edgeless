@@ -1,7 +1,9 @@
+use controller_task::OrchestratorDesc;
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-use edgeless_api::workflow_instance::SpawnWorkflowResponse;
+use edgeless_api::{domain_registration::DomainCapabilities, workflow_instance::SpawnWorkflowResponse};
 
 use super::*;
 
@@ -11,41 +13,36 @@ enum MockFunctionInstanceEvent {
     StartFunction(
         (
             // this is the id passed from the orchestrator to the controller
-            edgeless_api::orc::DomainManagedInstanceId,
+            edgeless_api::function_instance::DomainManagedInstanceId,
             edgeless_api::function_instance::SpawnFunctionRequest,
         ),
     ),
-    StopFunction(edgeless_api::orc::DomainManagedInstanceId),
+    StopFunction(edgeless_api::function_instance::DomainManagedInstanceId),
     StartResource(
         (
             // this is the id passed from the orchestrator to the controller
-            edgeless_api::orc::DomainManagedInstanceId,
+            edgeless_api::function_instance::DomainManagedInstanceId,
             edgeless_api::resource_configuration::ResourceInstanceSpecification,
         ),
     ),
-    StopResource(edgeless_api::orc::DomainManagedInstanceId),
+    StopResource(edgeless_api::function_instance::DomainManagedInstanceId),
     Patch(edgeless_api::common::PatchRequest),
-    #[allow(dead_code)]
-    UpdateNode(edgeless_api::node_registration::UpdateNodeRequest),
 }
 
 struct MockOrchestrator {
-    _node_id: uuid::Uuid,
     sender: futures::channel::mpsc::UnboundedSender<MockFunctionInstanceEvent>,
 }
 
-impl edgeless_api::orc::OrchestratorAPI for MockOrchestrator {
-    fn function_instance_api(&mut self) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId>> {
+impl edgeless_api::outer::orc::OrchestratorAPI for MockOrchestrator {
+    fn function_instance_api(
+        &mut self,
+    ) -> Box<dyn edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::DomainManagedInstanceId>> {
         Box::new(MockFunctionInstanceAPI { sender: self.sender.clone() })
-    }
-
-    fn node_registration_api(&mut self) -> Box<dyn edgeless_api::node_registration::NodeRegistrationAPI> {
-        Box::new(MockNodeRegistrationAPI { sender: self.sender.clone() })
     }
 
     fn resource_configuration_api(
         &mut self,
-    ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId>> {
+    ) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::DomainManagedInstanceId>> {
         Box::new(MockResourceConfigurationAPI { sender: self.sender.clone() })
     }
 }
@@ -56,29 +53,24 @@ struct MockFunctionInstanceAPI {
 }
 
 #[derive(Clone)]
-struct MockNodeRegistrationAPI {
-    sender: futures::channel::mpsc::UnboundedSender<MockFunctionInstanceEvent>,
-}
-
-#[derive(Clone)]
 struct MockResourceConfigurationAPI {
     sender: futures::channel::mpsc::UnboundedSender<MockFunctionInstanceEvent>,
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::DomainManagedInstanceId> for MockFunctionInstanceAPI {
+impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function_instance::DomainManagedInstanceId> for MockFunctionInstanceAPI {
     async fn start(
         &mut self,
         spawn_request: edgeless_api::function_instance::SpawnFunctionRequest,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::DomainManagedInstanceId>> {
         let new_id = uuid::Uuid::new_v4();
         self.sender
-            .send(MockFunctionInstanceEvent::StartFunction((new_id.clone(), spawn_request)))
+            .send(MockFunctionInstanceEvent::StartFunction((new_id, spawn_request)))
             .await
             .unwrap();
         Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
     }
-    async fn stop(&mut self, id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
+    async fn stop(&mut self, id: edgeless_api::function_instance::DomainManagedInstanceId) -> anyhow::Result<()> {
         self.sender.send(MockFunctionInstanceEvent::StopFunction(id)).await.unwrap();
         Ok(())
     }
@@ -89,19 +81,21 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::orc::Dom
     }
 }
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::orc::DomainManagedInstanceId> for MockResourceConfigurationAPI {
+impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::DomainManagedInstanceId>
+    for MockResourceConfigurationAPI
+{
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::orc::DomainManagedInstanceId>> {
+    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::DomainManagedInstanceId>> {
         let new_id = uuid::Uuid::new_v4();
         self.sender
-            .send(MockFunctionInstanceEvent::StartResource((new_id.clone(), instance_specification)))
+            .send(MockFunctionInstanceEvent::StartResource((new_id, instance_specification)))
             .await
             .unwrap();
         Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
     }
-    async fn stop(&mut self, resource_id: edgeless_api::orc::DomainManagedInstanceId) -> anyhow::Result<()> {
+    async fn stop(&mut self, resource_id: edgeless_api::function_instance::DomainManagedInstanceId) -> anyhow::Result<()> {
         self.sender.send(MockFunctionInstanceEvent::StopResource(resource_id)).await.unwrap();
         Ok(())
     }
@@ -111,46 +105,51 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     }
 }
 
-#[async_trait::async_trait]
-impl edgeless_api::node_registration::NodeRegistrationAPI for MockNodeRegistrationAPI {
-    async fn update_node(
-        &mut self,
-        request: edgeless_api::node_registration::UpdateNodeRequest,
-    ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
-        self.sender.send(MockFunctionInstanceEvent::UpdateNode(request)).await.unwrap();
-        Ok(edgeless_api::node_registration::UpdateNodeResponse::Accepted)
-    }
-    async fn keep_alive(&mut self) {}
-}
-
 async fn test_setup() -> (
     Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>,
     futures::channel::mpsc::UnboundedReceiver<MockFunctionInstanceEvent>,
-    uuid::Uuid,
 ) {
     let (mock_orc_sender, mock_orc_receiver) = futures::channel::mpsc::unbounded::<MockFunctionInstanceEvent>();
-    let node_id = uuid::Uuid::new_v4();
-    let mock_orc = MockOrchestrator {
-        _node_id: node_id.clone(),
-        sender: mock_orc_sender,
-    };
+    let mock_orc = MockOrchestrator { sender: mock_orc_sender };
 
-    let orc_clients = std::collections::HashMap::<String, Box<dyn edgeless_api::orc::OrchestratorAPI>>::from([(
-        "domain-1".to_string(),
-        Box::new(mock_orc) as Box<dyn edgeless_api::orc::OrchestratorAPI>,
+    let (workflow_instance_sender, workflow_instance_receiver) = futures::channel::mpsc::unbounded();
+    let (_domain_registration_sender, domain_registration_receiver) = futures::channel::mpsc::unbounded();
+    let (_internal_sender, internal_receiver) = futures::channel::mpsc::unbounded();
+
+    let mut capabilities = DomainCapabilities::default();
+    capabilities.runtimes.insert(String::from("RUST_WASM"));
+    capabilities.resource_classes.insert(String::from("test-res"));
+    let orchestrators = std::collections::HashMap::from([(
+        String::from("domain-1"),
+        OrchestratorDesc {
+            client: Box::new(mock_orc) as Box<dyn edgeless_api::outer::orc::OrchestratorAPI>,
+            orchestrator_url: String::default(),
+            capabilities,
+            refresh_deadline: std::time::SystemTime::now(),
+            counter: 0,
+            nonce: 42,
+        },
     )]);
 
-    let (mut controller, controller_task) = Controller::new(orc_clients);
+    let controller_task = Box::pin(async move {
+        let mut controller_task = controller_task::ControllerTask::new_with_orchestrators(
+            workflow_instance_receiver,
+            domain_registration_receiver,
+            internal_receiver,
+            orchestrators,
+        );
+        controller_task.run().await;
+    });
     tokio::spawn(controller_task);
-    let mut client = controller.get_api_client();
-    let wf_client = client.workflow_instance_api();
 
-    (wf_client, mock_orc_receiver, node_id)
+    let wf_client = client::ControllerClient::new(workflow_instance_sender).workflow_instance_api();
+
+    (wf_client, mock_orc_receiver)
 }
 
 #[tokio::test]
 async fn single_function_start_stop() {
-    let (mut wf_client, mut mock_orc_receiver, _node_id) = test_setup().await;
+    let (mut wf_client, mut mock_orc_receiver) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
 
@@ -186,8 +185,7 @@ async fn single_function_start_stop() {
     let mut new_func_id = uuid::Uuid::nil();
     assert!(new_func_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        new_func_id = id.clone();
-        assert!(spawn_req.instance_id.is_none());
+        new_func_id = id;
         assert_eq!(function_class_specification, spawn_req.code);
         assert!(spawn_req.annotations.is_empty());
         // TODO check state specifications
@@ -212,7 +210,7 @@ async fn single_function_start_stop() {
 
 #[tokio::test]
 async fn resource_to_function_start_stop() {
-    let (mut wf_client, mut mock_orc_receiver, _node_id) = test_setup().await;
+    let (mut wf_client, mut mock_orc_receiver) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
 
@@ -261,7 +259,7 @@ async fn resource_to_function_start_stop() {
     let mut new_func_id = uuid::Uuid::nil();
     assert!(new_func_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, _spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        new_func_id = id.clone();
+        new_func_id = id;
     } else {
         panic!();
     }
@@ -269,7 +267,7 @@ async fn resource_to_function_start_stop() {
     let mut new_res_id = uuid::Uuid::nil();
     assert!(new_res_id.is_nil());
     if let MockFunctionInstanceEvent::StartResource((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        new_res_id = id.clone();
+        new_res_id = id;
         assert_eq!("test-res".to_string(), spawn_req.class_type);
         assert!(spawn_req.configuration.is_empty());
     } else {
@@ -295,12 +293,12 @@ async fn resource_to_function_start_stop() {
         match mock_orc_receiver.try_next().unwrap().unwrap() {
             MockFunctionInstanceEvent::StopFunction(id) => {
                 assert_eq!(new_func_id, id);
-                assert!(got_function_stop == false);
+                assert!(!got_function_stop);
                 got_function_stop = true;
             }
             MockFunctionInstanceEvent::StopResource(id) => {
                 assert_eq!(new_res_id, id);
-                assert!(got_resource_stop == false);
+                assert!(!got_resource_stop);
                 got_resource_stop = true;
             }
             _ => {
@@ -314,7 +312,7 @@ async fn resource_to_function_start_stop() {
 
 #[tokio::test]
 async fn function_link_loop_start_stop() {
-    let (mut wf_client, mut mock_orc_receiver, _node_id) = test_setup().await;
+    let (mut wf_client, mut mock_orc_receiver) = test_setup().await;
 
     assert!(mock_orc_receiver.try_next().is_err());
 
@@ -366,8 +364,7 @@ async fn function_link_loop_start_stop() {
     let mut new_func1_id = uuid::Uuid::nil();
     assert!(new_func1_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        new_func1_id = id.clone();
-        assert!(spawn_req.instance_id.is_none());
+        new_func1_id = id;
         assert!(spawn_req.annotations.is_empty());
         // TODO check state specifications
     } else {
@@ -377,8 +374,7 @@ async fn function_link_loop_start_stop() {
     let mut new_func2_id = uuid::Uuid::nil();
     assert!(new_func2_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
-        new_func2_id = id.clone();
-        assert!(spawn_req.instance_id.is_none());
+        new_func2_id = id;
         assert!(spawn_req.annotations.is_empty());
         // TODO check state specifications
     } else {
@@ -417,7 +413,7 @@ async fn function_link_loop_start_stop() {
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-    let mut fids = std::collections::HashSet::from([new_func1_id.clone(), new_func2_id.clone()]);
+    let mut fids = std::collections::HashSet::from([new_func1_id, new_func2_id]);
     let stop_res = mock_orc_receiver.try_next().unwrap().unwrap();
     if let MockFunctionInstanceEvent::StopFunction(id) = stop_res {
         assert!(fids.remove(&id));

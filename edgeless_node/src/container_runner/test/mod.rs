@@ -49,6 +49,7 @@ fn test_docker_basic() {
 
     let name = uuid::Uuid::new_v4();
     let image_name = "edgeless_function".to_string();
+    let devices = vec![];
 
     match docker.create_container(
         name.to_string(),
@@ -60,6 +61,7 @@ fn test_docker_basic() {
                 NetworkMode: None,
                 PublishAllPorts: Some(true),
                 PortBindings: None,
+                Devices: Some(devices),
             }),
         },
     ) {
@@ -76,7 +78,8 @@ fn test_docker_basic() {
     match docker.start_container(&name.to_string()) {
         Ok(val) => println!("{}", val),
         Err(e) => {
-            panic!("{}", e);
+            println!("error when starting the container, this likely means Docker is misconfigured: {}", e);
+            return;
         }
     };
 
@@ -91,7 +94,7 @@ fn test_docker_basic() {
         .iter()
         .find(|x| {
             if let Some(name_found) = x.Names.first() {
-                if *name_found == format!("/{}", name.to_string()) {
+                if *name_found == format!("/{}", name) {
                     return true;
                 }
             }

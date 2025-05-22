@@ -1,10 +1,13 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 pub mod epaper_display;
 pub mod mock_display;
 pub mod mock_sensor;
 pub mod scd30_sensor;
 
+#[allow(async_fn_in_trait)]
 pub trait Resource: crate::invocation::InvocationAPI + crate::resource_configuration::ResourceConfigurationAPI {
     fn provider_id(&self) -> &'static str;
     fn resource_class(&self) -> &'static str;

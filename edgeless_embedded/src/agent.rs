@@ -1,6 +1,10 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+
 #[derive(Clone)]
+
 pub struct EmbeddedAgent {
     own_node_id: edgeless_api_core::instance_id::NodeId,
     upstream_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>,
@@ -11,6 +15,7 @@ pub struct EmbeddedAgent {
     registration_signal: &'static embassy_sync::signal::Signal<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>,
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum AgentEvent {
     Invocation(edgeless_api_core::invocation::Event<heapless::Vec<u8, 1500>>),
     Registration(
@@ -27,6 +32,7 @@ pub enum RegistrationReply {
 }
 
 impl EmbeddedAgent {
+    #[allow(clippy::await_holding_refcell_ref)]
     pub async fn new(
         spawner: embassy_executor::Spawner,
         node_id: edgeless_api_core::instance_id::NodeId,
@@ -34,8 +40,7 @@ impl EmbeddedAgent {
     ) -> &'static mut EmbeddedAgent {
         static CHANNEL_RAW: static_cell::StaticCell<embassy_sync::channel::Channel<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>> =
             static_cell::StaticCell::new();
-        let channel =
-            CHANNEL_RAW.init_with(|| embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>::new());
+        let channel = CHANNEL_RAW.init_with(embassy_sync::channel::Channel::<embassy_sync::blocking_mutex::raw::NoopRawMutex, AgentEvent, 2>::new);
 
         let sender = channel.sender();
         let receiver = channel.receiver();
@@ -56,12 +61,12 @@ impl EmbeddedAgent {
 
         static SLF_RAW: static_cell::StaticCell<EmbeddedAgent> = static_cell::StaticCell::new();
         let slf = SLF_RAW.init_with(|| EmbeddedAgent {
-            own_node_id: node_id.clone(),
+            own_node_id: node_id,
             upstream_sender: sender,
             upstream_receiver: Some(receiver),
             inner: slf_inner,
             registration_signal: REPLY_CHANNEL
-                .init_with(|| embassy_sync::signal::Signal::<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>::new()),
+                .init_with(embassy_sync::signal::Signal::<embassy_sync::blocking_mutex::raw::NoopRawMutex, RegistrationReply>::new),
         });
 
         {
@@ -85,6 +90,7 @@ impl EmbeddedAgent {
         self.upstream_receiver.take()
     }
 
+    #[allow(clippy::await_holding_refcell_ref)]
     pub async fn register(&mut self, addr: smoltcp::wire::Ipv4Address) {
         let mut url = heapless::String::<256>::new();
         let url_bytes = addr.as_bytes();
@@ -106,7 +112,7 @@ impl EmbeddedAgent {
                 .push(edgeless_api_core::node_registration::ResourceProviderSpecification {
                     provider_id: i.provider_id(),
                     class_type: i.resource_class(),
-                    outputs: outputs,
+                    outputs,
                 })
                 .is_err()
             {
@@ -118,7 +124,7 @@ impl EmbeddedAgent {
             node_id: edgeless_api_core::node_registration::NodeId(self.own_node_id),
             agent_url: url.clone(),
             invocation_url: url,
-            resources: resources,
+            resources,
         };
 
         loop {
@@ -126,17 +132,15 @@ impl EmbeddedAgent {
             self.upstream_sender
                 .send(AgentEvent::Registration((reg.clone(), self.registration_signal)))
                 .await;
-            match self.registration_signal.wait().await {
-                RegistrationReply::Sucess => {
-                    return;
-                }
-                _ => {}
+            if let RegistrationReply::Sucess = self.registration_signal.wait().await {
+                return;
             }
         }
     }
 }
 
 impl crate::invocation::InvocationAPI for EmbeddedAgent {
+    #[allow(clippy::await_holding_refcell_ref)]
     async fn handle(
         &mut self,
         event: edgeless_api_core::invocation::Event<&[u8]>,
@@ -160,6 +164,7 @@ impl crate::invocation::InvocationAPI for EmbeddedAgent {
                         edgeless_api_core::invocation::EventData::CallNoRet => edgeless_api_core::invocation::EventData::CallNoRet,
                         edgeless_api_core::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,
                     },
+                    created: event.created,
                 };
             self.upstream_sender.send(AgentEvent::Invocation(new_event)).await;
             Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)
@@ -178,6 +183,7 @@ impl crate::invocation::InvocationAPI for EmbeddedAgent {
 }
 
 impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
+    #[allow(clippy::await_holding_refcell_ref)]
     async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         let inner = self.inner.borrow_mut();
         let mut lck = inner.lock().await;
@@ -192,6 +198,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         })
     }
 
+    #[allow(clippy::await_holding_refcell_ref, clippy::needless_lifetimes)]
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
@@ -209,6 +216,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         })
     }
 
+    #[allow(clippy::await_holding_refcell_ref, clippy::needless_lifetimes)]
     async fn patch<'a>(
         &mut self,
         patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,

@@ -218,7 +218,7 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
 pub fn parse_output_event_data(api_instance: &crate::grpc_impl::api::OutputEventData) -> anyhow::Result<crate::guest_api_host::OutputEventData> {
     Ok(crate::guest_api_host::OutputEventData {
         originator: match &api_instance.originator {
-            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
                 Ok(originator) => originator,
                 Err(err) => return Err(anyhow::anyhow!("invalid originator field: {}", err)),
             },
@@ -233,10 +233,10 @@ pub fn parse_output_event_data_raw(
     api_instance: &crate::grpc_impl::api::OutputEventDataRaw,
 ) -> anyhow::Result<crate::guest_api_host::OutputEventDataRaw> {
     match &api_instance.dst {
-        Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+        Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
             Ok(dst) => Ok(crate::guest_api_host::OutputEventDataRaw {
                 originator: match &api_instance.originator {
-                    Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+                    Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
                         Ok(originator) => originator,
                         Err(err) => return Err(anyhow::anyhow!("invalid originator field: {}", err)),
                     },
@@ -256,7 +256,7 @@ pub fn parse_telemetry_log_event(
 ) -> anyhow::Result<crate::guest_api_host::TelemetryLogEvent> {
     Ok(crate::guest_api_host::TelemetryLogEvent {
         originator: match &api_instance.originator {
-            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
                 Ok(originator) => originator,
                 Err(err) => return Err(anyhow::anyhow!("invalid originator field: {}", err)),
             },
@@ -268,7 +268,7 @@ pub fn parse_telemetry_log_event(
             x if x == crate::grpc_impl::api::TelemetryLogLevel::LogInfo as i32 => crate::guest_api_host::TelemetryLogLevel::Info,
             x if x == crate::grpc_impl::api::TelemetryLogLevel::LogDebug as i32 => crate::guest_api_host::TelemetryLogLevel::Debug,
             x if x == crate::grpc_impl::api::TelemetryLogLevel::LogTrace as i32 => crate::guest_api_host::TelemetryLogLevel::Trace,
-            x => return Err(anyhow::anyhow!("invalid telemetry event log level: {}", x as i32)),
+            x => return Err(anyhow::anyhow!("invalid telemetry event log level: {}", { x })),
         },
         target: api_instance.target.clone(),
         msg: api_instance.msg.clone(),
@@ -278,7 +278,7 @@ pub fn parse_telemetry_log_event(
 pub fn parse_delayed_event_data(api_instance: &crate::grpc_impl::api::DelayedEventData) -> anyhow::Result<crate::guest_api_host::DelayedEventData> {
     Ok(crate::guest_api_host::DelayedEventData {
         originator: match &api_instance.originator {
-            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
                 Ok(originator) => originator,
                 Err(err) => return Err(anyhow::anyhow!("invalid originator field: {}", err)),
             },
@@ -293,7 +293,7 @@ pub fn parse_delayed_event_data(api_instance: &crate::grpc_impl::api::DelayedEve
 pub fn parse_sync_data(api_instance: &crate::grpc_impl::api::SyncData) -> anyhow::Result<crate::guest_api_host::SyncData> {
     Ok(crate::guest_api_host::SyncData {
         originator: match &api_instance.originator {
-            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(&instance_id) {
+            Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
                 Ok(originator) => originator,
                 Err(err) => return Err(anyhow::anyhow!("invalid originator field: {}", err)),
             },
@@ -408,7 +408,7 @@ mod test {
     #[test]
     fn serialize_deserialize_telemetry_log_event() {
         let mut messages = vec![];
-        for log_level in vec![
+        for log_level in [
             TelemetryLogLevel::Error,
             TelemetryLogLevel::Warn,
             TelemetryLogLevel::Info,

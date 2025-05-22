@@ -1,0 +1,9 @@
+{
+    "id": "sqlx_test",
+    "function_type": "RUST_WASM",
+    "version": "0.2",
+    "build": "Cargo.toml",
+    "outputs": [
+        "database"
+    ]
+}

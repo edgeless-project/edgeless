@@ -1,8 +1,35 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
 use std::io::prelude::*;
+
+pub struct FileLogResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for FileLogResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("file-log")
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([
+            (
+                String::from("add-source-id"),
+                String::from("If specified adds the InstanceId of the source component"),
+            ),
+            (String::from("add-timestamp"), String::from("If specified adds a timestamp")),
+        ])
+    }
+
+    fn version(&self) -> String {
+        String::from("1.1")
+    }
+}
 
 #[derive(Clone)]
 pub struct FileLogResourceProvider {
@@ -12,6 +39,7 @@ pub struct FileLogResourceProvider {
 struct FileLogResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, FileLogResource>,
 }
 
@@ -26,10 +54,17 @@ impl Drop for FileLogResource {
 }
 
 impl FileLogResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle, filename: &str, add_timestamp: bool) -> anyhow::Result<Self> {
+    async fn new(
+        dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        filename: &str,
+        add_source_id: bool,
+        add_timestamp: bool,
+    ) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
+        let mut telemetry_handle = telemetry_handle;
 
-        let mut outfile = std::fs::OpenOptions::new().create(true).write(true).append(true).open(filename)?;
+        let mut outfile = std::fs::OpenOptions::new().create(true).append(true).open(filename)?;
 
         log::info!("FileLogResource created, writing to file: {}", filename);
 
@@ -39,7 +74,10 @@ impl FileLogResource {
                     source_id,
                     channel_id,
                     message,
+                    created,
                 } = dataplane_handle.receive_next().await;
+                let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
+
                 let mut need_reply = false;
                 let message_data = match message {
                     Message::Call(data) => {
@@ -52,21 +90,30 @@ impl FileLogResource {
                     }
                 };
 
-                let line = match add_timestamp {
-                    true => format!("{} {}", chrono::Utc::now().to_rfc3339(), message_data),
-                    false => message_data,
-                };
+                // Compose the line piece by piece.
+                let mut line = "".to_string();
+                if add_timestamp {
+                    line.push_str(format!("{} ", chrono::Utc::now().to_rfc3339()).as_str());
+                }
+                if add_source_id {
+                    line.push_str(format!("{} ", source_id).as_str());
+                }
+                line.push_str(&message_data);
 
+                // Dump the line to the output file.
                 log::debug!("{}", line);
                 if let Err(e) = writeln!(outfile, "{}", line) {
                     log::error!("Could not write to file the message '{}': {}", line, e);
                 }
 
+                // Reply to the caller if the resource instance was called.
                 if need_reply {
                     dataplane_handle
                         .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
                         .await;
                 }
+
+                crate::resources::observe_execution(started, &mut telemetry_handle, need_reply);
             }
         });
 
@@ -77,12 +124,14 @@ impl FileLogResource {
 impl FileLogResourceProvider {
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {
             inner: std::sync::Arc::new(tokio::sync::Mutex::new(FileLogResourceProviderInner {
                 resource_provider_id,
                 dataplane_provider,
+                telemetry_handle,
                 instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, FileLogResource>::new(),
             })),
         }
@@ -99,17 +148,22 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             let mut lck = self.inner.lock().await;
 
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
-            let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
+            let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
 
             match FileLogResource::new(
                 dataplane_handle,
+                lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
+                    "FUNCTION_ID".to_string(),
+                    new_id.function_id.to_string(),
+                )])),
                 filename,
+                instance_specification.configuration.contains_key("add-source-id"),
                 instance_specification.configuration.contains_key("add-timestamp"),
             )
             .await
             {
                 Ok(resource) => {
-                    lck.instances.insert(new_id.clone(), resource);
+                    lck.instances.insert(new_id, resource);
                     return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
                 }
                 Err(err) => {

@@ -1,11 +1,19 @@
 # SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+# SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+# SPDX-FileCopyrightText: © 2023 Siemens AG
 # SPDX-License-Identifier: MIT
+
 [package]
 name = "edgeless_api"
-version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+version = "1.0.0"
+authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
 rust-version = "1.77"
+description = "EDGELESS gRPC API definitions"
+homepage = "https://edgeless-project.eu/"
+license = "MIT"
+repository = "https://github.com/edgeless-project/edgeless/"
+readme = "../README.md"
 
 [lib]
 name = "edgeless_api"
@@ -28,7 +36,7 @@ regex = "1.8"
 serde = {version = "1", features=["derive"]}
 minicbor =  {version = "0.19", default-features = false, features = ["derive"]}
 heapless = { version = "0.8" }
-
+get_if_addrs = "0.5.3"
 
 [build-dependencies]
 tonic-build = {version = "0.9", optional = true}

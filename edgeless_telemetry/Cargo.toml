@@ -1,10 +1,18 @@
 # SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+# SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+# SPDX-FileCopyrightText: © 2023 Siemens AG
 # SPDX-License-Identifier: MIT
+
 [package]
 name = "edgeless_telemetry"
-version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+version = "1.0.0"
+authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Lukasz Zalewski <zalewski.lukasz@siemens.com>", "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
+description = "Node telemetry support in EDGELESS"
+homepage = "https://edgeless-project.eu/"
+license = "MIT"
+repository = "https://github.com/edgeless-project/edgeless/"
+readme = "../README.md"
 
 [lib]
 name = "edgeless_telemetry"
@@ -25,3 +33,4 @@ toml = "0.7"
 edgeless_api = {path = "../edgeless_api", features = ["grpc_impl"]}
 prometheus-client = "0.21"
 warp = "0.3.5"
+chrono = "0.4.38"

@@ -1,9 +1,12 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+
 // TODO(raphaelhetzel) These should be actual types in the future to allow for type-safety.
 pub type NodeId = uuid::Uuid;
 pub type ComponentId = uuid::Uuid;
+pub type DomainManagedInstanceId = uuid::Uuid;
 
 pub const NODE_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-fffe00000000");
 pub const FUNCTION_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-fffd00000000");
@@ -26,12 +29,12 @@ impl<C> minicbor::Encode<C> for InstanceId {
 
 impl<C> minicbor::CborLen<C> for InstanceId {
     fn cbor_len(&self, _ctx: &mut C) -> usize {
-        34
+        34 // TODO: shouldn't this be 64 instead?
     }
 }
 
 impl<C> minicbor::Decode<'_, C> for InstanceId {
-    fn decode<'b>(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+    fn decode(d: &mut minicbor::Decoder<'_>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         // let data: [[u8; 16];2]  = d.decode::<[[u8;16]; 2]>().unwrap();
         let n_id: [u8; 16] = (*d.bytes()?).try_into().unwrap();
         let f_id: [u8; 16] = (*d.bytes()?).try_into().unwrap();
@@ -64,11 +67,7 @@ impl InstanceId {
     }
 
     pub fn is_none(&self) -> bool {
-        if self.node_id == NODE_ID_NONE && self.function_id == FUNCTION_ID_NONE {
-            true
-        } else {
-            false
-        }
+        self.node_id == NODE_ID_NONE && self.function_id == FUNCTION_ID_NONE
     }
 }
 
@@ -76,7 +75,7 @@ impl InstanceId {
 mod test {
     #[test]
     fn size_matches() {
-        let mut buffer = [0 as u8; 1000];
+        let mut buffer = [0_u8; 1000];
 
         let id = super::InstanceId::new(uuid::Uuid::new_v4());
 

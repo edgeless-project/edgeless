@@ -28,6 +28,18 @@ impl Docker {
     pub fn start(docker: &mut rs_docker::Docker, image_name: String) -> anyhow::Result<(String, u64)> {
         let name: String = uuid::Uuid::new_v4().to_string();
 
+        let mut devices = vec![];
+
+        // SecureExecutor will create trusted containers. In all these cases, image names
+        // have the following pattern "edgeless-sgx-function-<language>-<function_name>"
+        // Hence, if this pattern is detected, this means that we need to pass the SGX driver to the container
+        // This is mandatory to utilize SGX functionalities from within the container
+        // NUC devices are used for now that support SGX in the edge devices
+        if image_name.contains("edgeless-sgx-function-") {
+            let sgx_nuc_driver = crate::container_runner::container_devices::get_sgx_nuc_driver();
+            devices.push(sgx_nuc_driver);
+        }
+
         let id = match docker.create_container(
             name.to_string(),
             rs_docker::container::ContainerCreate {
@@ -38,6 +50,7 @@ impl Docker {
                     NetworkMode: None,
                     PublishAllPorts: Some(true),
                     PortBindings: None,
+                    Devices: Some(devices),
                 }),
             },
         ) {

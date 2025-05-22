@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+
+use std::str::FromStr;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum TelemetryLogLevel {
     Error,
@@ -46,6 +49,7 @@ pub enum TelemetryEvent {
     FunctionInvocationCompleted(std::time::Duration),
     FunctionStop(std::time::Duration),
     FunctionExit(FunctionExitStatus),
+    FunctionTransfer(std::time::Duration),
 }
 
 #[derive(Clone)]
@@ -95,11 +99,19 @@ pub trait EventProcessor: Sync + Send {
     fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult;
 }
 
-struct EventLogger {}
+struct EventLogger {
+    log_level: log::Level,
+}
+
+impl EventLogger {
+    fn new(log_level: log::Level) -> Self {
+        Self { log_level }
+    }
+}
 
 impl EventProcessor for EventLogger {
     fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult {
-        println!("Event: {:?} , tags: {:?}", event, event_tags);
+        log::log!(self.log_level, "Event: {:?} , tags: {:?}", event, event_tags);
         TelemetryProcessingResult::PROCESSED
     }
 }
@@ -135,28 +147,71 @@ pub struct TelemetryProcessor {
 }
 
 impl TelemetryProcessor {
-    pub async fn new(metrics_url: String) -> anyhow::Result<Self> {
-        match edgeless_api::util::parse_http_host(&metrics_url) {
-            Ok((_, ip, port)) => {
-                let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<TelemetryProcessorInput>();
+    ///
+    /// Create a sub-system to process telemetry events.
+    ///
+    /// Parameters:
+    /// - `prometheus_url`: HTTP end-point to which to bind a web server
+    ///   providing an interface suitable to be scraped by Prometheus
+    ///   (https://prometheus.io/); if empty then the server is not started
+    /// - `log_level`: level used for log directives at each new event
+    /// - `performance_target`: optional target that collects samples about
+    ///   performance-related events
+    ///
+    pub async fn new(
+        prometheus_url: String,
+        log_level: Option<String>,
+        performance_target: Option<crate::performance_target::PerformanceTargetInner>,
+    ) -> anyhow::Result<Self> {
+        let mut processing_chain: Vec<Box<dyn EventProcessor>> = vec![];
 
-                let inner = TelemetryProcessorInner {
-                    processing_chain: vec![
-                        Box::new(crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await),
-                        Box::new(EventLogger {}),
-                    ],
-                    receiver,
-                };
-
-                tokio::spawn(async move {
-                    let mut inner = inner;
-                    inner.run().await;
-                });
-
-                Ok(Self { sender })
+        // Argument check.
+        let log_level = match log_level {
+            Some(log_level) => {
+                if log_level.is_empty() {
+                    None
+                } else {
+                    match log::Level::from_str(&log_level) {
+                        Ok(log_level) => Some(log_level),
+                        Err(err) => anyhow::bail!("could not parse log_level: {}", err),
+                    }
+                }
             }
-            Err(err) => Err(err),
+            None => None,
+        };
+
+        // Add the performance target, if present.
+        if let Some(performance_target) = performance_target {
+            processing_chain.push(Box::new(crate::performance_target::PerformanceTargetOuter::new(performance_target)));
         }
+
+        // Create and add the Prometheus target, if required.
+        if !prometheus_url.is_empty() {
+            match edgeless_api::util::parse_http_host(&prometheus_url) {
+                Ok((_, ip, port)) => {
+                    processing_chain.push(Box::new(
+                        crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await,
+                    ));
+                }
+                Err(err) => anyhow::bail!("could not create Prometheus server: {}", err),
+            }
+        }
+
+        // Created and the log target, if required.
+        if let Some(log_level) = log_level {
+            processing_chain.push(Box::new(EventLogger::new(log_level)))
+        };
+
+        // Create a channel to receive telemetry events and the processor that
+        // will handle them, spawned in a dedicated task.
+        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<TelemetryProcessorInput>();
+        let inner = TelemetryProcessorInner { processing_chain, receiver };
+        tokio::spawn(async move {
+            let mut inner = inner;
+            inner.run().await;
+        });
+
+        Ok(Self { sender })
     }
 
     pub fn get_handle(&self, handle_tags: std::collections::BTreeMap<String, String>) -> TelemetryHandle {

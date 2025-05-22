@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+# SPDX-FileCopyrightText: © 2023 Siemens AG
 # SPDX-License-Identifier: MIT
 [target.xtensa-esp32-none-elf]
 runner = "espflash flash --monitor"

@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 use futures::{FutureExt, SinkExt};
 use std::marker::PhantomData;
@@ -35,6 +37,7 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
 
 impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInstanceType> {
     pub async fn new(
+        instance_id: edgeless_api::function_instance::InstanceId,
         spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
         data_plane: edgeless_dataplane::handle::DataplaneHandle,
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
@@ -42,7 +45,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
     ) -> Self {
-        let instance_id = spawn_req.instance_id.unwrap();
         let mut telemetry_handle = telemetry_handle;
         let mut state_handle = state_handle;
 
@@ -52,7 +54,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         let serialized_state = state_handle.get().await;
 
         let guest_api_host = crate::base_runtime::guest_api::GuestAPIHost {
-            instance_id: instance_id.clone(),
+            instance_id,
             data_plane: data_plane.clone(),
             callback_table: alias_mapping.clone(),
             state_handle,
@@ -69,9 +71,9 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
                 spawn_req.code.function_class_code.clone(),
                 data_plane,
                 serialized_state,
-                spawn_req.annotations.get("init-payload").map(|x| x.clone()),
+                spawn_req.annotations.get("init-payload").cloned(),
                 runtime_api,
-                instance_id.clone(),
+                instance_id,
             )
             .await,
         );
@@ -103,6 +105,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
 }
 
 impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstanceType> {
+    #[allow(clippy::too_many_arguments)]
     pub async fn new(
         poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
@@ -175,10 +178,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         self.function_instance
             .as_mut()
             .ok_or(super::FunctionInstanceError::InternalError)?
-            .init(
-                self.init_payload.as_ref().map(|x| x.as_str()),
-                self.serialized_state.as_ref().map(|x| x.as_str()),
-            )
+            .init(self.init_payload.as_deref(), self.serialized_state.as_deref())
             .await?;
 
         self.telemetry_handle.observe(
@@ -198,11 +198,12 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
                     return self.stop().await;
                 },
                 // Receive a normal event from the dataplane and invoke the function instance
-                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message} =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, created} =  Box::pin(self.data_plane.receive_next()).fuse() => {
                     self.process_message(
                         source_id,
                         channel_id,
                         message,
+                        created
                     ).await?;
                 }
             }
@@ -214,9 +215,18 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         source_id: edgeless_api::function_instance::InstanceId,
         channel_id: u64,
         message: edgeless_dataplane::core::Message,
+        created: edgeless_api::function_instance::EventTimestamp,
     ) -> Result<(), super::FunctionInstanceError> {
+        let now = chrono::Utc::now();
+        let created = chrono::DateTime::from_timestamp(created.secs, created.nsecs).unwrap_or(chrono::DateTime::UNIX_EPOCH);
+        let elapsed = (now - created).to_std().unwrap_or(std::time::Duration::ZERO);
+        self.telemetry_handle.observe(
+            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionTransfer(elapsed),
+            std::collections::BTreeMap::new(),
+        );
+
         match message {
-            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id.clone(), payload).await,
+            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, payload).await,
             edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, payload, channel_id).await,
             _ => {
                 log::debug!("Unprocessed Message");
@@ -289,10 +299,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
 
     async fn exit(&mut self, exit_status: Result<(), super::FunctionInstanceError>) {
         self.runtime_api
-            .send(super::runtime::RuntimeRequest::FunctionExit(
-                self.instance_id.clone(),
-                exit_status.clone(),
-            ))
+            .send(super::runtime::RuntimeRequest::FunctionExit(self.instance_id, exit_status.clone()))
             .await
             .unwrap_or_else(|_| log::error!("FunctionInstance outlived runner."));
 
@@ -300,7 +307,11 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionExit(match exit_status {
                 Ok(_) => edgeless_telemetry::telemetry_events::FunctionExitStatus::Ok,
                 Err(exit_err) => match exit_err {
-                    FunctionInstanceError::BadCode => edgeless_telemetry::telemetry_events::FunctionExitStatus::CodeError,
+                    FunctionInstanceError::BadCode(_) => {
+                        // NOTE: eventually pass the error message to the
+                        // telemetry endpoint
+                        edgeless_telemetry::telemetry_events::FunctionExitStatus::CodeError
+                    }
                     _ => edgeless_telemetry::telemetry_events::FunctionExitStatus::InternalError,
                 },
             }),

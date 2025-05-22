@@ -1,23 +1,25 @@
-// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
 #[cfg(test)]
-mod tests {
+mod system_tests {
     // use super::*;
 
-    use edgeless_api::controller::ControllerAPI;
+    use edgeless_api::outer::controller::ControllerAPI;
     use edgeless_api::workflow_instance::WorkflowInstanceAPI;
     use edgeless_orc::proxy::Proxy;
 
-    async fn setup(
-        num_domains: u32,
-        num_nodes_per_domain: u32,
-        redis_url: Option<&str>,
-    ) -> (Vec<futures::future::AbortHandle>, Box<(dyn WorkflowInstanceAPI)>) {
+    struct AbortHandles {
+        abort_handles_nodes: std::collections::HashMap<uuid::Uuid, futures::future::AbortHandle>,
+        abort_handles_orchestrators: std::collections::HashMap<String, futures::future::AbortHandle>,
+        abort_handle_controller: futures::future::AbortHandle,
+    }
+
+    async fn setup(num_domains: u32, num_nodes_per_domain: u32, redis_url: Option<&str>) -> (AbortHandles, Box<(dyn WorkflowInstanceAPI)>) {
         assert!(num_domains > 0);
         assert!(num_nodes_per_domain > 0);
-
-        let mut handles = vec![];
 
         let address = "127.0.0.1";
         let mut port = 7001;
@@ -29,111 +31,146 @@ mod tests {
             port
         };
 
-        let mut orchestrators = vec![];
+        let domain_register_url = format!("http://{}:{}", address, next_port());
+
+        let mut abort_handles_orchestrators = std::collections::HashMap::new();
+        let mut abort_handles_nodes = std::collections::HashMap::new();
         for domain_i in 0..num_domains {
             let orchestrator_url = format!("http://{}:{}", address, next_port());
+            let node_register_url = format!("http://{}:{}", address, next_port());
             let domain_id = format!("domain-{}", domain_i);
-            orchestrators.push(edgeless_con::EdgelessConOrcConfig {
-                domain_id: domain_id.clone(),
-                orchestrator_url: orchestrator_url.clone(),
-            });
 
             let (task, handle) = futures::future::abortable(edgeless_orc::edgeless_orc_main(edgeless_orc::EdgelessOrcSettings {
                 general: edgeless_orc::EdgelessOrcGeneralSettings {
-                    domain_id: domain_id.to_string(),
+                    domain_register_url: domain_register_url.clone(),
+                    subscription_refresh_interval_sec: 1,
+                    domain_id: domain_id.clone(),
                     orchestrator_url: orchestrator_url.to_string(),
-                    orchestrator_url_announced: "".to_string(),
-                    orchestrator_coap_url: None,
-                    orchestrator_coap_url_announced: None,
-                    agent_url: format!("http://{}:{}", address, next_port()),
-                    agent_url_announced: "".to_string(),
-                    invocation_url: format!("http://{}:{}", address, next_port()),
-                    invocation_url_announced: "".to_string(),
+                    orchestrator_url_announced: orchestrator_url.to_string(),
+                    node_register_url: node_register_url.clone(),
+                    node_register_coap_url: None,
                 },
                 baseline: edgeless_orc::EdgelessOrcBaselineSettings {
                     orchestration_strategy: edgeless_orc::OrchestrationStrategy::RoundRobin,
-                    keep_alive_interval_secs: 1,
                 },
                 proxy: match redis_url {
                     None => edgeless_orc::EdgelessOrcProxySettings {
                         proxy_type: "None".to_string(),
+                        proxy_gc_period_seconds: 0,
                         redis_url: None,
+                        dataset_settings: None,
                     },
                     Some(url) => edgeless_orc::EdgelessOrcProxySettings {
                         proxy_type: "Redis".to_string(),
+                        proxy_gc_period_seconds: 0,
                         redis_url: Some(url.to_string()),
-                    },
-                },
-                collector: match redis_url {
-                    None => edgeless_orc::EdgelessOrcCollectorSettings {
-                        collector_type: "None".to_string(),
-                        redis_url: None,
-                    },
-                    Some(url) => edgeless_orc::EdgelessOrcCollectorSettings {
-                        collector_type: "Redis".to_string(),
-                        redis_url: Some(url.to_string()),
+                        dataset_settings: None,
                     },
                 },
             }));
             tokio::spawn(task);
-            handles.push(handle);
+            abort_handles_orchestrators.insert(domain_id, handle);
 
             // The first node in each domain is also assigned a file-log resource.
             for node_i in 0..num_nodes_per_domain {
-                let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(match node_i {
-                    0 => edgeless_node::EdgelessNodeSettings {
-                        general: edgeless_node::EdgelessNodeGeneralSettings {
-                            node_id: uuid::Uuid::new_v4(),
-                            agent_url: format!("http://{}:{}", address, next_port()),
-                            agent_url_announced: "".to_string(),
-                            invocation_url: format!("http://{}:{}", address, next_port()),
-                            invocation_url_announced: "".to_string(),
-                            invocation_url_coap: None,
-                            invocation_url_announced_coap: None,
-                            metrics_url: format!("http://{}:{}", address, next_port()),
-                            orchestrator_url: orchestrator_url.to_string(),
-                        },
-                        wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
-                        container_runtime: None,
-                        resources: Some(edgeless_node::EdgelessNodeResourceSettings {
-                            http_ingress_url: None,
-                            http_ingress_provider: None,
-                            http_egress_provider: None,
-                            file_log_provider: Some("file-log-1".to_string()),
-                            redis_provider: None,
-                            dda_url: None,
-                            dda_provider: None,
-                        }),
-                        user_node_capabilities: None,
+                let file_log_provider = match node_i {
+                    0 => Some("file-log-1".to_string()),
+                    _ => None,
+                };
+                let node_id = uuid::Uuid::new_v4();
+                let agent_url = format!("http://{}:{}", address, next_port());
+                let invocation_url = format!("http://{}:{}", address, next_port());
+                let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(edgeless_node::EdgelessNodeSettings {
+                    general: edgeless_node::EdgelessNodeGeneralSettings {
+                        node_id: node_id.clone(),
+                        agent_url: agent_url.clone(),
+                        agent_url_announced: agent_url,
+                        invocation_url: invocation_url.clone(),
+                        invocation_url_announced: invocation_url,
+                        invocation_url_coap: None,
+                        invocation_url_announced_coap: None,
+                        node_register_url: node_register_url.clone(),
+                        subscription_refresh_interval_sec: 2,
                     },
-                    _ => {
-                        edgeless_node::EdgelessNodeSettings::new_without_resources(&orchestrator_url, address, next_port(), next_port(), next_port())
-                    }
+                    telemetry: edgeless_node::EdgelessNodeTelemetrySettings {
+                        metrics_url: format!("http://{}:{}", address, next_port()),
+                        log_level: None,
+                        performance_samples: false,
+                    },
+                    wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
+                    container_runtime: None,
+                    resources: Some(edgeless_node::EdgelessNodeResourceSettings {
+                        http_ingress_url: None,
+                        http_ingress_provider: None,
+                        http_egress_provider: None,
+                        file_log_provider,
+                        redis_provider: None,
+                        dda_provider: None,
+                        ollama_provider: None,
+                        kafka_egress_provider: None,
+                        metrics_collector_provider: None,
+                        sqlx_provider: None,
+                    }),
+                    user_node_capabilities: None,
                 }));
                 tokio::spawn(task);
-                handles.push(handle);
+                abort_handles_nodes.insert(node_id, handle);
             }
         }
 
-        let (task, handle) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
+        let (task, abort_handle_controller) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
             controller_url: controller_url.clone(),
-            orchestrators,
+            domain_register_url: domain_register_url.clone(),
         }));
         tokio::spawn(task);
-        handles.push(handle);
 
-        let mut con_client = edgeless_api::grpc_impl::controller::ControllerAPIClient::new(controller_url.as_str()).await;
+        let mut con_client = edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(controller_url.as_str()).await;
 
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
-        (handles, con_client.workflow_instance_api())
+        (
+            AbortHandles {
+                abort_handles_nodes,
+                abort_handles_orchestrators,
+                abort_handle_controller,
+            },
+            con_client.workflow_instance_api(),
+        )
     }
 
-    async fn wf_list(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> Vec<edgeless_api::workflow_instance::WorkflowInstance> {
-        match client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
-            Ok(instances) => instances,
-            Err(_) => vec![],
+    async fn wf_list(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> Vec<edgeless_api::workflow_instance::WorkflowId> {
+        (client.list().await).unwrap_or_default()
+    }
+
+    async fn domains_used(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> std::collections::HashSet<String> {
+        let mut ret = std::collections::HashSet::new();
+        for wf_id in wf_list(client).await {
+            let wf_info = client.inspect(wf_id).await.expect("Could not find a workflow just listed");
+            for mapping in wf_info.status.domain_mapping {
+                ret.insert(mapping.domain_id);
+            }
         }
+        ret
+    }
+
+    async fn nodes_in_domain(domain_id: &str, client: &mut Box<(dyn WorkflowInstanceAPI)>) -> u32 {
+        let res = client.domains(String::default()).await.unwrap_or_default();
+        if res.is_empty() {
+            return 0;
+        }
+        if let Some(entry) = res.get(domain_id) {
+            entry.num_nodes
+        } else {
+            0
+        }
+    }
+
+    async fn nodes_in_cluster(num_domains: u32, client: &mut Box<(dyn WorkflowInstanceAPI)>) -> u32 {
+        let mut num_nodes_founds = 0;
+        for domain_id in 0..num_domains {
+            num_nodes_founds += nodes_in_domain(format!("domain-{}", domain_id).as_str(), client).await;
+        }
+        num_nodes_founds
     }
 
     fn fixture_spec() -> edgeless_api::function_instance::FunctionClassSpecification {
@@ -141,27 +178,47 @@ mod tests {
             function_class_id: "system_test".to_string(),
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
-            function_class_code: include_bytes!("fixtures/system_test.wasm").to_vec(),
+            function_class_code: include_bytes!("../../functions/system_test/system_test.wasm").to_vec(),
             function_class_outputs: vec!["out1".to_string(), "out2".to_string(), "err".to_string(), "log".to_string()],
         }
     }
 
-    fn terminate(handles: Vec<futures::future::AbortHandle>) -> anyhow::Result<()> {
-        for handle in handles {
+    fn terminate(handles: AbortHandles) -> anyhow::Result<()> {
+        for handle in handles.abort_handles_nodes.values() {
             handle.abort();
         }
+        for handle in handles.abort_handles_orchestrators.values() {
+            handle.abort();
+        }
+        handles.abort_handle_controller.abort();
         Ok(())
+    }
+
+    fn tear_down_domain(domain_id: &str, handles: &mut AbortHandles) {
+        match handles.abort_handles_orchestrators.remove(domain_id) {
+            Some(handle) => handle.abort(),
+            None => panic!("domain {} not found", domain_id),
+        }
     }
 
     #[tokio::test]
     #[serial_test::serial]
     async fn system_test_single_domain_single_node() -> anyhow::Result<()> {
-        let _ = env_logger::try_init();
+        // let _ = env_logger::try_init();
 
         // Create the EDGELESS system.
         let (handles, mut client) = setup(1, 1, None).await;
 
         assert!(wf_list(&mut client).await.is_empty());
+
+        // Wait for all the nodes to be visible.
+        for _ in 0..100 {
+            if nodes_in_domain("domain-0", &mut client).await == 1 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(1, nodes_in_domain("domain-0", &mut client).await);
 
         // Create 10 workflows
         let mut workflow_ids = vec![];
@@ -222,12 +279,21 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     #[serial_test::serial]
     async fn system_test_single_domain_three_nodes() -> anyhow::Result<()> {
-        let _ = env_logger::try_init();
+        // let _ = env_logger::try_init();
 
         // Create the EDGELESS system.
         let (handles, mut client) = setup(1, 3, None).await;
 
         assert!(wf_list(&mut client).await.is_empty());
+
+        // Wait for all the nodes to be visible.
+        for _ in 0..100 {
+            if nodes_in_domain("domain-0", &mut client).await == 3 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(3, nodes_in_domain("domain-0", &mut client).await);
 
         let num_workflows = 3;
 
@@ -344,13 +410,96 @@ mod tests {
         terminate(handles)
     }
 
+    #[tokio::test]
+    #[serial_test::serial]
+    async fn system_test_three_domains_simple() -> anyhow::Result<()> {
+        // let _ = env_logger::try_init();
+
+        // Create the EDGELESS system.
+        let (mut handles, mut client) = setup(3, 1, None).await;
+
+        assert!(wf_list(&mut client).await.is_empty());
+
+        // Wait for all the nodes to be visible.
+        for _ in 0..100 {
+            if nodes_in_cluster(3, &mut client).await == 3 {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(3, nodes_in_cluster(3, &mut client).await);
+
+        // Create 100 workflows
+        let mut workflow_ids = vec![];
+        let mut domains = std::collections::HashSet::new();
+        for wf_i in 0..100 {
+            let err_str = format!("wf#{}, nodes in cluster {}", wf_i, nodes_in_cluster(3, &mut client).await);
+            let res = client
+                .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
+                    workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
+                        name: "f1".to_string(),
+                        function_class_specification: fixture_spec(),
+                        output_mapping: std::collections::HashMap::new(),
+                        annotations: std::collections::HashMap::new(),
+                    }],
+                    workflow_resources: vec![],
+                    annotations: std::collections::HashMap::new(),
+                })
+                .await;
+            workflow_ids.push(match res {
+                Ok(response) => match &response {
+                    edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => {
+                        panic!("workflow rejected [{}]: {}", err_str, err)
+                    }
+                    edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val) => {
+                        assert_eq!(1, val.domain_mapping.len());
+                        assert_eq!("f1", val.domain_mapping[0].name);
+                        domains.insert(val.domain_mapping[0].domain_id.clone());
+                        val.workflow_id.clone()
+                    }
+                },
+                Err(err) => panic!("could not start the workflow [{}]: {}", err_str, err),
+            });
+        }
+        assert_eq!(100, wf_list(&mut client).await.len());
+
+        let mut all_domains = std::collections::HashSet::new();
+        for i in 0..3 {
+            all_domains.insert(format!("domain-{}", i));
+        }
+        assert_eq!(all_domains, domains);
+        assert_eq!(all_domains, domains_used(&mut client).await);
+
+        // Tear down one orchestration domain.
+        tear_down_domain("domain-1", &mut handles);
+        all_domains.remove("domain-1");
+        for _ in 0..100 {
+            if domains_used(&mut client).await == all_domains {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(all_domains, domains_used(&mut client).await);
+
+        // Stop the workflows
+        for workflow_id in workflow_ids {
+            match client.stop(workflow_id).await {
+                Ok(_) => {}
+                Err(err) => panic!("could not stop the workflow: {}", err),
+            }
+        }
+        assert!(wf_list(&mut client).await.is_empty());
+
+        terminate(handles)
+    }
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     #[serial_test::serial]
     async fn system_test_orchestration_intent_migration_redis() -> anyhow::Result<()> {
-        let _ = env_logger::try_init();
+        // let _ = env_logger::try_init();
 
         // Skip the test if there is no local Redis listening on default port.
-        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true) {
+        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true, None) {
             Ok(redis_proxy) => redis_proxy,
             Err(_) => {
                 println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
@@ -359,7 +508,8 @@ mod tests {
         };
 
         // Create an EDGELESS system with a single domain and two nodes.
-        let (handles, mut client) = setup(1, 2, Some("redis://127.0.0.1:6379")).await;
+        let num_nodes = 2;
+        let (handles, mut client) = setup(1, num_nodes, Some("redis://127.0.0.1:6379")).await;
 
         // Check that in the Redis there are two regular nodes, in addition to
         // the one for metrics collection in the orchestrator.
@@ -374,20 +524,29 @@ mod tests {
             .keys()
             .cloned()
             .collect::<Vec<edgeless_api::function_instance::NodeId>>();
-        assert_eq!(node_uuids.len(), 1 + 2);
-        assert_eq!(redis_proxy.fetch_node_health().len(), 1 + 2);
+        assert_eq!(node_uuids.len() as u32, num_nodes);
+        assert_eq!(redis_proxy.fetch_node_health().len() as u32, num_nodes);
 
         // Check that there is no workflow through the client.
         assert!(wf_list(&mut client).await.is_empty());
 
+        // Wait for all the nodes to be visible.
+        for _ in 0..100 {
+            if nodes_in_domain("domain-0", &mut client).await == num_nodes {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(num_nodes, nodes_in_domain("domain-0", &mut client).await);
+
         // Clean-up closures.
-        let removeme_filename = || format!("removeme.log");
+        let removeme_filename = || "removeme.log".to_string();
         let cleanup = || {
             let _ = std::fs::remove_file(removeme_filename());
         };
 
         // Create one workflow
-        let workflow_id;
+
         cleanup();
         let res = client
             .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
@@ -414,26 +573,32 @@ mod tests {
                         annotations: std::collections::HashMap::new(),
                     },
                 ],
-                workflow_resources: vec![],
+                workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
+                    name: "log".to_string(),
+                    class_type: "file-log".to_string(),
+                    output_mapping: std::collections::HashMap::new(),
+                    configurations: std::collections::HashMap::from([("filename".to_string(), removeme_filename())]),
+                }],
                 annotations: std::collections::HashMap::new(),
             })
             .await;
-        workflow_id = Some(match res {
+        let expected_instance_names = std::collections::HashSet::from(["f1", "f2", "f3", "log"]);
+        let workflow_id = match res {
             Ok(response) => match &response {
                 edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => {
                     panic!("workflow rejected: {}", err)
                 }
                 edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val) => {
-                    assert_eq!(3, val.domain_mapping.len());
-                    for i in 0..3 {
-                        assert_eq!(format!("f{}", i + 1), val.domain_mapping[i].name);
+                    assert_eq!(4, val.domain_mapping.len());
+                    for i in 0..4 {
+                        assert!(expected_instance_names.contains(val.domain_mapping[i].name.as_str()));
                         assert_eq!("domain-0", val.domain_mapping[i].domain_id);
                     }
                     val.workflow_id.clone()
                 }
             },
             Err(err) => panic!("could not start the workflow: {}", err),
-        });
+        };
 
         // Check that the client now shows one workflow.
         assert_eq!(1, wf_list(&mut client).await.len());
@@ -454,7 +619,7 @@ mod tests {
         for (logical_fid, nodes) in &instances {
             assert!(nodes.len() == 1);
             println!("before function {} -> node {}", logical_fid, nodes.first().unwrap());
-            nodes_with_functions.insert(nodes.first().unwrap().clone());
+            nodes_with_functions.insert(*nodes.first().unwrap());
         }
 
         // Add intents to migrate the function instances.
@@ -469,8 +634,8 @@ mod tests {
         let mut intents = vec![];
         for (logical_fid, nodes) in &instances {
             assert!(nodes.len() == 1);
-            intents.push(edgeless_orc::orchestrator::DeployIntent::Migrate(
-                logical_fid.clone(),
+            intents.push(edgeless_orc::deploy_intent::DeployIntent::Migrate(
+                *logical_fid,
                 vec![other(nodes.first().unwrap())],
             ));
         }
@@ -512,7 +677,7 @@ mod tests {
         assert!(redis_proxy.retrieve_deploy_intents().is_empty());
 
         // Stop the workflows
-        match client.stop(workflow_id.unwrap()).await {
+        match client.stop(workflow_id).await {
             Ok(_) => {}
             Err(err) => panic!("could not stop the workflow: {}", err),
         }

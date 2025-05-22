@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 pub struct MockDisplayInstanceConfiguration {}
 
@@ -8,19 +10,21 @@ pub struct MockDisplay {
 }
 
 impl MockDisplay {
+    #[allow(clippy::needless_lifetimes)] // not needless
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<MockDisplayInstanceConfiguration, edgeless_api_core::common::ErrorResponse> {
         if data.class_type == "epaper-display" {
             Ok(MockDisplayInstanceConfiguration {})
         } else {
-            return Err(edgeless_api_core::common::ErrorResponse {
+            Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Wrong Resource class type.",
                 detail: None,
-            });
+            })
         }
     }
 
+    #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
         static SLF_RAW: static_cell::StaticCell<MockDisplay> = static_cell::StaticCell::new();
         SLF_RAW.init_with(|| MockDisplay {
@@ -32,15 +36,15 @@ impl MockDisplay {
 
 impl crate::resource::Resource for MockDisplay {
     fn provider_id(&self) -> &'static str {
-        return "mock-display-1";
+        "mock-display-1"
     }
 
     fn resource_class(&self) -> &'static str {
-        return "epaper-display";
+        "epaper-display"
     }
 
     fn outputs(&self) -> &'static [&'static str] {
-        return &[];
+        &[]
     }
 
     async fn has_instance(&self, id: &edgeless_api_core::instance_id::InstanceId) -> bool {
@@ -83,6 +87,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
         }
     }
 
+    #[allow(clippy::needless_lifetimes)]
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
@@ -98,7 +103,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
             });
         }
 
-        let id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone());
+        let id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID);
 
         self.instance_id = Some(id);
 
@@ -107,7 +112,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
 
     async fn patch(
         &mut self,
-        resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
+        _resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest<'_>,
     ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         Ok(())
     }

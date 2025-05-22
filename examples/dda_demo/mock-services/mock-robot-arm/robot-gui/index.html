@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+
+<head>
+  <title>Robot arm GUI</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, user-scalable=no,
+  minimum-scale=1.0, maximum-scale=1.0">
+
+  <script src="js/require.js" charset="utf-8"></script>
+  <script src="js/THREERobot.js"></script>
+
+  <!-- uses old versions of these dependencies in vendor/ -->
+  <script src="vendor/three.js/Three.js"></script>
+  <script src="vendor/three.js/Detector.js"></script>
+  <script src="vendor/three.js/Stats.js"></script>
+
+  <script src="vendor/threex/THREEx.screenshot.js"></script>
+  <script src="vendor/threex/THREEx.FullScreen.js"></script>
+  <script src="vendor/threex/THREEx.WindowResize.js"></script>
+  <script src="vendor/three.js/OrbitControls.js"></script>
+  <script src="vendor/three.js/TransformControls.js"></script>
+  <script src="vendor/EventDispatcher.js"></script>
+
+  <link href="css/main.css" rel="stylesheet" />
+</head>
+
+<body>
+  <div id="container"></div>
+  <script type="text/javascript">
+
+    var debug = {}
+    requirejs.config({
+      baseUrl: 'js',
+      paths: {
+        State: '../vendor/state/State',
+        Kinematic: 'InverseKinematic'
+      },
+    });
+
+    // Bootstraps the HMI for robot control
+    require(['Hmi'], function(Hmi) {
+      let hmi = new Hmi()
+
+    // connect through websockets
+    const socket = new WebSocket('ws://localhost:8019/ws');
+    socket.onopen = function (event) {
+        console.log("Connection opened, sending start message")
+        socket.send("start")
+    }
+
+    socket.onmessage = function (event) {
+        console.log("Moving arm: " + event.data)
+        hmi.moveArm(event.data)
+    };
+      
+    });
+  </script>
+</body>
+
+</html>
+
+<!-- moveArm(event.data == "UP" ? true : false) -->
