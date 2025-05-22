@@ -37,6 +37,9 @@ impl DomainRegistrationAPIServer {
                     log::info!("Start DomainRegisterAPI GRPC Server at {}", domain_registration_url);
 
                     match tonic::transport::Server::builder()
+                        .layer(tower::timeout::TimeoutLayer::new(std::time::Duration::from_millis(
+                            crate::grpc_impl::common::GRPC_TIMEOUT,
+                        )))
                         .add_service(
                             crate::grpc_impl::api::domain_registration_server::DomainRegistrationServer::new(domain_registration_api)
                                 .max_decoding_message_size(usize::MAX),

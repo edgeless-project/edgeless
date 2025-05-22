@@ -2,7 +2,10 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-use crate::grpc_impl::common::CommonConverters;
+use super::super::common::CommonConverters;
+use crate::invocation::LinkProcessingResult;
+use std::time::Duration;
+use tokio::time::timeout;
 
 struct InvocationConverters {}
 
@@ -96,12 +99,28 @@ impl InvocationAPIClient {
 
 #[async_trait::async_trait]
 impl crate::invocation::InvocationAPI for InvocationAPIClient {
-    async fn handle(&mut self, event: crate::invocation::Event) -> anyhow::Result<crate::invocation::LinkProcessingResult> {
+    async fn handle(&mut self, event: crate::invocation::Event) -> LinkProcessingResult {
+        // NOTE: for now not used, technically the most non-blocking version.
+        // // Option 1.
+        // let serialized_event = InvocationConverters::encode_crate_event(&event);
+        // // add a timeout, as this could hang the dataplane indefinitely
+        // let mut client = self.client.clone();
+        // // best effort, try not to block
+        // tokio::spawn(async move {
+        //     let _ = client.handle(tonic::Request::new(serialized_event)).await;
+        // });
+        // // return immediately
+        // return LinkProcessingResult::FINAL;
+
+        // Option 2.
         let serialized_event = InvocationConverters::encode_crate_event(&event);
-        let res = self.client.handle(tonic::Request::new(serialized_event)).await;
+        let res = timeout(Duration::from_millis(500), self.client.handle(tonic::Request::new(serialized_event))).await;
         match res {
-            Ok(_) => Ok(crate::invocation::LinkProcessingResult::PROCESSED),
-            Err(_) => Err(anyhow::anyhow!("Remote Event Request Failed")),
+            Ok(internal) => match internal {
+                Ok(_) => LinkProcessingResult::FINAL,
+                Err(e) => LinkProcessingResult::ERROR(e.to_string()),
+            },
+            Err(elapsed) => LinkProcessingResult::ERROR(elapsed.to_string()),
         }
     }
 }
@@ -124,11 +143,8 @@ impl crate::grpc_impl::api::function_invocation_server::FunctionInvocation for I
 
         let res = self.root_api.lock().await.handle(parsed_request).await;
         match res {
-            Ok(_) => Ok(tonic::Response::new(())),
-            Err(_) => {
-                panic!("error response");
-                Err(tonic::Status::internal("Server Error"))
-            }
+            LinkProcessingResult::ERROR(e) => Err(tonic::Status::internal("Server error")),
+            _ => Ok(tonic::Response::new(())),
         }
     }
 }
@@ -147,6 +163,12 @@ impl InvocationAPIServer {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start InvocationAPI GRPC Server at {}", invocation_url);
                     match tonic::transport::Server::builder()
+                        .http2_keepalive_timeout(Some(std::time::Duration::from_millis(200)))
+                        .http2_keepalive_interval(Some(std::time::Duration::from_millis(100)))
+                        .tcp_keepalive(Some(Duration::from_millis(100)))
+                        .layer(tower::timeout::TimeoutLayer::new(std::time::Duration::from_millis(
+                            crate::grpc_impl::common::GRPC_TIMEOUT,
+                        )))
                         .add_service(
                             crate::grpc_impl::api::function_invocation_server::FunctionInvocationServer::new(function_api)
                                 .max_decoding_message_size(usize::MAX),

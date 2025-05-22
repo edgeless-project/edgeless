@@ -124,7 +124,7 @@ impl CoapClient {
                 log::warn!("Sender could not send on iteration {}", i);
             }
 
-            let res = tokio::time::timeout(core::time::Duration::from_millis(500), &mut receiver).await;
+            let res = tokio::time::timeout(core::time::Duration::from_millis(2000), &mut receiver).await;
             match res {
                 Ok(reply) => {
                     if let Ok(val) = reply {

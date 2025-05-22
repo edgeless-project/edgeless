@@ -6,7 +6,7 @@ On the other hand, the directory `outer/` contains traits that put together
 the traits from top-level into composite traits.
 The code structure is designed to make it easier to implement the traits
 through different inter-process communication library/protocols.
-At the moment, the only 
+At the moment, the only
 
 > Every implementation has to implement the inner and outer traits.
 
@@ -86,6 +86,7 @@ Note:
 ```
 
 Legend:
+
 - Function instance starts and runs a gRPC server for GuestAPIFunction.
 - EDGELESS node connects to it to manage lifecycle and messaging.
 - Function instance connects back to the node’s GuestAPIHost to trigger cross-function operations or telemetry.

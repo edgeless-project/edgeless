@@ -40,6 +40,9 @@ impl GuestAPIFunctionServer {
                     log::info!("Start ContainerFunctionAPI GRPC Server at {}", container_function_url);
 
                     match tonic::transport::Server::builder()
+                        .layer(tower::timeout::TimeoutLayer::new(std::time::Duration::from_millis(
+                            crate::grpc_impl::common::GRPC_TIMEOUT,
+                        )))
                         .add_service(
                             crate::grpc_impl::api::guest_api_function_server::GuestApiFunctionServer::new(workflow_api)
                                 .max_decoding_message_size(usize::MAX),

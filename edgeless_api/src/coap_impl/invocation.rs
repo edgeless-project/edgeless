@@ -55,12 +55,12 @@ impl CoapInvocationServer {
 
                         match key_entry {
                             std::collections::hash_map::Entry::Vacant(entry) => {
-                                slf.root_api.handle(event).await.unwrap();
+                                slf.root_api.handle(event).await;
                                 entry.insert(token);
                             }
                             std::collections::hash_map::Entry::Occupied(mut entry) => {
                                 if entry.get() < &token || token == 0 {
-                                    slf.root_api.handle(event).await.unwrap();
+                                    slf.root_api.handle(event).await;
                                     entry.insert(token);
                                 } else {
                                     log::info!("Message Duplicate: {} !< {}", entry.get(), token);
@@ -79,7 +79,7 @@ impl CoapInvocationServer {
 
 #[async_trait::async_trait]
 impl crate::invocation::InvocationAPI for super::CoapClient {
-    async fn handle(&mut self, event: crate::invocation::Event) -> anyhow::Result<crate::invocation::LinkProcessingResult> {
+    async fn handle(&mut self, event: crate::invocation::Event) -> crate::invocation::LinkProcessingResult {
         let encoded_event = edgeless_api_core::invocation::Event::<&[u8]> {
             target: event.target,
             source: event.source,
@@ -105,6 +105,6 @@ impl crate::invocation::InvocationAPI for super::CoapClient {
         let ((packet, _addr), _tail) =
             edgeless_api_core::coap_mapping::COAPEncoder::encode_invocation_event(lck.endpoint, encoded_event, token, &mut buffer[..]);
         self.outgoing_sender.send(Vec::from(packet)).unwrap();
-        Ok(crate::invocation::LinkProcessingResult::FINAL)
+        crate::invocation::LinkProcessingResult::FINAL
     }
 }

@@ -53,6 +53,9 @@ impl OrchestratorAPIServer {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start OrchestratorAPIServer GRPC Server at {}", orchestrator_url);
                     match tonic::transport::Server::builder()
+                        .layer(tower::timeout::TimeoutLayer::new(std::time::Duration::from_millis(
+                            crate::grpc_impl::common::GRPC_TIMEOUT,
+                        )))
                         .add_service(
                             crate::grpc_impl::api::function_instance_server::FunctionInstanceServer::new(function_api)
                                 .max_decoding_message_size(usize::MAX),

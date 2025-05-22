@@ -12,12 +12,28 @@ pub enum EventData {
     Err,
 }
 
+// custom display format
 impl std::fmt::Display for EventData {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            EventData::Call(data) => write!(f, "Call (size {} bytes)", data.len()),
-            EventData::Cast(data) => write!(f, "Call (size {} bytes)", data.len()),
-            EventData::CallRet(data) => write!(f, "Call (size {} bytes)", data.len()),
+            EventData::Call(data) => write!(
+                f,
+                "Call (size {} bytes): {}",
+                data.len(),
+                core::str::from_utf8(data.as_bytes()).unwrap_or("not-utf-8")
+            ),
+            EventData::Cast(data) => write!(
+                f,
+                "Cast (size {} bytes): {}",
+                data.len(),
+                core::str::from_utf8(data.as_bytes()).unwrap_or("not-utf-8")
+            ),
+            EventData::CallRet(data) => write!(
+                f,
+                "CallRet (size {} bytes): {}",
+                data.len(),
+                core::str::from_utf8(data.as_bytes()).unwrap_or("not-utf-8")
+            ),
             EventData::CallNoRet => write!(f, "CallNoRet"),
             EventData::Err => write!(f, "Err"),
         }
@@ -46,13 +62,17 @@ impl std::fmt::Display for Event {
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum LinkProcessingResult {
+    // means that the event has been processed entirely and finally by the destination
     FINAL,
-    PROCESSED,
-    PASSED,
-    // TIMED_OUT,
+    // means that the event could not be handled by the link, so was ignored and
+    // not delivered
+    IGNORED,
+    // means that some Dataplane level error has occured with a description
+    ERROR(String),
 }
 
 #[async_trait::async_trait]
 pub trait InvocationAPI: Sync + Send {
-    async fn handle(&mut self, event: Event) -> anyhow::Result<LinkProcessingResult>;
+    // sends an event from source to target, non-blocking
+    async fn handle(&mut self, event: Event) -> LinkProcessingResult;
 }

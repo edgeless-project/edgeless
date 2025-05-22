@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use super::common::GRPC_RETRIES;
+
 ///
 /// gRPC client of a DomainRegistrationAPI
 ///
@@ -30,7 +32,10 @@ impl DomainRegistrationAPIClient {
             self.client = match crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient::connect(self.server_addr.clone()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    Some(client)
+                    // add a retry policy
+                    let retry_policy = super::common::Attempts(GRPC_RETRIES);
+                    let retrying_client = tower::retry::Retry::new(retry_policy, client);
+                    Some(retrying_client.get_ref().clone())
                 }
                 Err(err) => anyhow::bail!(err),
             }
