@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
+use std::time::Duration;
+
 pub struct NodeRegisterAPIClient {
     node_registration_client: Box<dyn crate::node_registration::NodeRegistrationAPI>,
 }
@@ -36,6 +38,9 @@ impl NodeRegisterAPIServer {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start NodeRegisterAPIServer GRPC Server at {}", node_register_url);
                     match tonic::transport::Server::builder()
+                        .layer(tower::timeout::TimeoutLayer::new(Duration::from_millis(
+                            crate::grpc_impl::common::GRPC_TIMEOUT,
+                        )))
                         .add_service(
                             crate::grpc_impl::api::node_registration_server::NodeRegistrationServer::new(node_registration_api)
                                 .max_decoding_message_size(usize::MAX),

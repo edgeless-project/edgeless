@@ -372,8 +372,10 @@ async fn main() -> anyhow::Result<()> {
                         created: edgeless_api::function_instance::EventTimestamp::default(),
                     };
                     match edgeless_api::invocation::InvocationAPI::handle(&mut client, event).await {
-                        Ok(_) => println!("event casted"),
-                        Err(err) => return Err(anyhow::anyhow!("error casting the event: {}", err)),
+                        edgeless_api::invocation::LinkProcessingResult::ERROR(_) => return Err(anyhow::anyhow!("invoking went wrong")),
+                        _ => {
+                            log::info!("invoking function success!")
+                        }
                     }
                 }
 

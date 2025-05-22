@@ -2,6 +2,50 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+use futures::future::{self, Ready};
+use tonic::{Request, Response, Status};
+use tower::retry::Policy;
+
+#[derive(Clone)]
+pub struct Attempts(pub usize);
+
+type GrpcRequest<T> = Request<T>;
+type GrpcResponse<T> = Response<T>;
+type GrpcError = Status;
+
+// TODO: add exponential backoff using the tower::retry::backoff module
+impl<Req, Res> Policy<GrpcRequest<Req>, GrpcResponse<Res>, GrpcError> for Attempts
+where
+    Req: Clone,
+{
+    type Future = Ready<()>;
+
+    fn retry(&mut self, _req: &mut GrpcRequest<Req>, result: &mut Result<GrpcResponse<Res>, GrpcError>) -> Option<Self::Future> {
+        match result {
+            Ok(_) => None,
+            Err(err) => {
+                if self.0 > 0 {
+                    log::warn!("[gRPC] attempt nr {}, error: {}", self.0, err);
+                    self.0 -= 1;
+                    Some(future::ready(()))
+                } else {
+                    log::warn!("[gRPC] no attempts left");
+                    None
+                }
+            }
+        }
+    }
+
+    fn clone_request(&mut self, req: &GrpcRequest<Req>) -> Option<GrpcRequest<Req>> {
+        // need to access the inner request
+        Some(GrpcRequest::new(req.get_ref().clone()))
+    }
+}
+
+// timeout in miliseconds for all grpc request
+pub static GRPC_TIMEOUT: u64 = 200;
+pub static GRPC_RETRIES: usize = 3;
+
 pub struct CommonConverters {}
 
 pub trait ParseableId<IdType> {

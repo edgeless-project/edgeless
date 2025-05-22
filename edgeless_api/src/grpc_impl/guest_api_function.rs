@@ -16,6 +16,7 @@ impl GuestAPIFunctionClient {
         loop {
             match crate::grpc_impl::api::guest_api_function_client::GuestApiFunctionClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
+                    // TODO: maybe add retry policy?
                     let client = client.max_decoding_message_size(usize::MAX);
                     return Ok(Self { client });
                 }

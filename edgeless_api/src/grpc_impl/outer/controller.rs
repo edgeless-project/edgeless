@@ -38,6 +38,9 @@ impl WorkflowInstanceAPIServer {
                     log::info!("Start ControllerAPI GRPC Server at {}", controller_url);
 
                     match tonic::transport::Server::builder()
+                        .layer(tower::timeout::TimeoutLayer::new(std::time::Duration::from_millis(
+                            crate::grpc_impl::common::GRPC_TIMEOUT,
+                        )))
                         .add_service(
                             crate::grpc_impl::api::workflow_instance_server::WorkflowInstanceServer::new(workflow_api)
                                 .max_decoding_message_size(usize::MAX),

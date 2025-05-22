@@ -29,7 +29,10 @@ impl NodeManagementClient {
             self.client = match crate::grpc_impl::api::node_management_client::NodeManagementClient::connect(self.server_addr.clone()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    Some(client)
+                    // add service level retry policy
+                    let retry_policy = super::common::Attempts(super::common::GRPC_RETRIES);
+                    let retrying_client = tower::retry::Retry::new(retry_policy, client);
+                    Some(retrying_client.get_ref().clone())
                 }
                 Err(err) => anyhow::bail!(err),
             }
