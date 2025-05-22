@@ -36,7 +36,7 @@ impl Docker {
         // This is mandatory to utilize SGX functionalities from within the container
         // NUC devices are used for now that support SGX in the edge devices
         if image_name.contains("edgeless-sgx-function-") {
-            let sgx_nuc_driver = crate::container_runner::container_devices::get_sgx_nuc_driver();
+            let sgx_nuc_driver = super::container_devices::get_sgx_nuc_driver();
             devices.push(sgx_nuc_driver);
         }
 

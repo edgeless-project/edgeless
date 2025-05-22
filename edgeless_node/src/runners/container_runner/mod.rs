@@ -2,11 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 pub mod container_devices;
-
 pub mod container_runtime;
-
 pub mod docker_utils;
-
 pub mod function_instance;
 
 #[cfg(test)]

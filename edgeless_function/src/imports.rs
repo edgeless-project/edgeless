@@ -25,4 +25,5 @@ extern "C" {
     pub(crate) fn slf_asm(out_node_id_ptr: *mut u8, out_component_id_ptr: *mut u8);
     pub(crate) fn delayed_cast_asm(delay_ms: u64, target_ptr: *const u8, target_len: usize, payload_ptr: *const u8, payload_len: usize);
     pub(crate) fn sync_asm(data_ptr: *const u8, data_len: u32);
+    pub(crate) fn get_current_time_asm() -> u64;
 }

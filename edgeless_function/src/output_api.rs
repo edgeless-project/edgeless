@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
 // SPDX-License-Identifier: MIT
 
+// These functions are imported by the WASM rust functions and called.
 pub fn cast_raw(target: crate::InstanceId, msg: &[u8]) {
     unsafe {
         crate::imports::cast_raw_asm(target.node_id.as_ptr(), target.component_id.as_ptr(), msg.as_ptr(), msg.len());
@@ -90,5 +91,12 @@ pub fn slf() -> crate::InstanceId {
 pub fn sync(state: &[u8]) {
     unsafe {
         crate::imports::sync_asm(state.as_ptr(), state.len() as u32);
+    }
+}
+
+pub fn get_current_time() -> u64 {
+    unsafe {
+        let ret = crate::imports::get_current_time_asm();
+        return ret;
     }
 }

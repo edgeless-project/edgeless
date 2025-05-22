@@ -7,16 +7,12 @@ use resources::resource_provider_specs::ResourceProviderSpecs;
 
 pub mod agent;
 pub mod base_runtime;
-pub mod container_runner;
 pub mod gpu_info;
 pub mod node_subscriber;
 pub mod power_info;
 pub mod resources;
+pub mod runners;
 pub mod state_management;
-#[cfg(feature = "wasmtime")]
-pub mod wasm_runner;
-#[cfg(feature = "wasmi")]
-pub mod wasmi_runner;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeSettings {
@@ -665,7 +661,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                     #[cfg(feature = "wasmtime")]
                     {
                         let (wasmtime_runtime_client, mut wasmtime_runtime_task_s) =
-                            base_runtime::runtime::create::<wasm_runner::function_instance::WASMFunctionInstance>(
+                            base_runtime::runtime::create::<runners::wasmtime_runner::function_instance::WASMFunctionInstance>(
                                 data_plane.clone(),
                                 state_manager.clone(),
                                 Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
@@ -673,7 +669,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                                     ("WASM_RUNTIME".to_string(), "wasmtime".to_string()),
                                     ("NODE_ID".to_string(), settings.general.node_id.to_string()),
                                 ]))),
-                                std::sync::Arc::new(tokio::sync::Mutex::new(Box::new(crate::wasm_runner::runtime::WasmRuntime::new()))),
+                                std::sync::Arc::new(tokio::sync::Mutex::new(Box::new(runners::wasmtime_runner::runtime::WasmRuntime::new()))),
                             );
                         runners.insert("RUST_WASM".to_string(), Box::new(wasmtime_runtime_client.clone()));
                         tokio::spawn(async move {
@@ -685,16 +681,17 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                     #[allow(unused_variables)]
                     #[cfg(feature = "wasmi")]
                     {
-                        let (wasmi_runtime_client, mut wasmi_runtime_task_s) = base_runtime::runtime::create::<wasmi_runner::WASMIFunctionInstance>(
-                            data_plane.clone(),
-                            state_manager.clone(),
-                            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
-                                ("WASM_RUNTIME".to_string(), "wasmi".to_string()),
-                                ("NODE_ID".to_string(), settings.general.node_id.to_string()),
-                            ]))),
-                            std::sync::Arc::new(tokio::sync::Mutex::new(Box::new(crate::wasmi_runner::runtime::WasmiRuntime::new()))),
-                        );
+                        let (wasmi_runtime_client, mut wasmi_runtime_task_s) =
+                            base_runtime::runtime::create::<runners::wasmi_runner::WASMIFunctionInstance>(
+                                data_plane.clone(),
+                                state_manager.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("FUNCTION_TYPE".to_string(), "RUST_WASM".to_string()),
+                                    ("WASM_RUNTIME".to_string(), "wasmi".to_string()),
+                                    ("NODE_ID".to_string(), settings.general.node_id.to_string()),
+                                ]))),
+                                std::sync::Arc::new(tokio::sync::Mutex::new(Box::new(runners::wasmi_runner::runtime::WasmiRuntime::new()))),
+                            );
                         runners.insert("RUST_WASM".to_string(), Box::new(wasmi_runtime_client.clone()));
                         tokio::spawn(async move {
                             wasmi_runtime_task_s.run().await;
@@ -711,16 +708,18 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     let container_runtime_task = match settings.container_runtime {
         Some(container_runtime_settings) => match container_runtime_settings.enabled {
             true => {
-                let (container_runtime, container_runtime_task, container_runtime_api) = container_runner::container_runtime::ContainerRuntime::new(
-                    std::collections::HashMap::from([("guest_api_host_url".to_string(), container_runtime_settings.guest_api_host_url.clone())]),
-                );
+                let (container_runtime, container_runtime_task, container_runtime_api) =
+                    runners::container_runner::container_runtime::ContainerRuntime::new(std::collections::HashMap::from([(
+                        "guest_api_host_url".to_string(),
+                        container_runtime_settings.guest_api_host_url.clone(),
+                    )]));
                 let server_task = edgeless_api::grpc_impl::outer::container_runtime::GuestAPIHostServer::run(
                     container_runtime_api,
                     container_runtime_settings.guest_api_host_url,
                 );
 
                 let (container_runtime_client, mut container_runtime_task_s) =
-                    base_runtime::runtime::create::<container_runner::function_instance::ContainerFunctionInstance>(
+                    base_runtime::runtime::create::<runners::container_runner::function_instance::ContainerFunctionInstance>(
                         data_plane.clone(),
                         state_manager.clone(),
                         Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([

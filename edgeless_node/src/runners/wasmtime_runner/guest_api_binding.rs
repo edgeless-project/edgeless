@@ -5,8 +5,12 @@
 
 use wasmtime::AsContextMut;
 
-/// Binds the WASM component's imports to the function's GuestAPIHost.
+/// Binds the WASM component's imports to the function's GuestAPIHost. Functions
+/// in this module are called directly by the Rust code for edgeless functions.
 pub struct GuestAPI {
+    // refers to the base runtime of an edgeless_node, one that is shared
+    // between all runners and contains shared functionality, such as e.g.
+    // dataplane calling
     pub host: crate::base_runtime::guest_api::GuestAPIHost,
 }
 
@@ -136,7 +140,6 @@ pub async fn call(
     out_ptr_ptr: i32,
     out_len_ptr: i32,
 ) -> wasmtime::Result<i32> {
-    log::info!("guest_api_binding::call");
     let mem = get_memory(&mut caller)?;
     let alloc = get_alloc(&mut caller)?;
 
@@ -214,6 +217,12 @@ pub async fn sync(mut caller: wasmtime::Caller<'_, GuestAPI>, state_ptr: i32, st
         .await
         .map_err(|_| wasmtime::Error::msg("sync error"))?;
     Ok(())
+}
+
+pub async fn get_current_time(mut caller: wasmtime::Caller<'_, GuestAPI>) -> wasmtime::Result<(u64)> {
+    let now = std::time::Instant::now();
+    let timestamp = now.elapsed().as_nanos() as u64;
+    Ok(timestamp)
 }
 
 pub async fn slf(mut caller: wasmtime::Caller<'_, GuestAPI>, out_node_id_ptr: i32, out_component_id_ptr: i32) -> wasmtime::Result<()> {

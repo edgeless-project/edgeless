@@ -2,144 +2,112 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+use super::invocation_event_handler::InvocationEventHandler;
+use super::remote_router::RemoteRouter;
 use crate::core::*;
-use crate::node_local::NodeLocalRouter;
-use edgeless_api::function_instance::{ComponentId, NodeId};
-use edgeless_api::invocation::InvocationAPI;
+use crate::local::local_router::NodeLocalRouter;
+use edgeless_api::function_instance::{ComponentId, EventTimestamp, InstanceId, NodeId};
+use edgeless_api::invocation::{EventData, InvocationAPI, LinkProcessingResult};
+use futures::channel::mpsc::UnboundedSender;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+
+pub struct RemoteLinkProvider {
+    own_node_id: edgeless_api::function_instance::NodeId,
+    remote_router: Arc<Mutex<RemoteRouter>>,
+    // TODO: why is there also a local_router here?
+    local_router: Arc<Mutex<NodeLocalRouter>>,
+}
+
+impl RemoteLinkProvider {
+    pub async fn new(own_node_id: edgeless_api::function_instance::NodeId) -> Self {
+        let locals = Arc::new(Mutex::new(NodeLocalRouter {
+            receivers: HashMap::<ComponentId, UnboundedSender<DataplaneEvent>>::new(),
+        }));
+
+        let remotes = Arc::new(Mutex::new(RemoteRouter { receivers: HashMap::new() }));
+
+        Self {
+            own_node_id,
+            remote_router: remotes,
+            local_router: locals,
+        }
+    }
+
+    // called when a new peer is connected; adds the receiver of incoming
+    // DataplaneEvents from that peer to the local data_structure
+    pub async fn new_link(&self, target: InstanceId, sender: UnboundedSender<DataplaneEvent>) -> Box<dyn DataPlaneLink> {
+        self.local_router.lock().await.receivers.insert(target.function_id, sender);
+        Box::new(RemoteLink {
+            remote_router: self.remote_router.clone(),
+        })
+    }
+
+    // This function is called by the local router to get the API for the
+    // incoming messages. Called once at the beggining when the
+    // DataplaneProvider is initialized.
+    pub async fn incoming_api(&mut self) -> Box<dyn edgeless_api::invocation::InvocationAPI> {
+        Box::new(InvocationEventHandler {
+            node_id: self.own_node_id,
+            local_router: self.local_router.clone(),
+        })
+    }
+
+    pub async fn add_peer(&mut self, peer_id: NodeId, peer_api: Box<dyn edgeless_api::invocation::InvocationAPI>) {
+        log::warn!("add_peer: {:?}", peer_id);
+        self.remote_router.lock().await.receivers.insert(peer_id, peer_api);
+    }
+
+    pub async fn del_peer(&mut self, peer_id: NodeId) {
+        log::warn!("del_peer: {:?}", peer_id);
+        self.remote_router.lock().await.receivers.remove(&peer_id);
+    }
+}
 
 // Link allowing to send messages to a remote node using the InvocationAPI.
 struct RemoteLink {
-    remotes: std::sync::Arc<tokio::sync::Mutex<RemoteRouter>>,
+    remote_router: Arc<Mutex<RemoteRouter>>,
 }
 
 #[async_trait::async_trait]
 impl DataPlaneLink for RemoteLink {
-    async fn handle_send(
+    async fn handle_cast(
         &mut self,
-        target: &edgeless_api::function_instance::InstanceId,
+        target: &InstanceId,
         msg: Message,
-        src: &edgeless_api::function_instance::InstanceId,
-        created: &edgeless_api::function_instance::EventTimestamp,
+        src: &InstanceId,
+        created: &EventTimestamp,
         stream_id: u64,
         metadata: &edgeless_api::function_instance::EventMetadata,
     ) -> LinkProcessingResult {
-        return self
-            .remotes
-            .lock()
-            .await
+        let mut lck = self.remote_router.lock().await;
+        let res = lck
             .handle(edgeless_api::invocation::Event {
                 target: *target,
                 source: *src,
                 stream_id,
                 data: match msg {
-                    Message::Call(data) => edgeless_api::invocation::EventData::Call(data),
-                    Message::Cast(data) => edgeless_api::invocation::EventData::Cast(data),
-                    Message::CallRet(data) => edgeless_api::invocation::EventData::CallRet(data),
-                    Message::CallNoRet => edgeless_api::invocation::EventData::CallNoRet,
-                    Message::Err(_) => edgeless_api::invocation::EventData::Err,
+                    Message::Call(data) => EventData::Call(data),
+                    Message::Cast(data) => EventData::Cast(data),
+                    Message::CallRet(data) => EventData::CallRet(data),
+                    Message::CallNoRet => EventData::CallNoRet,
+                    Message::Err(_) => EventData::Err,
                 },
                 created: *created,
                 metadata: metadata.clone(),
             })
-            .await
-            .unwrap();
-    }
-}
-
-pub struct RemoteRouter {
-    receivers: std::collections::HashMap<NodeId, Box<dyn edgeless_api::invocation::InvocationAPI>>,
-}
-
-pub struct RemoteLinkProvider {
-    own_node_id: edgeless_api::function_instance::NodeId,
-    remotes: std::sync::Arc<tokio::sync::Mutex<RemoteRouter>>,
-    locals: std::sync::Arc<tokio::sync::Mutex<NodeLocalRouter>>,
-}
-
-struct InvocationEventHandler {
-    node_id: edgeless_api::function_instance::NodeId,
-    locals: std::sync::Arc<tokio::sync::Mutex<NodeLocalRouter>>,
-}
-
-#[async_trait::async_trait]
-impl edgeless_api::invocation::InvocationAPI for InvocationEventHandler {
-    async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
-        if event.target.node_id == self.node_id {
-            self.locals.lock().await.handle(event).await
-        } else {
-            Err(anyhow::anyhow!("Wrong Node ID"))
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl edgeless_api::invocation::InvocationAPI for RemoteRouter {
-    async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
-        // get the correct receiver from the list of registered receivers
-        if let Some(node_client) = self.receivers.get_mut(&event.target.node_id) {
-            log::info!("handle - finally sending to the client");
-            if let Err(err) = node_client.handle(event).await {
-                log::info!("node_client.handle(event) has errored out");
-                log::warn!("Error in handling event: {}", err);
-            } else {
-                log::info!("node_client.handle(event) has worked")
-            }
-            Ok(edgeless_api::invocation::LinkProcessingResult::FINAL)
-        } else {
-            Ok(edgeless_api::invocation::LinkProcessingResult::PASSED)
-        }
-    }
-}
-
-impl RemoteLinkProvider {
-    pub async fn new(own_node_id: edgeless_api::function_instance::NodeId) -> Self {
-        let locals = std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalRouter {
-            receivers: std::collections::HashMap::<ComponentId, futures::channel::mpsc::UnboundedSender<DataplaneEvent>>::new(),
-        }));
-
-        let remotes = std::sync::Arc::new(tokio::sync::Mutex::new(RemoteRouter {
-            receivers: std::collections::HashMap::new(),
-        }));
-
-        Self {
-            own_node_id,
-            remotes,
-            locals,
-        }
-    }
-
-    pub async fn new_link(
-        &self,
-        target: edgeless_api::function_instance::InstanceId,
-        sender: futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
-    ) -> Box<dyn DataPlaneLink> {
-        self.locals.lock().await.receivers.insert(target.function_id, sender);
-        Box::new(RemoteLink {
-            remotes: self.remotes.clone(),
-        })
-    }
-
-    pub async fn incomming_api(&mut self) -> Box<dyn edgeless_api::invocation::InvocationAPI> {
-        Box::new(InvocationEventHandler {
-            node_id: self.own_node_id,
-            locals: self.locals.clone(),
-        })
-    }
-
-    pub async fn add_peer(&mut self, peer_id: NodeId, peer_api: Box<dyn edgeless_api::invocation::InvocationAPI>) {
-        self.remotes.lock().await.receivers.insert(peer_id, peer_api);
-    }
-
-    pub async fn del_peer(&mut self, peer_id: NodeId) {
-        self.remotes.lock().await.receivers.remove(&peer_id);
+            .await;
+        return res;
     }
 }
 
 #[cfg(test)]
 mod test {
+    use edgeless_api::invocation::LinkProcessingResult;
     use futures::SinkExt;
 
-    use crate::remote_node::*;
+    use crate::{core::Message, remote::remote_link::RemoteLinkProvider};
 
     #[tokio::test]
     async fn incomming_message() {
@@ -156,7 +124,7 @@ mod test {
         let created = edgeless_api::function_instance::EventTimestamp::default();
 
         let mut provider = RemoteLinkProvider::new(node_id).await;
-        let mut api = provider.incomming_api().await;
+        let mut api = provider.incoming_api().await;
 
         let (sender_1, mut receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
         provider.new_link(fid_target, sender_1).await;
@@ -169,11 +137,11 @@ mod test {
             created: created.clone(),
             metadata: edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00015u128, 0x42a42bdecaf00016u64),
         })
-        .await
-        .unwrap();
+        .await;
 
         assert!(receiver_1.try_next().is_err());
 
+        // TODO: needs to be fixed
         assert!(api
             .handle(edgeless_api::invocation::Event {
                 target: fid_wrong_node_id,
@@ -184,7 +152,7 @@ mod test {
                 metadata: edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00013u128, 0x42a42bdecaf00014u64),
             })
             .await
-            .is_err());
+            .eq(&LinkProcessingResult::ERROR("".to_string())));
 
         assert!(receiver_1.try_next().is_err());
 
@@ -197,8 +165,7 @@ mod test {
             created: created.clone(),
             metadata: metad_1.clone(),
         })
-        .await
-        .unwrap();
+        .await;
 
         let result = receiver_1.try_next();
         assert!(result.as_ref().is_ok_and(|o| o.is_some()));
@@ -213,12 +180,12 @@ mod test {
 
     #[async_trait::async_trait]
     impl edgeless_api::invocation::InvocationAPI for MockInvocationAPI {
-        async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<LinkProcessingResult> {
+        async fn handle(&mut self, event: edgeless_api::invocation::Event) -> LinkProcessingResult {
             self.events.send(event.clone()).await.unwrap();
             if event.target.node_id == self.own_node_id {
-                Ok(LinkProcessingResult::FINAL)
+                LinkProcessingResult::FINAL
             } else {
-                Ok(LinkProcessingResult::PASSED)
+                LinkProcessingResult::IGNORED
             }
         }
     }
@@ -281,7 +248,7 @@ mod test {
                 &metad_source,
             )
             .await;
-        assert_eq!(res, LinkProcessingResult::PASSED);
+        assert_eq!(res, LinkProcessingResult::IGNORED);
         assert!(api_receiver_node_2.try_next().is_err());
 
         let res = link

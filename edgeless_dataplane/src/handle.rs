@@ -1,45 +1,149 @@
-// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
-// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
-// SPDX-FileCopyrightText: © 2023 Siemens AG
+// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of
+// Connected Mobility SPDX-FileCopyrightText: © 2023 Claudio Cicconetti
+// <c.cicconetti@iit.cnr.it> SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-use futures::{SinkExt, StreamExt};
-
 use crate::core::*;
-use crate::node_local::*;
-use crate::remote_node::*;
+use crate::local::local_link::NodeLocalLinkProvider;
+use crate::remote::remote_link::RemoteLinkProvider;
+use edgeless_api::coap_impl::invocation::CoapInvocationServer;
+use edgeless_api::function_instance::{self, InstanceId};
+use edgeless_api::grpc_impl::invocation::InvocationAPIServer;
+use edgeless_api::invocation::LinkProcessingResult;
+use edgeless_api::util::parse_http_host;
+use futures::channel::mpsc::{unbounded, UnboundedReceiver};
+use futures::channel::oneshot::Sender;
+use futures::{SinkExt, StreamExt};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use uuid::Uuid;
 
-fn timestamp_utc() -> edgeless_api::function_instance::EventTimestamp {
+#[derive(Clone)]
+pub struct DataplaneProvider {
+    // manages communication with local function instances
+    local_provider: Arc<Mutex<NodeLocalLinkProvider>>,
+    // manages communication with remote peers
+    remote_provider: Arc<Mutex<RemoteLinkProvider>>,
+}
+
+impl DataplaneProvider {
+    pub async fn new(node_id: Uuid, invocation_url: String, invocation_url_coap: Option<String>) -> Self {
+        let remote_provider = Arc::new(Mutex::new(RemoteLinkProvider::new(node_id).await));
+        let (_, _, port) = parse_http_host(&invocation_url.clone()).unwrap();
+        let remote_provider_clone = remote_provider.clone();
+
+        // DataplaneProvider hosts the InvocationAPI server. RemoteLinkProvider
+        // implements the InvocationAPI interface and is called whenever an
+        // invocation is received by this InvocationAPI server.
+        let _grpc_server = tokio::spawn(InvocationAPIServer::run(
+            remote_provider_clone.lock().await.incoming_api().await,
+            invocation_url,
+        ));
+
+        // COAP is used for edgeless embedded
+        if let Some(invocation_url_coap) = invocation_url_coap {
+            let (_, coap_ip, coap_port) = parse_http_host(&invocation_url_coap.clone()).unwrap();
+            log::info!("Start COAP Invocation Server {}:{}", coap_ip, port);
+
+            let _coap_server = tokio::spawn(CoapInvocationServer::run(
+                remote_provider_clone.lock().await.incoming_api().await,
+                std::net::SocketAddrV4::new(coap_ip.parse().unwrap(), coap_port),
+            ));
+        }
+
+        Self {
+            local_provider: Arc::new(Mutex::new(NodeLocalLinkProvider::new())),
+            remote_provider,
+        }
+    }
+
+    // Gets a handle for a given function instance. This means, that this handle
+    // can be used by this instance to communicate with other instances in the
+    // cluster (using cast, call, reply) and enables other instances to
+    // communicate with this instance (incoming Dataplane Events can be received
+    // on receive_next).
+    pub async fn get_handle_for(&mut self, instance_id: InstanceId) -> DataplaneHandle {
+        let (sender, receiver) = unbounded::<DataplaneEvent>();
+        // the default output_chain consist of a local link and a remote link
+        let output_chain = vec![
+            // local link to communicate with other instances on the same node
+            self.local_provider.lock().await.new_link(instance_id, sender.clone()).await,
+            // remote link to communicate with other instances on different nodes
+            self.remote_provider.lock().await.new_link(instance_id, sender.clone()).await,
+        ];
+        DataplaneHandle::new(instance_id, output_chain, receiver).await
+    }
+
+    /// Since dataplane is a full-mesh, when the node-agent receives an
+    /// UpdatePeers request it adds them to the RemoteProvider, which in turn
+    /// makes them available to all function instances.
+    pub async fn add_peer(&mut self, peer: EdgelessDataplanePeerSettings) {
+        log::debug!("add_peer: {}", peer.node_id);
+        self.remote_provider
+            .lock()
+            .await
+            .add_peer(peer.node_id, Self::connect_to_peer(&peer).await)
+            .await;
+    }
+
+    pub async fn del_peer(&mut self, node_id: Uuid) {
+        log::debug!("del_peer: {}", node_id);
+        self.remote_provider.lock().await.del_peer(node_id).await;
+    }
+
+    // Connects to a remote peer either over grpc or coap
+    async fn connect_to_peer(peer: &EdgelessDataplanePeerSettings) -> Box<dyn edgeless_api::invocation::InvocationAPI> {
+        let (proto, url, port) = parse_http_host(&peer.invocation_url).unwrap();
+
+        let client: Box<dyn edgeless_api::invocation::InvocationAPI> = match proto {
+            edgeless_api::util::Proto::COAP => {
+                Box::new(edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port)).await)
+            }
+            _ => Box::new(edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&peer.invocation_url).await),
+        };
+        return client;
+    }
+}
+
+fn timestamp_utc() -> function_instance::EventTimestamp {
     let now = chrono::Utc::now();
-    edgeless_api::function_instance::EventTimestamp {
+    function_instance::EventTimestamp {
         secs: now.timestamp(),
         nsecs: now.timestamp_subsec_nanos(),
     }
 }
-
-/// The main handle representing an element (identified by a `InstanceId`) across the dataplane.
-/// The dataplane might require multiple links which are processed in a chain-like fashion.
+struct TemporaryReceivers {
+    temporary_receivers: HashMap<u64, Sender<(InstanceId, Message)>>,
+}
+/// The main handle representing an element (identified by a `InstanceId`)
+/// across the dataplane. The dataplane might require multiple links which are
+/// processed in a chain-like fashion.
 #[derive(Clone)]
 pub struct DataplaneHandle {
-    slf: edgeless_api::function_instance::InstanceId,
-    receiver: std::sync::Arc<tokio::sync::Mutex<futures::channel::mpsc::UnboundedReceiver<DataplaneEvent>>>,
-    output_chain: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn DataPlaneLink>>>>,
-    receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
+    // an handle is owned by a function instance / balancer / other component
+    // connected to the dataplane
+    handle_owner: InstanceId,
+    receiver: Arc<Mutex<UnboundedReceiver<DataplaneEvent>>>,
+    // output_chain is iterated upon to send a cast from this instance
+    // (handle_owner) to other instances either local or remote
+    output_chain: Arc<Mutex<Vec<Box<dyn DataPlaneLink>>>>,
+    receiver_overwrites: Arc<Mutex<TemporaryReceivers>>,
     next_id: u64,
 }
 
 impl DataplaneHandle {
-    async fn new(
-        receiver_id: edgeless_api::function_instance::InstanceId,
-        output_chain: Vec<Box<dyn DataPlaneLink>>,
-        receiver: futures::channel::mpsc::UnboundedReceiver<DataplaneEvent>,
-    ) -> Self {
-        let (main_sender, main_receiver) = futures::channel::mpsc::unbounded::<DataplaneEvent>();
-        let receiver_overwrites = std::sync::Arc::new(tokio::sync::Mutex::new(TemporaryReceivers {
-            temporary_receivers: std::collections::HashMap::new(),
+    async fn new(receiver_id: InstanceId, output_chain: Vec<Box<dyn DataPlaneLink>>, receiver: UnboundedReceiver<DataplaneEvent>) -> Self {
+        let (main_sender, main_receiver) = unbounded::<DataplaneEvent>();
+        // receiver overwrites are used to implement Call over Casts - replies
+        // are routed to them
+        let receiver_overwrites = Arc::new(Mutex::new(TemporaryReceivers {
+            temporary_receivers: HashMap::new(),
         }));
-
         let clone_overwrites = receiver_overwrites.clone();
-        // This task intercepts the messages received and routes responses towards temporary receivers while routing other events towards the main receiver used in `receive_next`.
+
+        // This task intercepts the messages received and routes responses
+        // towards temporary receivers while routing other events towards the
+        // main receiver used in `receive_next`.
         tokio::spawn(async move {
             let mut receiver = receiver;
             let mut main_sender = main_sender;
@@ -52,6 +156,9 @@ impl DataplaneHandle {
                     metadata,
                 }) = receiver.next().await
                 {
+                    // if there's a temporary receiver defined for this event,
+                    // route it there. Temporarty receivers are used to
+                    // implement calls.
                     if let Some(sender) = clone_overwrites.lock().await.temporary_receivers.remove(&channel_id) {
                         match sender.send((source_id, message.clone())) {
                             Ok(_) => {
@@ -62,6 +169,7 @@ impl DataplaneHandle {
                             }
                         }
                     }
+                    // otherwise do the normal path (for all other events)
                     match main_sender
                         .send(DataplaneEvent {
                             source_id,
@@ -82,16 +190,16 @@ impl DataplaneHandle {
         });
 
         DataplaneHandle {
-            slf: receiver_id,
-            receiver: std::sync::Arc::new(tokio::sync::Mutex::new(main_receiver)),
-            output_chain: std::sync::Arc::new(tokio::sync::Mutex::new(output_chain)),
+            handle_owner: receiver_id,
+            receiver: Arc::new(Mutex::new(main_receiver)),
+            output_chain: Arc::new(Mutex::new(output_chain)),
             receiver_overwrites,
             next_id: 1,
         }
     }
 
-    /// Main receive function for receiving the next cast or call event.
-    /// This is NOT used for processing replies to return values.
+    /// Main receive function for receiving the next cast or call event. This is
+    /// NOT used for processing replies to return values.
     pub async fn receive_next(&mut self) -> DataplaneEvent {
         loop {
             if let Some(DataplaneEvent {
@@ -112,9 +220,9 @@ impl DataplaneHandle {
                         created,
                         metadata,
                     };
+                } else {
+                    log::warn!("Unknown DataplaneEvent")
                 }
-                // TODO: what does this mean?``
-                // log::error!("Unprocesses other message");
             }
         }
     }
@@ -141,7 +249,9 @@ impl DataplaneHandle {
         let channel_id = self.next_id;
         self.next_id += 1;
 
-        // Potential Leak: This is only received if a message is received (or the handle is dropped)
+        // Potential Leak: This is only received if a message is received (or
+        // the handle is dropped)
+        // TODO: fix it by specifying a timeout after which this receiver is garbage collected
         self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
         self.send_inner(target, Message::Call(msg), timestamp_utc(), channel_id, metadata).await;
         match receiver.await {
@@ -170,7 +280,7 @@ impl DataplaneHandle {
                 CallRet::NoReply => Message::CallNoRet,
                 CallRet::Err(err_msg) => Message::Err(err_msg),
             },
-            edgeless_api::function_instance::EventTimestamp::default(),
+            function_instance::EventTimestamp::default(),
             channel_id,
             metadata,
         )
@@ -188,83 +298,22 @@ impl DataplaneHandle {
         log::info!("send_inner");
         let mut lck = self.output_chain.lock().await;
         for link in &mut lck.iter_mut() {
-            if link.handle_send(&target, msg.clone(), &self.slf, &created, channel_id, &metadata).await == LinkProcessingResult::FINAL {
-                return;
+            match link.handle_cast(&target, msg.clone(), &self.handle_owner, &created, channel_id).await {
+                LinkProcessingResult::FINAL => {
+                    log::info!("{:?}: event final", msg);
+                    return;
+                }
+                LinkProcessingResult::IGNORED => {
+                    log::warn!("{:?}: event ignored", msg);
+                }
+                LinkProcessingResult::ERROR(e) => {
+                    log::error!("{:?}: error while handling an outgoing event: {}", msg, e)
+                }
             }
         }
-        log::info!("Unprocessed Message: {:?}->{:?}", self.slf, target);
-    }
-}
-
-struct TemporaryReceivers {
-    temporary_receivers: std::collections::HashMap<u64, futures::channel::oneshot::Sender<(edgeless_api::function_instance::InstanceId, Message)>>,
-}
-
-#[derive(Clone)]
-pub struct DataplaneProvider {
-    local_provider: std::sync::Arc<tokio::sync::Mutex<NodeLocalLinkProvider>>,
-    remote_provider: std::sync::Arc<tokio::sync::Mutex<RemoteLinkProvider>>,
-}
-
-impl DataplaneProvider {
-    pub async fn new(node_id: uuid::Uuid, invocation_url: String, invocation_url_coap: Option<String>) -> Self {
-        let remote_provider = std::sync::Arc::new(tokio::sync::Mutex::new(RemoteLinkProvider::new(node_id).await));
-
-        let (_, _, port) = edgeless_api::util::parse_http_host(&invocation_url.clone()).unwrap();
-
-        let clone_provider = remote_provider.clone();
-        let _server = tokio::spawn(edgeless_api::grpc_impl::outer::invocation::InvocationAPIServer::run(
-            clone_provider.lock().await.incomming_api().await,
-            invocation_url,
-        ));
-
-        if let Some(invocation_url_coap) = invocation_url_coap {
-            let (_, coap_ip, coap_port) = edgeless_api::util::parse_http_host(&invocation_url_coap.clone()).unwrap();
-            log::info!("Start COAP Invocation Server {}:{}", coap_ip, port);
-
-            let _coap_server = tokio::spawn(edgeless_api::coap_impl::invocation::CoapInvocationServer::run(
-                clone_provider.lock().await.incomming_api().await,
-                std::net::SocketAddrV4::new(coap_ip.parse().unwrap(), coap_port),
-            ));
-        }
-
-        Self {
-            local_provider: std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalLinkProvider::new())),
-            remote_provider,
-        }
-    }
-
-    pub async fn get_handle_for(&mut self, target: edgeless_api::function_instance::InstanceId) -> DataplaneHandle {
-        let (sender, receiver) = futures::channel::mpsc::unbounded::<DataplaneEvent>();
-        let output_chain = vec![
-            self.local_provider.lock().await.new_link(target, sender.clone()).await,
-            self.remote_provider.lock().await.new_link(target, sender.clone()).await,
-        ];
-        DataplaneHandle::new(target, output_chain, receiver).await
-    }
-
-    pub async fn add_peer(&mut self, peer: EdgelessDataplanePeerSettings) {
-        log::debug!("add_peer {:?}", peer);
-        self.remote_provider
-            .lock()
-            .await
-            .add_peer(peer.node_id, Self::connect_peer(&peer).await)
-            .await;
-    }
-
-    pub async fn del_peer(&mut self, node_id: uuid::Uuid) {
-        log::debug!("del_peer {:?}", node_id);
-        self.remote_provider.lock().await.del_peer(node_id).await;
-    }
-
-    async fn connect_peer(target: &EdgelessDataplanePeerSettings) -> Box<dyn edgeless_api::invocation::InvocationAPI> {
-        let (proto, url, port) = edgeless_api::util::parse_http_host(&target.invocation_url).unwrap();
-        match proto {
-            edgeless_api::util::Proto::COAP => {
-                Box::new(edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port)).await)
-            }
-            _ => Box::new(edgeless_api::grpc_impl::outer::invocation::InvocationAPIClient::new(&target.invocation_url).await),
-        }
+        // TODO: at least one link must send a final, otherwise the dataplane
+        // event was not delivered successfully. If that's the case, immediately
+        // deliver on the receiver and close it.
     }
 }
 
@@ -362,8 +411,10 @@ mod test {
             dataplane
         });
 
-        // This test got stuck during initial testing. I suspect that this was due to the use of common ports across the testsuite
-        // but the timeouts should prevent it from blocking the entire testsuite if that was not the reason (timeout will lead to failure).
+        // This test got stuck during initial testing. I suspect that this was
+        // due to the use of common ports across the testsuite but the timeouts
+        // should prevent it from blocking the entire testsuite if that was not
+        // the reason (timeout will lead to failure).
         let (provider_1_r, provider_2_r) = futures::join!(
             tokio::time::timeout(tokio::time::Duration::from_secs(5), provider1_f),
             tokio::time::timeout(tokio::time::Duration::from_secs(5), provider2_f)

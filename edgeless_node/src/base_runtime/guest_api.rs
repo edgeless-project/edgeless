@@ -12,6 +12,8 @@ use tokio::sync::Mutex;
 /// Each function instance can import a set of functions that need to be implemented on the host-side.
 /// This provides the generic host-side implementation of these functions.
 /// Those need to be made available to the guest using a virtualization-specific interface/binding.
+/// These virtualization-specific bindings are provided in the runners module
+/// for e.g. docker, wasmtime and wasmi.
 pub struct GuestAPIHost {
     pub instance_id: edgeless_api::function_instance::InstanceId,
     pub data_plane: edgeless_dataplane::handle::DataplaneHandle,

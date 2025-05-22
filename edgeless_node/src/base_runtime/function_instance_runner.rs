@@ -198,7 +198,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     }
 
     async fn processing_loop(&mut self) -> Result<(), super::FunctionInstanceError> {
-        // let mut poison_pill_recv = Box::pin(self.poison_pill_receiver.recv()).fuse();
         loop {
             futures::select! {
                 // Given each function instance is an independent task, the runtime needs to send a poison pill to cleanly stop it (processed here)
