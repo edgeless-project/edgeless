@@ -138,7 +138,7 @@ fn test_docker_basic() {
 
 #[test]
 fn test_docker_basic_with_utils() {
-    let mut docker = match crate::container_runner::docker_utils::Docker::connect() {
+    let mut docker = match super::docker_utils::Docker::connect() {
         Ok(docker) => docker,
         Err(err) => {
             println!("could not connect to Docker, which may fine: {}", err);
@@ -148,7 +148,7 @@ fn test_docker_basic_with_utils() {
 
     let image_name = "edgeless_function".to_string();
 
-    let (id, port) = match crate::container_runner::docker_utils::Docker::start(&mut docker, image_name) {
+    let (id, port) = match super::docker_utils::Docker::start(&mut docker, image_name) {
         Ok((id, port)) => (id, port),
         Err(err) => {
             println!("could not create container, which may be fine: {}", err);
@@ -156,5 +156,5 @@ fn test_docker_basic_with_utils() {
         }
     };
     println!("container ID: {}, port: {}", id, port);
-    crate::container_runner::docker_utils::Docker::stop(&mut docker, id).expect("we should be able to stop a container that started flawlessly");
+    super::docker_utils::Docker::stop(&mut docker, id).expect("we should be able to stop a container that started flawlessly");
 }

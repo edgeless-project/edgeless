@@ -8,6 +8,8 @@ use futures::{Future, SinkExt, StreamExt};
 #[cfg(test)]
 pub mod test;
 
+// All incoming requests from all different APIs are transformed into one of the
+// variants of the AgentRequest enum, which unifies the agent control loop.
 enum AgentRequest {
     // Function lifecycle management API.
     SpawnFunction(

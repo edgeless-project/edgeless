@@ -4,6 +4,7 @@
 extern crate redis;
 use futures::{SinkExt, StreamExt};
 use redis::Commands;
+use std::time::Duration;
 
 pub struct MetricsCollectorResourceSpec {}
 
@@ -37,14 +38,14 @@ pub struct MetricsCollectorResourceProvider {
 }
 
 enum Event {
-    /// A new workflow-level transaction begins, with given identifier.
-    WorkflowBegin(u64),
-    /// A workflow-level transaction ends, with given identifier.
-    WorkflowEnd(u64),
-    /// A new function-level transaction begins, with given identifier.
-    FunctionBegin(u64),
-    /// A function-level transaction ends, with given identifier.
-    FunctionEnd(u64),
+    /// A new workflow-level transaction begins, with given: (timestamp, workflow_id).
+    WorkflowBegin(u64, u64),
+    /// A workflow-level transaction ends, with given: (timestamp, workflow_id).
+    WorkflowEnd(u64, u64),
+    /// A new function-level transaction begins, with given: (timestamp, workflow_id, function_id).
+    FunctionBegin(u64, u64, u64),
+    /// A function-level transaction ends, with given: (timestamp, workflow_id, function_id).
+    FunctionEnd(u64, u64, u64),
     /// A new epoch begins, with given warm-up period, in ms.
     Reset(u64),
 }
@@ -58,25 +59,39 @@ impl Event {
                 Err(err) => anyhow::bail!("warm-up period parse error: {}", err),
             };
             return Ok(Event::Reset(warmup));
-        }
-        anyhow::ensure!(tokens.len() == 3, "invalid number of tokens, expected 3 found {}", tokens.len());
-        let transaction = match tokens[2].parse::<u64>() {
-            Ok(val) => val,
-            Err(err) => anyhow::bail!("transaction parse error: {}", err),
-        };
-        if tokens[0] == "workflow" {
+        } else if tokens.len() == 4 && tokens[0] == "workflow" {
+            let timestamp = match tokens[2].parse::<u64>() {
+                Ok(val) => val,
+                Err(err) => anyhow::bail!("timestamp parse error: {}", err),
+            };
+            let workflow_id = match tokens[3].parse::<u64>() {
+                Ok(val) => val,
+                Err(err) => anyhow::bail!("transaction parse error: {}", err),
+            };
             if tokens[1] == "begin" {
-                Ok(Event::WorkflowBegin(transaction))
+                return Ok(Event::WorkflowBegin(timestamp, workflow_id));
             } else if tokens[1] == "end" {
-                return Ok(Event::WorkflowEnd(transaction));
+                return Ok(Event::WorkflowEnd(timestamp, workflow_id));
             } else {
                 anyhow::bail!("invalid workflow command: {}", tokens[1]);
             }
-        } else if tokens[0] == "function" {
+        } else if tokens.len() == 5 && tokens[0] == "function" {
+            let timestamp = match tokens[2].parse::<u64>() {
+                Ok(val) => val,
+                Err(err) => anyhow::bail!("timestamp parse error: {}", err),
+            };
+            let workflow_id = match tokens[3].parse::<u64>() {
+                Ok(val) => val,
+                Err(err) => anyhow::bail!("workflow_id parse error: {}", err),
+            };
+            let function_id = match tokens[4].parse::<u64>() {
+                Ok(val) => val,
+                Err(err) => anyhow::bail!("function_id parse error: {}", err),
+            };
             if tokens[1] == "begin" {
-                return Ok(Event::FunctionBegin(transaction));
+                return Ok(Event::FunctionBegin(timestamp, workflow_id, function_id));
             } else if tokens[1] == "end" {
-                return Ok(Event::FunctionEnd(transaction));
+                return Ok(Event::FunctionEnd(timestamp, workflow_id, function_id));
             } else {
                 anyhow::bail!("invalid workflow command: {}", tokens[1]);
             }
@@ -87,36 +102,46 @@ impl Event {
 
     fn initial(&self) -> &str {
         match self {
-            Event::WorkflowBegin(_) | Event::WorkflowEnd(_) => "W",
-            Event::FunctionBegin(_) | Event::FunctionEnd(_) => "F",
+            Event::WorkflowBegin(_, _) | Event::WorkflowEnd(_, _) => "W",
+            Event::FunctionBegin(_, _, _) | Event::FunctionEnd(_, _, _) => "F",
             _ => "",
         }
     }
 
     fn full(&self) -> &str {
         match self {
-            Event::WorkflowBegin(_) | Event::WorkflowEnd(_) => "workflow",
-            Event::FunctionBegin(_) | Event::FunctionEnd(_) => "function",
+            Event::WorkflowBegin(_, _) | Event::WorkflowEnd(_, _) => "workflow",
+            Event::FunctionBegin(_, _, _) | Event::FunctionEnd(_, _, _) => "function",
             _ => "",
         }
     }
 
     fn transaction(&self) -> u64 {
         match self {
-            Event::WorkflowBegin(transaction)
-            | Event::WorkflowEnd(transaction)
-            | Event::FunctionBegin(transaction)
-            | Event::FunctionEnd(transaction) => *transaction,
+            Event::WorkflowBegin(_, transaction)
+            | Event::WorkflowEnd(_, transaction)
+            | Event::FunctionBegin(_, _, transaction)
+            | Event::FunctionEnd(_, _, transaction) => *transaction,
+            _ => 0,
+        }
+    }
+
+    fn timestamp(&self) -> u64 {
+        match self {
+            Event::WorkflowBegin(timestamp, _)
+            | Event::WorkflowEnd(timestamp, _)
+            | Event::FunctionBegin(timestamp, _, _)
+            | Event::FunctionEnd(timestamp, _, _) => *timestamp,
             _ => 0,
         }
     }
 
     fn workflow(&self) -> bool {
-        matches!(self, Event::WorkflowBegin(_) | Event::WorkflowEnd(_))
+        matches!(self, Event::WorkflowBegin(_, _) | Event::WorkflowEnd(_, _))
     }
 
     fn begin(&self) -> bool {
-        matches!(self, Event::WorkflowBegin(_) | Event::FunctionBegin(_))
+        matches!(self, Event::WorkflowBegin(_, _) | Event::FunctionBegin(_, _, _))
     }
 }
 
@@ -173,26 +198,27 @@ impl MetricsCollectorResource {
     // alpha is the smoothing factor of the EWMA of samples.
     async fn new(
         dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
-        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+        telemetry_handle: std::sync::Arc<tokio::sync::Mutex<Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>>>,
         alpha: f64,
         wf_name: String,
-        sender: futures::channel::mpsc::UnboundedSender<RedisCommand>,
+        sender: std::sync::Arc<tokio::sync::Mutex<futures::channel::mpsc::UnboundedSender<RedisCommand>>>,
     ) -> anyhow::Result<Self> {
-        let mut dataplane_handle = dataplane_handle;
-        let mut sender = sender;
-        let mut telemetry_handle = telemetry_handle;
+        let dataplane_handle = dataplane_handle;
+        let sender = sender;
+        // let telemetry_handle = telemetry_handle;
 
         let handle = tokio::spawn(async move {
-            let mut timestamps = std::collections::HashMap::new();
-            let mut averages = std::collections::HashMap::new();
+            let timestamps = std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
+            let averages = std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
             loop {
                 let edgeless_dataplane::core::DataplaneEvent {
                     source_id,
                     channel_id,
                     message,
                     created,
-                } = dataplane_handle.receive_next().await;
-                let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
+                } = dataplane_handle.clone().receive_next().await;
+                // TODO: fix
+                // let started = crate::resources::observe_transfer(created, &mut telemetry_handle.lock().await);
 
                 let mut need_reply = false;
                 let message_data = match message {
@@ -206,50 +232,78 @@ impl MetricsCollectorResource {
                     }
                 };
 
-                match Event::new(&message_data) {
-                    Ok(event) => {
-                        if let Event::Reset(warmup) = event {
-                            let _ = sender.send(RedisCommand::Reset(warmup)).await;
-                        } else if event.workflow() && wf_name.is_empty() {
-                            // Skip workflow events with empty workflow name.
-                            continue;
-                        } else {
-                            let id = match event.workflow() {
-                                true => wf_name.clone(),
-                                false => source_id.function_id.to_string(),
-                            };
-                            let key = format!("{}:{}:{}", event.initial(), id, event.transaction());
-                            let avg_key = format!("{}:{}", event.initial(), id);
-                            if event.begin() {
-                                timestamps.insert(key, std::time::Instant::now());
-                            } else if let Some(ts) = timestamps.remove(&key) {
-                                let current = ts.elapsed().as_millis() as i64;
-                                let _ = sender
-                                    .send(RedisCommand::Push(
-                                        format!("{}:{}:samples", event.full(), id),
-                                        current,
-                                        std::time::SystemTime::now(),
-                                    ))
-                                    .await;
-                                let average = match averages.get(&avg_key) {
-                                    Some(prev_value) => current as f64 * alpha + (1.0_f64 - alpha) * prev_value,
-                                    None => current as f64,
+                // the handling of a new event should be non-blocking to avoid
+                // side effect from collection
+                // first shadow the variables with their copies
+                let mut dataplane_handle = dataplane_handle.clone();
+                let sender = sender.clone();
+                let wf_name = wf_name.clone();
+                let timestamps = timestamps.clone();
+                let averages = averages.clone();
+
+                // run in the background to avoid problems
+                let handle = tokio::spawn(async move {
+                    let mut sender_guard = sender.lock().await;
+                    match Event::new(&message_data) {
+                        Ok(event) => {
+                            if let Event::Reset(warmup) = event {
+                                let _ = sender_guard.send(RedisCommand::Reset(warmup)).await;
+                            } else if event.workflow() && wf_name.is_empty() {
+                                ()
+                            } else {
+                                // workflow or function event
+                                let id = match event.workflow() {
+                                    true => wf_name,
+                                    false => source_id.function_id.to_string(),
                                 };
-                                averages.insert(avg_key, average);
-                                let _ = sender.send(RedisCommand::Set(format!("{}:{}:average", event.full(), id), average)).await;
+                                let key = format!("{}:{}:{}", event.initial(), id, event.transaction());
+                                let avg_key = format!("{}:{}", event.initial(), id);
+                                let timestamp = event.timestamp();
+                                if event.begin() {
+                                    timestamps.lock().await.insert(key, timestamp);
+                                } else if let Some(begin_timestamp) = timestamps.lock().await.remove(&key) {
+                                    // calculate the time difference
+                                    let current: i64 = (timestamp - begin_timestamp) as i64;
+                                    let _ = sender_guard
+                                        .send(RedisCommand::Push(
+                                            format!("{}:{}:samples", event.full(), id),
+                                            current,
+                                            std::time::SystemTime::now(),
+                                        ))
+                                        .await;
+                                    let average = match averages.lock().await.get(&avg_key) {
+                                        Some(prev_value) => current as f64 * alpha + (1.0_f64 - alpha) * prev_value,
+                                        None => current as f64,
+                                    };
+                                    averages.lock().await.insert(avg_key, average);
+                                    let _ = sender_guard
+                                        .send(RedisCommand::Set(format!("{}:{}:average", event.full(), id), average))
+                                        .await;
+                                } else {
+                                    // this only occurs if for some reason the
+                                    // workflow / function end timestamp is
+                                    // received before the begin timestamp.
+                                    panic!("should never happen");
+                                }
                             }
                         }
+                        Err(err) => log::warn!("invalid metrics-collector event received: {}", err),
                     }
-                    Err(err) => log::warn!("invalid metrics-collector event received: {}", err),
-                }
 
-                if need_reply {
-                    dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
-                        .await;
-                }
+                    if need_reply {
+                        dataplane_handle
+                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                            .await;
+                    }
 
-                crate::resources::observe_execution(started, &mut telemetry_handle, need_reply);
+                    // TODO: fix at some point
+                    // crate::resources::observe_execution(started, &mut telemetry_handle.lock().await.as_ref(), need_reply);
+                });
+                // warn the user if a metric could not be persisted
+                let _ = tokio::time::timeout(Duration::from_millis(500), handle).await.unwrap_or_else(|_| {
+                    log::warn!("metric could not be persisted");
+                    Ok(())
+                });
             }
         });
 
@@ -350,13 +404,13 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
 
         match MetricsCollectorResource::new(
             dataplane_handle,
-            lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
+            std::sync::Arc::new(tokio::sync::Mutex::new(lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
                 "FUNCTION_ID".to_string(),
                 new_id.function_id.to_string(),
-            )])),
+            )])))),
             alpha,
             wf_name,
-            lck.sender.clone(),
+            std::sync::Arc::new(tokio::sync::Mutex::new(lck.sender.clone())),
         )
         .await
         {
