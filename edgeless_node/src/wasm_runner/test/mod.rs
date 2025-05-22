@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use futures::SinkExt;
 use std::time::Duration;
@@ -40,7 +41,7 @@ impl crate::state_management::StateManagerAPI for MockStateMananger {
         state_id: uuid::Uuid,
     ) -> Box<dyn crate::state_management::StateHandleAPI> {
         Box::new(MockStateHandle {
-            state_id: state_id,
+            state_id,
             output_mocks: self.output_mocks.clone(),
             state_set_sender: self.state_set_sender.clone(),
         })
@@ -60,7 +61,7 @@ impl crate::state_management::StateHandleAPI for MockStateHandle {
     }
 
     async fn set(&mut self, serialized_state: String) {
-        self.state_set_sender.send((self.state_id.clone(), serialized_state)).await.unwrap();
+        self.state_set_sender.send((self.state_id, serialized_state)).await.unwrap();
     }
 }
 
@@ -94,24 +95,24 @@ async fn basic_lifecycle() {
     tokio::spawn(async move { rt_task.run().await });
 
     let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
-        instance_id: Some(instance_id.clone()),
         code: edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "EXAMPLE_1".to_string(),
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
-            function_class_code: include_bytes!("fixtures/messaging_test.wasm").to_vec(),
+            function_class_code: include_bytes!("../../../../functions/messaging_test/messaging_test.wasm").to_vec(),
             function_class_outputs: vec![],
         },
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
-            state_id: instance_id.function_id.clone(),
+            state_id: instance_id.function_id,
             state_policy: edgeless_api::function_instance::StatePolicy::Transient,
         },
+        workflow_id: "workflow_1".to_string(),
     };
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
-    let _res = client.start(spawn_req).await;
+    let _res = client.start(instance_id, spawn_req).await;
 
     // wait for lifetime events created during spawn
     tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
@@ -150,7 +151,7 @@ async fn basic_lifecycle() {
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
-    let stop_res = client.stop(instance_id.clone()).await;
+    let stop_res = client.stop(instance_id).await;
     assert!(stop_res.is_ok());
 
     // wait for lifetime events created after stoping it
@@ -189,6 +190,11 @@ async fn basic_lifecycle() {
     );
 }
 
+type TelemetryReceiver = std::sync::mpsc::Receiver<(
+    edgeless_telemetry::telemetry_events::TelemetryEvent,
+    std::collections::BTreeMap<String, String>,
+)>;
+
 async fn messaging_test_setup() -> (
     crate::base_runtime::runtime::RuntimeClient,
     InstanceId,
@@ -196,10 +202,7 @@ async fn messaging_test_setup() -> (
     InstanceId,
     DataplaneHandle,
     InstanceId,
-    std::sync::mpsc::Receiver<(
-        edgeless_telemetry::telemetry_events::TelemetryEvent,
-        std::collections::BTreeMap<String, String>,
-    )>,
+    TelemetryReceiver,
 ) {
     // shared?
     let node_id = uuid::Uuid::new_v4();
@@ -210,10 +213,10 @@ async fn messaging_test_setup() -> (
 
     // shared insert
     let test_peer_fid = edgeless_api::function_instance::InstanceId::new(node_id);
-    let test_peer_handle = dataplane_provider.get_handle_for(test_peer_fid.clone()).await;
+    let test_peer_handle = dataplane_provider.get_handle_for(test_peer_fid).await;
 
     let next_fid = edgeless_api::function_instance::InstanceId::new(node_id);
-    let next_handle = dataplane_provider.get_handle_for(next_fid.clone()).await;
+    let next_handle = dataplane_provider.get_handle_for(next_fid).await;
     // end shared insert
 
     let (telemetry_mock_sender, telemetry_mock_receiver) = std::sync::mpsc::channel::<(
@@ -234,30 +237,30 @@ async fn messaging_test_setup() -> (
     tokio::spawn(async move { rt_task.run().await });
 
     let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
-        instance_id: Some(instance_id.clone()),
         code: edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "EXAMPLE_1".to_string(),
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
-            function_class_code: include_bytes!("fixtures/messaging_test.wasm").to_vec(),
+            function_class_code: include_bytes!("../../../../functions/messaging_test/messaging_test.wasm").to_vec(),
             function_class_outputs: vec!["test".to_string()],
         },
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
-            state_id: instance_id.function_id.clone(),
+            state_id: instance_id.function_id,
             state_policy: edgeless_api::function_instance::StatePolicy::Transient,
         },
+        workflow_id: "workflow_1".to_string(),
     };
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
-    let res = client.start(spawn_req).await;
+    let res = client.start(instance_id, spawn_req).await;
     assert!(res.is_ok());
 
     let res = client
         .patch(PatchRequest {
-            function_id: instance_id.function_id.clone(),
-            output_mapping: std::collections::HashMap::from([("test".to_string(), next_fid.clone())]),
+            function_id: instance_id.function_id,
+            output_mapping: std::collections::HashMap::from([("test".to_string(), next_fid)]),
         })
         .await;
 
@@ -281,13 +284,29 @@ async fn messaging_test_setup() -> (
     )
 }
 
+async fn is_telemetry_event_transfer(receiver: &mut TelemetryReceiver) -> bool {
+    let telemetry_event = receiver.try_recv();
+    assert!(telemetry_event.is_ok());
+    let (telemetry_event, _tags) = telemetry_event.unwrap();
+    std::mem::discriminant(&telemetry_event) == std::mem::discriminant(&TelemetryEvent::FunctionTransfer(tokio::time::Duration::ZERO))
+}
+
+async fn is_telemetry_event_invocation_complete(receiver: &mut TelemetryReceiver) -> bool {
+    let telemetry_event = receiver.try_recv();
+    assert!(telemetry_event.is_ok());
+    let (telemetry_event, _tags) = telemetry_event.unwrap();
+    std::mem::discriminant(&telemetry_event) == std::mem::discriminant(&TelemetryEvent::FunctionInvocationCompleted(tokio::time::Duration::ZERO))
+}
+
 // test input (host-> function): cast
 // We assume this works after this test and trigger the different outputs using casts.
 #[tokio::test]
 async fn messaging_cast_raw_input() {
-    let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
-    test_peer_handle.send(instance_id.clone(), "some_message".to_string()).await;
+    let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
+    test_peer_handle.send(instance_id, "some_message".to_string()).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
+
+    assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
 
     assert!(telemetry_mock_receiver.try_recv().is_ok());
     assert!(telemetry_mock_receiver.try_recv().is_ok());
@@ -297,18 +316,13 @@ async fn messaging_cast_raw_input() {
 // test output (i.e. the method available to the function): cast
 #[tokio::test]
 async fn messaging_cast_raw_output() {
-    let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
+    let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id.clone(), "test_cast_raw_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_cast_raw_output".to_string()).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    let telemetry_event = telemetry_mock_receiver.try_recv();
-    assert!(telemetry_event.is_ok());
-    let (telemetry_event, _tags) = telemetry_event.unwrap();
-    assert_eq!(
-        std::mem::discriminant(&telemetry_event),
-        std::mem::discriminant(&TelemetryEvent::FunctionInvocationCompleted(tokio::time::Duration::from_secs(1)))
-    );
+    assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
+    assert!(is_telemetry_event_invocation_complete(&mut telemetry_mock_receiver).await);
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
     let test_message = test_peer_handle.receive_next().await;
@@ -322,10 +336,12 @@ async fn messaging_cast_raw_output() {
 // test output: call
 #[tokio::test]
 async fn messaging_call_raw_output() {
-    let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
+    let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id.clone(), "test_call_raw_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_call_raw_output".to_string()).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
+
+    assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
 
     // This won't have completed here.
     assert!(telemetry_mock_receiver.try_recv().is_err());
@@ -342,22 +358,17 @@ async fn messaging_call_raw_output() {
         .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    let telemetry_event = telemetry_mock_receiver.try_recv();
-    assert!(telemetry_event.is_ok());
-    let (telemetry_event, _tags) = telemetry_event.unwrap();
-    assert_eq!(
-        std::mem::discriminant(&telemetry_event),
-        std::mem::discriminant(&TelemetryEvent::FunctionInvocationCompleted(tokio::time::Duration::from_secs(1)))
-    );
+    assert!(is_telemetry_event_invocation_complete(&mut telemetry_mock_receiver).await);
     assert!(telemetry_mock_receiver.try_recv().is_err());
 }
 
 // test output: delayed_cast
 #[tokio::test]
 async fn messaging_delayed_cast_output() {
-    let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
+    let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
+        messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id.clone(), "test_delayed_cast_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_delayed_cast_output".to_string()).await;
     let start = tokio::time::Instant::now();
 
     let test_message = next_handle.receive_next().await;
@@ -371,31 +382,22 @@ async fn messaging_delayed_cast_output() {
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    let telemetry_event = telemetry_mock_receiver.try_recv();
-    assert!(telemetry_event.is_ok());
-    let (telemetry_event, _tags) = telemetry_event.unwrap();
-    assert_eq!(
-        std::mem::discriminant(&telemetry_event),
-        std::mem::discriminant(&TelemetryEvent::FunctionInvocationCompleted(tokio::time::Duration::from_secs(1)))
-    );
+    assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
+    assert!(is_telemetry_event_invocation_complete(&mut telemetry_mock_receiver).await);
     assert!(telemetry_mock_receiver.try_recv().is_err());
 }
 
 // test output: cast
 #[tokio::test]
 async fn messaging_cast_output() {
-    let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
+    let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
+        messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id.clone(), "test_cast_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_cast_output".to_string()).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    let telemetry_event = telemetry_mock_receiver.try_recv();
-    assert!(telemetry_event.is_ok());
-    let (telemetry_event, _tags) = telemetry_event.unwrap();
-    assert_eq!(
-        std::mem::discriminant(&telemetry_event),
-        std::mem::discriminant(&TelemetryEvent::FunctionInvocationCompleted(tokio::time::Duration::from_secs(1)))
-    );
+    assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
+    assert!(is_telemetry_event_invocation_complete(&mut telemetry_mock_receiver).await);
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
     let test_message = next_handle.receive_next().await;
@@ -406,10 +408,13 @@ async fn messaging_cast_output() {
 // test output: call
 #[tokio::test]
 async fn messaging_call_output() {
-    let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
+    let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
+        messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id.clone(), "test_call_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_call_output".to_string()).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
+
+    assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
 
     // This won't have completed here.
     assert!(telemetry_mock_receiver.try_recv().is_err());
@@ -421,24 +426,20 @@ async fn messaging_call_output() {
     next_handle.reply(test_message.source_id, test_message.channel_id, CallRet::NoReply).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    let telemetry_event = telemetry_mock_receiver.try_recv();
-    assert!(telemetry_event.is_ok());
-    let (telemetry_event, _tags) = telemetry_event.unwrap();
-    assert_eq!(
-        std::mem::discriminant(&telemetry_event),
-        std::mem::discriminant(&TelemetryEvent::FunctionInvocationCompleted(tokio::time::Duration::from_secs(1)))
-    );
+    assert!(is_telemetry_event_invocation_complete(&mut telemetry_mock_receiver).await);
     assert!(telemetry_mock_receiver.try_recv().is_err());
 }
 
 // test whether a function can be stopped while it is waiting for a call response
 #[tokio::test]
 async fn function_in_call_can_be_stopped() {
-    let (mut client, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, telemetry_mock_receiver) =
+    let (mut client, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
 
-    test_peer_handle.send(instance_id.clone(), "test_call_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_call_output".to_string()).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
+
+    assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
 
     // This won't have completed here.
     assert!(telemetry_mock_receiver.try_recv().is_err());
@@ -458,64 +459,47 @@ async fn function_in_call_can_be_stopped() {
 // test call-interaction: Noreply
 #[tokio::test]
 async fn messaging_call_raw_input_noreply() {
-    let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
+    let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
-    let ret = test_peer_handle.call(instance_id.clone(), "some_cast".to_string()).await;
+    let ret = test_peer_handle.call(instance_id, "some_cast".to_string()).await;
     assert_eq!(ret, CallRet::NoReply);
 
-    let telemetry_event = telemetry_mock_receiver.try_recv();
-    assert!(telemetry_event.is_ok());
-    let (telemetry_event, _tags) = telemetry_event.unwrap();
-    assert_eq!(
-        std::mem::discriminant(&telemetry_event),
-        std::mem::discriminant(&TelemetryEvent::FunctionInvocationCompleted(tokio::time::Duration::from_secs(1)))
-    );
+    assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
+    assert!(is_telemetry_event_invocation_complete(&mut telemetry_mock_receiver).await);
     assert!(telemetry_mock_receiver.try_recv().is_err());
 }
 
 // test call-interaction: Reply
 #[tokio::test]
 async fn messaging_call_raw_input_reply() {
-    let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
+    let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
-    let ret = test_peer_handle.call(instance_id.clone(), "test_ret".to_string()).await;
+    let ret = test_peer_handle.call(instance_id, "test_ret".to_string()).await;
     assert_eq!(ret, CallRet::Reply("test_reply".to_string()));
 
-    let telemetry_event = telemetry_mock_receiver.try_recv();
-    assert!(telemetry_event.is_ok());
-    let (telemetry_event, _tags) = telemetry_event.unwrap();
-    assert_eq!(
-        std::mem::discriminant(&telemetry_event),
-        std::mem::discriminant(&TelemetryEvent::FunctionInvocationCompleted(tokio::time::Duration::from_secs(1)))
-    );
+    assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
+    assert!(is_telemetry_event_invocation_complete(&mut telemetry_mock_receiver).await);
     assert!(telemetry_mock_receiver.try_recv().is_err());
 }
 
 // test call-interaction: Error
 #[tokio::test]
 async fn messaging_call_raw_input_err() {
-    let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, telemetry_mock_receiver) = messaging_test_setup().await;
+    let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
 
-    let ret = test_peer_handle.call(instance_id.clone(), "test_err".to_string()).await;
+    let ret = test_peer_handle.call(instance_id, "test_err".to_string()).await;
     assert_eq!(ret, CallRet::Err);
 
-    let telemetry_event = telemetry_mock_receiver.try_recv();
-    assert!(telemetry_event.is_ok());
-    let (telemetry_event, _tags) = telemetry_event.unwrap();
-    assert_eq!(
-        std::mem::discriminant(&telemetry_event),
-        std::mem::discriminant(&TelemetryEvent::FunctionInvocationCompleted(tokio::time::Duration::from_secs(1)))
-    );
+    assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
+    assert!(is_telemetry_event_invocation_complete(&mut telemetry_mock_receiver).await);
     assert!(telemetry_mock_receiver.try_recv().is_err());
 }
 
 #[tokio::test]
 async fn state_management() {
-    env_logger::init();
-
     let node_id = uuid::Uuid::new_v4();
     let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
-    let fid2 = edgeless_api::function_instance::InstanceId::new(node_id);
+    let instance_id_another = edgeless_api::function_instance::InstanceId::new(node_id);
 
     let output_mocks = std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
     let (state_mock_sender, mut state_mock_receiver) = futures::channel::mpsc::unbounded::<(uuid::Uuid, String)>();
@@ -526,7 +510,7 @@ async fn state_management() {
 
     let mut dataplane_provider = edgeless_dataplane::handle::DataplaneProvider::new(node_id, "http://127.0.0.1:7002".to_string(), None).await;
 
-    let (telemetry_mock_sender, telemetry_mock_receiver) = std::sync::mpsc::channel::<(
+    let (telemetry_mock_sender, mut telemetry_mock_receiver) = std::sync::mpsc::channel::<(
         edgeless_telemetry::telemetry_events::TelemetryEvent,
         std::collections::BTreeMap<String, String>,
     )>();
@@ -535,7 +519,7 @@ async fn state_management() {
     });
 
     let test_peer_fid = edgeless_api::function_instance::InstanceId::new(node_id);
-    let mut test_peer_handle = dataplane_provider.get_handle_for(test_peer_fid.clone()).await;
+    let mut test_peer_handle = dataplane_provider.get_handle_for(test_peer_fid).await;
 
     let (mut client, mut rt_task) = crate::base_runtime::runtime::create::<super::function_instance::WASMFunctionInstance>(
         dataplane_provider,
@@ -546,25 +530,25 @@ async fn state_management() {
 
     tokio::spawn(async move { rt_task.run().await });
 
-    let mut spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
-        instance_id: Some(instance_id.clone()),
+    let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
         code: edgeless_api::function_instance::FunctionClassSpecification {
             function_class_id: "EXAMPLE_1".to_string(),
             function_class_type: "RUST_WASM".to_string(),
             function_class_version: "0.1".to_string(),
-            function_class_code: include_bytes!("fixtures/state_test.wasm").to_vec(),
+            function_class_code: include_bytes!("../../../../functions/state_test/state_test.wasm").to_vec(),
             function_class_outputs: Vec::new(),
         },
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
-            state_id: instance_id.function_id.clone(),
+            state_id: instance_id.function_id,
             state_policy: edgeless_api::function_instance::StatePolicy::Transient,
         },
+        workflow_id: "workflow_1".to_string(),
     };
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
-    let res = client.start(spawn_req.clone()).await;
+    let res = client.start(instance_id, spawn_req.clone()).await;
     assert!(res.is_ok());
 
     tokio::time::sleep(Duration::from_millis(50)).await;
@@ -576,7 +560,7 @@ async fn state_management() {
         init_log_event,
         TelemetryEvent::FunctionLogEntry(
             edgeless_telemetry::telemetry_events::TelemetryLogLevel::Info,
-            "edgeless_test_state".to_string(),
+            "state_test".to_string(),
             "no_state".to_string()
         )
     );
@@ -585,7 +569,7 @@ async fn state_management() {
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
     // trigger sync
-    test_peer_handle.send(instance_id.clone(), "test_cast_raw_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_cast_raw_output".to_string()).await;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let (state_set_id, state_set_value) = state_mock_receiver.try_next().unwrap().unwrap();
@@ -593,10 +577,11 @@ async fn state_management() {
     assert_eq!(state_set_id, instance_id.function_id.clone());
     assert_eq!(state_set_value, "new_state".to_string());
 
+    assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
     assert!(telemetry_mock_receiver.try_recv().is_ok());
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
-    let res = client.stop(instance_id.clone()).await;
+    let res = client.stop(instance_id).await;
     assert!(res.is_ok());
 
     tokio::time::sleep(Duration::from_millis(100)).await;
@@ -606,15 +591,10 @@ async fn state_management() {
 
     // now we try starting with state
 
-    output_mocks
-        .lock()
-        .await
-        .insert(instance_id.function_id.clone(), "existing_state".to_string());
+    output_mocks.lock().await.insert(instance_id.function_id, "existing_state".to_string());
 
     // TODO(raphaelhetzel) InstanceId reuse leads to problems that need to be fixed.
-    spawn_req.instance_id = Some(fid2);
-
-    let res2 = client.start(spawn_req).await;
+    let res2 = client.start(instance_id_another, spawn_req).await;
     assert!(res2.is_ok());
 
     tokio::time::sleep(Duration::from_millis(100)).await;

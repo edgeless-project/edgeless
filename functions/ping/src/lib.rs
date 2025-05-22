@@ -31,10 +31,6 @@ impl EdgeFunction for PingerFun {
                 CallRet::Err => { log::info!("Got Reply Error"); },
             }
 
-            //if let CallRet::Reply(_msg) = res {
-            //    log::info!("Got Reply");
-            //}
-
             delayed_cast(1000, "self", b"wakeup");
         }
     }

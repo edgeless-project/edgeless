@@ -1,11 +1,18 @@
+# SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 # SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 # SPDX-License-Identifier: MIT
 
 [package]
 name = "edgeless_benchmark"
-version = "0.1.0"
-authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it>"]
+version = "1.0.0"
+authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it"]
 edition = "2021"
+description = "EDGELESS benchmark suite"
+homepage = "https://edgeless-project.eu/"
+license = "MIT"
+repository = "https://github.com/edgeless-project/edgeless/"
+readme = "../README.md"
+
 
 [lib]
 name = "edgeless_benchmark"
@@ -21,19 +28,19 @@ env_logger = "0.10"
 tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 anyhow = "1.0"
-uuid = {version= "1.3", features = ["v4"] }
+uuid = { version = "1.3", features = ["v4"] }
 async-trait = "0.1"
-edgeless_api = {path = "../edgeless_api", features = ["grpc_impl"]}
-edgeless_cli = {path = "../edgeless_cli"}
+edgeless_api = { path = "../edgeless_api", features = ["grpc_impl"] }
+edgeless_cli = { path = "../edgeless_cli" }
 edgeless_dataplane = { path = "../edgeless_dataplane" }
 edgeless_node = { path = "../edgeless_node" }
 edgeless_telemetry = { path = "../edgeless_telemetry" }
-clap = { version = "4.3", features=["derive"] }
+clap = { version = "4.3", features = ["derive"] }
 redis = "*"
 serde = "1"
 toml = "0.7"
 serde_json = "1.0"
-cargo = "0.77"
+cargo = "0.84"
 openssl = { version = "0.10", features = ["vendored"] }
 rand = { version = "0.8" }
 rand_distr = { version = "0.4" }

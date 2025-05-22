@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 /// Generic function runtime hosting a set of runners of one type (e.g. WASM/Docker)
 /// Split into the active component `RuntimeTask` and the cloneable `RuntimeClient` allowing to interact with the runtime.
@@ -11,9 +13,9 @@ pub trait GuestAPIHostRegister {
         &mut self,
         instance_id: &edgeless_api::function_instance::InstanceId,
         guest_api_host: crate::base_runtime::guest_api::GuestAPIHost,
-    ) -> ();
+    );
 
-    fn deregister_guest_api_host(&mut self, instance_id: &edgeless_api::function_instance::InstanceId) -> ();
+    fn deregister_guest_api_host(&mut self, instance_id: &edgeless_api::function_instance::InstanceId);
 
     fn guest_api_host(
         &mut self,
@@ -39,7 +41,10 @@ pub struct RuntimeTask<FunctionInstanceType: super::FunctionInstance> {
 }
 
 pub enum RuntimeRequest {
-    Start(edgeless_api::function_instance::SpawnFunctionRequest),
+    Start(
+        edgeless_api::function_instance::InstanceId,
+        edgeless_api::function_instance::SpawnFunctionRequest,
+    ),
     Stop(edgeless_api::function_instance::InstanceId),
     Patch(edgeless_api::common::PatchRequest),
     FunctionExit(edgeless_api::function_instance::InstanceId, Result<(), super::FunctionInstanceError>),
@@ -91,8 +96,8 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         log::info!("Starting Edgeless Runner");
         while let Some(req) = self.receiver.next().await {
             match req {
-                RuntimeRequest::Start(spawn_request) => {
-                    self.start_function(spawn_request).await;
+                RuntimeRequest::Start(instance_id, spawn_request) => {
+                    self.start_function(instance_id, spawn_request).await;
                 }
                 RuntimeRequest::Stop(instance_id) => {
                     self.stop_function(instance_id).await;
@@ -107,17 +112,16 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         }
     }
 
-    async fn start_function(&mut self, spawn_request: edgeless_api::function_instance::SpawnFunctionRequest) {
-        log::info!("Start Function {:?}", spawn_request.instance_id);
-        let instance_id = match spawn_request.instance_id.clone() {
-            Some(id) => id,
-            None => {
-                return;
-            }
-        };
+    async fn start_function(
+        &mut self,
+        instance_id: edgeless_api::function_instance::InstanceId,
+        spawn_request: edgeless_api::function_instance::SpawnFunctionRequest,
+    ) {
+        log::info!("Start Function {:?}", instance_id);
         let cloned_req = spawn_request.clone();
-        let data_plane = self.data_plane_provider.get_handle_for(instance_id.clone()).await;
+        let data_plane = self.data_plane_provider.get_handle_for(instance_id).await;
         let instance = super::function_instance_runner::FunctionInstanceRunner::new(
+            instance_id,
             cloned_req,
             data_plane,
             self.slf_channel.clone(),
@@ -131,7 +135,7 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
             self.guest_api_host_register.clone(),
         )
         .await;
-        self.functions.insert(instance_id.function_id.clone(), instance);
+        self.functions.insert(instance_id.function_id, instance);
     }
 
     async fn stop_function(&mut self, instance_id: edgeless_api::function_instance::InstanceId) {
@@ -164,8 +168,12 @@ impl RuntimeClient {
 
 #[async_trait::async_trait]
 impl super::RuntimeAPI for RuntimeClient {
-    async fn start(&mut self, request: edgeless_api::function_instance::SpawnFunctionRequest) -> anyhow::Result<()> {
-        match self.sender.send(RuntimeRequest::Start(request)).await {
+    async fn start(
+        &mut self,
+        instance_id: edgeless_api::function_instance::InstanceId,
+        request: edgeless_api::function_instance::SpawnFunctionRequest,
+    ) -> anyhow::Result<()> {
+        match self.sender.send(RuntimeRequest::Start(instance_id, request)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
         }

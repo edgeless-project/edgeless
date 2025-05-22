@@ -1,7 +1,28 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
+
+pub struct HttpEgressResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for HttpEgressResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("http-egress")
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::new()
+    }
+
+    fn version(&self) -> String {
+        String::from("1.1")
+    }
+}
 
 #[derive(Clone)]
 pub struct EgressResourceProvider {
@@ -11,6 +32,7 @@ pub struct EgressResourceProvider {
 struct EgressResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     egress_instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, EgressResource>,
 }
 
@@ -25,8 +47,12 @@ impl Drop for EgressResource {
 }
 
 impl EgressResource {
-    async fn new(dataplane_handle: edgeless_dataplane::handle::DataplaneHandle) -> Self {
+    async fn new(
+        dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+    ) -> Self {
         let mut dataplane_handle = dataplane_handle;
+        let mut telemetry_handle = telemetry_handle;
 
         let handle = tokio::spawn(async move {
             loop {
@@ -34,7 +60,9 @@ impl EgressResource {
                     source_id,
                     channel_id,
                     message,
+                    created,
                 } = dataplane_handle.receive_next().await;
+                let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
                 let message_data = match message {
                     Message::Call(data) => data,
                     _ => {
@@ -67,6 +95,7 @@ impl EgressResource {
                         }
                     }
                 });
+                crate::resources::observe_execution(started, &mut telemetry_handle, true);
             }
         });
 
@@ -111,7 +140,7 @@ impl EgressResource {
 
         Ok(edgeless_http::EdgelessHTTPResponse {
             status: ret.status().as_u16(),
-            headers: headers,
+            headers,
             body: match ret.bytes().await {
                 Ok(btes) => Some(btes.to_vec()),
                 _ => None,
@@ -123,12 +152,14 @@ impl EgressResource {
 impl EgressResourceProvider {
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {
             inner: std::sync::Arc::new(tokio::sync::Mutex::new(EgressResourceProviderInner {
                 resource_provider_id,
                 dataplane_provider,
+                telemetry_handle,
                 egress_instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, EgressResource>::new(),
             })),
         }
@@ -144,9 +175,14 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         let mut lck = self.inner.lock().await;
 
         let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
-        let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id.clone()).await;
+        let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
 
-        lck.egress_instances.insert(new_id.clone(), EgressResource::new(dataplane_handle).await);
+        let telemetry_handle = lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
+            "FUNCTION_ID".to_string(),
+            new_id.function_id.to_string(),
+        )]));
+        lck.egress_instances
+            .insert(new_id, EgressResource::new(dataplane_handle, telemetry_handle).await);
 
         Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
     }

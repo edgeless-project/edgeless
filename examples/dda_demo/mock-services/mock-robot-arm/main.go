@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -12,12 +13,21 @@ import (
 	"github.com/coatyio/dda/config"
 	"github.com/coatyio/dda/dda"
 	"github.com/coatyio/dda/services/com/api"
+	"github.com/gorilla/websocket"
 )
 
 const measurementType = "com.edgeless.moveRobotArm"
 
 var inst *dda.Dda
 var isRoboticArmUp = false
+var cmds chan string
+
+// for websocket
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
+	CheckOrigin:     func(r *http.Request) bool { return true }, // allow all origins for now
+}
 
 // accepts DDA actions to move the robotic arm
 func acceptActions(ctx context.Context) {
@@ -28,11 +38,12 @@ func acceptActions(ctx context.Context) {
 	for action := range events {
 		println("Received an action to move the robotic arm from DDA")
 
-		time.Sleep(2 * time.Second) // artificial delay
+		time.Sleep(600 * time.Millisecond) // artificial delay
 
 		utf8String := string(action.Params)
 
 		move_diff_value, err := strconv.ParseFloat(utf8String, 64)
+		println(move_diff_value)
 		if err != nil {
 			println("Failed to parse DDA action params")
 			continue
@@ -41,16 +52,40 @@ func acceptActions(ctx context.Context) {
 		isRoboticArmUp = move_diff_value > 0
 		if isRoboticArmUp {
 			println("UP moving - received command from workflow as as temperature was too hot!")
+			cmds <- "UP"
 		} else {
 			println("DOWN moving - received command from workflow as as temperature was too cold!")
+			cmds <- "DOWN"
 		}
 
 		action.Callback(api.ActionResult{
 			Context: "success",
 			Data:    []byte("ok"),
 		})
-
 	}
+}
+
+func handleWsConnection(w http.ResponseWriter, r *http.Request) {
+	c, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		return
+	}
+	println("Handling ws connection")
+
+	go func() {
+		_, _, err = c.ReadMessage()
+
+		c.SetCloseHandler(func(code int, text string) error {
+			println("closing")
+			return nil
+		})
+		println("Relaying commands to the GUI over websocket")
+		for cmd := range cmds {
+			println("New command: " + cmd)
+			c.WriteMessage(websocket.TextMessage, []byte(cmd))
+		}
+		println("End")
+	}()
 }
 
 func main() {
@@ -74,6 +109,16 @@ func main() {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+
+	// prepare for relaying to gui over websocket
+	cmds = make(chan string, 100)
+
+	// Start a websockets server which is used by the robotic arm GUI to change
+	// its position
+	http.HandleFunc("/ws", handleWsConnection)
+
+	// Chrome does not allow ws localhost connections without tls - use firefox
+	go http.ListenAndServe(":8019", nil)
 
 	println("Starting to accept actions to move my robotic arm from DDA")
 	go acceptActions(ctx)

@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use super::common::CommonConverters;
 
@@ -22,10 +23,6 @@ impl FunctonInstanceConverters {
         api_request: &crate::grpc_impl::api::SpawnFunctionRequest,
     ) -> anyhow::Result<crate::function_instance::SpawnFunctionRequest> {
         Ok(crate::function_instance::SpawnFunctionRequest {
-            instance_id: match api_request.instance_id.as_ref() {
-                Some(id) => Some(CommonConverters::parse_instance_id(id)?),
-                None => None,
-            },
             code: Self::parse_function_class_specification(match api_request.code.as_ref() {
                 Some(val) => val,
                 None => {
@@ -39,6 +36,7 @@ impl FunctonInstanceConverters {
                     return Err(anyhow::anyhow!("Request does not contain state_spec."));
                 }
             })?,
+            workflow_id: api_request.workflow_id.clone(),
         })
     }
 
@@ -69,13 +67,10 @@ impl FunctonInstanceConverters {
 
     pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFunctionRequest) -> crate::grpc_impl::api::SpawnFunctionRequest {
         crate::grpc_impl::api::SpawnFunctionRequest {
-            instance_id: req
-                .instance_id
-                .as_ref()
-                .and_then(|instance_id| Some(CommonConverters::serialize_instance_id(instance_id))),
             code: Some(Self::serialize_function_class_specification(&req.code)),
             annotations: req.annotations.clone(),
             state_specification: Some(Self::serialize_state_specification(&req.state_specification)),
+            workflow_id: req.workflow_id.clone(),
         }
     }
 
@@ -93,29 +88,40 @@ impl FunctonInstanceConverters {
 
 #[derive(Clone)]
 pub struct FunctionInstanceAPIClient<FunctionIdType> {
-    client: crate::grpc_impl::api::function_instance_client::FunctionInstanceClient<tonic::transport::Channel>,
+    client: Option<crate::grpc_impl::api::function_instance_client::FunctionInstanceClient<tonic::transport::Channel>>,
+    server_addr: String,
     _phantom: std::marker::PhantomData<FunctionIdType>,
 }
 
 impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + Sync + 'static> FunctionInstanceAPIClient<FunctionIdType> {
-    pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
-        loop {
-            match crate::grpc_impl::api::function_instance_client::FunctionInstanceClient::connect(server_addr.to_string()).await {
+    pub fn new(server_addr: String) -> Self {
+        Self {
+            client: None,
+            server_addr,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    /// Try connecting, if not already connected.
+    ///
+    /// If an error is returned, then the client is set to None (disconnected).
+    /// Otherwise, the client is set to some value (connected).
+    async fn try_connect(&mut self) -> anyhow::Result<()> {
+        if self.client.is_none() {
+            self.client = match crate::grpc_impl::api::function_instance_client::FunctionInstanceClient::connect(self.server_addr.clone()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    return Ok(Self {
-                        client,
-                        _phantom: std::marker::PhantomData,
-                    });
+                    Some(client)
                 }
-                Err(err) => match retry_interval {
-                    Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
-                    None => {
-                        return Err(anyhow::anyhow!("Error when connecting to {}: {}", server_addr, err));
-                    }
-                },
+                Err(err) => anyhow::bail!(err),
             }
         }
+        Ok(())
+    }
+
+    /// Disconnect the client.
+    fn disconnect(&mut self) {
+        self.client = None;
     }
 }
 
@@ -129,44 +135,83 @@ where
         &mut self,
         request: crate::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<crate::common::StartComponentResponse<FunctionIdType>> {
-        match self
-            .client
-            .start(tonic::Request::new(FunctonInstanceConverters::serialize_spawn_function_request(&request)))
-            .await
-        {
-            Ok(res) => CommonConverters::parse_start_component_response::<FunctionIdType>(&res.into_inner()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Communication error while starting a function instance: {}",
-                err.to_string()
-            )),
+        match self.try_connect().await {
+            Ok(_) => {
+                if let Some(client) = &mut self.client {
+                    match client
+                        .start(tonic::Request::new(FunctonInstanceConverters::serialize_spawn_function_request(&request)))
+                        .await
+                    {
+                        Ok(res) => CommonConverters::parse_start_component_response::<FunctionIdType>(&res.into_inner()),
+                        Err(err) => {
+                            self.disconnect();
+                            Err(anyhow::anyhow!(
+                                "Error when starting a function at {}: {}",
+                                self.server_addr,
+                                err.to_string()
+                            ))
+                        }
+                    }
+                } else {
+                    panic!("The impossible happened");
+                }
+            }
+            Err(err) => {
+                anyhow::bail!("Error when connecting to {}: {}", self.server_addr, err);
+            }
         }
     }
 
     async fn stop(&mut self, id: FunctionIdType) -> anyhow::Result<()> {
-        match self
-            .client
-            .stop(tonic::Request::new(super::common::SerializeableId::serialize(&id)))
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Communication error while stopping a function instance: {}",
-                err.to_string()
-            )),
+        match self.try_connect().await {
+            Ok(_) => {
+                if let Some(client) = &mut self.client {
+                    match client.stop(tonic::Request::new(super::common::SerializeableId::serialize(&id))).await {
+                        Ok(_) => Ok(()),
+                        Err(err) => {
+                            self.disconnect();
+                            Err(anyhow::anyhow!(
+                                "Error when stopping a function at {}: {}",
+                                self.server_addr,
+                                err.to_string()
+                            ))
+                        }
+                    }
+                } else {
+                    panic!("The impossible happened");
+                }
+            }
+            Err(err) => {
+                anyhow::bail!("Error when connecting to {}: {}", self.server_addr, err);
+            }
         }
     }
 
     async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()> {
-        match self
-            .client
-            .patch(tonic::Request::new(CommonConverters::serialize_patch_request(&update)))
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Communication error while updating the links of a function instance: {}",
-                err.to_string()
-            )),
+        match self.try_connect().await {
+            Ok(_) => {
+                if let Some(client) = &mut self.client {
+                    match client
+                        .patch(tonic::Request::new(CommonConverters::serialize_patch_request(&update)))
+                        .await
+                    {
+                        Ok(_) => Ok(()),
+                        Err(err) => {
+                            self.disconnect();
+                            Err(anyhow::anyhow!(
+                                "Error when patching a function at {}: {}",
+                                self.server_addr,
+                                err.to_string()
+                            ))
+                        }
+                    }
+                } else {
+                    panic!("The impossible happened");
+                }
+            }
+            Err(err) => {
+                anyhow::bail!("Error when connecting to {}: {}", self.server_addr, err);
+            }
         }
     }
 }
@@ -262,10 +307,6 @@ mod tests {
     #[test]
     fn serialize_deserialize_spawn_function_request() {
         let messages = vec![SpawnFunctionRequest {
-            instance_id: Some(InstanceId {
-                node_id: uuid::Uuid::new_v4(),
-                function_id: uuid::Uuid::new_v4(),
-            }),
             code: FunctionClassSpecification {
                 function_class_id: "my-func-id".to_string(),
                 function_class_type: "WASM".to_string(),
@@ -278,6 +319,7 @@ mod tests {
                 state_id: uuid::Uuid::new_v4(),
                 state_policy: StatePolicy::NodeLocal,
             },
+            workflow_id: "workflow_1".to_string(),
         }];
         for msg in messages {
             match FunctonInstanceConverters::parse_spawn_function_request(&FunctonInstanceConverters::serialize_spawn_function_request(&msg)) {

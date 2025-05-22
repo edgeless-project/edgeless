@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
 #[async_trait::async_trait]
@@ -7,21 +8,15 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<crate::common::StartComponentResponse<edgeless_api_core::instance_id::InstanceId>> {
-        let mut outputs = heapless::Vec::<(&str, edgeless_api_core::instance_id::InstanceId), 16>::new();
         let mut configuration = heapless::Vec::<(&str, &str), 16>::new();
-        for (key, val) in &instance_specification.output_mapping {
-            outputs.push((&key, val.clone())).map_err(|_| anyhow::anyhow!("Too many outputs"))?;
-        }
-
         for (key, val) in &instance_specification.configuration {
             configuration
-                .push((&key, &val))
+                .push((key, val))
                 .map_err(|_| anyhow::anyhow!("Too many configuration options"))?;
         }
 
         let encoded_resource_spec = edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification {
             class_type: &instance_specification.class_type,
-            output_mapping: outputs,
             configuration,
         };
 
@@ -56,11 +51,9 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
 
     async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()> {
         let mut outputs: [Option<(&str, edgeless_api_core::instance_id::InstanceId)>; 16] = [None; 16];
-        let mut outputs_i: usize = 0;
 
-        for (key, val) in &update.output_mapping {
-            outputs[outputs_i] = Some((key, val.clone()));
-            outputs_i = outputs_i + 1;
+        for (outputs_i, (key, val)) in update.output_mapping.iter().enumerate() {
+            outputs[outputs_i] = Some((key, *val));
         }
 
         let encoded_patch_req = edgeless_api_core::resource_configuration::EncodedPatchRequest {

@@ -1,14 +1,20 @@
 # SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+# SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+# SPDX-FileCopyrightText: © 2023 Siemens AG
 # SPDX-License-Identifier: MIT
 [workspace]
 
 [package]
 name = "edgeless-embedded-esp32"
-version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de>>"]
+version = "1.0.0"
+authors = [ "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
 resolver = "2"
 rust-version = "1.73"
+description = "Support of some ESP32 microcontrollers in EDGELESS"
+homepage = "https://edgeless-project.eu/"
+license = "MIT"
+repository = "https://github.com/edgeless-project/edgeless/"
 
 [profile.dev.package.esp-wifi]
 opt-level = 3
@@ -90,3 +96,4 @@ tum_node_2_13 = ["epaper_2_13", "scd30"]
 
 [build-dependencies]
 embuild = "0.31.2"
+authors = [ "Technical University of Munich, Chair of Connected Mobility" ]

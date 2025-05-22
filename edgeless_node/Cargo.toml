@@ -1,12 +1,19 @@
 # SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 # SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+# SPDX-FileCopyrightText: © 2023 Siemens AG
 # SPDX-License-Identifier: MIT
+
 [package]
 name = "edgeless_node"
-version = "0.1.0"
-authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
+version = "1.0.0"
+authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Lukasz Zalewski <zalewski.lukasz@siemens.com>", "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2021"
 rust-version = "1.76"
+description = "Reference implementation of an EDGELESS node"
+homepage = "https://edgeless-project.eu/"
+license = "MIT"
+repository = "https://github.com/edgeless-project/edgeless/"
+readme = "../README.md"
 
 [lib]
 name = "edgeless_node"
@@ -26,35 +33,47 @@ wasmi = ["dep:wasmi"]
 [dependencies]
 log = "0.4"
 env_logger = "0.10"
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["full", "tracing", "macros"] }
+tracing-subscriber = "0.3"
+console-subscriber = "0.1.5"
 futures = "0.3"
 anyhow = "1.0"
-uuid = {version= "1.3", features = ["v4", "serde"] }
+uuid = { version = "1.3", features = ["v4", "serde"] }
 async-trait = "0.1"
-wasmtime = {version = "18", optional = true}
+wasmtime = { version = "18", optional = true }
 serde = "1.0"
 serde_json = "1.0"
-clap = { version = "4.3", features=["derive"] }
+clap = { version = "4.3", features = ["derive"] }
 toml = "0.7"
-edgeless_api = {path = "../edgeless_api", features = ["grpc_impl"]}
+edgeless_api = { path = "../edgeless_api", features = ["grpc_impl"] }
 edgeless_telemetry = { path = "../edgeless_telemetry" }
 edgeless_dataplane = { path = "../edgeless_dataplane" }
-edgeless_http = {path = "../edgeless_http", features = ["hyper"]}
+edgeless_http = { path = "../edgeless_http", features = ["hyper"] }
 edgeless_function = { path = "../edgeless_function" }
-hyper = { version = "1.2", features = ["full"]}
-hyper-util = { version = "0.1", features = ["tokio"]}
+hyper = { version = "1.2", features = ["full"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
 reqwest = { version = "0.11" }
-http-body-util = "0.1.0-rc.3" 
+http-body-util = "0.1.0-rc.3"
 redis = "*"
 openssl = { version = "0.10", features = ["vendored"] }
-sysinfo = "0.30.12"
-wasmi = {version = "0.31", default-features = false , optional = true}
-tonic = "0.10.2"
-prost = "0.12"
-base64 = "0.21.5"
-rs-docker = "0.0.58"
+sysinfo = "0.31.4"
+wasmi = { version = "0.31", default-features = false, optional = true }
+tonic = "0.11.0"
+prost = "0.12.6"
+base64 = "0.22.1"
+# A fork is used instead of the actual crate code because Devices support is needed for Intel SGX
+# But is not implemented in the latest version of rs-docker "0.0.60"
+# See this GitHub issue: https://github.com/edgeless-project/edgeless/issues/226 for more information
+rs-docker = { version = "0.0.61", git = "https://github.com/edgeless-project/rust-docker.git" }
 chrono = "0.4.38"
 libloading = "0.8.3"
+ollama-rs = { version = "0.2.0", features = ["chat-history"] }
+rdkafka = { version = "0.36.2", optional = true }
+dda = { path = "../edgeless_dda" }
+rand = "0.8.5"
+# note use sqlx 0.8.1 will inccur cargo issue
+sqlx = { version = "0.8.0", features = ["runtime-tokio-native-tls", "sqlite", "json",]}
+edgeless_function = { path = "../edgeless_function" }
 
 [build-dependencies]
-tonic-build = "0.10"
+tonic-build = "0.11"

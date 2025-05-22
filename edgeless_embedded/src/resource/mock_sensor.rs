@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 pub struct MockSensorInner {
     pub instance_id: Option<edgeless_api_core::instance_id::InstanceId>,
@@ -17,23 +18,17 @@ pub struct MockSensor {
 }
 
 impl MockSensor {
+    #[allow(clippy::needless_lifetimes)] // not needless
     async fn parse_configuration<'a>(
         data: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> Result<MockSensorConfiguration, edgeless_api_core::common::ErrorResponse> {
-        let mut out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
+        let out_id: Option<edgeless_api_core::instance_id::InstanceId> = None;
 
         if data.class_type != "scd30-sensor" {
             return Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Wrong Resource class type",
                 detail: None,
             });
-        }
-
-        for (key, val) in data.output_mapping {
-            if key == "data_out" {
-                out_id = Some(val);
-                break;
-            }
         }
 
         // let out_id = match out_id {
@@ -62,6 +57,7 @@ impl MockSensor {
         })
     }
 
+    #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
         static SENSOR_STATE_RAW: static_cell::StaticCell<
             core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
@@ -80,22 +76,23 @@ impl MockSensor {
 
 impl crate::resource::Resource for MockSensor {
     fn provider_id(&self) -> &'static str {
-        return "mock-scd30-sensor-1";
+        "mock-scd30-sensor-1"
     }
 
     fn resource_class(&self) -> &'static str {
-        return "scd30-sensor";
+        "scd30-sensor"
     }
 
     fn outputs(&self) -> &'static [&'static str] {
-        return &["data_out"];
+        &["data_out"]
     }
 
+    #[allow(clippy::await_holding_refcell_ref)]
     async fn has_instance(&self, instance_id: &edgeless_api_core::instance_id::InstanceId) -> bool {
         let tmp = self.inner.borrow_mut();
         let lck = tmp.lock().await;
 
-        return lck.instance_id == Some(instance_id.clone());
+        lck.instance_id == Some(*instance_id)
     }
 
     async fn launch(&mut self, spawner: embassy_executor::Spawner, dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {
@@ -104,6 +101,7 @@ impl crate::resource::Resource for MockSensor {
 }
 
 #[embassy_executor::task]
+#[allow(clippy::await_holding_refcell_ref)]
 pub async fn mock_sensor_task(
     state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
     dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
@@ -134,7 +132,9 @@ impl crate::invocation::InvocationAPI for MockSensor {
     }
 }
 
+#[allow(clippy::await_holding_refcell_ref)]
 impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
+    #[allow(clippy::needless_lifetimes)]
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
@@ -147,16 +147,16 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
         let mut lck = tmp.lock().await;
         log::info!("got Lock Start");
 
-        if let Some(_) = lck.instance_id {
+        if lck.instance_id.is_some() {
             return Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Resource Busy",
                 detail: None,
             });
         }
 
-        let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID.clone());
+        let instance_id = edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID);
 
-        lck.instance_id = Some(instance_id.clone());
+        lck.instance_id = Some(instance_id);
         lck.data_out_id = instance_specification.data_out_id;
         lck.delay = instance_specification.delay_s;
         log::info!("End Start");
@@ -190,12 +190,10 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;
 
-        for output_callback in patch_req.output_mapping {
-            if let Some((key, val)) = output_callback {
-                if key == "data_out" {
-                    lck.data_out_id = Some(val);
-                    break;
-                }
+        for (key, val) in patch_req.output_mapping.into_iter().flatten() {
+            if key == "data_out" {
+                lck.data_out_id = Some(val);
+                break;
             }
         }
 

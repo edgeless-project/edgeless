@@ -1,78 +1,33 @@
 # EDGELESS repository layout
 
-Each of the primary services is implemented as its own crate: library + (optional) binary wrapper.
 
-Refer to the `README` file of a particular component to find out more.
-
-You may want to check the [conventions of Rust's module system](https://doc.rust-lang.org/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html).
-
-## Core Components
-
-These represent the core components of the EDGELESS project, as proposed in the
-design phase.
-
-### edgeless_node
-
-Worker node including the agent and the function runtime.
-  * Exposes the `AgentAPI` consisting of the `FunctionInstanceAPI`
-  * Exposes the `InvocationAPI` (data plane)
-  * Binary: `edgeless_node_d`
-
-### edgeless_orc
-
-ε-ORC (EDGELESS orchestrator)
-
-  * Exposes the `OrchestratorAPI` consisting of the `FunctionInstanceAPI`
-  * Binary: `edgeless_orc_d`
-
-### edgeless_con
-
-ε-CON (EDGELESS controller)
-
-  * Exposes the `ControllerAPI` consisting of the `WorkflowInstanceAPI`
-  * Binary: `edgeless_con_d`
-
-### edgeless_bal
-
-ε-BAL (EDGELESS balancer)
-
-  * Manages resources, e.g., HTTP ingress/egress, and exposes a `ResourceConfigurationAPI` to
-    configure it.
-  * Binary: `edgeless_bal_d`
+| Directory                   | Description                                                                                                                                                                                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| deployment                  | Docker and Docker Compose scripts                                                                                                                                                                                                                                   |
+| documentation               | Repository documentation.                                                                                                                                                                                                                                           |
+| edgeless_api                | gRPC API definitions, both services and messages. This directory must be imported by other projects wishing to interact with EDGELESS components through its interfaces.                                                                                            |
+| edgeless_api_core           | API definitions with minimal functions for embedded devices using CoAP.                                                                                                                                                                                             |
+| edgeless_bal                | Reference implementation of the ε-BAL, currently a mere skeleton. The concrete implementation will be done in the next project phase when inter-domain workflows will be supported.                                                                                 |
+| edgeless_benchmark          | Suite to benchmark an EDGELESS system in controlled and repeatable conditions using artificial workloads.                                                                                                                                                           |
+| edgeless_cli                | EDGELESS command-line interface. This is used currently to locally build function instances and to interact with the ε-CON to create/terminate/list workflows.                                                                                                      |
+| edgeless_con                | Reference implementation of the ε-CON, currently only supporting a single orchestration domain and ignoring workflow annotations.                                                                                                                                   |
+| edgeless_container_function | Skeleton of a function to be deployed in a container.                                                                                                                                                                                                               |
+| edgeless_dataplane          | EDGELESS intra-domain dataplane, which is realised through the full-mesh interconnection of gRPC services. Provides the primary communication chains. Used by communicating entities to send and receive events. Provides local and remote communication providers. |
+| edgeless_dda                | EDGELESS Data Distribution Agent.                                                                                                                                                                                                                                   |
+| edgeless_embedded           | Work-in-progress implementation of special features for embedded devices.                                                                                                                                                                                           |
+| edgeless_embedded_emu       | Embedded device emulator.                                                                                                                                                                                                                                           |
+| edgeless_embedded_esp32     | Support of some ESP32 microcontrollers.                                                                                                                                                                                                                             |
+| edgeless_function           | WebAssembly Rust bindings and function programming model.                                                                                                                                                                                                           |
+| edgeless_http               | Utility structures and methods for HTTP bindings. Specifies the interface between the ingress and the functions consuming HTTP events.                                                                                                                              |
+| edgeless_inabox             | Implements a minimal, yet complete, EDGELESS system consisting of an ε-CON, an ε-ORC, an ε-BAL and an edgeless node. This is intended to be used for development/validation purposes.                                                                               |
+| edgeless_node               | EDGELESS node with WebAssembly and [Container](container-runtime.md) run-times.                                                                                                                                                                                     |
+| edgeless_orc                | Reference implementation of the ε-ORC, supporting deployment annotations and implementing two simple function instance allocation strategies: random and round-robin. Upscaling is not supported: all the functions are deployed as single instances.               |
+| edgeless_systemtests        | Tests of EDGELESS components deployed in a system fashion, e.g., interacting through gRPC interfaces.                                                                                                                                                               |
+| edgeless_telemetry          | Node telemetry support in EDGELESS, also supporting Prometheus agents.                                                                                                                                                                                              |
+| examples                    | Examples showcasing the key features of the EDGELESS reference implementation.                                                                                                                                                                                      |
+| functions                   | Library of _example functions_ shipping with the EDGELESS platform and used in the examples.                                                                                                                                                                        |
+| model                       | Work-in-progress OCaml model of the EDGELESS system.                                                                                                                                                                                                                |
+| scripts                     | Collection of scripts                                                                                                                                                                                                                                               |
 
 
-## Tools
-
-The following tools allow users to test and interact with the EDGELESS project.
-
-### edgeless_cli
-
-CLI to interact with the e-Controller
-    * Binary: `edgeless_cli`
-
-### edgeless_inabox
-
-A standalone EDGELESS environment with preconfigured instances of all required services inside a single binary.
-This is the easiest way to spawn up a development instance of edgeless
-
-## Libraries
-
-In addition to the core components and tools, the repository contains the
-following libraries:
-
-* `edgeless_api`: Crate defining all inter-service APIs
-    * Contains GRPC implementations of those inter-service APIs
-
-* `edgeless_function`: Crate defining the interfaces for the tier1 guests
-    * Tier1 Guests: Rust Functions compiled to WASM
-    * Interface to the functions relies on the WASM component model.
-
-* `edgeless_dataplane`: Crate defining the Edgeless data plane.
-    * Provides the primary communication chains
-        * Used by communicating entities to send and receive events
-    * Provides a local communication provider
-    * Provides a remote communication provider based on the `InvocationAPI`
-
-* `edgeless_http`: Crate containing HTTP-related types.
-    * Specifies the interface between the Ingress and the functions consuming
-      HTTP Events.
+Check the [conventions of Rust's module system](https://doc.rust-lang.org/book/ch07-00-managing-growing-projects-with-packages-crates-and-modules.html).

@@ -1,10 +1,14 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
+
 use std::str::FromStr;
 
 #[derive(Clone)]
 pub struct NodeManagementClient {
-    client: crate::grpc_impl::api::node_management_client::NodeManagementClient<tonic::transport::Channel>,
+    client: Option<crate::grpc_impl::api::node_management_client::NodeManagementClient<tonic::transport::Channel>>,
+    server_addr: String,
 }
 
 pub struct NodeManagementAPIService {
@@ -12,41 +16,71 @@ pub struct NodeManagementAPIService {
 }
 
 impl NodeManagementClient {
-    pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
-        loop {
-            match crate::grpc_impl::api::node_management_client::NodeManagementClient::connect(server_addr.to_string()).await {
+    pub fn new(server_addr: String) -> Self {
+        Self { client: None, server_addr }
+    }
+
+    /// Try connecting, if not already connected.
+    ///
+    /// If an error is returned, then the client is set to None (disconnected).
+    /// Otherwise, the client is set to some value (connected).
+    async fn try_connect(&mut self) -> anyhow::Result<()> {
+        if self.client.is_none() {
+            self.client = match crate::grpc_impl::api::node_management_client::NodeManagementClient::connect(self.server_addr.clone()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    return Ok(Self { client });
+                    Some(client)
                 }
-                Err(err) => match retry_interval {
-                    Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
-                    None => {
-                        return Err(anyhow::anyhow!("Error when connecting to {}: {}", server_addr, err));
-                    }
-                },
+                Err(err) => anyhow::bail!(err),
             }
         }
+        Ok(())
+    }
+
+    /// Disconnect the client.
+    fn disconnect(&mut self) {
+        self.client = None;
     }
 }
 
 #[async_trait::async_trait]
 impl crate::node_management::NodeManagementAPI for NodeManagementClient {
     async fn update_peers(&mut self, request: crate::node_management::UpdatePeersRequest) -> anyhow::Result<()> {
-        match self
-            .client
-            .update_peers(tonic::Request::new(serialize_update_peers_request(&request)))
-            .await
-        {
-            Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while updating peers: {}", err.to_string())),
+        match self.try_connect().await {
+            Ok(_) => {
+                if let Some(client) = &mut self.client {
+                    if let Err(err) = client.update_peers(tonic::Request::new(serialize_update_peers_request(&request))).await {
+                        self.disconnect();
+                        anyhow::bail!("Error when updating peers at {}: {}", self.server_addr, err.to_string());
+                    } else {
+                        Ok(())
+                    }
+                } else {
+                    panic!("The impossible happened");
+                }
+            }
+            Err(err) => {
+                anyhow::bail!("Error when connecting to {}: {}", self.server_addr, err);
+            }
         }
     }
-
-    async fn keep_alive(&mut self) -> anyhow::Result<crate::node_management::HealthStatus> {
-        match self.client.keep_alive(tonic::Request::new(())).await {
-            Ok(res) => parse_health_status(&res.into_inner()),
-            Err(err) => Err(anyhow::anyhow!("Communication error during keep alive: {}", err.to_string())),
+    async fn reset(&mut self) -> anyhow::Result<()> {
+        match self.try_connect().await {
+            Ok(_) => {
+                if let Some(client) = &mut self.client {
+                    if let Err(err) = client.reset(tonic::Request::new(())).await {
+                        self.disconnect();
+                        anyhow::bail!("Error when resetting at {}: {}", self.server_addr, err.to_string());
+                    } else {
+                        Ok(())
+                    }
+                } else {
+                    panic!("The impossible happened");
+                }
+            }
+            Err(err) => {
+                anyhow::bail!("Error when resetting to {}: {}", self.server_addr, err);
+            }
         }
     }
 }
@@ -69,11 +103,10 @@ impl crate::grpc_impl::api::node_management_server::NodeManagement for NodeManag
             Err(err) => Err(tonic::Status::internal(format!("Error when updating peers: {}", err))),
         }
     }
-
-    async fn keep_alive(&self, _request: tonic::Request<()>) -> Result<tonic::Response<crate::grpc_impl::api::HealthStatus>, tonic::Status> {
-        match self.node_management_api.lock().await.keep_alive().await {
-            Ok(health_status) => Ok(tonic::Response::new(serialize_health_status(&health_status))),
-            Err(err) => Err(tonic::Status::internal(format!("Error during keep alive: {}", err))),
+    async fn reset(&self, _request: tonic::Request<()>) -> Result<tonic::Response<()>, tonic::Status> {
+        match self.node_management_api.lock().await.reset().await {
+            Ok(_) => Ok(tonic::Response::new(())),
+            Err(err) => Err(tonic::Status::internal(format!("Error when resetting: {}", err))),
         }
     }
 }
@@ -113,20 +146,6 @@ pub fn parse_update_peers_request(
     }
 }
 
-pub fn parse_health_status(api_instance: &crate::grpc_impl::api::HealthStatus) -> anyhow::Result<crate::node_management::HealthStatus> {
-    Ok(crate::node_management::HealthStatus {
-        cpu_usage: api_instance.cpu_usage,
-        cpu_load: api_instance.cpu_load,
-        mem_free: api_instance.mem_free,
-        mem_used: api_instance.mem_used,
-        mem_total: api_instance.mem_total,
-        mem_available: api_instance.mem_available,
-        proc_cpu_usage: api_instance.proc_cpu_usage,
-        proc_memory: api_instance.proc_memory,
-        proc_vmemory: api_instance.proc_vmemory,
-    })
-}
-
 fn serialize_update_peers_request(req: &crate::node_management::UpdatePeersRequest) -> crate::grpc_impl::api::UpdatePeersRequest {
     match req {
         crate::node_management::UpdatePeersRequest::Add(node_id, invocation_url) => crate::grpc_impl::api::UpdatePeersRequest {
@@ -147,24 +166,9 @@ fn serialize_update_peers_request(req: &crate::node_management::UpdatePeersReque
     }
 }
 
-fn serialize_health_status(req: &crate::node_management::HealthStatus) -> crate::grpc_impl::api::HealthStatus {
-    crate::grpc_impl::api::HealthStatus {
-        cpu_usage: req.cpu_usage,
-        cpu_load: req.cpu_load,
-        mem_free: req.mem_free,
-        mem_used: req.mem_used,
-        mem_total: req.mem_total,
-        mem_available: req.mem_available,
-        proc_cpu_usage: req.proc_cpu_usage,
-        proc_memory: req.proc_memory,
-        proc_vmemory: req.proc_vmemory,
-    }
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::node_management::HealthStatus;
     use crate::node_management::UpdatePeersRequest;
 
     #[test]
@@ -176,31 +180,6 @@ mod test {
         ];
         for msg in messages {
             match parse_update_peers_request(&serialize_update_peers_request(&msg)) {
-                Ok(val) => assert_eq!(msg, val),
-                Err(err) => panic!("{}", err),
-            }
-        }
-    }
-
-    #[test]
-    fn serialize_deserialize_health_status() {
-        let messages = vec![
-            HealthStatus::empty(),
-            HealthStatus::invalid(),
-            HealthStatus {
-                cpu_usage: 1,
-                cpu_load: 2,
-                mem_free: 3,
-                mem_used: 4,
-                mem_total: 5,
-                mem_available: 6,
-                proc_cpu_usage: 7,
-                proc_memory: 8,
-                proc_vmemory: 9,
-            },
-        ];
-        for msg in messages {
-            match parse_health_status(&serialize_health_status(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }

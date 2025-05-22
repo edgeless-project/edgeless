@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 #[derive(Clone, minicbor::Decode, minicbor::Encode, minicbor::CborLen)]
 pub enum EventData<T> {
@@ -24,6 +25,8 @@ pub struct Event<T> {
     pub stream_id: u64,
     #[n(3)]
     pub data: EventData<T>,
+    #[n(4)]
+    pub created: crate::event_timestamp::EventTimestamp,
 }
 
 #[derive(Debug, PartialEq, Eq)]

@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
 use futures::FutureExt;
@@ -25,10 +27,10 @@ pub enum GuestAPIError {
 impl GuestAPIHost {
     pub async fn cast_alias(&mut self, alias: &str, msg: &str) -> Result<(), GuestAPIError> {
         if alias == "self" {
-            self.data_plane.send(self.instance_id.clone(), msg.to_string()).await;
+            self.data_plane.send(self.instance_id, msg.to_string()).await;
             Ok(())
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            self.data_plane.send(target.clone(), msg.to_string()).await;
+            self.data_plane.send(target, msg.to_string()).await;
             Ok(())
         } else {
             Err(GuestAPIError::UnknownAlias)
@@ -42,7 +44,7 @@ impl GuestAPIHost {
 
     pub async fn call_alias(&mut self, alias: &str, msg: &str) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         if alias == "self" {
-            return self.call_raw(self.instance_id.clone(), msg).await;
+            self.call_raw(self.instance_id, msg).await
             // return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
             return self.call_raw(target, msg).await;
@@ -60,10 +62,10 @@ impl GuestAPIHost {
     ) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         futures::select! {
             _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
-                return Ok(edgeless_dataplane::core::CallRet::Err)
+                Ok(edgeless_dataplane::core::CallRet::Err)
             },
             call_res = Box::pin(self.data_plane.call(target, msg.to_string())).fuse() => {
-                return Ok(call_res)
+                Ok(call_res)
             }
         }
     }
@@ -76,7 +78,7 @@ impl GuestAPIHost {
     }
 
     pub async fn slf(&mut self) -> edgeless_api::function_instance::InstanceId {
-        self.instance_id.clone()
+        self.instance_id
     }
 
     pub async fn delayed_cast(&mut self, delay: u64, target_alias: &str, payload: &str) -> Result<(), GuestAPIError> {
@@ -84,7 +86,7 @@ impl GuestAPIHost {
         let cloned_msg = payload.to_string();
 
         let target_instance_id = if target_alias == "self" {
-            self.instance_id.clone()
+            self.instance_id
         } else if let Some(targted_id) = self.callback_table.get_mapping(target_alias).await {
             targted_id
         } else {

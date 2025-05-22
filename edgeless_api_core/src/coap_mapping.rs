@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use alloc::vec;
 use coap_lite::{MessageClass, MessageType, ResponseType};
@@ -12,7 +14,7 @@ impl COAPEncoder {
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut buffer = [0 as u8; 1024];
+        let mut buffer = [0_u8; 1024];
         let new_event: crate::invocation::Event<&minicbor::bytes::ByteSlice> = crate::invocation::Event::<&minicbor::bytes::ByteSlice> {
             target: event.target,
             source: event.source,
@@ -24,6 +26,7 @@ impl COAPEncoder {
                 crate::invocation::EventData::CallNoRet => crate::invocation::EventData::CallNoRet,
                 crate::invocation::EventData::Err => crate::invocation::EventData::Err,
             },
+            created: event.created,
         };
         minicbor::encode(&new_event, &mut buffer[..]).unwrap();
         let len = minicbor::len(&event);
@@ -37,26 +40,26 @@ impl COAPEncoder {
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut buffer = [0 as u8; 1024];
+        let mut buffer = [0_u8; 1024];
         minicbor::encode(&instance, &mut buffer[..]).unwrap();
         let len = minicbor::len(&instance);
 
         Self::encode(endpoint, token, "resources/start", out_buf, true, &buffer[..len])
     }
 
-    pub fn encode_stop_resource<'a, Endpoint>(
+    pub fn encode_stop_resource<Endpoint>(
         endpoint: Endpoint,
         instance_id: crate::instance_id::InstanceId,
         token: u8,
-        out_buf: &'a mut [u8],
-    ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+        out_buf: &mut [u8],
+    ) -> ((&mut [u8], Endpoint), &mut [u8]) {
         let mut req = coap_lite::CoapRequest::<Endpoint>::new();
         req.set_method(coap_lite::RequestType::Post);
         req.set_path("resources/stop");
         req.message.set_token(vec![token]);
         let mut buffer = [0_u8; 512];
-        minicbor::encode(&instance_id, &mut buffer[..]).unwrap();
-        let len = minicbor::len(&instance_id);
+        minicbor::encode(instance_id, &mut buffer[..]).unwrap();
+        let len = minicbor::len(instance_id);
 
         Self::encode(endpoint, token, "resources/stop", out_buf, true, &buffer[..len])
     }
@@ -67,7 +70,7 @@ impl COAPEncoder {
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut buffer = [0 as u8; 1024];
+        let mut buffer = [0_u8; 1024];
         minicbor::encode(&patch_request, &mut buffer[..]).unwrap();
         let len = minicbor::len(&patch_request);
 
@@ -80,35 +83,22 @@ impl COAPEncoder {
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut buffer = [0 as u8; 2048];
-        minicbor::encode(&node_registration, &mut buffer[..]).unwrap();
-        let len = minicbor::len(&node_registration);
+        let mut buffer = [0_u8; 2048];
+        minicbor::encode(node_registration, &mut buffer[..]).unwrap();
+        let len = minicbor::len(node_registration);
 
         Self::encode(endpoint, token, "registration/register", out_buf, true, &buffer[..len])
     }
 
-    pub fn encode_node_deregistration<'a, Endpoint>(
+    pub fn encode_peer_add<'a, Endpoint>(
         endpoint: Endpoint,
-        node_id: crate::node_registration::NodeId,
-        token: u8,
-        out_buf: &'a mut [u8],
-    ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut buffer = [0 as u8; 2048];
-        minicbor::encode(&node_id, &mut buffer[..]).unwrap();
-        let len = minicbor::len(&node_id);
-
-        Self::encode(endpoint, token, "registration/deregister", out_buf, true, &buffer[..len])
-    }
-
-    pub fn encode_peer_add<'a, 'b, Endpoint>(
-        endpoint: Endpoint,
-        node_id: &'b crate::node_registration::NodeId,
+        node_id: &crate::node_registration::NodeId,
         node_ip: [u8; 4],
         port: u16,
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut buffer = [0 as u8; 2048];
+        let mut buffer = [0_u8; 2048];
         minicbor::encode((node_id, node_ip, port), &mut buffer[..]).unwrap();
         let len = minicbor::len((node_id, node_ip, port));
 
@@ -121,14 +111,18 @@ impl COAPEncoder {
         token: u8,
         out_buf: &'a mut [u8],
     ) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
-        let mut buffer = [0 as u8; 2048];
+        let mut buffer = [0_u8; 2048];
         minicbor::encode(node_id, &mut buffer[..]).unwrap();
         let len = minicbor::len(node_id);
 
         Self::encode(endpoint, token, "peers/remove", out_buf, true, &buffer[..len])
     }
 
-    pub fn encode_keepalive<'a, Endpoint>(endpoint: Endpoint, token: u8, out_buf: &'a mut [u8]) -> ((&'a mut [u8], Endpoint), &'a mut [u8]) {
+    pub fn encode_reset<Endpoint>(endpoint: Endpoint, token: u8, out_buf: &mut [u8]) -> ((&mut [u8], Endpoint), &mut [u8]) {
+        Self::encode(endpoint, token, "reset", out_buf, true, &[])
+    }
+
+    pub fn encode_keepalive<Endpoint>(endpoint: Endpoint, token: u8, out_buf: &mut [u8]) -> ((&mut [u8], Endpoint), &mut [u8]) {
         Self::encode(endpoint, token, "keepalive", out_buf, true, &[])
     }
 
@@ -182,20 +176,21 @@ impl COAPEncoder {
         ((data, endpoint), tail)
     }
 
-    pub fn encode_instance_id<'a>(instance_id: crate::instance_id::InstanceId, out_buf: &'a mut [u8]) -> (&'a mut [u8], &'a mut [u8]) {
+    pub fn encode_instance_id(instance_id: crate::instance_id::InstanceId, out_buf: &mut [u8]) -> (&mut [u8], &mut [u8]) {
         let len = minicbor::len(instance_id);
         let (data, tail) = out_buf.split_at_mut(len);
         minicbor::encode(instance_id, &mut data[..]).unwrap();
         (data, tail)
     }
 
-    pub fn encode_error_response<'a>(error: crate::common::ErrorResponse, out_buf: &'a mut [u8]) -> (&'a mut [u8], &'a mut [u8]) {
+    pub fn encode_error_response(error: crate::common::ErrorResponse, out_buf: &mut [u8]) -> (&mut [u8], &mut [u8]) {
         let (data, tail) = out_buf.split_at_mut(minicbor::len(error.summary));
         minicbor::encode(error.summary, &mut data[..]).unwrap();
         (data, tail)
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum CoapMessage<'a> {
     Invocation(crate::invocation::Event<&'a [u8]>),
     ResourceStart(crate::resource_configuration::EncodedResourceInstanceSpecification<'a>),
@@ -205,23 +200,31 @@ pub enum CoapMessage<'a> {
     PeerAdd((crate::instance_id::NodeId, [u8; 4], u16)),
     PeerRemove(crate::instance_id::NodeId),
     NodeRegistration(crate::node_registration::EncodedNodeRegistration<'a>),
-    NodeDeregistration(crate::node_registration::NodeId),
     Response(&'a [u8], bool),
 }
 
 pub struct CoapDecoder {}
 
+#[derive(Debug)]
+pub struct CoapDecoderError;
+
+impl core::fmt::Display for CoapDecoderError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "CoAP decoder error")
+    }
+}
+
 impl CoapDecoder {
-    pub fn decode<'a>(data: &'a [u8]) -> Result<(CoapMessage<'a>, u8), ()> {
+    pub fn decode(data: &[u8]) -> Result<(CoapMessage<'_>, u8), CoapDecoderError> {
         let packet = coap_lite::Packet::from_bytes(data).unwrap();
         match packet.header.code {
             MessageClass::Request(_) => Self::decode_request(data),
             MessageClass::Response(_) => Self::decode_response(data),
-            _ => Err(()),
+            _ => Err(CoapDecoderError {}),
         }
     }
 
-    pub fn decode_request<'a>(data: &'a [u8]) -> Result<(CoapMessage<'a>, u8), ()> {
+    pub fn decode_request(data: &[u8]) -> Result<(CoapMessage<'_>, u8), CoapDecoderError> {
         let packet = coap_lite::Packet::from_bytes(data).unwrap();
 
         let path = match packet.get_option(coap_lite::CoapOption::UriPath) {
@@ -253,6 +256,7 @@ impl CoapDecoder {
                         crate::invocation::EventData::CallNoRet => crate::invocation::EventData::CallNoRet,
                         crate::invocation::EventData::Err => crate::invocation::EventData::Err,
                     },
+                    created: event.created,
                 };
                 Ok((CoapMessage::Invocation(new_event), packet.get_token()[0]))
             }
@@ -281,44 +285,37 @@ impl CoapDecoder {
                 let registration: crate::node_registration::EncodedNodeRegistration = minicbor::decode(body_ref).unwrap();
                 Ok((CoapMessage::NodeRegistration(registration), packet.get_token()[0]))
             }
-            "registration/deregister" => {
-                let resource_id: crate::node_registration::NodeId = minicbor::decode(body_ref).unwrap();
-                Ok((CoapMessage::NodeDeregistration(resource_id), packet.get_token()[0]))
-            }
-            _ => Err(()),
+            _ => Err(CoapDecoderError {}),
         }
     }
 
-    pub fn decode_response<'a>(data: &'a [u8]) -> Result<(CoapMessage<'a>, u8), ()> {
+    pub fn decode_response(data: &[u8]) -> Result<(CoapMessage<'_>, u8), CoapDecoderError> {
         let packet = coap_lite::Packet::from_bytes(data).unwrap();
         let response = coap_lite::CoapResponse { message: packet };
         let body_len = response.message.payload.len();
         let body_ref = &data[(data.len() - body_len)..];
 
         let return_status_ok = match response.message.header.code {
-            MessageClass::Response(response_type) => match response_type {
-                ResponseType::Content => true,
-                _ => false,
-            },
+            MessageClass::Response(response_type) => matches!(response_type, ResponseType::Content),
             _ => true,
         };
 
         Ok((CoapMessage::Response(body_ref, return_status_ok), response.message.get_token()[0]))
     }
 
-    pub fn decode_instance_id(data: &[u8]) -> Result<crate::instance_id::InstanceId, ()> {
+    pub fn decode_instance_id(data: &[u8]) -> Result<crate::instance_id::InstanceId, CoapDecoderError> {
         let parsed = minicbor::decode::<crate::instance_id::InstanceId>(data);
         match parsed {
             Ok(id) => Ok(id),
-            Err(_) => Err(()),
+            Err(_) => Err(CoapDecoderError {}),
         }
     }
 
-    pub fn decode_error_response(data: &[u8]) -> Result<crate::instance_id::InstanceId, ()> {
+    pub fn decode_error_response(data: &[u8]) -> Result<crate::instance_id::InstanceId, CoapDecoderError> {
         let parsed = minicbor::decode::<crate::instance_id::InstanceId>(data);
         match parsed {
             Ok(id) => Ok(id),
-            Err(_) => Err(()),
+            Err(_) => Err(CoapDecoderError {}),
         }
     }
 }

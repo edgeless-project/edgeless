@@ -1,6 +1,5 @@
-// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
-// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
-// SPDX-FileCopyrightText: © 2023 Siemens AG
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
 #[derive(Clone)]
@@ -21,25 +20,36 @@ pub struct ActiveComponent {
     pub name: String,
 
     // Name of the domain that manages the lifecycle of this function/resource.
+    //
+    // If the domain name is an empty string, then the component is current
+    // not assigned to any domain, and the field `lid` is meaningless.
+    //
+    // [TODO] In principle a logical component could be mapped to _multiple_
+    //  domains, in which case this field should be transformed in a container.
     pub domain_id: String,
 
-    // Identifier returned by the e-ORC.
-    pub fid: edgeless_api::function_instance::ComponentId,
+    // Logical identifier of the function/resource.
+    pub lid: edgeless_api::function_instance::ComponentId,
 }
 
 impl ActiveWorkflow {
+    pub fn is_orphan(&self) -> bool {
+        for component in self.domain_mapping.values() {
+            if component.domain_id.is_empty() {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn mapped_fids(&self, component_name: &str) -> Option<Vec<edgeless_api::function_instance::ComponentId>> {
         let comp = self.domain_mapping.get(component_name)?;
-        Some(vec![comp.fid])
+        Some(vec![comp.lid])
     }
 
     pub fn component_type(&self, component_name: &str) -> Option<super::ComponentType> {
         let item = self.domain_mapping.get(component_name);
-        if let Some(item) = item {
-            return Some(item.component_type.clone());
-        } else {
-            return None;
-        }
+        item.map(|item| item.component_type.clone())
     }
 
     pub fn domain_mapping(&self) -> Vec<edgeless_api::workflow_instance::WorkflowFunctionMapping> {
@@ -47,6 +57,7 @@ impl ActiveWorkflow {
             .iter()
             .map(|(name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
                 name: name.clone(),
+                function_id: component.lid,
                 domain_id: component.domain_id.clone(),
             })
             .collect()
@@ -91,8 +102,8 @@ impl ActiveWorkflow {
 impl std::fmt::Display for ActiveComponent {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.component_type {
-            super::ComponentType::Function => write!(f, "function name {}, domain {}, fid {}", self.name, self.domain_id, self.fid),
-            super::ComponentType::Resource => write!(f, "resource name {}, domain {}, fid {}", self.name, self.domain_id, self.fid),
+            super::ComponentType::Function => write!(f, "function name {}, domain {}, fid {}", self.name, self.domain_id, self.lid),
+            super::ComponentType::Resource => write!(f, "resource name {}, domain {}, fid {}", self.name, self.domain_id, self.lid),
         }
     }
 }

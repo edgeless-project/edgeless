@@ -1,4 +1,6 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
 use wasmtime::AsContextMut;
@@ -36,8 +38,8 @@ pub async fn cast_raw(
     payload_len: i32,
 ) -> wasmtime::Result<()> {
     let mem = get_memory(&mut caller)?;
-    let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16 as usize].to_vec();
-    let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16 as usize].to_vec();
+    let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16_usize].to_vec();
+    let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16_usize].to_vec();
     let instance_id = edgeless_api::function_instance::InstanceId {
         node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmtime::Error::msg("uuid error"))?),
         function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmtime::Error::msg("uuid error"))?),
@@ -64,8 +66,8 @@ pub async fn call_raw(
 ) -> wasmtime::Result<i32> {
     let mem = get_memory(&mut caller)?;
     let alloc = get_alloc(&mut caller)?;
-    let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16 as usize].to_vec();
-    let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16 as usize].to_vec();
+    let node_id = mem.data_mut(&mut caller)[instance_node_id_ptr as usize..(instance_node_id_ptr as usize) + 16_usize].to_vec();
+    let component_id = mem.data_mut(&mut caller)[instance_component_id_ptr as usize..(instance_component_id_ptr as usize) + 16_usize].to_vec();
     let instance_id = edgeless_api::function_instance::InstanceId {
         node_id: uuid::Uuid::from_bytes(node_id.try_into().map_err(|_| wasmtime::Error::msg("uuid error"))?),
         function_id: uuid::Uuid::from_bytes(component_id.try_into().map_err(|_| wasmtime::Error::msg("uuid error"))?),
@@ -81,7 +83,7 @@ pub async fn call_raw(
     match call_ret {
         edgeless_dataplane::core::CallRet::NoReply => Ok(0),
         edgeless_dataplane::core::CallRet::Reply(data) => {
-            let len = data.as_bytes().len();
+            let len = data.len();
 
             let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes()).await?;
             super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;
@@ -140,7 +142,7 @@ pub async fn call(
     match call_ret {
         edgeless_dataplane::core::CallRet::NoReply => Ok(0),
         edgeless_dataplane::core::CallRet::Reply(data) => {
-            let len = data.as_bytes().len();
+            let len = data.len();
 
             let data_ptr = super::helpers::copy_to_vm(&mut caller.as_context_mut(), &mem, &alloc, data.as_bytes()).await?;
             super::helpers::copy_to_vm_ptr(&mut caller.as_context_mut(), &mem, out_ptr_ptr, &data_ptr.to_le_bytes())?;

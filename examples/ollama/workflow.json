@@ -1,0 +1,53 @@
+{
+    "functions": [
+        {
+            "name": "http_extractor",
+            "class_specification": {
+                "id": "http_extractor",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/http_extractor/http_extractor.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "ollama"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "http-ingress",
+            "class_type": "http-ingress",
+            "output_mapping": {
+                "new_request": "http_extractor"
+            },
+            "configurations": {
+                "host": "demo.edgeless.com",
+                "methods": "POST"
+            }
+        },
+        {
+            "name": "ollama",
+            "class_type": "ollama",
+            "output_mapping": {
+                "out": "file-log"
+            },
+            "configurations": {
+                "model": "llama3"
+            }
+        },
+        {
+            "name": "file-log",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "ollama.log",
+                "add-timestamp": "true"
+            }
+        }
+    ],
+    "annotations": {}
+}

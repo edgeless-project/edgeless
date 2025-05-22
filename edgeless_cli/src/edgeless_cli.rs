@@ -2,27 +2,30 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 University of Cambridge, System Research Group
 // SPDX-FileCopyrightText: © 2024 Roman Kolcun <roman.kolcun@cl.cam.ac.uk>
+// SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-mod workflow_spec;
 
+mod workflow_spec;
+use cargo::GlobalContext;
 use clap::Parser;
-use edgeless_api::{controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
+use edgeless_api::{outer::controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
 
 use mailparse::{parse_content_disposition, parse_header};
 use reqwest::header::ACCEPT;
 use reqwest::{multipart, Body, Client};
 use std::collections::HashMap;
+use std::fs::{self};
 use std::io::Cursor;
+use std::time::SystemTime;
 use tokio::fs::File;
 use tokio_util::codec::{BytesCodec, FramedRead};
-use toml; // for parse
-use std::fs;
 
 #[derive(Debug, clap::Subcommand)]
 enum WorkflowCommands {
     Start { spec_file: String },
     Stop { id: String },
     List {},
+    Inspect { id: String },
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -54,6 +57,12 @@ enum FunctionCommands {
 }
 
 #[derive(Debug, clap::Subcommand)]
+enum DomainCommands {
+    Inspect { id: String },
+    List {},
+}
+
+#[derive(Debug, clap::Subcommand)]
 enum Commands {
     Workflow {
         #[command(subcommand)]
@@ -62,6 +71,10 @@ enum Commands {
     Function {
         #[command(subcommand)]
         function_command: FunctionCommands,
+    },
+    Domain {
+        #[command(subcommand)]
+        domain_command: DomainCommands,
     },
 }
 
@@ -76,12 +89,26 @@ struct Args {
     template: String,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, serde::Serialize)]
 struct CLiConfig {
     controller_url: String,
-    pub repository_url: String,
-    pub repository_basic_auth_user: String,
-    pub repository_basic_auth_pass: String,
+    function_repository: Option<FunctionRepositoryConfig>,
+}
+
+impl Default for CLiConfig {
+    fn default() -> Self {
+        Self {
+            controller_url: String::from("http://127.0.0.1:7001"),
+            function_repository: Some(FunctionRepositoryConfig::default()),
+        }
+    }
+}
+
+#[derive(serde::Deserialize, serde::Serialize, Default)]
+struct FunctionRepositoryConfig {
+    pub url: String,
+    pub basic_auth_user: String,
+    pub basic_auth_pass: String,
 }
 
 enum BuildProfile {
@@ -148,11 +175,77 @@ impl Platform {
 }
 
 pub fn edgeless_cli_default_conf() -> String {
-    let controller_url = String::from("controller_url = \"http://127.0.0.1:7001\"");
-    let repository_url = String::from("repository_url = \"\"");
-    let repository_user = String::from("repository_basic_auth_user = \"\"");
-    let reposisitory_passwd = String::from("repository_basic_auth_pass = \"\"");
-    return format!("{}\n{}\n{}\n{}", controller_url, repository_url, repository_user, reposisitory_passwd);
+    let cli_conf = CLiConfig::default();
+    toml::to_string(&cli_conf).expect("Wrong")
+}
+
+async fn wf_client(config_file: &str) -> anyhow::Result<Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>> {
+    anyhow::ensure!(
+        std::fs::metadata(config_file).is_ok(),
+        "configuration file does not exist or cannot be accessed: {}",
+        config_file
+    );
+
+    let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(config_file).unwrap()).unwrap();
+    let mut con_client = edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(&conf.controller_url).await;
+    Ok(con_client.workflow_instance_api())
+}
+
+async fn workflow_stop(wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>, id: &str) -> anyhow::Result<()> {
+    anyhow::ensure!(workflow_info_or_none(wf_client, id).await.is_some(), "unknown or invalid workflow {}", id);
+    wf_client
+        .stop(edgeless_api::workflow_instance::WorkflowId {
+            workflow_id: uuid::Uuid::parse_str(id)?,
+        })
+        .await?;
+    println!("Workflow {} stopped", id);
+    Ok(())
+}
+
+async fn workflow_info_or_none(
+    wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>,
+    id: &str,
+) -> Option<edgeless_api::workflow_instance::WorkflowInfo> {
+    let workflow_id = if let Ok(id) = uuid::Uuid::parse_str(id) { id } else { return None };
+    match wf_client.inspect(edgeless_api::workflow_instance::WorkflowId { workflow_id }).await {
+        Ok(info) => Some(info),
+        Err(_) => None,
+    }
+}
+
+async fn workflow_inspect(wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>, id: &str) -> anyhow::Result<()> {
+    let info = workflow_info_or_none(wf_client, id).await;
+    anyhow::ensure!(info.is_some(), "unknown or invalid workflow {}", id);
+    let info = info.unwrap();
+    assert_eq!(id, info.status.workflow_id.to_string());
+    for fun in info.request.workflow_functions {
+        println!("* function {}", fun.name);
+        println!("{}", fun.function_class_specification.to_short_string());
+        for (out, next) in fun.output_mapping {
+            println!("OUT {} -> {}", out, next);
+        }
+        for (name, annotation) in fun.annotations {
+            println!("F_ANN {} -> {}", name, annotation);
+        }
+    }
+    for res in info.request.workflow_resources {
+        println!("* resource {}", res.name);
+        println!("{}", res.class_type);
+        for (out, next) in res.output_mapping {
+            println!("OUT {} -> {}", out, next);
+        }
+        for (name, annotation) in res.configurations {
+            println!("CONF {} -> {}", name, annotation);
+        }
+    }
+    println!("* mapping");
+    for (name, annotation) in info.request.annotations {
+        println!("W_ANN {} -> {}", name, annotation);
+    }
+    for mapping in info.status.domain_mapping {
+        println!("MAP {} -> {} [logical ID {}]", mapping.name, mapping.domain_id, mapping.function_id);
+    }
+    Ok(())
 }
 
 #[tokio::main]
@@ -169,73 +262,18 @@ async fn main() -> anyhow::Result<()> {
         None => log::debug!("Bye"),
         Some(x) => match x {
             Commands::Workflow { workflow_command } => {
-                if std::fs::metadata(&args.config_file).is_err() {
-                    return Err(anyhow::anyhow!(
-                        "configuration file does not exist or cannot be accessed: {}",
-                        &args.config_file
-                    ));
-                }
-                log::debug!("Got Config");
-                let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
-                let mut con_client = edgeless_api::grpc_impl::controller::ControllerAPIClient::new(&conf.controller_url).await;
-                let mut con_wf_client = con_client.workflow_instance_api();
+                let mut wf_client = wf_client(&args.config_file).await?;
                 match workflow_command {
                     WorkflowCommands::Start { spec_file } => {
                         log::debug!("Start Workflow");
-                        let workflow: workflow_spec::WorkflowSpec =
-                            serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
-                        let res = con_wf_client
-                            .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                                workflow_functions: workflow
-                                    .functions
-                                    .into_iter()
-                                    .map(|func_spec| {
-                                        let function_class_code = match func_spec.class_specification.function_type.as_str() {
-                                            "RUST_WASM" => std::fs::read(
-                                                std::path::Path::new(&spec_file)
-                                                    .parent()
-                                                    .unwrap()
-                                                    .join(func_spec.class_specification.code.unwrap()),
-                                            )
-                                            .unwrap(),
-                                            "CONTAINER" => func_spec.class_specification.code.unwrap().as_bytes().to_vec(),
-                                            "RUST_NATIVE" => std::fs::read(
-                                                std::path::Path::new(&spec_file)
-                                                    .parent()
-                                                    .unwrap()
-                                                    .join(func_spec.class_specification.code.unwrap()),
-                                            )
-                                            .unwrap(),
-                                            _ => panic!("unknown function class type: {}", func_spec.class_specification.function_type),
-                                        };
 
-                                        edgeless_api::workflow_instance::WorkflowFunction {
-                                            name: func_spec.name,
-                                            function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                                                function_class_id: func_spec.class_specification.id,
-                                                function_class_type: func_spec.class_specification.function_type,
-                                                function_class_version: func_spec.class_specification.version,
-                                                function_class_code,
-                                                function_class_outputs: func_spec.class_specification.outputs,
-                                            },
-                                            output_mapping: func_spec.output_mapping,
-                                            annotations: func_spec.annotations,
-                                        }
-                                    })
-                                    .collect(),
-                                workflow_resources: workflow
-                                    .resources
-                                    .into_iter()
-                                    .map(|res_spec| edgeless_api::workflow_instance::WorkflowResource {
-                                        name: res_spec.name,
-                                        class_type: res_spec.class_type,
-                                        output_mapping: res_spec.output_mapping,
-                                        configurations: res_spec.configurations,
-                                    })
-                                    .collect(),
-                                annotations: workflow.annotations.clone(),
-                            })
-                            .await;
+                        let workflow_spec: edgeless_cli::workflow_spec::WorkflowSpec =
+                            serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
+                        let parent_path = std::path::Path::new(&spec_file)
+                            .parent()
+                            .expect("cannot find the workflow spec's parent path");
+                        let workflow = edgeless_cli::workflow_spec_to_request(workflow_spec, parent_path)?;
+                        let res = wf_client.start(workflow).await;
                         match res {
                             Ok(response) => {
                                 match &response {
@@ -243,7 +281,7 @@ async fn main() -> anyhow::Result<()> {
                                         println!("{:?}", err);
                                     }
                                     SpawnWorkflowResponse::WorkflowInstance(val) => {
-                                        println!("{}", val.workflow_id.workflow_id.to_string());
+                                        println!("{}", val.workflow_id.workflow_id);
                                     }
                                 }
                                 log::info!("{:?}", response)
@@ -252,26 +290,29 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                     WorkflowCommands::Stop { id } => {
-                        let parsed_id = uuid::Uuid::parse_str(&id)?;
-                        match con_wf_client
-                            .stop(edgeless_api::workflow_instance::WorkflowId { workflow_id: parsed_id })
-                            .await
-                        {
-                            Ok(_) => println!("Workflow Stopped"),
-                            Err(err) => println!("{}", err),
+                        if id.to_lowercase() == "all" {
+                            for wf_id in wf_client.list().await? {
+                                workflow_stop(&mut wf_client, &wf_id.workflow_id.to_string()).await?
+                            }
+                        } else {
+                            workflow_stop(&mut wf_client, &id).await?
                         }
                     }
-                    WorkflowCommands::List {} => match con_wf_client.list(edgeless_api::workflow_instance::WorkflowId::none()).await {
-                        Ok(instances) => {
-                            for instance in instances.iter() {
-                                println!("workflow: {}", instance.workflow_id.to_string());
-                                for function in instance.domain_mapping.iter() {
-                                    println!("\t{:?}", function);
-                                }
-                            }
+                    WorkflowCommands::List {} => {
+                        for wf_id in wf_client.list().await? {
+                            println!("{}", wf_id);
                         }
-                        Err(err) => println!("{}", err),
-                    },
+                    }
+                    WorkflowCommands::Inspect { id } => {
+                        if id.to_lowercase() == "all" {
+                            for wf_id in wf_client.list().await? {
+                                println!("** workflow {}", wf_id);
+                                workflow_inspect(&mut wf_client, &wf_id.workflow_id.to_string()).await?
+                            }
+                        } else {
+                            workflow_inspect(&mut wf_client, &id).await?
+                        }
+                    }
                 }
             }
             Commands::Function { function_command } => match function_command {
@@ -283,71 +324,118 @@ async fn main() -> anyhow::Result<()> {
                     let function_spec: workflow_spec::WorkflowSpecFunctionClass = serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
                     let build_dir = std::env::temp_dir().join(format!("edgeless-{}-{}", function_spec.id, uuid::Uuid::new_v4()));
 
-                    let config = &cargo::util::config::Config::default()?;
-                    let mut ws = cargo::core::Workspace::new(&cargo_manifest, config)?;
+                    let context = GlobalContext::default().expect("Could not construct a global context for the workspace");
+                    let mut ws = cargo::core::Workspace::new(&cargo_manifest, &context)?;
                     ws.set_target_dir(cargo::util::Filesystem::new(build_dir.clone()));
 
-                    let pack = ws.current()?;
-
-                    let platform = Platform::from_string(architecture.as_str());
-
-                    let profile = BuildProfile::from_string(build_profile.as_str());
-
-                    println!("Building profile {} for architecture {} using {} target.", profile.name(), platform.name(), platform.target());
-
-                    let lib_name = match pack.library() {
-                        Some(val) => match platform {
-                            Platform::WASM => val.name().to_string(),
-                            _ => format!("lib{}", val.name()), 
-                        }
-                        None => {
-                            return Err(anyhow::anyhow!("Cargo package does not contain library."));
-                        }
+                    // check if function.json, Cargo.toml, Cargo.lock or src/
+                    // have been modified since the last time the function has
+                    // been built. If not - skip the build.
+                    let function_build_time = match fs::metadata(out_file.clone()) {
+                        Ok(metadata) => metadata.modified().ok(),
+                        Err(_) => None,
                     };
 
-                    let mut build_config = cargo::core::compiler::BuildConfig::new(
-                        config,
-                        None,
-                        false,
-                        //&vec!["wasm32-unknown-unknown".to_string()],
-                        &vec![platform.target()],
-                        cargo::core::compiler::CompileMode::Build,
-                    )?;
+                    // standard files - could be extended to look for more
+                    let triggering_files = ["Cargo.toml", "Cargo.lock", "function.json", "src/lib.rs"];
+                    let full_paths: Vec<std::path::PathBuf> = triggering_files.iter().map(|&f| cargo_project_path.join(f)).collect();
+                    let mod_timestamps: Vec<SystemTime> = full_paths
+                        .iter()
+                        .filter_map(|p| fs::metadata(p).ok())
+                        .filter_map(|m| m.modified().ok())
+                        .collect();
+                    let last_modification = mod_timestamps
+                        .iter()
+                        .max()
+                        .expect("Function to be build does not contain the required files.");
 
-                    match profile {
-                        BuildProfile::RELEASE => build_config.requested_profile = cargo::util::interning::InternedString::new("release"),
-                        _ => (),
-                    }
-
-                    let compile_options = cargo::ops::CompileOptions {
-                        build_config: build_config,
-                        cli_features: cargo::core::resolver::CliFeatures::new_all(false),
-                        spec: cargo::ops::Packages::Packages(Vec::new()),
-                        filter: cargo::ops::CompileFilter::Default {
-                            required_features_filterable: false,
-                        },
-                        target_rustdoc_args: None,
-                        target_rustc_args: None,
-                        target_rustc_crate_types: None,
-                        rustdoc_document_private_items: false,
-                        honor_rust_version: true,
+                    let should_rebuild = match function_build_time {
+                        Some(t) => t < *last_modification, // we don't use the vector anywhere else, deref is fine
+                        None => true,
                     };
 
-                    cargo::ops::compile(&ws, &compile_options)?;
+                    if !should_rebuild {
+                        log::info!("Skipping the function build, as no modifications to relevant files were detected.");
+                        return Ok(());
+                    } else {
+                        if function_build_time.is_some() {
+                            log::info!("Sources were modified - rebuilding the function.");
+                        } else {
+                            log::info!("Building the function for the first time.")
+                        }
+                        let pack = ws.current()?;
 
-                    let raw_result = build_dir
-                        .join(format!("{}/{}/{}.{}", platform.target(), profile.name(), lib_name, platform.suffix()))
-                        .to_str()
-                        .unwrap()
-                        .to_string();
-                    let out_file = cargo_project_path
-                        .join(format!("{}.{}", function_spec.id, platform.suffix()))
-                        .to_str()
-                        .unwrap()
-                        .to_string();
-                    println!("src {} dst {}", raw_result, out_file); 
-                    match platform {
-                        Platform::WASM => println!(
+                        let lib_name = match pack.library() {
+                            Some(val) => val.name(),
+                            None => {
+                                return Err(anyhow::anyhow!("Cargo package does not contain library."));
+                            }
+                        };
+
+
+                        let pack = ws.current()?;
+
+                        let platform = Platform::from_string(architecture.as_str());
+
+                        let profile = BuildProfile::from_string(build_profile.as_str());
+
+                        println!("Building profile {} for architecture {} using {} target.", profile.name(), platform.name(), platform.target());
+
+                        let lib_name = match pack.library() {
+                            Some(val) => match platform {
+                                Platform::WASM => val.name().to_string(),
+                                _ => format!("lib{}", val.name()), 
+                            }
+                            None => {
+                                return Err(anyhow::anyhow!("Cargo package does not contain library."));
+                            }
+                        };
+
+                        let mut build_config = cargo::core::compiler::BuildConfig::new(
+                            &context,
+                            None,
+                            false,
+                            //&vec!["wasm32-unknown-unknown".to_string()],
+                            &vec![platform.target()],
+                            cargo::core::compiler::CompileMode::Build,
+                        )?;
+
+                        match profile {
+                            BuildProfile::RELEASE => build_config.requested_profile = cargo::util::interning::InternedString::new("release"),
+                            _ => (),
+                        }
+
+                        let compile_options = cargo::ops::CompileOptions {
+                            build_config: build_config,
+                            cli_features: cargo::core::resolver::CliFeatures::new_all(false),
+                            spec: cargo::ops::Packages::Packages(Vec::new()),
+                            filter: cargo::ops::CompileFilter::Default {
+                                required_features_filterable: false,
+                            },
+                            target_rustdoc_args: None,
+                            target_rustc_args: None,
+                            target_rustc_crate_types: None,
+                            rustdoc_document_private_items: false,
+                            honor_rust_version: Some(true),
+                        };
+
+                        cargo::ops::compile(&ws, &compile_options)?;
+
+                        let raw_result = build_dir
+                            .join(format!("{}/{}/{}.{}", platform.target(), profile.name(), lib_name, platform.suffix()))
+                            .to_str()
+                            .unwrap()
+                            .to_string();
+               
+                        let out_file = cargo_project_path
+                            .join(format!("{}.{}", function_spec.id, platform.suffix()))
+                            .to_str()
+                            .unwrap()
+                            .to_string();
+                        println!("src {} dst {}", raw_result, out_file); 
+
+                        match platform {
+                            Platform::WASM => println!(
                             "{:?}",
                             std::process::Command::new("wasm-opt")
                                 .args(["-Oz", &raw_result, "-o", &out_file])
@@ -355,7 +443,7 @@ async fn main() -> anyhow::Result<()> {
                         ),
                         _ => println!(
                             "{:?}",
-                            fs::copy(&raw_result, out_file)?
+                            std::fs::copy(&raw_result, out_file)?
                         ),
                     }
                 }
@@ -379,6 +467,7 @@ async fn main() -> anyhow::Result<()> {
                             "cast" => edgeless_api::invocation::EventData::Cast(payload),
                             _ => return Err(anyhow::anyhow!("invalid event type: {}", event_type)),
                         },
+                        created: edgeless_api::function_instance::EventTimestamp::default(),
                     };
                     match edgeless_api::invocation::InvocationAPI::handle(&mut client, event).await {
                         Ok(_) => println!("event casted"),
@@ -395,12 +484,16 @@ async fn main() -> anyhow::Result<()> {
                     }
                     log::debug!("Got Config");
                     let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
+                    let function_repository_conf = match conf.function_repository {
+                        Some(conf) => conf,
+                        None => anyhow::bail!("function repository configuration section missing"),
+                    };
 
                     let client = Client::new();
                     let response = client
-                        .get(conf.repository_url.to_string() + "/api/admin/function/" + function_name.as_str())
+                        .get(function_repository_conf.url.to_string() + "/api/admin/function/" + function_name.as_str())
                         .header(ACCEPT, "application/json")
-                        .basic_auth(conf.repository_basic_auth_user, Some(conf.repository_basic_auth_pass))
+                        .basic_auth(function_repository_conf.basic_auth_user, Some(function_repository_conf.basic_auth_pass))
                         .send()
                         .await
                         .expect("failed to get response")
@@ -420,12 +513,16 @@ async fn main() -> anyhow::Result<()> {
                     }
                     log::debug!("Got Config");
                     let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
+                    let function_repository_conf = match conf.function_repository {
+                        Some(conf) => conf,
+                        None => anyhow::bail!("function repository configuration section missing"),
+                    };
 
                     let client = Client::new();
                     let response = client
-                        .get(conf.repository_url.to_string() + "/api/admin/function/download/" + code_file_id.as_str())
+                        .get(function_repository_conf.url.to_string() + "/api/admin/function/download/" + code_file_id.as_str())
                         .header(ACCEPT, "*/*")
-                        .basic_auth(conf.repository_basic_auth_user, Some(conf.repository_basic_auth_pass))
+                        .basic_auth(function_repository_conf.basic_auth_user, Some(function_repository_conf.basic_auth_pass))
                         .send()
                         .await
                         .expect("failed to get header");
@@ -459,6 +556,10 @@ async fn main() -> anyhow::Result<()> {
                     }
                     log::debug!("Got Config");
                     let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(&args.config_file).unwrap()).unwrap();
+                    let function_repository_conf = match conf.function_repository {
+                        Some(conf) => conf,
+                        None => anyhow::bail!("function repository configuration section missing"),
+                    };
 
                     let client = Client::new();
                     let file = File::open(&binary_name).await?;
@@ -475,9 +576,12 @@ async fn main() -> anyhow::Result<()> {
                     let form = multipart::Form::new().part("file", some_file); // this is in curl -F "file"
 
                     let response = client
-                        .post(conf.repository_url.to_string() + "/api/admin/function/upload")
+                        .post(function_repository_conf.url.to_string() + "/api/admin/function/upload")
                         .header(ACCEPT, "application/json")
-                        .basic_auth(conf.repository_basic_auth_user, Some(conf.repository_basic_auth_pass))
+                        .basic_auth(
+                            function_repository_conf.basic_auth_user.clone(),
+                            Some(function_repository_conf.basic_auth_pass.clone()),
+                        )
                         .multipart(form)
                         .send()
                         .await
@@ -498,19 +602,10 @@ async fn main() -> anyhow::Result<()> {
                                    ],
                     });
 
-                    if std::fs::metadata(&args.config_file).is_err() {
-                        return Err(anyhow::anyhow!(
-                            "configuration file does not exist or cannot be accessed: {}",
-                            &args.config_file
-                        ));
-                    }
-                    log::debug!("Got Config");
-                    let conf_new: CLiConfig = toml::from_str(&std::fs::read_to_string(&args.config_file).unwrap()).unwrap();
-
                     let post_response = client
-                        .post(conf_new.repository_url.to_string() + "/api/admin/function")
+                        .post(function_repository_conf.url.to_string() + "/api/admin/function")
                         .header(ACCEPT, "application/json")
-                        .basic_auth(conf_new.repository_basic_auth_user, Some(conf_new.repository_basic_auth_pass))
+                        .basic_auth(function_repository_conf.basic_auth_user, Some(function_repository_conf.basic_auth_pass))
                         .json(&r)
                         .send()
                         .await
@@ -521,6 +616,30 @@ async fn main() -> anyhow::Result<()> {
                     println!("post_response body: {:?}", post_response);
                 }
             },
+            Commands::Domain { domain_command } => {
+                let mut wf_client = wf_client(&args.config_file).await?;
+                match domain_command {
+                    DomainCommands::List {} => {
+                        for (domain_id, caps) in wf_client.domains(String::from("")).await? {
+                            println!("domain {} ({} nodes)", domain_id, caps.num_nodes);
+                        }
+                    }
+                    DomainCommands::Inspect { id } => {
+                        if id.to_lowercase() == "all" {
+                            let domains = wf_client.domains(Default::default()).await?;
+                            for (domain, caps) in domains {
+                                println!("domain {},{}", domain, caps);
+                            }
+                        } else {
+                            let domains = wf_client.domains(id.clone()).await?;
+                            match domains.get(&id) {
+                                None => println!("domain {} not found", id),
+                                Some(caps) => println!("domain {},{}", id, caps),
+                            }
+                        }
+                    }
+                }
+            }
         },
     }
     Ok(())

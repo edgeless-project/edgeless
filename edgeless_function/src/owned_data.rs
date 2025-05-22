@@ -1,4 +1,5 @@
 // SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
 pub struct OwnedByteBuff {
@@ -41,6 +42,9 @@ impl OwnedByteBuff {
         }
     }
 
+    /// # Safety
+    ///
+    /// We are nice people. Nice people do not add bugs to unsafe Rust code.
     pub unsafe fn consume(self) -> (*mut u8, usize) {
         let res = (self.data, self.size);
         core::mem::forget(self);

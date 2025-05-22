@@ -1,4 +1,5 @@
-// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Technical University of Munich, Chair of Connected Mobility
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
 use core::str::FromStr;
@@ -23,7 +24,7 @@ pub struct ResourceProviderSpecification<'a> {
 }
 
 impl<C> minicbor::Encode<C> for NodeId {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
         let n_id = *self.0.as_bytes();
         e.bytes(&n_id)?;
         Ok(())
@@ -31,7 +32,7 @@ impl<C> minicbor::Encode<C> for NodeId {
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for NodeId {
-    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let n_id: [u8; 16] = (*d.bytes()?).try_into().unwrap();
         Ok(NodeId(uuid::Uuid::from_bytes(n_id)))
     }
@@ -45,7 +46,7 @@ impl<C> minicbor::CborLen<C> for NodeId {
 }
 
 impl<C> minicbor::Encode<C> for EncodedNodeRegistration<'_> {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
         let mut e = e;
         e = e.encode(self.node_id.clone())?;
         e = e.encode(self.agent_url.as_str())?;
@@ -63,24 +64,22 @@ impl<C> minicbor::Encode<C> for EncodedNodeRegistration<'_> {
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for EncodedNodeRegistration<'b> {
-    fn decode(d: &mut minicbor::Decoder<'b>, ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+    fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
         let id: NodeId = d.decode()?;
         let agent_url: &str = d.str()?;
         let invocation_url: &str = d.str()?;
 
         let mut resources: heapless::Vec<ResourceProviderSpecification, 16> = heapless::Vec::new();
 
-        for item in d.array_iter::<ResourceProviderSpecification<'b>>().unwrap() {
-            if let Ok(item) = item {
-                resources.push(item);
-            }
+        for item in d.array_iter::<ResourceProviderSpecification<'b>>().unwrap().flatten() {
+            let _ = resources.push(item);
         }
 
         Ok(EncodedNodeRegistration {
             node_id: id,
-            agent_url: heapless::String::from_str(&agent_url).unwrap(),
-            invocation_url: heapless::String::from_str(&invocation_url).unwrap(),
-            resources: resources,
+            agent_url: heapless::String::from_str(agent_url).unwrap(),
+            invocation_url: heapless::String::from_str(invocation_url).unwrap(),
+            resources,
         })
     }
 }
@@ -92,7 +91,7 @@ impl<C> minicbor::CborLen<C> for EncodedNodeRegistration<'_> {
         let mut resources: heapless::Vec<ResourceProviderSpecification, 16> = heapless::Vec::new();
 
         for item in &self.resources {
-            resources.push(item.clone());
+            let _ = resources.push(item.clone());
         }
 
         len + resources[..resources.len()].cbor_len(ctx)
@@ -100,7 +99,7 @@ impl<C> minicbor::CborLen<C> for EncodedNodeRegistration<'_> {
 }
 
 impl<C> minicbor::Encode<C> for ResourceProviderSpecification<'_> {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
         let mut e = e;
         e = e.encode(self.provider_id)?;
         e = e.encode(self.class_type)?;
@@ -122,16 +121,14 @@ impl<'b, C> minicbor::Decode<'b, C> for ResourceProviderSpecification<'b> {
         let class_type: &str = d.decode()?;
 
         let mut outputs = heapless::Vec::new();
-        for item in d.array_iter::<&str>().unwrap() {
-            if let Ok(item) = item {
-                outputs.push(item).unwrap();
-            }
+        for item in d.array_iter::<&str>().unwrap().flatten() {
+            outputs.push(item).unwrap();
         }
 
         Ok(ResourceProviderSpecification {
-            provider_id: &provider_id,
-            class_type: &class_type,
-            outputs: outputs,
+            provider_id,
+            class_type,
+            outputs,
         })
     }
 }

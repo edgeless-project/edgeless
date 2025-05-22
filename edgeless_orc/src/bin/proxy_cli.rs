@@ -1,9 +1,8 @@
-// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
-// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+// SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
 use itertools::Itertools;
-use std::str::FromStr;
+use std::{io::Write, str::FromStr};
 
 use clap::Parser;
 use edgeless_orc::proxy::Proxy;
@@ -20,8 +19,14 @@ struct Args {
 }
 
 #[derive(Debug, clap::Subcommand)]
+enum DumpCommands {
+    Performance {},
+}
+
+#[derive(Debug, clap::Subcommand)]
 enum NodeCommands {
     Capabilities {},
+    ResourceProviders {},
     Health {},
     Instances {},
 }
@@ -30,6 +35,8 @@ enum NodeCommands {
 enum ShowCommands {
     Functions {},
     Resources {},
+    LogicalToPhysical {},
+    LogicalToWorkflow {},
     Node {
         #[command(subcommand)]
         node_command: NodeCommands,
@@ -51,6 +58,10 @@ enum Commands {
         #[command(subcommand)]
         intent_command: IntentCommands,
     },
+    Dump {
+        #[command(subcommand)]
+        dump_command: DumpCommands,
+    },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -60,7 +71,7 @@ fn main() -> anyhow::Result<()> {
 
     anyhow::ensure!(args.proxy_type.to_lowercase() == "redis", "unknown proxy type: {}", args.proxy_type);
 
-    let mut proxy = match edgeless_orc::proxy_redis::ProxyRedis::new(&args.redis_url, false) {
+    let mut proxy = match edgeless_orc::proxy_redis::ProxyRedis::new(&args.redis_url, false, None) {
         Ok(proxy) => proxy,
         Err(err) => anyhow::bail!("could not connect to a Redis at {}: {}", args.redis_url, err),
     };
@@ -81,10 +92,29 @@ fn main() -> anyhow::Result<()> {
                     println!("{} -> {}", resource, node);
                 }
             }
+            ShowCommands::LogicalToPhysical {} => {
+                for (logical, physical) in proxy.fetch_instances_to_physical_ids().iter().sorted_by_key(|x| x.0.to_string()) {
+                    println!(
+                        "{} -> {}",
+                        logical,
+                        physical.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                    );
+                }
+            }
+            ShowCommands::LogicalToWorkflow {} => {
+                for (logical, workflow_id) in proxy.fetch_logical_id_to_workflow_id().iter().sorted_by_key(|x| x.0.to_string()) {
+                    println!("{} -> {}", logical, workflow_id);
+                }
+            }
             ShowCommands::Node { node_command } => match node_command {
                 NodeCommands::Capabilities {} => {
                     for (node, capabilities) in proxy.fetch_node_capabilities().iter().sorted_by_key(|x| x.0.to_string()) {
                         println!("{} -> {}", node, capabilities);
+                    }
+                }
+                NodeCommands::ResourceProviders {} => {
+                    for (provider_id, resource_providers) in proxy.fetch_resource_providers().iter().sorted_by_key(|x| x.0.to_string()) {
+                        println!("{} -> {}", provider_id, resource_providers);
                     }
                 }
                 NodeCommands::Health {} => {
@@ -115,7 +145,28 @@ fn main() -> anyhow::Result<()> {
                     Ok(node_id) => node_id,
                     Err(err) => anyhow::bail!("invalid instance id {}: {}", node, err),
                 };
-                proxy.add_deploy_intents(vec![edgeless_orc::orchestrator::DeployIntent::Migrate(instance_id, vec![node_id])]);
+                proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Migrate(instance_id, vec![node_id])]);
+            }
+        },
+        Commands::Dump { dump_command } => match dump_command {
+            DumpCommands::Performance {} => {
+                for (metric, inner_map) in proxy.fetch_performance_samples() {
+                    for (id, values) in inner_map {
+                        let filename = format!("{}-{}.dat", metric, id);
+                        println!("saving to {}", filename);
+                        let mut outfile = std::fs::OpenOptions::new()
+                            .write(true)
+                            .append(false)
+                            .create(true)
+                            .truncate(true)
+                            .open(filename.clone())?;
+                        for value in values {
+                            outfile
+                                .write_all(format!("{},{}\n", value.0, value.1).as_bytes())
+                                .unwrap_or_else(|_| panic!("could not write to file '{}'", filename));
+                        }
+                    }
+                }
             }
         },
     }
