@@ -100,7 +100,6 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
         linker
             .define("env", "sync_asm", wasmi::Func::wrap(&mut store, guest_api_binding::sync))
             .map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
-        // TODO: add the get_current_time api to wasmi too
 
         let instance = linker
             .instantiate(&mut store, &module)

@@ -3,7 +3,7 @@
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use super::common::GRPC_RETRIES;
+use super::common::GRPC_SERVICE_RETRIES;
 use std::str::FromStr;
 
 #[derive(Clone)]
@@ -31,7 +31,7 @@ impl NodeRegistrationClient {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
                     // add service level retry policy
-                    let retry_policy = super::common::Attempts(GRPC_RETRIES);
+                    let retry_policy = super::common::Attempts(GRPC_SERVICE_RETRIES);
                     let retrying_client = tower::retry::Retry::new(retry_policy, client);
                     Some(retrying_client.get_ref().clone())
                 }

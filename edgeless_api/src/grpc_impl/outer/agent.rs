@@ -61,7 +61,7 @@ impl AgentAPIServer {
 
                     match tonic::transport::Server::builder()
                         .layer(tower::timeout::TimeoutLayer::new(std::time::Duration::from_millis(
-                            crate::grpc_impl::common::GRPC_TIMEOUT,
+                            crate::grpc_impl::common::GRPC_SERVICE_TIMEOUT,
                         )))
                         .add_service(
                             crate::grpc_impl::api::function_instance_server::FunctionInstanceServer::new(function_api)
