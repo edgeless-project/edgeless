@@ -300,11 +300,10 @@ impl DataplaneHandle {
         for link in &mut lck.iter_mut() {
             match link.handle_cast(&target, msg.clone(), &self.handle_owner, &created, channel_id).await {
                 LinkProcessingResult::FINAL => {
-                    log::info!("{:?}: event final", msg);
                     return;
                 }
                 LinkProcessingResult::IGNORED => {
-                    log::warn!("{:?}: event ignored", msg);
+                    log::debug!("{:?}: event ignored", msg);
                 }
                 LinkProcessingResult::ERROR(e) => {
                     log::error!("{:?}: error while handling an outgoing event: {}", msg, e)
@@ -313,7 +312,8 @@ impl DataplaneHandle {
         }
         // TODO: at least one link must send a final, otherwise the dataplane
         // event was not delivered successfully. If that's the case, immediately
-        // deliver on the receiver and close it.
+        // deliver on the receiver and close it. needs to be finally decided and
+        // implemented in a consistent manner
     }
 }
 

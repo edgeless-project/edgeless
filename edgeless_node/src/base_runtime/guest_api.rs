@@ -68,13 +68,11 @@ impl GuestAPIHost {
     }
 
     pub async fn call_alias(&mut self, alias: &str, msg: &str) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
-        log::info!("call_alias");
         if alias == "self" {
             self.call_raw(self.instance_id, msg).await
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
             tokio::select! {
                 res = self.call_raw(target, msg) => {
-                    // log::info!("call_alias: call okay {:?}", res);
                     return res
                 },
                 _ = tokio::time::sleep(Duration::from_millis(DATAPLANE_TIMEOUT)) => {
