@@ -107,7 +107,6 @@ Currently there are several known limitations, including the following ones:
   the same domain.
 - No workflow-level annotations are supported.
 - The payload of events is not encrypted.
-- There is no persistence of the soft states of the various components.
 - There currently are no guarantees on stability and API stability.
 
 The full list of issues is tracked on
