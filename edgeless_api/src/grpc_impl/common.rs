@@ -6,6 +6,10 @@ use futures::future::{self, Ready};
 use tonic::{Request, Response, Status};
 use tower::retry::Policy;
 
+// timeout in miliseconds for all grpc request
+pub static GRPC_SERVICE_TIMEOUT: u64 = 2000;
+pub static GRPC_SERVICE_RETRIES: usize = 3;
+
 #[derive(Clone)]
 pub struct Attempts(pub usize);
 
@@ -14,6 +18,10 @@ type GrpcResponse<T> = Response<T>;
 type GrpcError = Status;
 
 // TODO: add exponential backoff using the tower::retry::backoff module
+// NOTE: this handles the case where the request has already arrived at the
+// service side, but since the server is busy it has failed the first time. The
+// client side retries are realized through another mechanism, see invocation.rs
+// for an example.
 impl<Req, Res> Policy<GrpcRequest<Req>, GrpcResponse<Res>, GrpcError> for Attempts
 where
     Req: Clone,
@@ -41,10 +49,6 @@ where
         Some(GrpcRequest::new(req.get_ref().clone()))
     }
 }
-
-// timeout in miliseconds for all grpc request
-pub static GRPC_TIMEOUT: u64 = 200;
-pub static GRPC_RETRIES: usize = 3;
 
 pub struct CommonConverters {}
 

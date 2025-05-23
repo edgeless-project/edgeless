@@ -39,7 +39,7 @@ impl NodeRegisterAPIServer {
                     log::info!("Start NodeRegisterAPIServer GRPC Server at {}", node_register_url);
                     match tonic::transport::Server::builder()
                         .layer(tower::timeout::TimeoutLayer::new(Duration::from_millis(
-                            crate::grpc_impl::common::GRPC_TIMEOUT,
+                            crate::grpc_impl::common::GRPC_SERVICE_TIMEOUT,
                         )))
                         .add_service(
                             crate::grpc_impl::api::node_registration_server::NodeRegistrationServer::new(node_registration_api)

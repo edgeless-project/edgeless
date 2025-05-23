@@ -30,7 +30,7 @@ impl NodeManagementClient {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
                     // add service level retry policy
-                    let retry_policy = super::common::Attempts(super::common::GRPC_RETRIES);
+                    let retry_policy = super::common::Attempts(super::common::GRPC_SERVICE_RETRIES);
                     let retrying_client = tower::retry::Retry::new(retry_policy, client);
                     Some(retrying_client.get_ref().clone())
                 }

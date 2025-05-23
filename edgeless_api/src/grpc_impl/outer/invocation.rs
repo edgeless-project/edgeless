@@ -5,7 +5,6 @@
 use super::super::common::CommonConverters;
 use crate::invocation::LinkProcessingResult;
 use std::time::Duration;
-use tokio::time::timeout;
 
 struct InvocationConverters {}
 
@@ -13,6 +12,13 @@ const TYPE_CALL: i32 = crate::grpc_impl::api::EventType::Call as i32;
 const TYPE_CAST: i32 = crate::grpc_impl::api::EventType::Cast as i32;
 const TYPE_CALL_RET: i32 = crate::grpc_impl::api::EventType::CallRet as i32;
 const TYPE_CALL_NO_RET: i32 = crate::grpc_impl::api::EventType::CallNoRet as i32;
+
+const RECONNECT_TRIES: i32 = 5;
+const RECONNECT_TIMEOUT: u64 = 500;
+// time after which we consider the connection to invocation grpc server broken
+// and start the reconnection attempts
+const INVOCATION_TIMEOUT: u64 = 500;
+const INVOCATION_TCP_KEEPALIVE: u64 = 2000;
 
 impl InvocationConverters {
     fn parse_api_event(api_event: &crate::grpc_impl::api::Event) -> anyhow::Result<crate::invocation::Event> {
@@ -78,6 +84,7 @@ impl InvocationConverters {
 
 pub struct InvocationAPIClient {
     client: crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient<tonic::transport::Channel>,
+    server_addr: String,
 }
 
 impl InvocationAPIClient {
@@ -86,22 +93,58 @@ impl InvocationAPIClient {
             match crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    return Self { client };
+                    return Self {
+                        client,
+                        server_addr: server_addr.to_string(),
+                    };
+                    // TODO: is the server side retry policy really needed?
+                    // let retry_policy = super::common::Attempts(super::common::GRPC_RETRIES);
+                    // let retrying_client = tower::retry::Retry::new(retry_policy, client);
+                    // return Self {
+                    //     client: retrying_client.get_ref().clone(),
+                    // };
                 }
                 Err(e) => {
-                    log::debug!("Waiting for InvocationAPI");
+                    log::warn!("Waiting for InvocationAPI to connect: {e}");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 }
             }
+        }
+    }
+
+    async fn reconnect(&mut self) -> Result<(), anyhow::Error> {
+        let mut retries = RECONNECT_TRIES;
+        loop {
+            if retries == 0 {
+                log::error!("could not reconnect in reasonable time");
+                anyhow::bail!("could not reconnect in reasonable time");
+            }
+            match crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient::connect(self.server_addr.clone()).await {
+                Ok(client) => {
+                    self.client = client.max_decoding_message_size(usize::MAX);
+                    return Ok(());
+                }
+                Err(e) => {
+                    log::warn!("Waiting for InvocationAPI to reconnect: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_millis(RECONNECT_TIMEOUT)).await;
+                }
+            }
+            retries -= 1;
         }
     }
 }
 
 #[async_trait::async_trait]
 impl crate::invocation::InvocationAPI for InvocationAPIClient {
+    // NOTE: LinkProcessingResult is decided by the client, based on the fact if
+    // the request was successfull (a successfull request returns an empty
+    // response). In the current implementation, we assume that a request has
+    // been final if it has been sent to a remote client and a response was
+    // received (not like the original idea was).
+    // NOTE: this needs to be reevaluated for any real world deployments
     async fn handle(&mut self, event: crate::invocation::Event) -> LinkProcessingResult {
-        // NOTE: for now not used, technically the most non-blocking version.
-        // // Option 1.
+        // // Option 1. true non-blocking, as it returns immediately - in spirit
+        // of edgeless fire and forget
         // let serialized_event = InvocationConverters::encode_crate_event(&event);
         // // add a timeout, as this could hang the dataplane indefinitely
         // let mut client = self.client.clone();
@@ -112,15 +155,26 @@ impl crate::invocation::InvocationAPI for InvocationAPIClient {
         // // return immediately
         // return LinkProcessingResult::FINAL;
 
-        // Option 2.
-        let serialized_event = InvocationConverters::encode_crate_event(&event);
-        let res = timeout(Duration::from_millis(500), self.client.handle(tonic::Request::new(serialized_event))).await;
-        match res {
-            Ok(internal) => match internal {
-                Ok(_) => LinkProcessingResult::FINAL,
-                Err(e) => LinkProcessingResult::ERROR(e.to_string()),
-            },
-            Err(elapsed) => LinkProcessingResult::ERROR(elapsed.to_string()),
+        // Option 2. try until successfull
+        loop {
+            let serialized_event = InvocationConverters::encode_crate_event(&event);
+            let res = tokio::time::timeout(
+                Duration::from_millis(INVOCATION_TIMEOUT),
+                self.client.handle(tonic::Request::new(serialized_event)),
+            )
+            .await;
+            if let Ok(_) = res {
+                return LinkProcessingResult::FINAL;
+            } else if let Err(elapsed) = res {
+                let res = self.reconnect().await;
+                if let Ok(_) = res {
+                    log::info!("reconnected successfully, retrying the request");
+                    continue;
+                } else {
+                    log::warn!("reconnect did not work");
+                    return LinkProcessingResult::ERROR(elapsed.to_string());
+                }
+            }
         }
     }
 }
@@ -163,11 +217,17 @@ impl InvocationAPIServer {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start InvocationAPI GRPC Server at {}", invocation_url);
                     match tonic::transport::Server::builder()
-                        .http2_keepalive_timeout(Some(std::time::Duration::from_millis(200)))
-                        .http2_keepalive_interval(Some(std::time::Duration::from_millis(100)))
-                        .tcp_keepalive(Some(Duration::from_millis(100)))
+                        // TODO: left for future reference
+                        // for reusing the same tcp connection for many http requests
+                        // .http2_keepalive_interval(Some(std::time::Duration::from_millis(500)))
+                        // .http2_keepalive_timeout(Some(std::time::Duration::from_millis(200)))
+                        // can help in identifying and closing half-open
+                        // connections faster
+                        .tcp_keepalive(Some(Duration::from_millis(INVOCATION_TCP_KEEPALIVE)))
+                        // if the handling of request takes too long on the
+                        // server side, drop this request
                         .layer(tower::timeout::TimeoutLayer::new(std::time::Duration::from_millis(
-                            crate::grpc_impl::common::GRPC_TIMEOUT,
+                            crate::grpc_impl::common::GRPC_SERVICE_TIMEOUT,
                         )))
                         .add_service(
                             crate::grpc_impl::api::function_invocation_server::FunctionInvocationServer::new(function_api)

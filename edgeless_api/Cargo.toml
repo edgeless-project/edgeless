@@ -51,7 +51,7 @@ serde = { version = "1", features = ["derive"] }
 minicbor = { version = "0.19", default-features = false, features = ["derive"] }
 heapless = { version = "0.8" }
 get_if_addrs = "0.5.3"
-tower = { version = "0.5.2", features = ["retry"] }
+tower = { version = "0.5.2", features = ["full"] }
 
 [build-dependencies]
 tonic-build = { version = "0.13.1", optional = true, features = ["prost"] }

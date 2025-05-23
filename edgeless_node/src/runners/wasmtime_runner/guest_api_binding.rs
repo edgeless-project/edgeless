@@ -3,6 +3,8 @@
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 
+use std::time::UNIX_EPOCH;
+
 use wasmtime::AsContextMut;
 
 /// Binds the WASM component's imports to the function's GuestAPIHost. Functions
@@ -219,9 +221,9 @@ pub async fn sync(mut caller: wasmtime::Caller<'_, GuestAPI>, state_ptr: i32, st
     Ok(())
 }
 
-pub async fn get_current_time(mut caller: wasmtime::Caller<'_, GuestAPI>) -> wasmtime::Result<(u64)> {
-    let now = std::time::Instant::now();
-    let timestamp = now.elapsed().as_nanos() as u64;
+pub async fn get_current_time(mut _caller: wasmtime::Caller<'_, GuestAPI>) -> wasmtime::Result<(u64)> {
+    let now = std::time::SystemTime::now();
+    let timestamp = now.duration_since(std::time::UNIX_EPOCH).expect("time went backwards").as_nanos() as u64;
     Ok(timestamp)
 }
 
