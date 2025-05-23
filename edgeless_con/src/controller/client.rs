@@ -87,4 +87,18 @@ impl edgeless_api::workflow_instance::WorkflowInstanceAPI for ControllerWorkflow
             Err(err) => Err(anyhow::anyhow!("Controller Channel Error: {}", err)),
         }
     }
+    async fn migrate(
+        &mut self,
+        request: edgeless_api::workflow_instance::MigrateWorkflowRequest,
+    ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse> {
+        let (reply_sender, reply_receiver) =
+            tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>();
+        if let Err(err) = self.sender.send(super::ControllerRequest::Migrate(request.clone(), reply_sender)).await {
+            anyhow::bail!("Controller Channel Error: {}", err);
+        }
+        match reply_receiver.await {
+            Ok(ret) => ret,
+            Err(err) => Err(anyhow::anyhow!("Controller Channel Error: {}", err)),
+        }
+    }
 }

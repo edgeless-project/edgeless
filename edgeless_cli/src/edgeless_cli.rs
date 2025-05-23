@@ -22,6 +22,7 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 enum WorkflowCommands {
     Start { spec_file: String },
     Stop { id: String },
+    Migrate { id: String, domain: String },
     List {},
     Inspect { id: String },
 }
@@ -227,6 +228,24 @@ async fn main() -> anyhow::Result<()> {
                             }
                         } else {
                             workflow_stop(&mut wf_client, &id).await?
+                        }
+                    }
+                    WorkflowCommands::Migrate { id, domain } => {
+                        match wf_client
+                            .migrate(edgeless_api::workflow_instance::MigrateWorkflowRequest {
+                                workflow_id: edgeless_api::workflow_instance::WorkflowId::new(&id)?,
+                                domain_id: domain.clone(),
+                            })
+                            .await?
+                        {
+                            SpawnWorkflowResponse::ResponseError(response_error) => println!(
+                                "migration of {} to {} failed: {} ({})",
+                                id,
+                                domain,
+                                response_error.summary,
+                                response_error.detail.unwrap_or_default()
+                            ),
+                            SpawnWorkflowResponse::WorkflowInstance(_workflow_instance) => println!("migration of {} to {} successful", id, domain),
                         }
                     }
                     WorkflowCommands::List {} => {

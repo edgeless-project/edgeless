@@ -28,6 +28,7 @@ New features:
   instances that connect to an OpenFaaS-compatible function via an URL
   specified in the node's configuration. The resource has two output channels:
   "out" for the result of the function and "err" for functon execution errors.
+- Add ε-CON support to workflow migration to a target domain.
 
 Improvements:
 
@@ -62,6 +63,7 @@ API changes:
 - Updated the content of the Event message in FunctionInvocation to include
   a timestamp of when the event was created.
 - Add active_power to node health status
+- Add WorkflowInstance::Migrate method, with associated messages.
 
 ## [1.0.0] - 2024-11-12
 

@@ -132,6 +132,19 @@ impl WorkflowInstanceConverters {
         Ok(ret)
     }
 
+    pub fn parse_migrate_workflow_request(
+        api_workflow: &crate::grpc_impl::api::MigrateWorkflowRequest,
+    ) -> anyhow::Result<crate::workflow_instance::MigrateWorkflowRequest> {
+        if let (Some(workflow_id), Some(domain_id)) = (&api_workflow.workflow_id, &api_workflow.domain_id) {
+            Ok(crate::workflow_instance::MigrateWorkflowRequest {
+                workflow_id: Self::parse_workflow_id(workflow_id)?,
+                domain_id: domain_id.domain_id.clone(),
+            })
+        } else {
+            anyhow::bail!("missing workflow_id or domain_id in MigrateWorkflowRequest");
+        }
+    }
+
     pub fn serialize_workflow_id(crate_id: &crate::workflow_instance::WorkflowId) -> crate::grpc_impl::api::WorkflowId {
         crate::grpc_impl::api::WorkflowId {
             workflow_id: crate_id.workflow_id.to_string(),
@@ -217,6 +230,17 @@ impl WorkflowInstanceConverters {
             name: crate_mapping.name.to_string(),
             function_id: crate_mapping.function_id.to_string(),
             domain_id: crate_mapping.domain_id.to_string(),
+        }
+    }
+
+    pub fn serialize_migrate_workflow_request(
+        crate_mapping: &crate::workflow_instance::MigrateWorkflowRequest,
+    ) -> crate::grpc_impl::api::MigrateWorkflowRequest {
+        crate::grpc_impl::api::MigrateWorkflowRequest {
+            workflow_id: Some(Self::serialize_workflow_id(&crate_mapping.workflow_id)),
+            domain_id: Some(crate::grpc_impl::api::DomainId {
+                domain_id: crate_mapping.domain_id.clone(),
+            }),
         }
     }
 }
@@ -324,6 +348,21 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             Err(err) => Err(anyhow::anyhow!("Communication error while listing workflows: {}", err.to_string())),
         }
     }
+    async fn migrate(
+        &mut self,
+        request: crate::workflow_instance::MigrateWorkflowRequest,
+    ) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowResponse> {
+        let ret = self
+            .client
+            .migrate(tonic::Request::new(
+                crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_migrate_workflow_request(&request),
+            ))
+            .await;
+        match ret {
+            Ok(ret) => return crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_workflow_spawn_response(&ret.into_inner()),
+            Err(err) => Err(anyhow::anyhow!("Communication error while migrating a workflow: {}", err.to_string())),
+        }
+    }
 }
 
 pub struct WorkflowInstanceAPIServer {
@@ -415,6 +454,29 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
                 "Internal error when listing domain capabilities: {}",
                 err
             ))),
+        }
+    }
+
+    async fn migrate(
+        &self,
+        request: tonic::Request<crate::grpc_impl::api::MigrateWorkflowRequest>,
+    ) -> Result<tonic::Response<crate::grpc_impl::api::SpawnWorkflowResponse>, tonic::Status> {
+        let request = match crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::parse_migrate_workflow_request(&request.into_inner()) {
+            Ok(val) => val,
+            Err(err) => return Err(tonic::Status::internal(format!("Internal error when migrating a workflow: {}", err))),
+        };
+        let ret = self.root_api.lock().await.migrate(request).await;
+        match ret {
+            Ok(response) => Ok(tonic::Response::new(
+                crate::grpc_impl::workflow_instance::WorkflowInstanceConverters::serialize_workflow_spawn_response(&response),
+            )),
+            Err(err) => Ok(tonic::Response::new(crate::grpc_impl::api::SpawnWorkflowResponse {
+                response_error: Some(crate::grpc_impl::api::ResponseError {
+                    summary: "Request rejected".to_string(),
+                    detail: Some(err.to_string()),
+                }),
+                workflow_status: None,
+            })),
         }
     }
 }
