@@ -1034,13 +1034,13 @@ mod test {
 
         // Node's last health.
         let node_health_res = redis_proxy.fetch_node_health();
-        health_status.mem_free -= 2;
         assert_eq!(std::collections::HashMap::from([(node_id_perf, health_status.clone())]), node_health_res);
 
         // Node's health history.
         let node_healths_res = redis_proxy.fetch_node_healths();
         let health_history = node_healths_res.get(&node_id_perf).unwrap();
         assert_eq!(3, health_history.len());
+        health_status.mem_free -= 2;
         assert_eq!(health_status, health_history[0].1);
         health_status.mem_free += 1;
         assert_eq!(health_status, health_history[1].1);
