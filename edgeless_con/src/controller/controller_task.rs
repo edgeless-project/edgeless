@@ -211,6 +211,15 @@ impl ControllerTask {
                                 log::error!("Unhandled: {:?}", err);
                             }
                         }
+                        super::ControllerRequest::Migrate(request, reply_sender) => {
+                            let reply = match self.migrate_workflow(&request).await {
+                                Ok(val) => Ok(val),
+                                Err(spawn_req) => Err(anyhow::anyhow!("could not migrate workflow: {:?}", spawn_req))
+                            };
+                            if let Err(err) = reply_sender.send(reply) {
+                                log::error!("Unhandled: {:?}", err);
+                            }
+                        }
                     }
                 },
                 Some(req) = self.internal_receiver.next() => {
@@ -545,6 +554,80 @@ impl ControllerTask {
                 desc.refresh_deadline = update_domain_request.refresh_deadline;
                 Ok(response)
             }
+        }
+    }
+
+    /// Migrate a workflow to a target domain.
+    ///
+    /// If successful, return the new allocation.
+    /// Return a response error if the workflow or target domains are not known,
+    /// or if the target domain is not compatible with the workflow specs.
+    async fn migrate_workflow(
+        &mut self,
+        request: &edgeless_api::workflow_instance::MigrateWorkflowRequest,
+    ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse> {
+        let workflow = if let Some(active_workflow) = self.active_workflows.get(&request.workflow_id) {
+            &active_workflow.desired_state
+        } else {
+            if let Some(workflow) = self.orphan_workflows.get(&request.workflow_id) {
+                workflow
+            } else {
+                return Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
+                    edgeless_api::common::ResponseError {
+                        summary: String::from("Unknown workflow id"),
+                        detail: Some(request.workflow_id.to_string()),
+                    },
+                ));
+            }
+        };
+
+        if let Some(desc) = self.orchestrators.get(&request.domain_id) {
+            if Self::is_compatible(desc, workflow) {
+                if let Some(spec) = self.stop_workflow(&request.workflow_id).await {
+                    match self.relocate_workflow(&request.workflow_id, spec, &request.domain_id).await {
+                        Ok(response) => {
+                            if let edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_) = response {
+                                log::info!(
+                                    "workflow '{}' successfully migrated to domain '{}'",
+                                    request.workflow_id,
+                                    request.domain_id
+                                );
+                                Ok(response)
+                            } else {
+                                panic!(
+                                    "relocation of the workflow '{}' has triggered a non-implemented sequence",
+                                    request.workflow_id
+                                );
+                            }
+                        }
+                        Err(workflow_request) => {
+                            self.orphan_workflows.insert(request.workflow_id.clone(), workflow_request);
+                            Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
+                                edgeless_api::common::ResponseError {
+                                    summary: String::from("Error when migrating the workflow"),
+                                    detail: Some(format!("workflow_id {}, domain_id {}", request.workflow_id, request.domain_id)),
+                                },
+                            ))
+                        }
+                    }
+                } else {
+                    panic!("the workflow '{}' has just disappeared", request.workflow_id);
+                }
+            } else {
+                Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
+                    edgeless_api::common::ResponseError {
+                        summary: String::from("Incompatible target domain"),
+                        detail: Some(format!("workflow_id {}, domain_id {}", request.workflow_id, request.domain_id)),
+                    },
+                ))
+            }
+        } else {
+            Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
+                edgeless_api::common::ResponseError {
+                    summary: String::from("Unknown orchestration domain"),
+                    detail: Some(request.domain_id.clone()),
+                },
+            ))
         }
     }
 
