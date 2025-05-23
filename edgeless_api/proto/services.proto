@@ -87,6 +87,11 @@ service WorkflowInstance {
     // Input: the identifier of the domain or an empty value to query all.
     // Output: the list of capabilities of the known domains.
     rpc Domains (DomainId) returns (DomainCapabilitiesList);
+
+    // Migrate a workflow from its domain to another.
+    // Input: the workflow to migrate and the target domain.
+    // Output: the status of workflow instance, if migrated.
+    rpc Migrate (MigrateWorkflowRequest) returns (SpawnWorkflowResponse);
 }
 
 // API to handle events.

@@ -38,6 +38,11 @@ pub(crate) enum ControllerRequest {
         // Reply Channel
         tokio::sync::oneshot::Sender<anyhow::Result<std::collections::HashMap<String, edgeless_api::domain_registration::DomainCapabilities>>>,
     ),
+    Migrate(
+        edgeless_api::workflow_instance::MigrateWorkflowRequest,
+        // Reply Channel
+        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>,
+    ),
 }
 
 pub(crate) enum DomainRegisterRequest {

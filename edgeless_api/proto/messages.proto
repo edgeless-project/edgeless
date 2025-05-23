@@ -450,7 +450,13 @@ message UpdateDomainResponse {
     bool reset = 2;
 }
 
-// message Domain
+// Message to request the migration of a workflow to another domain.
+message MigrateWorkflowRequest {
+    // The workflow to be migrated.
+    WorkflowId workflow_id = 1;
+    // The domain to which the workflow should be migrated.
+    DomainId domain_id     = 2;
+}
 
 // Event types.
 enum EventType {

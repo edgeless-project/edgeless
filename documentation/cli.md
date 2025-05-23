@@ -25,14 +25,15 @@ This build mode does not require any live EDGELESS component.
 Second, it allows interaction with a live ε-CON via the `WorkflowInstance` API.
 The operations currently allowed are reported in the table below.
 
-| Operation          | Argument                              | Description                                  |
-| ------------------ | ------------------------------------- | -------------------------------------------- |
-| `workflow start`   | Path of a JSON workflow specification | Create a new workflow                        |
-| `workflow stop`    | Workflow identifier                   | Stop an active workflow                      |
-| `workflow list`    |                                       | List the identifiers of the active workflows |
-| `workflow inspect` | Workflow identifier                   | Show details about an active workflow        |
-| `domain list`      |                                       | List the domain identifiers                  |
-| `domain inspect`   | Domain identifier                     | Show details about an orchestration domain   |
+| Operation          | Argument                              | Description                                                    |
+| ------------------ | ------------------------------------- | -------------------------------------------------------------- |
+| `workflow start`   | Path of a JSON workflow specification | Create a new workflow                                          |
+| `workflow stop`    | Workflow identifier (or "all")        | Stop an active workflow                                        |
+| `workflow migrate` | Workflow and domain identifiers       | Migrate the workflow specified to a target domain, if possible |
+| `workflow list`    |                                       | List the identifiers of the active workflows                   |
+| `workflow inspect` | Workflow identifier (or "all")        | Show details about an active workflow                          |
+| `domain list`      |                                       | List the domain identifiers                                    |
+| `domain inspect`   | Domain identifier (or "all")          | Show details about an orchestration domain                     |
 
 ## proxy_cli
 
