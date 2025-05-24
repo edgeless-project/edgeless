@@ -37,3 +37,6 @@ The ε-CON has the following interfaces, also illustrated in the diagram below:
 
 ![](diagrams-con.png)
 
+The ε-CON saves the information on the active workflows on a local file,
+specified in the configuration, which is loaded upon the next start of the
+service.

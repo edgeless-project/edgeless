@@ -169,7 +169,7 @@ impl EdgeFunction for BenchMapReduce {
         };
 
         if conf.is_first {
-            telemetry_log(4, "tbegin", &state.transaction_id.to_string());
+            telemetry_log(5, "tbegin", &state.transaction_id.to_string());
             message.transaction_id = state.transaction_id;
             state.transaction_id += 1;
             for output in &conf.outputs {
@@ -205,7 +205,7 @@ impl EdgeFunction for BenchMapReduce {
             // - otherwise: sum the vectors and invoke the downstream outputs.
             if state.pending.len() == conf.inputs.len() {
                 if conf.is_last {
-                    telemetry_log(4, "tend", &last_transaction_id.to_string());
+                    telemetry_log(5, "tend", &last_transaction_id.to_string());
                     if conf.init_id_from_redis {
                         cast("redis", format!("{}", last_transaction_id).as_bytes())
                     }
