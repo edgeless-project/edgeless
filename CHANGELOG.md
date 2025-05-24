@@ -65,6 +65,13 @@ API changes:
 - Add active_power to node health status
 - Add WorkflowInstance::Migrate method, with associated messages.
 
+Removed features:
+
+- The metrics-collector resource was removed, since it is superseded by the
+  collection on nodes of `telemetry_log` events, which are then transfered to
+  ε-ORC, which makes them available via the proxy or dumps them to a dataset
+  on the local filesystem.
+
 ## [1.0.0] - 2024-11-12
 
 Initial stable release.

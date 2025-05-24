@@ -8,12 +8,10 @@
                 "version": "0.1",
                 "code": "../../functions/vector_mul/vector_mul.wasm",
                 "outputs": [
-                    "metric",
                     "out"
                 ]
             },
             "output_mapping": {
-                "metric": "metrics-collector",
                 "out": "client"
             },
             "annotations": {
@@ -21,16 +19,6 @@
             }
         }
     ],
-    "resources": [
-        {
-            "name": "metrics-collector",
-            "class_type": "metrics-collector",
-            "output_mapping": {},
-            "configurations": {
-                "alpha": "0.9",
-                "wf_name": "vector_mul_wf_single"
-            }
-        }
-    ],
+    "resources": [],
     "annotations": {}
 }

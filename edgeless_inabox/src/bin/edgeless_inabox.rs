@@ -7,7 +7,7 @@ use std::path::Path;
 use clap::Parser;
 use edgeless_node::{
     EdgelessNodeContainerRuntimeSettings, EdgelessNodeGeneralSettings, EdgelessNodeResourceSettings, EdgelessNodeSettings,
-    EdgelessNodeTelemetrySettings, MetricsCollectorProviderSettings, OllamaProviderSettings, ServerlessProviderSettings,
+    EdgelessNodeTelemetrySettings, OllamaProviderSettings, ServerlessProviderSettings,
 };
 use std::fs;
 use uuid::Uuid;
@@ -24,10 +24,6 @@ struct Args {
     /// When generating templates, add this number of nodes per domain.
     #[arg(long, short, default_value_t = 1)]
     num_of_nodes: u32,
-    /// When generating templates, add a metrics-collector node.
-    /// This flag also automatically enables a Redis proxy at redis://127.0.0.1:6379.
-    #[arg(long, default_value_t = false)]
-    metrics_collector: bool,
     /// Initial TCP port to be used for services.
     #[arg(long, default_value_t = 7000)]
     initial_port: u16,
@@ -41,13 +37,7 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     if args.templates {
-        let last_port = generate_configs(
-            args.config_path,
-            args.num_of_nodes,
-            args.metrics_collector,
-            args.initial_port,
-            args.bind_to_nonloopback,
-        )?;
+        let last_port = generate_configs(args.config_path, args.num_of_nodes, args.initial_port, args.bind_to_nonloopback)?;
         log::info!("Templates written, last port used: {}", last_port);
         return Ok(());
     }
@@ -64,13 +54,7 @@ fn main() -> anyhow::Result<()> {
 /// Generates configs for a minimal in-a-box edgeless cluster with
 /// number_of_nodes nodes in the directory. If directory is non-empty, it
 /// fails.
-fn generate_configs(
-    config_path: String,
-    number_of_nodes: u32,
-    metrics_collector: bool,
-    initial_port: u16,
-    bind_to_nonloopback: bool,
-) -> anyhow::Result<u16> {
+fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16, bind_to_nonloopback: bool) -> anyhow::Result<u16> {
     log::info!("Generating configuration files for EDGELESS in-a-box with {} nodes", number_of_nodes);
 
     let reserved_controller_port = 7001;
@@ -126,19 +110,11 @@ fn generate_configs(
         baseline: edgeless_orc::EdgelessOrcBaselineSettings {
             orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,
         },
-        proxy: match metrics_collector {
-            true => edgeless_orc::EdgelessOrcProxySettings {
-                proxy_type: "Redis".to_string(),
-                proxy_gc_period_seconds: 360,
-                redis_url: Some(String::from("redis://127.0.0.1:6379")),
-                dataset_settings: Some(edgeless_orc::EdgelessOrcProxyDatasetSettings::default()),
-            },
-            false => edgeless_orc::EdgelessOrcProxySettings {
-                proxy_type: "None".to_string(),
-                proxy_gc_period_seconds: 0,
-                redis_url: None,
-                dataset_settings: None,
-            },
+        proxy: edgeless_orc::EdgelessOrcProxySettings {
+            proxy_type: "None".to_string(),
+            proxy_gc_period_seconds: 0,
+            redis_url: None,
+            dataset_settings: None,
         },
     };
 
@@ -169,7 +145,6 @@ fn generate_configs(
             },
             telemetry: EdgelessNodeTelemetrySettings {
                 metrics_url: next_url(false),
-                log_level: Some(String::default()),
                 performance_samples: false,
             },
             wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
@@ -203,58 +178,12 @@ fn generate_configs(
                 ollama_provider: Some(OllamaProviderSettings::default()),
                 serverless_provider: Some(vec![ServerlessProviderSettings::default()]),
                 kafka_egress_provider: Some(String::default()),
-                metrics_collector_provider: Some(MetricsCollectorProviderSettings::default()),
                 sqlx_provider: match counter == 0 {
                     true => Some("sqlx-1".to_string()),
                     false => None,
                 },
             }),
             user_node_capabilities: Some(edgeless_node::NodeCapabilitiesUser::default()),
-            power_info: None,
-        });
-    }
-
-    if metrics_collector {
-        let agent_url = next_url(true);
-        let invocation_url = next_url(true);
-        node_confs.push(EdgelessNodeSettings {
-            general: EdgelessNodeGeneralSettings {
-                node_id: uuid::Uuid::new_v4(),
-                agent_url: agent_url.clone(),
-                agent_url_announced: announced_url(agent_url),
-                invocation_url: invocation_url.clone(),
-                invocation_url_announced: announced_url(invocation_url),
-                invocation_url_coap: None,
-                invocation_url_announced_coap: None,
-                node_register_url: orc_conf.general.node_register_url.clone(),
-                subscription_refresh_interval_sec: 10,
-            },
-            telemetry: EdgelessNodeTelemetrySettings {
-                metrics_url: next_url(false),
-                log_level: Some(String::default()),
-                performance_samples: false,
-            },
-            wasm_runtime: None,
-            container_runtime: None,
-            resources: Some(EdgelessNodeResourceSettings {
-                prepend_hostname: true,
-                http_ingress_url: None,
-                http_ingress_provider: None,
-                http_egress_provider: None,
-                file_log_provider: None,
-                redis_provider: None,
-                dda_provider: None,
-                ollama_provider: None,
-                serverless_provider: None,
-                kafka_egress_provider: None,
-                metrics_collector_provider: Some(edgeless_node::MetricsCollectorProviderSettings {
-                    collector_type: String::from("Redis"),
-                    redis_url: Some(String::from("redis://127.0.0.1:6379")),
-                    provider: String::from("metrics-collector-1"),
-                }),
-                sqlx_provider: None,
-            }),
-            user_node_capabilities: None,
             power_info: None,
         });
     }

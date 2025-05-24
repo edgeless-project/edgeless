@@ -9,53 +9,6 @@ use rand::prelude::*;
 use rand::SeedableRng;
 use std::str::FromStr;
 
-const ALPHA: f64 = 0.9_f64;
-
-fn timestamp_now() -> String {
-    let duration = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap();
-    format!("{}.{}", duration.as_secs(), duration.subsec_millis())
-}
-
-pub async fn setup_metrics_collector(engine: &mut Engine, single_trigger_wasm: &str, warmup: f64) -> anyhow::Result<String> {
-    let function_class_code = match std::fs::read(single_trigger_wasm) {
-        Ok(code) => code,
-        Err(err) => anyhow::bail!("cannot read source: {}", err),
-    };
-    let res = engine
-        .client
-        .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-            workflow_functions: vec![WorkflowFunction {
-                name: "single_trigger".to_string(),
-                function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                    function_class_id: "single_trigger".to_string(),
-                    function_class_type: "RUST_WASM".to_string(),
-                    function_class_version: "0.1".to_string(),
-                    function_class_code,
-                    function_class_outputs: vec!["out".to_string()],
-                },
-                output_mapping: std::collections::HashMap::from([("out".to_string(), "metrics-collector".to_string())]),
-                annotations: std::collections::HashMap::from([("init-payload".to_string(), format!("reset:{}", (warmup * 1000.0) as u64))]),
-            }],
-            workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
-                name: "metrics-collector".to_string(),
-                class_type: "metrics-collector".to_string(),
-                output_mapping: std::collections::HashMap::new(),
-                configurations: std::collections::HashMap::new(),
-            }],
-            annotations: std::collections::HashMap::new(),
-        })
-        .await;
-    match res {
-        Ok(response) => match &response {
-            SpawnWorkflowResponse::ResponseError(err) => Err(anyhow!("{}", err)),
-            SpawnWorkflowResponse::WorkflowInstance(val) => Ok(val.workflow_id.workflow_id.to_string()),
-        },
-        Err(err) => {
-            panic!("error when setting up warm-up on the metrics collector: {}", err);
-        }
-    }
-}
-
 /// Engine for the creation/termination of EDGELESS workflows.
 pub struct Engine {
     /// The client interface.
@@ -66,14 +19,14 @@ pub struct Engine {
     rng: rand::rngs::StdRng,
     /// Identifier of the next workflow to start.
     wf_id: u32,
-    /// Redis client.
-    redis_client: Option<crate::redis_dumper::RedisDumper>,
+    /// Csv dumper.
+    csv_dumper: crate::csv_dumper::CsvDumper,
     /// Mapping between UUID and name of the admitted workflows.
     uuid_to_names: std::collections::HashMap<uuid::Uuid, String>,
 }
 
 impl Engine {
-    pub async fn new(controller_url: &str, wf_type: WorkflowType, seed: u64, redis_client: Option<crate::redis_dumper::RedisDumper>) -> Self {
+    pub async fn new(controller_url: &str, wf_type: WorkflowType, seed: u64, csv_dumper: crate::csv_dumper::CsvDumper) -> Self {
         Self {
             client: edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(controller_url)
                 .await
@@ -81,22 +34,8 @@ impl Engine {
             wf_type,
             rng: rand::rngs::StdRng::seed_from_u64(seed),
             wf_id: 0,
-            redis_client,
+            csv_dumper,
             uuid_to_names: std::collections::HashMap::new(),
-        }
-    }
-
-    ///
-    /// Dump the content of the Redis file to a set of output CSV files.
-    ///
-    /// - `dataset_path`: the path where to save the files.
-    /// - `append`: if true append to the output files, if they exist already.
-    ///
-    pub fn dump(&mut self, dataset_path: &str, append: bool) {
-        if let Some(redis_client) = &mut self.redis_client {
-            if let Err(err) = redis_client.dump_csv(dataset_path, append) {
-                log::error!("error dumping from Redis: {}", err);
-            }
         }
     }
 
@@ -152,11 +91,11 @@ impl Engine {
                 let mut matrix_sizes = vec![];
 
                 for i in 0..chain_size {
-                    let mut outputs = vec!["metric".to_string()];
+                    let mut outputs = vec![];
                     for k in 0..20 {
                         outputs.push(format!("out-{}", k).to_string());
                     }
-                    let mut output_mapping = std::collections::HashMap::from([("metric".to_string(), "metrics-collector".to_string())]);
+                    let mut output_mapping = std::collections::HashMap::new();
                     if i != (chain_size - 1) {
                         output_mapping.insert("out-0".to_string(), format!("f{}", (i + 1)));
                     } else if data.transaction_interval == 0 {
@@ -225,10 +164,7 @@ impl Engine {
                         i => format!("f{}", chain_size - i - 1),
                     };
 
-                    let mut output_mapping = std::collections::HashMap::from([("out".to_string(), next_func_name)]);
-                    if self.redis_client.is_some() {
-                        output_mapping.insert("metric".to_string(), "metrics-collector".to_string());
-                    }
+                    let output_mapping = std::collections::HashMap::from([("out".to_string(), next_func_name)]);
 
                     let annotations = std::collections::HashMap::from([(
                         "init-payload".to_string(),
@@ -251,7 +187,7 @@ impl Engine {
                             function_class_type: "RUST_WASM".to_string(),
                             function_class_version: "0.1".to_string(),
                             function_class_code: std::fs::read(&data.function_wasm_path).unwrap(),
-                            function_class_outputs: vec!["metric".to_string(), "out".to_string()],
+                            function_class_outputs: vec!["out".to_string()],
                         },
                         output_mapping,
                         annotations,
@@ -401,18 +337,6 @@ impl Engine {
             }
         };
 
-        if self.redis_client.is_some() && self.wf_type.metrics_collector() {
-            resources.push(edgeless_api::workflow_instance::WorkflowResource {
-                name: "metrics-collector".to_string(),
-                class_type: "metrics-collector".to_string(),
-                output_mapping: std::collections::HashMap::new(),
-                configurations: std::collections::HashMap::from([
-                    ("alpha".to_string(), format!("{}", ALPHA)),
-                    ("wf_name".to_string(), wf_name.clone()),
-                ]),
-            });
-        }
-
         self.wf_id += 1;
 
         if functions.is_empty() {
@@ -428,13 +352,8 @@ impl Engine {
             workflow_resources: resources,
             annotations,
         };
-        if let Some(redis_client) = &mut self.redis_client {
-            redis_client.set(format!("workflow:{}:begin", wf_name).as_str(), &timestamp_now());
-            redis_client.set(
-                format!("workflow:{}:request", wf_name).as_str(),
-                serde_json::to_string(&req).unwrap_or_default().as_str(),
-            );
-        }
+        self.csv_dumper
+            .add("workflow:request", &wf_name, serde_json::to_string(&req).unwrap_or_default().as_str());
 
         // Request the creation of the workflow.
         let res = self.client.start(req).await;
@@ -443,12 +362,12 @@ impl Engine {
         // workflow:$wf_name:response
         match res {
             Ok(response) => {
-                if let Some(redis_client) = &mut self.redis_client {
-                    redis_client.set(
-                        format!("workflow:{}:response", wf_name).as_str(),
-                        serde_json::to_string(&response).unwrap_or_default().as_str(),
-                    );
-                }
+                self.csv_dumper.add(
+                    "workflow:response",
+                    &wf_name,
+                    serde_json::to_string(&response).unwrap_or_default().as_str(),
+                );
+
                 match &response {
                     SpawnWorkflowResponse::ResponseError(err) => Err(anyhow!("{}", err)),
                     SpawnWorkflowResponse::WorkflowInstance(val) => {
@@ -464,10 +383,8 @@ impl Engine {
     }
 
     pub async fn stop_workflow(&mut self, uuid: &str) -> anyhow::Result<()> {
-        if let Some(redis_client) = &mut self.redis_client {
-            if let Some(wf_name) = self.uuid_to_names.get(&uuid::Uuid::from_str(uuid).unwrap()) {
-                redis_client.set(format!("workflow:{}:end", wf_name).as_str(), &timestamp_now());
-            }
+        if let Some(wf_name) = self.uuid_to_names.get(&uuid::Uuid::from_str(uuid).unwrap()) {
+            self.csv_dumper.add("workflow:end", wf_name, "");
         }
         let res = self.client.stop(WorkflowId::from_string(uuid)).await;
         match res {

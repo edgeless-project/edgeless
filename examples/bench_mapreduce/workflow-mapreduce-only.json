@@ -28,7 +28,6 @@
                 "version": "0.1",
                 "code": "../../functions/bench_mapreduce/bench_mapreduce.wasm",
                 "outputs": [
-                    "metric",
                     "err",
                     "out-0",
                     "out-1",
@@ -36,7 +35,6 @@
                 ]
             },
             "output_mapping": {
-                "metric": "metric",
                 "err": "err",
                 "out-0": "middle",
                 "out-1": "middle",
@@ -54,14 +52,12 @@
                 "version": "0.1",
                 "code": "../../functions/bench_mapreduce/bench_mapreduce.wasm",
                 "outputs": [
-                    "metric",
                     "err",
                     "out-0",
                     "out-1"
                 ]
             },
             "output_mapping": {
-                "metric": "metric",
                 "err": "err",
                 "out-0": "last",
                 "out-1": "last"
@@ -78,12 +74,10 @@
                 "version": "0.1",
                 "code": "../../functions/bench_mapreduce/bench_mapreduce.wasm",
                 "outputs": [
-                    "metric",
                     "err"
                 ]
             },
             "output_mapping": {
-                "metric": "metric",
                 "err": "err"
             },
             "annotations": {
@@ -99,15 +93,6 @@
             "configurations": {
                 "filename": "err.log",
                 "add-source-id": "true",
-                "add-timestamp": "true"
-            }
-        },
-        {
-            "name": "metric",
-            "class_type": "file-log",
-            "output_mapping": {},
-            "configurations": {
-                "filename": "metric.log",
                 "add-timestamp": "true"
             }
         }

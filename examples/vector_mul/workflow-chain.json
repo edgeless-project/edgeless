@@ -5,15 +5,13 @@
             "class_specification": {
                 "id": "vector_mul",
                 "function_type": "RUST_WASM",
-                "version": "0.1",
+                "version": "0.2",
                 "code": "../../functions/vector_mul/vector_mul.wasm",
                 "outputs": [
-                    "metric",
                     "out"
                 ]
             },
             "output_mapping": {
-                "metric": "metrics-collector",
                 "out": "f1"
             },
             "annotations": {
@@ -25,15 +23,13 @@
             "class_specification": {
                 "id": "vector_mul",
                 "function_type": "RUST_WASM",
-                "version": "0.1",
+                "version": "0.2",
                 "code": "../../functions/vector_mul/vector_mul.wasm",
                 "outputs": [
-                    "metric",
                     "out"
                 ]
             },
             "output_mapping": {
-                "metric": "metrics-collector",
                 "out": "f2"
             },
             "annotations": {
@@ -45,15 +41,13 @@
             "class_specification": {
                 "id": "vector_mul",
                 "function_type": "RUST_WASM",
-                "version": "0.1",
+                "version": "0.2",
                 "code": "../../functions/vector_mul/vector_mul.wasm",
                 "outputs": [
-                    "metric",
                     "out"
                 ]
             },
             "output_mapping": {
-                "metric": "metrics-collector",
                 "out": "client"
             },
             "annotations": {
@@ -61,16 +55,6 @@
             }
         }
     ],
-    "resources": [
-        {
-            "name": "metrics-collector",
-            "class_type": "metrics-collector",
-            "output_mapping": {},
-            "configurations": {
-                "alpha": "0.9",
-                "wf_name": "vector_mul_wf_chain"
-            }
-        }
-    ],
+    "resources": [],
     "annotations": {}
 }

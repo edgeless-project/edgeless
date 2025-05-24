@@ -226,8 +226,4 @@ impl WorkflowType {
             "json-spec".to_string(),
         ]
     }
-
-    pub fn metrics_collector(&self) -> bool {
-        !matches!(self, WorkflowType::None | WorkflowType::Single(_, _) | WorkflowType::MapReduce(_))
-    }
 }
