@@ -10,3 +10,8 @@ pub fn to_seconds(us: u64) -> f64 {
 pub fn to_microseconds(s: f64) -> u64 {
     (s * MEGA as f64).round() as u64
 }
+
+pub fn timestamp_now() -> f64 {
+    let duration = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap();
+    duration.as_secs_f64()
+}

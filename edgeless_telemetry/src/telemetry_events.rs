@@ -3,8 +3,6 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use std::str::FromStr;
-
 #[derive(Debug, PartialEq, Eq)]
 pub enum TelemetryLogLevel {
     Error,
@@ -31,6 +29,16 @@ pub fn telemetry_to_api(lvl: TelemetryLogLevel) -> String {
         TelemetryLogLevel::Info => "Info".to_string(),
         TelemetryLogLevel::Warn => "Warn".to_string(),
         TelemetryLogLevel::Error => "Error".to_string(),
+    }
+}
+
+fn to_log_level(lvl: &TelemetryLogLevel) -> log::Level {
+    match lvl {
+        TelemetryLogLevel::Error => log::Level::Error,
+        TelemetryLogLevel::Warn => log::Level::Warn,
+        TelemetryLogLevel::Info => log::Level::Info,
+        TelemetryLogLevel::Debug => log::Level::Debug,
+        TelemetryLogLevel::Trace => log::Level::Trace,
     }
 }
 
@@ -99,19 +107,18 @@ pub trait EventProcessor: Sync + Send {
     fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult;
 }
 
-struct EventLogger {
-    log_level: log::Level,
-}
-
-impl EventLogger {
-    fn new(log_level: log::Level) -> Self {
-        Self { log_level }
-    }
-}
+#[derive(Default)]
+struct EventLogger {}
 
 impl EventProcessor for EventLogger {
     fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult {
-        log::log!(self.log_level, "Event: {:?} , tags: {:?}", event, event_tags);
+        match event {
+            TelemetryEvent::FunctionLogEntry(log_level, target, msg) => {
+                log::log!(to_log_level(log_level), "{}: {}", target, msg);
+            }
+            _ => log::info!("Event: {:?} , tags: {:?}", event, event_tags),
+        }
+
         TelemetryProcessingResult::PROCESSED
     }
 }
@@ -154,31 +161,11 @@ impl TelemetryProcessor {
     /// - `prometheus_url`: HTTP end-point to which to bind a web server
     ///   providing an interface suitable to be scraped by Prometheus
     ///   (https://prometheus.io/); if empty then the server is not started
-    /// - `log_level`: level used for log directives at each new event
     /// - `performance_target`: optional target that collects samples about
     ///   performance-related events
     ///
-    pub async fn new(
-        prometheus_url: String,
-        log_level: Option<String>,
-        performance_target: Option<crate::performance_target::PerformanceTargetInner>,
-    ) -> anyhow::Result<Self> {
+    pub async fn new(prometheus_url: String, performance_target: Option<crate::performance_target::PerformanceTargetInner>) -> anyhow::Result<Self> {
         let mut processing_chain: Vec<Box<dyn EventProcessor>> = vec![];
-
-        // Argument check.
-        let log_level = match log_level {
-            Some(log_level) => {
-                if log_level.is_empty() {
-                    None
-                } else {
-                    match log::Level::from_str(&log_level) {
-                        Ok(log_level) => Some(log_level),
-                        Err(err) => anyhow::bail!("could not parse log_level: {}", err),
-                    }
-                }
-            }
-            None => None,
-        };
 
         // Add the performance target, if present.
         if let Some(performance_target) = performance_target {
@@ -198,9 +185,7 @@ impl TelemetryProcessor {
         }
 
         // Created and the log target, if required.
-        if let Some(log_level) = log_level {
-            processing_chain.push(Box::new(EventLogger::new(log_level)))
-        };
+        processing_chain.push(Box::new(EventLogger::default()));
 
         // Create a channel to receive telemetry events and the processor that
         // will handle them, spawned in a dedicated task.

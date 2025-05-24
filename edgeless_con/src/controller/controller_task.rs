@@ -568,17 +568,15 @@ impl ControllerTask {
     ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse> {
         let workflow = if let Some(active_workflow) = self.active_workflows.get(&request.workflow_id) {
             &active_workflow.desired_state
+        } else if let Some(workflow) = self.orphan_workflows.get(&request.workflow_id) {
+            workflow
         } else {
-            if let Some(workflow) = self.orphan_workflows.get(&request.workflow_id) {
-                workflow
-            } else {
-                return Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
-                    edgeless_api::common::ResponseError {
-                        summary: String::from("Unknown workflow id"),
-                        detail: Some(request.workflow_id.to_string()),
-                    },
-                ));
-            }
+            return Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
+                edgeless_api::common::ResponseError {
+                    summary: String::from("Unknown workflow id"),
+                    detail: Some(request.workflow_id.to_string()),
+                },
+            ));
         };
 
         if let Some(desc) = self.orchestrators.get(&request.domain_id) {

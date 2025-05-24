@@ -40,8 +40,6 @@ pub struct EdgelessNodeSettings {
 pub struct EdgelessNodeTelemetrySettings {
     /// The URL exposed by this node to publish telemetry metrics collected.
     pub metrics_url: String,
-    /// Log level to use for telemetry events, if enabled.
-    pub log_level: Option<String>,
     /// True if performance samples are sent to the orchestrator as part of health status responses to keep-alive polls.
     pub performance_samples: bool,
 }
@@ -95,7 +93,7 @@ pub struct EdgelessNodeGeneralSettings {
     pub subscription_refresh_interval_sec: u64,
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeResourceSettings {
     /// If true, prepend the hostname to the resource name.
     pub prepend_hostname: bool,
@@ -124,8 +122,6 @@ pub struct EdgelessNodeResourceSettings {
     /// The resource will connect to a remote Kafka server to stream the
     /// messages received on a given topic.
     pub kafka_egress_provider: Option<String>,
-    /// The metrics collector resource provider settings.
-    pub metrics_collector_provider: Option<MetricsCollectorProviderSettings>,
     /// The sqlx resource provider.
     pub sqlx_provider: Option<String>,
 }
@@ -162,27 +158,6 @@ pub struct ServerlessProviderSettings {
     pub function_url: String,
     /// The resource provider name, if not empty.
     pub provider: String,
-}
-
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
-pub struct MetricsCollectorProviderSettings {
-    /// Type of the metrics collector that is used to store run-time
-    /// measurements from function instances.
-    pub collector_type: String,
-    /// If collector_type is "Redis" then this is the URL of the Redis server.
-    pub redis_url: Option<String>,
-    /// If not empty, a metrics collector resource provider with that name is created.
-    pub provider: String,
-}
-
-impl Default for MetricsCollectorProviderSettings {
-    fn default() -> Self {
-        Self {
-            collector_type: String::from("None"),
-            redis_url: Some(String::from("redis://localhost:6379")),
-            provider: String::default(),
-        }
-    }
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -608,64 +583,6 @@ async fn fill_resources(
             }
         }
 
-        if let Some(settings) = &settings.metrics_collector_provider {
-            if !settings.provider.is_empty() {
-                match settings.collector_type.to_lowercase().as_str() {
-                    "redis" => match &settings.redis_url {
-                        Some(redis_url) => {
-                            match redis::Client::open(redis_url.clone()) {
-                                Ok(client) => match client.get_connection() {
-                                    Ok(redis_connection) => {
-                                        let class_type = resources::metrics_collector::MetricsCollectorResourceSpec {}.class_type();
-                                        let provider_id = make_provider_id(&settings.provider);
-                                        log::info!(
-                                            "Creating metrics-collector resource provider '{}' connected to a Redis server at {}",
-                                            settings.provider,
-                                            redis_url
-                                        );
-                                        ret.insert(
-                                            provider_id.clone(),
-                                            agent::ResourceDesc {
-                                                class_type: class_type.clone(),
-                                                client: Box::new(
-                                                    resources::metrics_collector::MetricsCollectorResourceProvider::new(
-                                                        data_plane.clone(),
-                                                        Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                                            ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
-                                                            ("RESOURCE_PROVIDER_ID".to_string(), settings.provider.clone()),
-                                                            ("NODE_ID".to_string(), node_id.to_string()),
-                                                        ]))),
-                                                        edgeless_api::function_instance::InstanceId::new(node_id),
-                                                        redis_connection,
-                                                    )
-                                                    .await,
-                                                ),
-                                            },
-                                        );
-                                        provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                                            provider_id,
-                                            class_type,
-                                            outputs: vec![],
-                                        });
-
-                                        log::info!("metrics collector connected to Redis at {}", redis_url);
-                                    }
-                                    Err(err) => log::error!("error when connecting to Redis at {}: {}", redis_url, err),
-                                },
-                                Err(err) => log::error!("error when creating a Redis client at {}: {}", redis_url, err),
-                            };
-                        }
-                        None => {
-                            log::error!("redis_url not specified for a Redis metrics collector");
-                        }
-                    },
-                    _ => {
-                        log::error!("unknown  metrics collector type");
-                    }
-                }
-            }
-        }
-
         if let Some(provider_id) = &settings.sqlx_provider {
             if !provider_id.is_empty() {
                 log::info!("Creating resource '{}'", provider_id);
@@ -722,7 +639,6 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     // Create the telemetry provider.
     let telemetry_provider = match edgeless_telemetry::telemetry_events::TelemetryProcessor::new(
         settings.telemetry.metrics_url.clone(),
-        settings.telemetry.log_level,
         if settings.telemetry.performance_samples {
             Some(telemetry_performance_target.clone())
         } else {
@@ -876,7 +792,6 @@ pub fn edgeless_node_default_conf() -> String {
         },
         telemetry: EdgelessNodeTelemetrySettings {
             metrics_url: String::from("http://127.0.0.1:7007"),
-            log_level: Some(String::default()),
             performance_samples: false,
         },
         wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
@@ -892,7 +807,6 @@ pub fn edgeless_node_default_conf() -> String {
             ollama_provider: Some(OllamaProviderSettings::default()),
             serverless_provider: Some(vec![ServerlessProviderSettings::default()]),
             kafka_egress_provider: Some(String::default()),
-            metrics_collector_provider: Some(MetricsCollectorProviderSettings::default()),
             sqlx_provider: Some(String::from("sqlite://sqlite.db")),
         }),
         user_node_capabilities: Some(NodeCapabilitiesUser::default()),
