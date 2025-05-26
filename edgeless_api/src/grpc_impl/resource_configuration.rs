@@ -8,7 +8,7 @@ pub struct ResourceConfigurationConverters {}
 
 impl ResourceConfigurationConverters {
     pub fn parse_resource_instance_specification(
-        api_spec: &crate::grpc_impl::api::ResourceInstanceSpecification,
+        api_spec: &crate::grpc_impl::grpc_api_stubs::ResourceInstanceSpecification,
     ) -> anyhow::Result<crate::resource_configuration::ResourceInstanceSpecification> {
         Ok(crate::resource_configuration::ResourceInstanceSpecification {
             class_type: api_spec.resource_class_type.clone(),
@@ -19,8 +19,8 @@ impl ResourceConfigurationConverters {
 
     pub fn serialize_resource_instance_specification(
         crate_spec: &crate::resource_configuration::ResourceInstanceSpecification,
-    ) -> crate::grpc_impl::api::ResourceInstanceSpecification {
-        crate::grpc_impl::api::ResourceInstanceSpecification {
+    ) -> crate::grpc_impl::grpc_api_stubs::ResourceInstanceSpecification {
+        crate::grpc_impl::grpc_api_stubs::ResourceInstanceSpecification {
             resource_class_type: crate_spec.class_type.clone(),
             configuration: crate_spec.configuration.clone(),
             workflow_id: crate_spec.workflow_id.clone(),
@@ -30,7 +30,7 @@ impl ResourceConfigurationConverters {
 
 #[derive(Clone)]
 pub struct ResourceConfigurationClient<ResourceIdType> {
-    client: Option<crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient<tonic::transport::Channel>>,
+    client: Option<crate::grpc_impl::grpc_api_stubs::resource_configuration_client::ResourceConfigurationClient<tonic::transport::Channel>>,
     server_addr: String,
     _phantom: std::marker::PhantomData<ResourceIdType>,
 }
@@ -51,7 +51,7 @@ impl<ResourceIdType> ResourceConfigurationClient<ResourceIdType> {
     async fn try_connect(&mut self) -> anyhow::Result<()> {
         if self.client.is_none() {
             self.client =
-                match crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient::connect(self.server_addr.clone()).await {
+                match crate::grpc_impl::grpc_api_stubs::resource_configuration_client::ResourceConfigurationClient::connect(self.server_addr.clone()).await {
                     Ok(client) => {
                         let client = client.max_decoding_message_size(usize::MAX);
                         Some(client)
@@ -72,7 +72,7 @@ impl<ResourceIdType> ResourceConfigurationClient<ResourceIdType> {
 impl<ResourceIdType: SerializeableId + Clone + Send + Sync + 'static> crate::resource_configuration::ResourceConfigurationAPI<ResourceIdType>
     for ResourceConfigurationClient<ResourceIdType>
 where
-    super::api::InstanceIdVariant: ParseableId<ResourceIdType>,
+    super::grpc_api_stubs::InstanceIdVariant: ParseableId<ResourceIdType>,
 {
     async fn start(
         &mut self,
@@ -163,23 +163,23 @@ pub struct ResourceConfigurationServerHandler<ResourceIdType> {
 }
 
 #[async_trait::async_trait]
-impl<ResourceIdType: Clone + Send + 'static> crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
+impl<ResourceIdType: Clone + Send + 'static> crate::grpc_impl::grpc_api_stubs::resource_configuration_server::ResourceConfiguration
     for ResourceConfigurationServerHandler<ResourceIdType>
 where
-    crate::grpc_impl::api::InstanceIdVariant: crate::grpc_impl::common::ParseableId<ResourceIdType>,
+    crate::grpc_impl::grpc_api_stubs::InstanceIdVariant: crate::grpc_impl::common::ParseableId<ResourceIdType>,
     ResourceIdType: crate::grpc_impl::common::SerializeableId,
 {
     async fn start(
         &self,
-        request: tonic::Request<crate::grpc_impl::api::ResourceInstanceSpecification>,
-    ) -> tonic::Result<tonic::Response<crate::grpc_impl::api::StartComponentResponse>> {
+        request: tonic::Request<crate::grpc_impl::grpc_api_stubs::ResourceInstanceSpecification>,
+    ) -> tonic::Result<tonic::Response<crate::grpc_impl::grpc_api_stubs::StartComponentResponse>> {
         let inner = request.into_inner();
         let parsed_spec =
             match crate::grpc_impl::resource_configuration::ResourceConfigurationConverters::parse_resource_instance_specification(&inner) {
                 Ok(val) => val,
                 Err(err) => {
-                    return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
-                        response_error: Some(crate::grpc_impl::api::ResponseError {
+                    return Ok(tonic::Response::new(crate::grpc_impl::grpc_api_stubs::StartComponentResponse {
+                        response_error: Some(crate::grpc_impl::grpc_api_stubs::ResponseError {
                             summary: "Invalid resource specification".to_string(),
                             detail: Some(err.to_string()),
                         }),
@@ -190,8 +190,8 @@ where
         match self.root_api.lock().await.start(parsed_spec).await {
             Ok(response) => Ok(tonic::Response::new(CommonConverters::serialize_start_component_response(&response))),
             Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
-                    response_error: Some(crate::grpc_impl::api::ResponseError {
+                return Ok(tonic::Response::new(crate::grpc_impl::grpc_api_stubs::StartComponentResponse {
+                    response_error: Some(crate::grpc_impl::grpc_api_stubs::ResponseError {
                         summary: "Resource creation rejected".to_string(),
                         detail: Some(err.to_string()),
                     }),
@@ -201,8 +201,8 @@ where
         }
     }
 
-    async fn stop(&self, request: tonic::Request<crate::grpc_impl::api::InstanceIdVariant>) -> tonic::Result<tonic::Response<()>> {
-        let inner: super::api::InstanceIdVariant = request.into_inner();
+    async fn stop(&self, request: tonic::Request<crate::grpc_impl::grpc_api_stubs::InstanceIdVariant>) -> tonic::Result<tonic::Response<()>> {
+        let inner: super::grpc_api_stubs::InstanceIdVariant = request.into_inner();
         let parsed_id = match crate::grpc_impl::common::ParseableId::<ResourceIdType>::parse(&inner) {
             Ok(val) => val,
             Err(err) => {
@@ -215,7 +215,7 @@ where
         }
     }
 
-    async fn patch(&self, update: tonic::Request<crate::grpc_impl::api::PatchRequest>) -> tonic::Result<tonic::Response<()>> {
+    async fn patch(&self, update: tonic::Request<crate::grpc_impl::grpc_api_stubs::PatchRequest>) -> tonic::Result<tonic::Response<()>> {
         let inner = update.into_inner();
         let parsed_request = match CommonConverters::parse_patch_request(&inner) {
             Ok(val) => val,

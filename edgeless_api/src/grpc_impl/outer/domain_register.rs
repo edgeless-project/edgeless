@@ -41,7 +41,7 @@ impl DomainRegistrationAPIServer {
                             crate::grpc_impl::common::GRPC_SERVICE_TIMEOUT,
                         )))
                         .add_service(
-                            crate::grpc_impl::api::domain_registration_server::DomainRegistrationServer::new(domain_registration_api)
+                            crate::grpc_impl::grpc_api_stubs::domain_registration_server::DomainRegistrationServer::new(domain_registration_api)
                                 .max_decoding_message_size(usize::MAX),
                         )
                         .serve(host)

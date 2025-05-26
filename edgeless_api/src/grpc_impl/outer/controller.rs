@@ -42,7 +42,7 @@ impl WorkflowInstanceAPIServer {
                             crate::grpc_impl::common::GRPC_SERVICE_TIMEOUT,
                         )))
                         .add_service(
-                            crate::grpc_impl::api::workflow_instance_server::WorkflowInstanceServer::new(workflow_api)
+                            crate::grpc_impl::grpc_api_stubs::workflow_instance_server::WorkflowInstanceServer::new(workflow_api)
                                 .max_decoding_message_size(usize::MAX),
                         )
                         .serve(host)

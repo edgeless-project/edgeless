@@ -26,7 +26,7 @@ impl ClientDesc {
                     let addr = std::net::SocketAddrV4::new(host.parse().unwrap(), port);
                     Box::new(edgeless_api::coap_impl::CoapClient::new(addr).await)
                 }
-                _ => Box::new(edgeless_api::grpc_impl::outer::agent::AgentAPIClient::new(&request.agent_url)),
+                _ => Box::new(edgeless_api::grpc_impl::outer::agent::AgentAPIClient::new(&request.agent_url).await),
             },
             capabilities: request.capabilities.clone(),
         })

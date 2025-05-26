@@ -8,7 +8,7 @@ pub struct FunctonInstanceConverters {}
 
 impl FunctonInstanceConverters {
     pub fn parse_function_class_specification(
-        api_spec: &crate::grpc_impl::api::FunctionClassSpecification,
+        api_spec: &crate::grpc_impl::grpc_api_stubs::FunctionClassSpecification,
     ) -> anyhow::Result<crate::function_instance::FunctionClassSpecification> {
         Ok(crate::function_instance::FunctionClassSpecification {
             function_class_id: api_spec.function_class_id.clone(),
@@ -20,7 +20,7 @@ impl FunctonInstanceConverters {
     }
 
     pub fn parse_spawn_function_request(
-        api_request: &crate::grpc_impl::api::SpawnFunctionRequest,
+        api_request: &crate::grpc_impl::grpc_api_stubs::SpawnFunctionRequest,
     ) -> anyhow::Result<crate::function_instance::SpawnFunctionRequest> {
         Ok(crate::function_instance::SpawnFunctionRequest {
             code: Self::parse_function_class_specification(match api_request.code.as_ref() {
@@ -41,7 +41,7 @@ impl FunctonInstanceConverters {
     }
 
     pub fn parse_state_specification(
-        api_spec: &crate::grpc_impl::api::StateSpecification,
+        api_spec: &crate::grpc_impl::grpc_api_stubs::StateSpecification,
     ) -> anyhow::Result<crate::function_instance::StateSpecification> {
         Ok(crate::function_instance::StateSpecification {
             state_id: uuid::Uuid::parse_str(&api_spec.state_id)?,
@@ -55,8 +55,8 @@ impl FunctonInstanceConverters {
 
     pub fn serialize_function_class_specification(
         spec: &crate::function_instance::FunctionClassSpecification,
-    ) -> crate::grpc_impl::api::FunctionClassSpecification {
-        crate::grpc_impl::api::FunctionClassSpecification {
+    ) -> crate::grpc_impl::grpc_api_stubs::FunctionClassSpecification {
+        crate::grpc_impl::grpc_api_stubs::FunctionClassSpecification {
             function_class_id: spec.function_class_id.clone(),
             function_class_type: spec.function_class_type.clone(),
             function_class_version: spec.function_class_version.clone(),
@@ -65,8 +65,8 @@ impl FunctonInstanceConverters {
         }
     }
 
-    pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFunctionRequest) -> crate::grpc_impl::api::SpawnFunctionRequest {
-        crate::grpc_impl::api::SpawnFunctionRequest {
+    pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFunctionRequest) -> crate::grpc_impl::grpc_api_stubs::SpawnFunctionRequest {
+        crate::grpc_impl::grpc_api_stubs::SpawnFunctionRequest {
             code: Some(Self::serialize_function_class_specification(&req.code)),
             annotations: req.annotations.clone(),
             state_specification: Some(Self::serialize_state_specification(&req.state_specification)),
@@ -74,13 +74,13 @@ impl FunctonInstanceConverters {
         }
     }
 
-    pub fn serialize_state_specification(crate_spec: &crate::function_instance::StateSpecification) -> crate::grpc_impl::api::StateSpecification {
-        crate::grpc_impl::api::StateSpecification {
+    pub fn serialize_state_specification(crate_spec: &crate::function_instance::StateSpecification) -> crate::grpc_impl::grpc_api_stubs::StateSpecification {
+        crate::grpc_impl::grpc_api_stubs::StateSpecification {
             state_id: crate_spec.state_id.to_string(),
             policy: match crate_spec.state_policy {
-                crate::function_instance::StatePolicy::Transient => crate::grpc_impl::api::StatePolicy::Transient as i32,
-                crate::function_instance::StatePolicy::Global => crate::grpc_impl::api::StatePolicy::Global as i32,
-                crate::function_instance::StatePolicy::NodeLocal => crate::grpc_impl::api::StatePolicy::NodeLocal as i32,
+                crate::function_instance::StatePolicy::Transient => crate::grpc_impl::grpc_api_stubs::StatePolicy::Transient as i32,
+                crate::function_instance::StatePolicy::Global => crate::grpc_impl::grpc_api_stubs::StatePolicy::Global as i32,
+                crate::function_instance::StatePolicy::NodeLocal => crate::grpc_impl::grpc_api_stubs::StatePolicy::NodeLocal as i32,
             },
         }
     }
@@ -88,7 +88,7 @@ impl FunctonInstanceConverters {
 
 #[derive(Clone)]
 pub struct FunctionInstanceAPIClient<FunctionIdType> {
-    client: Option<crate::grpc_impl::api::function_instance_client::FunctionInstanceClient<tonic::transport::Channel>>,
+    client: Option<crate::grpc_impl::grpc_api_stubs::function_instance_client::FunctionInstanceClient<tonic::transport::Channel>>,
     server_addr: String,
     _phantom: std::marker::PhantomData<FunctionIdType>,
 }
@@ -108,7 +108,7 @@ impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + 
     /// Otherwise, the client is set to some value (connected).
     async fn try_connect(&mut self) -> anyhow::Result<()> {
         if self.client.is_none() {
-            self.client = match crate::grpc_impl::api::function_instance_client::FunctionInstanceClient::connect(self.server_addr.clone()).await {
+            self.client = match crate::grpc_impl::grpc_api_stubs::function_instance_client::FunctionInstanceClient::connect(self.server_addr.clone()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
                     Some(client)
@@ -129,7 +129,7 @@ impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + 
 impl<FunctionIdType: super::common::SerializeableId + Clone + Send + Sync + 'static> crate::function_instance::FunctionInstanceAPI<FunctionIdType>
     for FunctionInstanceAPIClient<FunctionIdType>
 where
-    super::api::InstanceIdVariant: super::common::ParseableId<FunctionIdType>,
+    super::grpc_api_stubs::InstanceIdVariant: super::common::ParseableId<FunctionIdType>,
 {
     async fn start(
         &mut self,
@@ -221,20 +221,20 @@ pub struct FunctionInstanceAPIServer<FunctionIdType> {
 
 #[async_trait::async_trait]
 impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + 'static>
-    crate::grpc_impl::api::function_instance_server::FunctionInstance for FunctionInstanceAPIServer<FunctionIdType>
+    crate::grpc_impl::grpc_api_stubs::function_instance_server::FunctionInstance for FunctionInstanceAPIServer<FunctionIdType>
 where
-    crate::grpc_impl::api::InstanceIdVariant: crate::grpc_impl::common::ParseableId<FunctionIdType>,
+    crate::grpc_impl::grpc_api_stubs::InstanceIdVariant: crate::grpc_impl::common::ParseableId<FunctionIdType>,
 {
     async fn start(
         &self,
-        request: tonic::Request<crate::grpc_impl::api::SpawnFunctionRequest>,
-    ) -> Result<tonic::Response<crate::grpc_impl::api::StartComponentResponse>, tonic::Status> {
+        request: tonic::Request<crate::grpc_impl::grpc_api_stubs::SpawnFunctionRequest>,
+    ) -> Result<tonic::Response<crate::grpc_impl::grpc_api_stubs::StartComponentResponse>, tonic::Status> {
         let inner_request = request.into_inner();
         let parsed_request = match FunctonInstanceConverters::parse_spawn_function_request(&inner_request) {
             Ok(val) => val,
             Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
-                    response_error: Some(crate::grpc_impl::api::ResponseError {
+                return Ok(tonic::Response::new(crate::grpc_impl::grpc_api_stubs::StartComponentResponse {
+                    response_error: Some(crate::grpc_impl::grpc_api_stubs::ResponseError {
                         summary: "Invalid function instance creation request".to_string(),
                         detail: Some(err.to_string()),
                     }),
@@ -245,8 +245,8 @@ where
         match self.root_api.lock().await.start(parsed_request).await {
             Ok(response) => Ok(tonic::Response::new(CommonConverters::serialize_start_component_response(&response))),
             Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
-                    response_error: Some(crate::grpc_impl::api::ResponseError {
+                return Ok(tonic::Response::new(crate::grpc_impl::grpc_api_stubs::StartComponentResponse {
+                    response_error: Some(crate::grpc_impl::grpc_api_stubs::ResponseError {
                         summary: "Function instance creation request rejected".to_string(),
                         detail: Some(err.to_string()),
                     }),
@@ -256,7 +256,7 @@ where
         }
     }
 
-    async fn stop(&self, request: tonic::Request<super::api::InstanceIdVariant>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn stop(&self, request: tonic::Request<super::grpc_api_stubs::InstanceIdVariant>) -> Result<tonic::Response<()>, tonic::Status> {
         let stop_function_id = match crate::grpc_impl::common::ParseableId::<FunctionIdType>::parse(&request.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
@@ -273,7 +273,7 @@ where
         }
     }
 
-    async fn patch(&self, update: tonic::Request<crate::grpc_impl::api::PatchRequest>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn patch(&self, update: tonic::Request<crate::grpc_impl::grpc_api_stubs::PatchRequest>) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_update = match CommonConverters::parse_patch_request(&update.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {

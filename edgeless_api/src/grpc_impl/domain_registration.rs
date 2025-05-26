@@ -14,7 +14,7 @@ use super::common::GRPC_SERVICE_RETRIES;
 ///
 #[derive(Clone)]
 pub struct DomainRegistrationAPIClient {
-    client: Option<crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient<tonic::transport::Channel>>,
+    client: Option<crate::grpc_impl::grpc_api_stubs::domain_registration_client::DomainRegistrationClient<tonic::transport::Channel>>,
     server_addr: String,
 }
 
@@ -29,7 +29,7 @@ impl DomainRegistrationAPIClient {
     /// Otherwise, the client is set to some value (connected).
     async fn try_connect(&mut self) -> anyhow::Result<()> {
         if self.client.is_none() {
-            self.client = match crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient::connect(self.server_addr.clone()).await {
+            self.client = match crate::grpc_impl::grpc_api_stubs::domain_registration_client::DomainRegistrationClient::connect(self.server_addr.clone()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
                     // add a retry policy
@@ -85,11 +85,11 @@ pub struct DomainRegistrationAPIServer {
 }
 
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::domain_registration_server::DomainRegistration for DomainRegistrationAPIServer {
+impl crate::grpc_impl::grpc_api_stubs::domain_registration_server::DomainRegistration for DomainRegistrationAPIServer {
     async fn update_domain(
         &self,
-        request: tonic::Request<crate::grpc_impl::api::UpdateDomainRequest>,
-    ) -> Result<tonic::Response<crate::grpc_impl::api::UpdateDomainResponse>, tonic::Status> {
+        request: tonic::Request<crate::grpc_impl::grpc_api_stubs::UpdateDomainRequest>,
+    ) -> Result<tonic::Response<crate::grpc_impl::grpc_api_stubs::UpdateDomainResponse>, tonic::Status> {
         let parsed_request = match parse_update_domain_request(&request.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -107,7 +107,7 @@ impl crate::grpc_impl::api::domain_registration_server::DomainRegistration for D
     }
 }
 
-pub fn parse_domain_capabilities(api_instance: &crate::grpc_impl::api::DomainCapabilities) -> crate::domain_registration::DomainCapabilities {
+pub fn parse_domain_capabilities(api_instance: &crate::grpc_impl::grpc_api_stubs::DomainCapabilities) -> crate::domain_registration::DomainCapabilities {
     crate::domain_registration::DomainCapabilities {
         num_nodes: api_instance.num_nodes,
         num_cpus: api_instance.num_cpus,
@@ -125,8 +125,8 @@ pub fn parse_domain_capabilities(api_instance: &crate::grpc_impl::api::DomainCap
     }
 }
 
-pub fn serialize_domain_capabilities(req: &crate::domain_registration::DomainCapabilities) -> crate::grpc_impl::api::DomainCapabilities {
-    crate::grpc_impl::api::DomainCapabilities {
+pub fn serialize_domain_capabilities(req: &crate::domain_registration::DomainCapabilities) -> crate::grpc_impl::grpc_api_stubs::DomainCapabilities {
+    crate::grpc_impl::grpc_api_stubs::DomainCapabilities {
         num_nodes: req.num_nodes,
         num_cpus: req.num_cpus,
         num_cores: req.num_cores,
@@ -144,7 +144,7 @@ pub fn serialize_domain_capabilities(req: &crate::domain_registration::DomainCap
 }
 
 fn parse_update_domain_request(
-    api_instance: &crate::grpc_impl::api::UpdateDomainRequest,
+    api_instance: &crate::grpc_impl::grpc_api_stubs::UpdateDomainRequest,
 ) -> anyhow::Result<crate::domain_registration::UpdateDomainRequest> {
     let capabilities = match &api_instance.capabilities {
         Some(capabilities) => parse_domain_capabilities(capabilities),
@@ -160,20 +160,20 @@ fn parse_update_domain_request(
     })
 }
 
-fn serialize_update_domain_response(req: &crate::domain_registration::UpdateDomainResponse) -> crate::grpc_impl::api::UpdateDomainResponse {
+fn serialize_update_domain_response(req: &crate::domain_registration::UpdateDomainResponse) -> crate::grpc_impl::grpc_api_stubs::UpdateDomainResponse {
     match req {
-        crate::domain_registration::UpdateDomainResponse::ResponseError(err) => crate::grpc_impl::api::UpdateDomainResponse {
-            response_error: Some(crate::grpc_impl::api::ResponseError {
+        crate::domain_registration::UpdateDomainResponse::ResponseError(err) => crate::grpc_impl::grpc_api_stubs::UpdateDomainResponse {
+            response_error: Some(crate::grpc_impl::grpc_api_stubs::ResponseError {
                 summary: err.summary.clone(),
                 detail: err.detail.clone(),
             }),
             reset: false,
         },
-        crate::domain_registration::UpdateDomainResponse::Accepted => crate::grpc_impl::api::UpdateDomainResponse {
+        crate::domain_registration::UpdateDomainResponse::Accepted => crate::grpc_impl::grpc_api_stubs::UpdateDomainResponse {
             response_error: None,
             reset: false,
         },
-        crate::domain_registration::UpdateDomainResponse::Reset => crate::grpc_impl::api::UpdateDomainResponse {
+        crate::domain_registration::UpdateDomainResponse::Reset => crate::grpc_impl::grpc_api_stubs::UpdateDomainResponse {
             response_error: None,
             reset: true,
         },
@@ -181,7 +181,7 @@ fn serialize_update_domain_response(req: &crate::domain_registration::UpdateDoma
 }
 
 fn parse_update_domain_response(
-    api_instance: &crate::grpc_impl::api::UpdateDomainResponse,
+    api_instance: &crate::grpc_impl::grpc_api_stubs::UpdateDomainResponse,
 ) -> anyhow::Result<crate::domain_registration::UpdateDomainResponse> {
     match api_instance.response_error.as_ref() {
         Some(err) => Ok(crate::domain_registration::UpdateDomainResponse::ResponseError(
@@ -197,8 +197,8 @@ fn parse_update_domain_response(
     }
 }
 
-fn serialize_update_domain_request(req: &crate::domain_registration::UpdateDomainRequest) -> crate::grpc_impl::api::UpdateDomainRequest {
-    crate::grpc_impl::api::UpdateDomainRequest {
+fn serialize_update_domain_request(req: &crate::domain_registration::UpdateDomainRequest) -> crate::grpc_impl::grpc_api_stubs::UpdateDomainRequest {
+    crate::grpc_impl::grpc_api_stubs::UpdateDomainRequest {
         domain_id: req.domain_id.clone(),
         orchestrator_url: req.orchestrator_url.clone(),
         capabilities: Some(serialize_domain_capabilities(&req.capabilities)),
