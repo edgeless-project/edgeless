@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-use super::common::CommonConverters;
+use crate::grpc_impl::common::CommonConverters;
 
 struct InvocationConverters {}
 
@@ -129,7 +129,7 @@ pub struct InvocationAPIServer {}
 impl InvocationAPIServer {
     pub fn run(data_plane: Box<dyn crate::invocation::InvocationAPI>, invocation_url: String) -> futures::future::BoxFuture<'static, ()> {
         let data_plane = data_plane;
-        let function_api = crate::grpc_impl::invocation::InvocationAPIServerHandler {
+        let function_api = super::invocation::InvocationAPIServerHandler {
             root_api: tokio::sync::Mutex::new(data_plane),
         };
         Box::pin(async move {
