@@ -56,22 +56,24 @@ pub trait ParseableId<IdType> {
     fn parse(api_id_variant: &Self) -> anyhow::Result<IdType>;
 }
 pub trait SerializeableId {
-    fn serialize(id: &Self) -> crate::grpc_impl::api::InstanceIdVariant;
+    fn serialize(id: &Self) -> crate::grpc_impl::grpc_api_stubs::InstanceIdVariant;
 }
 
-impl ParseableId<edgeless_api_core::instance_id::InstanceId> for crate::grpc_impl::api::InstanceIdVariant {
+impl ParseableId<edgeless_api_core::instance_id::InstanceId> for crate::grpc_impl::grpc_api_stubs::InstanceIdVariant {
     fn parse(api_id_variant: &Self) -> anyhow::Result<crate::function_instance::InstanceId> {
         match api_id_variant.clone().instance_id_type.ok_or(anyhow::anyhow!("Missing Id"))? {
-            crate::grpc_impl::api::instance_id_variant::InstanceIdType::InstanceId(instance_id) => CommonConverters::parse_instance_id(&instance_id),
+            crate::grpc_impl::grpc_api_stubs::instance_id_variant::InstanceIdType::InstanceId(instance_id) => {
+                CommonConverters::parse_instance_id(&instance_id)
+            }
             _ => Err(anyhow::anyhow!("Wrong Type")),
         }
     }
 }
 
-impl ParseableId<crate::function_instance::DomainManagedInstanceId> for crate::grpc_impl::api::InstanceIdVariant {
+impl ParseableId<crate::function_instance::DomainManagedInstanceId> for crate::grpc_impl::grpc_api_stubs::InstanceIdVariant {
     fn parse(api_id_variant: &Self) -> anyhow::Result<crate::function_instance::DomainManagedInstanceId> {
         match api_id_variant.clone().instance_id_type.ok_or(anyhow::anyhow!("Missing Id"))? {
-            crate::grpc_impl::api::instance_id_variant::InstanceIdType::DomainManagedInstanceId(instance_id) => {
+            crate::grpc_impl::grpc_api_stubs::instance_id_variant::InstanceIdType::DomainManagedInstanceId(instance_id) => {
                 CommonConverters::parse_domain_managed_instance_id(&instance_id)
             }
             _ => Err(anyhow::anyhow!("Wrong Type")),
@@ -80,9 +82,9 @@ impl ParseableId<crate::function_instance::DomainManagedInstanceId> for crate::g
 }
 
 impl SerializeableId for edgeless_api_core::instance_id::InstanceId {
-    fn serialize(id: &Self) -> crate::grpc_impl::api::InstanceIdVariant {
-        crate::grpc_impl::api::InstanceIdVariant {
-            instance_id_type: Some(crate::grpc_impl::api::instance_id_variant::InstanceIdType::InstanceId(
+    fn serialize(id: &Self) -> crate::grpc_impl::grpc_api_stubs::InstanceIdVariant {
+        crate::grpc_impl::grpc_api_stubs::InstanceIdVariant {
+            instance_id_type: Some(crate::grpc_impl::grpc_api_stubs::instance_id_variant::InstanceIdType::InstanceId(
                 CommonConverters::serialize_instance_id(id),
             )),
         }
@@ -90,31 +92,35 @@ impl SerializeableId for edgeless_api_core::instance_id::InstanceId {
 }
 
 impl SerializeableId for crate::function_instance::DomainManagedInstanceId {
-    fn serialize(id: &Self) -> crate::grpc_impl::api::InstanceIdVariant {
-        crate::grpc_impl::api::InstanceIdVariant {
-            instance_id_type: Some(crate::grpc_impl::api::instance_id_variant::InstanceIdType::DomainManagedInstanceId(
-                CommonConverters::serialize_domain_managed_instance_id(id),
-            )),
+    fn serialize(id: &Self) -> crate::grpc_impl::grpc_api_stubs::InstanceIdVariant {
+        crate::grpc_impl::grpc_api_stubs::InstanceIdVariant {
+            instance_id_type: Some(
+                crate::grpc_impl::grpc_api_stubs::instance_id_variant::InstanceIdType::DomainManagedInstanceId(
+                    CommonConverters::serialize_domain_managed_instance_id(id),
+                ),
+            ),
         }
     }
 }
 
 impl CommonConverters {
-    pub fn parse_response_error(api_request: &crate::grpc_impl::api::ResponseError) -> anyhow::Result<crate::common::ResponseError> {
+    pub fn parse_response_error(api_request: &crate::grpc_impl::grpc_api_stubs::ResponseError) -> anyhow::Result<crate::common::ResponseError> {
         Ok(crate::common::ResponseError {
             summary: api_request.summary.to_string(),
             detail: api_request.detail.clone(),
         })
     }
 
-    pub fn parse_instance_id(api_id: &crate::grpc_impl::api::InstanceId) -> anyhow::Result<crate::function_instance::InstanceId> {
+    pub fn parse_instance_id(api_id: &crate::grpc_impl::grpc_api_stubs::InstanceId) -> anyhow::Result<crate::function_instance::InstanceId> {
         Ok(crate::function_instance::InstanceId {
             node_id: uuid::Uuid::parse_str(&api_id.node_id)?,
             function_id: uuid::Uuid::parse_str(&api_id.function_id)?,
         })
     }
 
-    pub fn parse_event_timestamp(api_ts: &crate::grpc_impl::api::EventTimestamp) -> anyhow::Result<crate::function_instance::EventTimestamp> {
+    pub fn parse_event_timestamp(
+        api_ts: &crate::grpc_impl::grpc_api_stubs::EventTimestamp,
+    ) -> anyhow::Result<crate::function_instance::EventTimestamp> {
         Ok(crate::function_instance::EventTimestamp {
             secs: api_ts.secs,
             nsecs: api_ts.nsecs,
@@ -122,13 +128,13 @@ impl CommonConverters {
     }
 
     pub fn parse_domain_managed_instance_id(
-        api_id: &crate::grpc_impl::api::DomainManagedInstanceId,
+        api_id: &crate::grpc_impl::grpc_api_stubs::DomainManagedInstanceId,
     ) -> anyhow::Result<crate::function_instance::DomainManagedInstanceId> {
         Ok(uuid::Uuid::parse_str(&api_id.instance_id)?)
     }
 
     pub fn parse_start_component_response<ResourceIdType>(
-        api_instance: &crate::grpc_impl::api::StartComponentResponse,
+        api_instance: &crate::grpc_impl::grpc_api_stubs::StartComponentResponse,
     ) -> anyhow::Result<crate::common::StartComponentResponse<ResourceIdType>>
     where
         crate::grpc_impl::api::InstanceIdVariant: ParseableId<ResourceIdType>,
@@ -150,7 +156,7 @@ impl CommonConverters {
         }
     }
 
-    pub fn parse_patch_request(api_update: &crate::grpc_impl::api::PatchRequest) -> anyhow::Result<crate::common::PatchRequest> {
+    pub fn parse_patch_request(api_update: &crate::grpc_impl::grpc_api_stubs::PatchRequest) -> anyhow::Result<crate::common::PatchRequest> {
         Ok(crate::common::PatchRequest {
             function_id: uuid::Uuid::parse_str(&api_update.function_id)?,
             output_mapping: api_update
@@ -164,22 +170,22 @@ impl CommonConverters {
         })
     }
 
-    pub fn serialize_response_error(crate_function: &crate::common::ResponseError) -> crate::grpc_impl::api::ResponseError {
-        crate::grpc_impl::api::ResponseError {
+    pub fn serialize_response_error(crate_function: &crate::common::ResponseError) -> crate::grpc_impl::grpc_api_stubs::ResponseError {
+        crate::grpc_impl::grpc_api_stubs::ResponseError {
             summary: crate_function.summary.clone(),
             detail: crate_function.detail.clone(),
         }
     }
 
-    pub fn serialize_instance_id(instance_id: &crate::function_instance::InstanceId) -> crate::grpc_impl::api::InstanceId {
-        crate::grpc_impl::api::InstanceId {
+    pub fn serialize_instance_id(instance_id: &crate::function_instance::InstanceId) -> crate::grpc_impl::grpc_api_stubs::InstanceId {
+        crate::grpc_impl::grpc_api_stubs::InstanceId {
             node_id: instance_id.node_id.to_string(),
             function_id: instance_id.function_id.to_string(),
         }
     }
 
-    pub fn serialize_event_timestamp(ts: &crate::function_instance::EventTimestamp) -> crate::grpc_impl::api::EventTimestamp {
-        crate::grpc_impl::api::EventTimestamp {
+    pub fn serialize_event_timestamp(ts: &crate::function_instance::EventTimestamp) -> crate::grpc_impl::grpc_api_stubs::EventTimestamp {
+        crate::grpc_impl::grpc_api_stubs::EventTimestamp {
             secs: ts.secs,
             nsecs: ts.nsecs,
         }
@@ -187,29 +193,29 @@ impl CommonConverters {
 
     pub fn serialize_domain_managed_instance_id(
         instance_id: &crate::function_instance::DomainManagedInstanceId,
-    ) -> crate::grpc_impl::api::DomainManagedInstanceId {
-        crate::grpc_impl::api::DomainManagedInstanceId {
+    ) -> crate::grpc_impl::grpc_api_stubs::DomainManagedInstanceId {
+        crate::grpc_impl::grpc_api_stubs::DomainManagedInstanceId {
             instance_id: instance_id.to_string(),
         }
     }
 
     pub fn serialize_start_component_response<ComponentIdType: SerializeableId>(
         req: &crate::common::StartComponentResponse<ComponentIdType>,
-    ) -> crate::grpc_impl::api::StartComponentResponse {
+    ) -> crate::grpc_impl::grpc_api_stubs::StartComponentResponse {
         match req {
-            crate::common::StartComponentResponse::ResponseError(err) => crate::grpc_impl::api::StartComponentResponse {
+            crate::common::StartComponentResponse::ResponseError(err) => crate::grpc_impl::grpc_api_stubs::StartComponentResponse {
                 response_error: Some(CommonConverters::serialize_response_error(err)),
                 instance_id: None,
             },
-            crate::common::StartComponentResponse::InstanceId(id) => crate::grpc_impl::api::StartComponentResponse {
+            crate::common::StartComponentResponse::InstanceId(id) => crate::grpc_impl::grpc_api_stubs::StartComponentResponse {
                 response_error: None,
                 instance_id: Some(SerializeableId::serialize(id)),
             },
         }
     }
 
-    pub fn serialize_patch_request(crate_update: &crate::common::PatchRequest) -> crate::grpc_impl::api::PatchRequest {
-        crate::grpc_impl::api::PatchRequest {
+    pub fn serialize_patch_request(crate_update: &crate::common::PatchRequest) -> crate::grpc_impl::grpc_api_stubs::PatchRequest {
+        crate::grpc_impl::grpc_api_stubs::PatchRequest {
             function_id: crate_update.function_id.to_string(),
             output_mapping: crate_update
                 .output_mapping

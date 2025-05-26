@@ -575,7 +575,7 @@ impl OrchestratorTask {
                 }
             },
             Err(err) => {
-                log::error!("Unhandled: {}", err);
+                log::error!("Unhandled error, when starting a workflow: {}", err);
                 Err(anyhow::anyhow!("Could not start a function instance for LID {}: {}", lid, err))
             }
         }
@@ -850,7 +850,7 @@ impl OrchestratorTask {
                 .update_peers(edgeless_api::node_management::UpdatePeersRequest::Del(node_id))
                 .await
             {
-                log::error!("Unhandled: {}", err);
+                log::error!("Unhandled error when updating peers: {}", err);
             }
         }
 

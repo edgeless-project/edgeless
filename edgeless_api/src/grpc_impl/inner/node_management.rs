@@ -2,12 +2,16 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
+use std::{str::FromStr, time::Duration};
 
-use std::str::FromStr;
+const RECONNECT_TRIES: i32 = 5;
+const RECONNECT_TIMEOUT: u64 = 500;
+const TIMEOUT: u64 = 500;
+const TCP_KEEPALIVE: u64 = 2000;
 
 #[derive(Clone)]
 pub struct NodeManagementClient {
-    client: Option<crate::grpc_impl::api::node_management_client::NodeManagementClient<tonic::transport::Channel>>,
+    client: crate::grpc_impl::grpc_api_stubs::node_management_client::NodeManagementClient<tonic::transport::Channel>,
     server_addr: String,
 }
 
@@ -16,81 +20,98 @@ pub struct NodeManagementAPIService {
 }
 
 impl NodeManagementClient {
-    pub fn new(server_addr: String) -> Self {
-        Self { client: None, server_addr }
-    }
-
-    /// Try connecting, if not already connected.
-    ///
-    /// If an error is returned, then the client is set to None (disconnected).
-    /// Otherwise, the client is set to some value (connected).
-    async fn try_connect(&mut self) -> anyhow::Result<()> {
-        if self.client.is_none() {
-            self.client = match crate::grpc_impl::api::node_management_client::NodeManagementClient::connect(self.server_addr.clone()).await {
+    pub async fn new(server_addr: String) -> Self {
+        loop {
+            match crate::grpc_impl::grpc_api_stubs::node_management_client::NodeManagementClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    // add service level retry policy
-                    let retry_policy = super::common::Attempts(super::common::GRPC_SERVICE_RETRIES);
-                    let retrying_client = tower::retry::Retry::new(retry_policy, client);
-                    Some(retrying_client.get_ref().clone())
+                    // TODO: add client level retry policy
+                    return Self {
+                        client,
+                        server_addr: server_addr.to_string(),
+                    };
                 }
-                Err(err) => anyhow::bail!(err),
+                Err(e) => {
+                    log::warn!("Waiting for NodeManagementAPI to connect: {e}");
+                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                }
             }
         }
-        Ok(())
     }
 
-    /// Disconnect the client.
-    fn disconnect(&mut self) {
-        self.client = None;
+    async fn reconnect(&mut self) -> Result<(), anyhow::Error> {
+        let mut retries = RECONNECT_TRIES;
+        loop {
+            if retries == 0 {
+                log::error!("could not reconnect in reasonable time");
+                anyhow::bail!("could not reconnect in reasonable time");
+            }
+            match crate::grpc_impl::grpc_api_stubs::node_management_client::NodeManagementClient::connect(self.server_addr.clone()).await {
+                Ok(client) => {
+                    self.client = client.max_decoding_message_size(usize::MAX);
+                    return Ok(());
+                }
+                Err(e) => {
+                    log::warn!("Waiting for NodeManagementAPI to reconnect: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_millis(RECONNECT_TIMEOUT)).await;
+                }
+            }
+            retries -= 1;
+        }
     }
 }
 
 #[async_trait::async_trait]
 impl crate::node_management::NodeManagementAPI for NodeManagementClient {
     async fn update_peers(&mut self, request: crate::node_management::UpdatePeersRequest) -> anyhow::Result<()> {
-        match self.try_connect().await {
-            Ok(_) => {
-                if let Some(client) = &mut self.client {
-                    if let Err(err) = client.update_peers(tonic::Request::new(serialize_update_peers_request(&request))).await {
-                        self.disconnect();
-                        anyhow::bail!("Error when updating peers at {}: {}", self.server_addr, err.to_string());
-                    } else {
-                        Ok(())
-                    }
+        loop {
+            let serialized_event = serialize_update_peers_request(&request);
+            let res = tokio::time::timeout(
+                Duration::from_millis(TIMEOUT),
+                self.client.update_peers(tonic::Request::new(serialized_event)),
+            )
+            .await;
+            // first Result layer is for the tokio::time::timeout
+            if let Ok(_) = res {
+                return anyhow::Ok(());
+            } else if let Err(_) = res {
+                let res = self.reconnect().await;
+                if let Ok(_) = res {
+                    log::info!("reconnected successfully, retrying the request");
+                    continue;
                 } else {
-                    panic!("The impossible happened");
+                    log::error!("reconnect did not work");
+                    return Err(anyhow::anyhow!("Error in NodeManagementAPI {}", self.server_addr));
                 }
-            }
-            Err(err) => {
-                anyhow::bail!("Error when connecting to {}: {}", self.server_addr, err);
             }
         }
     }
     async fn reset(&mut self) -> anyhow::Result<()> {
-        match self.try_connect().await {
-            Ok(_) => {
-                if let Some(client) = &mut self.client {
-                    if let Err(err) = client.reset(tonic::Request::new(())).await {
-                        self.disconnect();
-                        anyhow::bail!("Error when resetting at {}: {}", self.server_addr, err.to_string());
-                    } else {
-                        Ok(())
-                    }
+        loop {
+            let res = tokio::time::timeout(Duration::from_millis(TIMEOUT), self.client.reset(tonic::Request::new(()))).await;
+            // first Result layer is for the tokio::time::timeout
+            if let Ok(_) = res {
+                return anyhow::Ok(());
+            } else if let Err(_) = res {
+                let res = self.reconnect().await;
+                if let Ok(_) = res {
+                    log::info!("reconnected successfully, retrying the request");
+                    continue;
                 } else {
-                    panic!("The impossible happened");
+                    log::error!("reconnect did not work");
+                    return Err(anyhow::anyhow!("Error in NodeManagementAPI {}", self.server_addr));
                 }
-            }
-            Err(err) => {
-                anyhow::bail!("Error when resetting to {}: {}", self.server_addr, err);
             }
         }
     }
 }
 
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::node_management_server::NodeManagement for NodeManagementAPIService {
-    async fn update_peers(&self, request: tonic::Request<crate::grpc_impl::api::UpdatePeersRequest>) -> Result<tonic::Response<()>, tonic::Status> {
+impl crate::grpc_impl::grpc_api_stubs::node_management_server::NodeManagement for NodeManagementAPIService {
+    async fn update_peers(
+        &self,
+        request: tonic::Request<crate::grpc_impl::grpc_api_stubs::UpdatePeersRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match parse_update_peers_request(&request.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -118,7 +139,7 @@ fn parse_update_peers_request(
     api_instance: &crate::grpc_impl::api::UpdatePeersRequest,
 ) -> anyhow::Result<crate::node_management::UpdatePeersRequest> {
     match api_instance.request_type {
-        x if x == crate::grpc_impl::api::UpdatePeersRequestType::Add as i32 => {
+        x if x == crate::grpc_impl::grpc_api_stubs::UpdatePeersRequestType::Add as i32 => {
             if let (Some(node_id), Some(invocation_url)) = (&api_instance.node_id, &api_instance.invocation_url) {
                 let node_id = uuid::Uuid::from_str(node_id.as_str());
                 match node_id {
@@ -131,7 +152,7 @@ fn parse_update_peers_request(
                 ))
             }
         }
-        x if x == crate::grpc_impl::api::UpdatePeersRequestType::Del as i32 => {
+        x if x == crate::grpc_impl::grpc_api_stubs::UpdatePeersRequestType::Del as i32 => {
             if let Some(node_id) = &api_instance.node_id {
                 let node_id = uuid::Uuid::from_str(node_id.as_str());
                 match node_id {
@@ -144,25 +165,25 @@ fn parse_update_peers_request(
                 ))
             }
         }
-        x if x == crate::grpc_impl::api::UpdatePeersRequestType::Clear as i32 => Ok(crate::node_management::UpdatePeersRequest::Clear),
+        x if x == crate::grpc_impl::grpc_api_stubs::UpdatePeersRequestType::Clear as i32 => Ok(crate::node_management::UpdatePeersRequest::Clear),
         x => Err(anyhow::anyhow!("Ill-formed UpdatePeersRequest message: unknown type {}", x)),
     }
 }
 
-fn serialize_update_peers_request(req: &crate::node_management::UpdatePeersRequest) -> crate::grpc_impl::api::UpdatePeersRequest {
+fn serialize_update_peers_request(req: &crate::node_management::UpdatePeersRequest) -> crate::grpc_impl::grpc_api_stubs::UpdatePeersRequest {
     match req {
-        crate::node_management::UpdatePeersRequest::Add(node_id, invocation_url) => crate::grpc_impl::api::UpdatePeersRequest {
-            request_type: crate::grpc_impl::api::UpdatePeersRequestType::Add as i32,
+        crate::node_management::UpdatePeersRequest::Add(node_id, invocation_url) => crate::grpc_impl::grpc_api_stubs::UpdatePeersRequest {
+            request_type: crate::grpc_impl::grpc_api_stubs::UpdatePeersRequestType::Add as i32,
             node_id: Some(node_id.to_string()),
             invocation_url: Some(invocation_url.clone()),
         },
-        crate::node_management::UpdatePeersRequest::Del(node_id) => crate::grpc_impl::api::UpdatePeersRequest {
-            request_type: crate::grpc_impl::api::UpdatePeersRequestType::Del as i32,
+        crate::node_management::UpdatePeersRequest::Del(node_id) => crate::grpc_impl::grpc_api_stubs::UpdatePeersRequest {
+            request_type: crate::grpc_impl::grpc_api_stubs::UpdatePeersRequestType::Del as i32,
             node_id: Some(node_id.to_string()),
             invocation_url: None,
         },
-        crate::node_management::UpdatePeersRequest::Clear => crate::grpc_impl::api::UpdatePeersRequest {
-            request_type: crate::grpc_impl::api::UpdatePeersRequestType::Clear as i32,
+        crate::node_management::UpdatePeersRequest::Clear => crate::grpc_impl::grpc_api_stubs::UpdatePeersRequest {
+            request_type: crate::grpc_impl::grpc_api_stubs::UpdatePeersRequestType::Clear as i32,
             node_id: None,
             invocation_url: None,
         },

@@ -3,7 +3,7 @@
 
 #[derive(Clone)]
 pub struct GuestAPIHostClient {
-    client: crate::grpc_impl::api::guest_api_host_client::GuestApiHostClient<tonic::transport::Channel>,
+    client: crate::grpc_impl::grpc_api_stubs::guest_api_host_client::GuestApiHostClient<tonic::transport::Channel>,
 }
 
 pub struct GuestAPIHostService {
@@ -13,7 +13,7 @@ pub struct GuestAPIHostService {
 impl GuestAPIHostClient {
     pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
         loop {
-            match crate::grpc_impl::api::guest_api_host_client::GuestApiHostClient::connect(server_addr.to_string()).await {
+            match crate::grpc_impl::grpc_api_stubs::guest_api_host_client::GuestApiHostClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     // TODO: maybe add retry policy?
                     let client = client.max_decoding_message_size(usize::MAX);
@@ -90,8 +90,8 @@ impl crate::guest_api_host::GuestAPIHost for GuestAPIHostClient {
 }
 
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHostService {
-    async fn cast(&self, event: tonic::Request<crate::grpc_impl::api::OutputEventData>) -> Result<tonic::Response<()>, tonic::Status> {
+impl crate::grpc_impl::grpc_api_stubs::guest_api_host_server::GuestApiHost for GuestAPIHostService {
+    async fn cast(&self, event: tonic::Request<crate::grpc_impl::grpc_api_stubs::OutputEventData>) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match parse_output_event_data(&event.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -107,7 +107,10 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
         }
     }
 
-    async fn cast_raw(&self, event: tonic::Request<crate::grpc_impl::api::OutputEventDataRaw>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn cast_raw(
+        &self,
+        event: tonic::Request<crate::grpc_impl::grpc_api_stubs::OutputEventDataRaw>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match parse_output_event_data_raw(&event.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -125,8 +128,8 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
 
     async fn call(
         &self,
-        event: tonic::Request<crate::grpc_impl::api::OutputEventData>,
-    ) -> Result<tonic::Response<crate::grpc_impl::api::CallReturn>, tonic::Status> {
+        event: tonic::Request<crate::grpc_impl::grpc_api_stubs::OutputEventData>,
+    ) -> Result<tonic::Response<crate::grpc_impl::grpc_api_stubs::CallReturn>, tonic::Status> {
         let parsed_request = match parse_output_event_data(&event.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -144,8 +147,8 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
 
     async fn call_raw(
         &self,
-        event: tonic::Request<crate::grpc_impl::api::OutputEventDataRaw>,
-    ) -> Result<tonic::Response<crate::grpc_impl::api::CallReturn>, tonic::Status> {
+        event: tonic::Request<crate::grpc_impl::grpc_api_stubs::OutputEventDataRaw>,
+    ) -> Result<tonic::Response<crate::grpc_impl::grpc_api_stubs::CallReturn>, tonic::Status> {
         let parsed_request = match parse_output_event_data_raw(&event.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -161,7 +164,10 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
         }
     }
 
-    async fn telemetry_log(&self, event: tonic::Request<crate::grpc_impl::api::TelemetryLogEvent>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn telemetry_log(
+        &self,
+        event: tonic::Request<crate::grpc_impl::grpc_api_stubs::TelemetryLogEvent>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match parse_telemetry_log_event(&event.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -177,7 +183,7 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
         }
     }
 
-    async fn slf(&self, _request: tonic::Request<()>) -> Result<tonic::Response<crate::grpc_impl::api::InstanceId>, tonic::Status> {
+    async fn slf(&self, _request: tonic::Request<()>) -> Result<tonic::Response<crate::grpc_impl::grpc_api_stubs::InstanceId>, tonic::Status> {
         match self.guest_api_host.lock().await.slf().await {
             Ok(msg) => Ok(tonic::Response::new(crate::grpc_impl::common::CommonConverters::serialize_instance_id(
                 &msg,
@@ -186,7 +192,10 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
         }
     }
 
-    async fn delayed_cast(&self, event: tonic::Request<crate::grpc_impl::api::DelayedEventData>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn delayed_cast(
+        &self,
+        event: tonic::Request<crate::grpc_impl::grpc_api_stubs::DelayedEventData>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match parse_delayed_event_data(&event.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -202,7 +211,7 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
         }
     }
 
-    async fn sync(&self, event: tonic::Request<crate::grpc_impl::api::SyncData>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn sync(&self, event: tonic::Request<crate::grpc_impl::grpc_api_stubs::SyncData>) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match parse_sync_data(&event.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -262,11 +271,11 @@ fn parse_telemetry_log_event(api_instance: &crate::grpc_impl::api::TelemetryLogE
             None => return Err(anyhow::anyhow!("missing originator field")),
         },
         log_level: match api_instance.log_level {
-            x if x == crate::grpc_impl::api::TelemetryLogLevel::LogError as i32 => crate::guest_api_host::TelemetryLogLevel::Error,
-            x if x == crate::grpc_impl::api::TelemetryLogLevel::LogWarn as i32 => crate::guest_api_host::TelemetryLogLevel::Warn,
-            x if x == crate::grpc_impl::api::TelemetryLogLevel::LogInfo as i32 => crate::guest_api_host::TelemetryLogLevel::Info,
-            x if x == crate::grpc_impl::api::TelemetryLogLevel::LogDebug as i32 => crate::guest_api_host::TelemetryLogLevel::Debug,
-            x if x == crate::grpc_impl::api::TelemetryLogLevel::LogTrace as i32 => crate::guest_api_host::TelemetryLogLevel::Trace,
+            x if x == crate::grpc_impl::grpc_api_stubs::TelemetryLogLevel::LogError as i32 => crate::guest_api_host::TelemetryLogLevel::Error,
+            x if x == crate::grpc_impl::grpc_api_stubs::TelemetryLogLevel::LogWarn as i32 => crate::guest_api_host::TelemetryLogLevel::Warn,
+            x if x == crate::grpc_impl::grpc_api_stubs::TelemetryLogLevel::LogInfo as i32 => crate::guest_api_host::TelemetryLogLevel::Info,
+            x if x == crate::grpc_impl::grpc_api_stubs::TelemetryLogLevel::LogDebug as i32 => crate::guest_api_host::TelemetryLogLevel::Debug,
+            x if x == crate::grpc_impl::grpc_api_stubs::TelemetryLogLevel::LogTrace as i32 => crate::guest_api_host::TelemetryLogLevel::Trace,
             x => return Err(anyhow::anyhow!("invalid telemetry event log level: {}", { x })),
         },
         target: api_instance.target.clone(),
@@ -306,39 +315,39 @@ fn parse_sync_data(api_instance: &crate::grpc_impl::api::SyncData) -> anyhow::Re
     })
 }
 
-fn serialize_output_event_data(event: &crate::guest_api_host::OutputEventData) -> crate::grpc_impl::api::OutputEventData {
-    crate::grpc_impl::api::OutputEventData {
+fn serialize_output_event_data(event: &crate::guest_api_host::OutputEventData) -> crate::grpc_impl::grpc_api_stubs::OutputEventData {
+    crate::grpc_impl::grpc_api_stubs::OutputEventData {
         originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         alias: event.alias.clone(),
         msg: event.msg.clone(),
     }
 }
 
-fn serialize_output_event_data_raw(event: &crate::guest_api_host::OutputEventDataRaw) -> crate::grpc_impl::api::OutputEventDataRaw {
-    crate::grpc_impl::api::OutputEventDataRaw {
+fn serialize_output_event_data_raw(event: &crate::guest_api_host::OutputEventDataRaw) -> crate::grpc_impl::grpc_api_stubs::OutputEventDataRaw {
+    crate::grpc_impl::grpc_api_stubs::OutputEventDataRaw {
         originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         dst: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.dst)),
         msg: event.msg.clone(),
     }
 }
 
-fn serialize_telemetry_log_event(event: &crate::guest_api_host::TelemetryLogEvent) -> crate::grpc_impl::api::TelemetryLogEvent {
-    crate::grpc_impl::api::TelemetryLogEvent {
+fn serialize_telemetry_log_event(event: &crate::guest_api_host::TelemetryLogEvent) -> crate::grpc_impl::grpc_api_stubs::TelemetryLogEvent {
+    crate::grpc_impl::grpc_api_stubs::TelemetryLogEvent {
         originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         log_level: match event.log_level {
-            crate::guest_api_host::TelemetryLogLevel::Error => crate::grpc_impl::api::TelemetryLogLevel::LogError as i32,
-            crate::guest_api_host::TelemetryLogLevel::Warn => crate::grpc_impl::api::TelemetryLogLevel::LogWarn as i32,
-            crate::guest_api_host::TelemetryLogLevel::Info => crate::grpc_impl::api::TelemetryLogLevel::LogInfo as i32,
-            crate::guest_api_host::TelemetryLogLevel::Debug => crate::grpc_impl::api::TelemetryLogLevel::LogDebug as i32,
-            crate::guest_api_host::TelemetryLogLevel::Trace => crate::grpc_impl::api::TelemetryLogLevel::LogTrace as i32,
+            crate::guest_api_host::TelemetryLogLevel::Error => crate::grpc_impl::grpc_api_stubs::TelemetryLogLevel::LogError as i32,
+            crate::guest_api_host::TelemetryLogLevel::Warn => crate::grpc_impl::grpc_api_stubs::TelemetryLogLevel::LogWarn as i32,
+            crate::guest_api_host::TelemetryLogLevel::Info => crate::grpc_impl::grpc_api_stubs::TelemetryLogLevel::LogInfo as i32,
+            crate::guest_api_host::TelemetryLogLevel::Debug => crate::grpc_impl::grpc_api_stubs::TelemetryLogLevel::LogDebug as i32,
+            crate::guest_api_host::TelemetryLogLevel::Trace => crate::grpc_impl::grpc_api_stubs::TelemetryLogLevel::LogTrace as i32,
         },
         msg: event.msg.clone(),
         target: event.target.clone(),
     }
 }
 
-fn serialize_delayed_event_data(event: &crate::guest_api_host::DelayedEventData) -> crate::grpc_impl::api::DelayedEventData {
-    crate::grpc_impl::api::DelayedEventData {
+fn serialize_delayed_event_data(event: &crate::guest_api_host::DelayedEventData) -> crate::grpc_impl::grpc_api_stubs::DelayedEventData {
+    crate::grpc_impl::grpc_api_stubs::DelayedEventData {
         originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         delay: event.delay,
         alias: event.alias.clone(),
@@ -347,8 +356,8 @@ fn serialize_delayed_event_data(event: &crate::guest_api_host::DelayedEventData)
     }
 }
 
-fn serialize_sync_data(event: &crate::guest_api_host::SyncData) -> crate::grpc_impl::api::SyncData {
-    crate::grpc_impl::api::SyncData {
+fn serialize_sync_data(event: &crate::guest_api_host::SyncData) -> crate::grpc_impl::grpc_api_stubs::SyncData {
+    crate::grpc_impl::grpc_api_stubs::SyncData {
         originator: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.originator)),
         serialized_state: event.serialized_data.clone(),
     }

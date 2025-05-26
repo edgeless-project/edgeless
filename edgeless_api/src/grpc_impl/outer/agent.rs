@@ -9,13 +9,13 @@ pub struct AgentAPIClient {
 }
 
 impl AgentAPIClient {
-    pub fn new(api_addr: &str) -> Self {
+    pub async fn new(api_addr: &str) -> Self {
         Self {
             function_instance_client: Box::new(crate::grpc_impl::inner::function_instance::FunctionInstanceAPIClient::<
                 edgeless_api_core::instance_id::InstanceId,
             >::new(api_addr.to_string())),
-            node_management_client: Box::new(crate::grpc_impl::inner::node_management::NodeManagementClient::new(api_addr.to_string())),
-            resource_management_client: Box::new(crate::grpc_impl::inner::resource_configuration::ResourceConfigurationClient::new(
+            node_management_client: Box::new(crate::grpc_impl::node_management::NodeManagementClient::new(api_addr.to_string()).await),
+            resource_management_client: Box::new(crate::grpc_impl::resource_configuration::ResourceConfigurationClient::new(
                 api_addr.to_string(),
             )),
         }
@@ -64,16 +64,18 @@ impl AgentAPIServer {
                             crate::grpc_impl::common::GRPC_SERVICE_TIMEOUT,
                         )))
                         .add_service(
-                            crate::grpc_impl::api::function_instance_server::FunctionInstanceServer::new(function_api)
+                            crate::grpc_impl::grpc_api_stubs::function_instance_server::FunctionInstanceServer::new(function_api)
                                 .max_decoding_message_size(usize::MAX),
                         )
                         .add_service(
-                            crate::grpc_impl::api::node_management_server::NodeManagementServer::new(node_management_api)
+                            crate::grpc_impl::grpc_api_stubs::node_management_server::NodeManagementServer::new(node_management_api)
                                 .max_decoding_message_size(usize::MAX),
                         )
                         .add_service(
-                            crate::grpc_impl::api::resource_configuration_server::ResourceConfigurationServer::new(resource_configuration_api)
-                                .max_decoding_message_size(usize::MAX),
+                            crate::grpc_impl::grpc_api_stubs::resource_configuration_server::ResourceConfigurationServer::new(
+                                resource_configuration_api,
+                            )
+                            .max_decoding_message_size(usize::MAX),
                         )
                         .serve(host)
                         .await

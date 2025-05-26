@@ -3,7 +3,7 @@
 
 #[derive(Clone)]
 pub struct GuestAPIFunctionClient {
-    client: crate::grpc_impl::api::guest_api_function_client::GuestApiFunctionClient<tonic::transport::Channel>,
+    client: crate::grpc_impl::grpc_api_stubs::guest_api_function_client::GuestApiFunctionClient<tonic::transport::Channel>,
 }
 
 pub struct GuestAPIFunctionService {
@@ -14,7 +14,7 @@ impl GuestAPIFunctionClient {
     pub async fn new(server_addr: &str, timeout: std::time::Duration) -> anyhow::Result<Self> {
         let ts = std::time::Instant::now();
         loop {
-            match crate::grpc_impl::api::guest_api_function_client::GuestApiFunctionClient::connect(server_addr.to_string()).await {
+            match crate::grpc_impl::grpc_api_stubs::guest_api_function_client::GuestApiFunctionClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     // TODO: maybe add retry policy?
                     let client = client.max_decoding_message_size(usize::MAX);
@@ -79,8 +79,8 @@ impl crate::guest_api_function::GuestAPIFunction for GuestAPIFunctionClient {
 }
 
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for GuestAPIFunctionService {
-    async fn boot(&self, boot_data: tonic::Request<crate::grpc_impl::api::BootData>) -> Result<tonic::Response<()>, tonic::Status> {
+impl crate::grpc_impl::grpc_api_stubs::guest_api_function_server::GuestApiFunction for GuestAPIFunctionService {
+    async fn boot(&self, boot_data: tonic::Request<crate::grpc_impl::grpc_api_stubs::BootData>) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match parse_boot_data(&boot_data.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -93,7 +93,10 @@ impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for Gues
         }
     }
 
-    async fn init(&self, init_data: tonic::Request<crate::grpc_impl::api::FunctionInstanceInit>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn init(
+        &self,
+        init_data: tonic::Request<crate::grpc_impl::grpc_api_stubs::FunctionInstanceInit>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match parse_function_instance_init(&init_data.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -109,7 +112,7 @@ impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for Gues
         }
     }
 
-    async fn cast(&self, event: tonic::Request<crate::grpc_impl::api::InputEventData>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn cast(&self, event: tonic::Request<crate::grpc_impl::grpc_api_stubs::InputEventData>) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match parse_input_event_data(&event.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -127,8 +130,8 @@ impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for Gues
 
     async fn call(
         &self,
-        event: tonic::Request<crate::grpc_impl::api::InputEventData>,
-    ) -> Result<tonic::Response<crate::grpc_impl::api::CallReturn>, tonic::Status> {
+        event: tonic::Request<crate::grpc_impl::grpc_api_stubs::InputEventData>,
+    ) -> Result<tonic::Response<crate::grpc_impl::grpc_api_stubs::CallReturn>, tonic::Status> {
         let parsed_request = match parse_input_event_data(&event.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -187,50 +190,52 @@ fn parse_input_event_data(api_instance: &crate::grpc_impl::api::InputEventData) 
     }
 }
 
-pub fn parse_call_return(api_instance: &crate::grpc_impl::api::CallReturn) -> anyhow::Result<crate::guest_api_function::CallReturn> {
+pub fn parse_call_return(api_instance: &crate::grpc_impl::grpc_api_stubs::CallReturn) -> anyhow::Result<crate::guest_api_function::CallReturn> {
     match api_instance.r#type {
-        x if x == crate::grpc_impl::api::CallRetType::CallRetNoReply as i32 => Ok(crate::guest_api_function::CallReturn::NoRet),
-        x if x == crate::grpc_impl::api::CallRetType::CallRetReply as i32 => {
+        x if x == crate::grpc_impl::grpc_api_stubs::CallRetType::CallRetNoReply as i32 => Ok(crate::guest_api_function::CallReturn::NoRet),
+        x if x == crate::grpc_impl::grpc_api_stubs::CallRetType::CallRetReply as i32 => {
             Ok(crate::guest_api_function::CallReturn::Reply(api_instance.msg.clone()))
         }
-        x if x == crate::grpc_impl::api::CallRetType::CallRetErr as i32 => Ok(crate::guest_api_function::CallReturn::Err),
+        x if x == crate::grpc_impl::grpc_api_stubs::CallRetType::CallRetErr as i32 => Ok(crate::guest_api_function::CallReturn::Err),
         x => Err(anyhow::anyhow!("Ill-formed CallReturn message: unknown type {}", x)),
     }
 }
 
-fn serialize_boot_data(boot_data: &crate::guest_api_function::BootData) -> crate::grpc_impl::api::BootData {
-    crate::grpc_impl::api::BootData {
+fn serialize_boot_data(boot_data: &crate::guest_api_function::BootData) -> crate::grpc_impl::grpc_api_stubs::BootData {
+    crate::grpc_impl::grpc_api_stubs::BootData {
         guest_api_host_endpoint: boot_data.guest_api_host_endpoint.clone(),
         instance_id: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&boot_data.instance_id)),
     }
 }
 
-fn serialize_function_instance_init(init_data: &crate::guest_api_function::FunctionInstanceInit) -> crate::grpc_impl::api::FunctionInstanceInit {
-    crate::grpc_impl::api::FunctionInstanceInit {
+fn serialize_function_instance_init(
+    init_data: &crate::guest_api_function::FunctionInstanceInit,
+) -> crate::grpc_impl::grpc_api_stubs::FunctionInstanceInit {
+    crate::grpc_impl::grpc_api_stubs::FunctionInstanceInit {
         init_payload: init_data.init_payload.clone(),
         serialized_state: init_data.serialized_state.clone(),
     }
 }
 
-fn serialize_input_event_data(event: &crate::guest_api_function::InputEventData) -> crate::grpc_impl::api::InputEventData {
-    crate::grpc_impl::api::InputEventData {
+fn serialize_input_event_data(event: &crate::guest_api_function::InputEventData) -> crate::grpc_impl::grpc_api_stubs::InputEventData {
+    crate::grpc_impl::grpc_api_stubs::InputEventData {
         src: Some(crate::grpc_impl::common::CommonConverters::serialize_instance_id(&event.src)),
         msg: event.msg.clone(),
     }
 }
 
-pub fn serialize_call_return(ret: &crate::guest_api_function::CallReturn) -> crate::grpc_impl::api::CallReturn {
+pub fn serialize_call_return(ret: &crate::guest_api_function::CallReturn) -> crate::grpc_impl::grpc_api_stubs::CallReturn {
     match ret {
-        crate::guest_api_function::CallReturn::NoRet => crate::grpc_impl::api::CallReturn {
-            r#type: crate::grpc_impl::api::CallRetType::CallRetNoReply as i32,
+        crate::guest_api_function::CallReturn::NoRet => crate::grpc_impl::grpc_api_stubs::CallReturn {
+            r#type: crate::grpc_impl::grpc_api_stubs::CallRetType::CallRetNoReply as i32,
             msg: vec![],
         },
-        crate::guest_api_function::CallReturn::Reply(msg) => crate::grpc_impl::api::CallReturn {
-            r#type: crate::grpc_impl::api::CallRetType::CallRetReply as i32,
+        crate::guest_api_function::CallReturn::Reply(msg) => crate::grpc_impl::grpc_api_stubs::CallReturn {
+            r#type: crate::grpc_impl::grpc_api_stubs::CallRetType::CallRetReply as i32,
             msg: msg.clone(),
         },
-        crate::guest_api_function::CallReturn::Err => crate::grpc_impl::api::CallReturn {
-            r#type: crate::grpc_impl::api::CallRetType::CallRetErr as i32,
+        crate::guest_api_function::CallReturn::Err => crate::grpc_impl::grpc_api_stubs::CallReturn {
+            r#type: crate::grpc_impl::grpc_api_stubs::CallRetType::CallRetErr as i32,
             msg: vec![],
         },
     }

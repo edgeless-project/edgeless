@@ -10,7 +10,7 @@ pub struct NodeRegisterAPIClient {
 impl NodeRegisterAPIClient {
     pub async fn new(api_addr: String) -> Self {
         Self {
-            node_registration_client: Box::new(crate::grpc_impl::inner::node_registration::NodeRegistrationClient::new(api_addr)),
+            node_registration_client: Box::new(crate::grpc_impl::node_registration::NodeRegistrationClient::new(&api_addr).await),
         }
     }
 }
@@ -42,7 +42,7 @@ impl NodeRegisterAPIServer {
                             crate::grpc_impl::common::GRPC_SERVICE_TIMEOUT,
                         )))
                         .add_service(
-                            crate::grpc_impl::api::node_registration_server::NodeRegistrationServer::new(node_registration_api)
+                            crate::grpc_impl::grpc_api_stubs::node_registration_server::NodeRegistrationServer::new(node_registration_api)
                                 .max_decoding_message_size(usize::MAX),
                         )
                         .serve(host)

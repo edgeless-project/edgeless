@@ -3,7 +3,8 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-pub mod api {
+// TODO: the protos should be moved to the grpc_impl
+pub mod grpc_api_stubs {
     tonic::include_proto!("edgeless_api");
 }
 mod common;

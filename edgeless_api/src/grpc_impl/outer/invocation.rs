@@ -8,10 +8,10 @@ use std::time::Duration;
 
 struct InvocationConverters {}
 
-const TYPE_CALL: i32 = crate::grpc_impl::api::EventType::Call as i32;
-const TYPE_CAST: i32 = crate::grpc_impl::api::EventType::Cast as i32;
-const TYPE_CALL_RET: i32 = crate::grpc_impl::api::EventType::CallRet as i32;
-const TYPE_CALL_NO_RET: i32 = crate::grpc_impl::api::EventType::CallNoRet as i32;
+const TYPE_CALL: i32 = crate::grpc_impl::grpc_api_stubs::EventType::Call as i32;
+const TYPE_CAST: i32 = crate::grpc_impl::grpc_api_stubs::EventType::Cast as i32;
+const TYPE_CALL_RET: i32 = crate::grpc_impl::grpc_api_stubs::EventType::CallRet as i32;
+const TYPE_CALL_NO_RET: i32 = crate::grpc_impl::grpc_api_stubs::EventType::CallNoRet as i32;
 
 const RECONNECT_TRIES: i32 = 5;
 const RECONNECT_TIMEOUT: u64 = 500;
@@ -21,7 +21,7 @@ const INVOCATION_TIMEOUT: u64 = 500;
 const INVOCATION_TCP_KEEPALIVE: u64 = 2000;
 
 impl InvocationConverters {
-    fn parse_api_event(api_event: &crate::grpc_impl::api::Event) -> anyhow::Result<crate::invocation::Event> {
+    fn parse_api_event(api_event: &crate::grpc_impl::grpc_api_stubs::Event) -> anyhow::Result<crate::invocation::Event> {
         Ok(crate::invocation::Event {
             target: CommonConverters::parse_instance_id(api_event.target.as_ref().unwrap())?,
             source: CommonConverters::parse_instance_id(api_event.source.as_ref().unwrap())?,
@@ -36,7 +36,7 @@ impl InvocationConverters {
         })
     }
 
-    fn parse_api_event_data(api_event_data: &crate::grpc_impl::api::EventData) -> anyhow::Result<crate::invocation::EventData> {
+    fn parse_api_event_data(api_event_data: &crate::grpc_impl::grpc_api_stubs::EventData) -> anyhow::Result<crate::invocation::EventData> {
         match api_event_data.event_type {
             TYPE_CALL => Ok(crate::invocation::EventData::Call(api_event_data.payload.to_string())),
             TYPE_CAST => Ok(crate::invocation::EventData::Cast(api_event_data.payload.to_string())),
@@ -46,8 +46,8 @@ impl InvocationConverters {
         }
     }
 
-    fn encode_crate_event(crate_event: &crate::invocation::Event) -> crate::grpc_impl::api::Event {
-        crate::grpc_impl::api::Event {
+    fn encode_crate_event(crate_event: &crate::invocation::Event) -> crate::grpc_impl::grpc_api_stubs::Event {
+        crate::grpc_impl::grpc_api_stubs::Event {
             target: Some(CommonConverters::serialize_instance_id(&crate_event.target)),
             source: Some(CommonConverters::serialize_instance_id(&crate_event.source)),
             stream_id: crate_event.stream_id,
@@ -57,25 +57,25 @@ impl InvocationConverters {
         }
     }
 
-    fn encode_crate_event_data(crate_event: &crate::invocation::EventData) -> crate::grpc_impl::api::EventData {
+    fn encode_crate_event_data(crate_event: &crate::invocation::EventData) -> crate::grpc_impl::grpc_api_stubs::EventData {
         let mut payload_buffer = "".to_string();
         let event = match crate_event {
             crate::invocation::EventData::Call(payload) => {
                 payload_buffer = payload.to_string();
-                crate::grpc_impl::api::EventType::Call
+                crate::grpc_impl::grpc_api_stubs::EventType::Call
             }
             crate::invocation::EventData::Cast(payload) => {
                 payload_buffer = payload.to_string();
-                crate::grpc_impl::api::EventType::Cast
+                crate::grpc_impl::grpc_api_stubs::EventType::Cast
             }
             crate::invocation::EventData::CallRet(payload) => {
                 payload_buffer = payload.to_string();
-                crate::grpc_impl::api::EventType::CallRet
+                crate::grpc_impl::grpc_api_stubs::EventType::CallRet
             }
-            crate::invocation::EventData::CallNoRet => crate::grpc_impl::api::EventType::CallNoRet,
-            crate::invocation::EventData::Err => crate::grpc_impl::api::EventType::Err,
+            crate::invocation::EventData::CallNoRet => crate::grpc_impl::grpc_api_stubs::EventType::CallNoRet,
+            crate::invocation::EventData::Err => crate::grpc_impl::grpc_api_stubs::EventType::Err,
         };
-        crate::grpc_impl::api::EventData {
+        crate::grpc_impl::grpc_api_stubs::EventData {
             payload: payload_buffer,
             event_type: event as i32,
         }
@@ -83,14 +83,14 @@ impl InvocationConverters {
 }
 
 pub struct InvocationAPIClient {
-    client: crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient<tonic::transport::Channel>,
+    client: crate::grpc_impl::grpc_api_stubs::function_invocation_client::FunctionInvocationClient<tonic::transport::Channel>,
     server_addr: String,
 }
 
 impl InvocationAPIClient {
     pub async fn new(server_addr: &str) -> Self {
         loop {
-            match crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient::connect(server_addr.to_string()).await {
+            match crate::grpc_impl::grpc_api_stubs::function_invocation_client::FunctionInvocationClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
                     return Self {
@@ -119,7 +119,7 @@ impl InvocationAPIClient {
                 log::error!("could not reconnect in reasonable time");
                 anyhow::bail!("could not reconnect in reasonable time");
             }
-            match crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient::connect(self.server_addr.clone()).await {
+            match crate::grpc_impl::grpc_api_stubs::function_invocation_client::FunctionInvocationClient::connect(self.server_addr.clone()).await {
                 Ok(client) => {
                     self.client = client.max_decoding_message_size(usize::MAX);
                     return Ok(());
@@ -184,8 +184,8 @@ pub struct InvocationAPIServerHandler {
 }
 
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::function_invocation_server::FunctionInvocation for InvocationAPIServerHandler {
-    async fn handle(&self, request: tonic::Request<crate::grpc_impl::api::Event>) -> Result<tonic::Response<()>, tonic::Status> {
+impl crate::grpc_impl::grpc_api_stubs::function_invocation_server::FunctionInvocation for InvocationAPIServerHandler {
+    async fn handle(&self, request: tonic::Request<crate::grpc_impl::grpc_api_stubs::Event>) -> Result<tonic::Response<()>, tonic::Status> {
         let inner_request = request.into_inner();
         let parsed_request = match InvocationConverters::parse_api_event(&inner_request) {
             Ok(val) => val,
@@ -230,7 +230,7 @@ impl InvocationAPIServer {
                             crate::grpc_impl::common::GRPC_SERVICE_TIMEOUT,
                         )))
                         .add_service(
-                            crate::grpc_impl::api::function_invocation_server::FunctionInvocationServer::new(function_api)
+                            crate::grpc_impl::grpc_api_stubs::function_invocation_server::FunctionInvocationServer::new(function_api)
                                 .max_decoding_message_size(usize::MAX),
                         )
                         .serve(host)

@@ -7,13 +7,13 @@ use std::str::FromStr;
 
 #[derive(Clone)]
 pub struct WorkflowInstanceAPIClient {
-    client: crate::grpc_impl::api::workflow_instance_client::WorkflowInstanceClient<tonic::transport::Channel>,
+    client: crate::grpc_impl::grpc_api_stubs::workflow_instance_client::WorkflowInstanceClient<tonic::transport::Channel>,
 }
 
 impl WorkflowInstanceAPIClient {
     pub async fn new(server_addr: &str) -> Self {
         loop {
-            match crate::grpc_impl::api::workflow_instance_client::WorkflowInstanceClient::connect(server_addr.to_string()).await {
+            match crate::grpc_impl::grpc_api_stubs::workflow_instance_client::WorkflowInstanceClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
                     return Self { client };
@@ -95,7 +95,7 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
     ) -> anyhow::Result<std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>> {
         let ret = self
             .client
-            .domains(tonic::Request::new(crate::grpc_impl::api::DomainId { domain_id }))
+            .domains(tonic::Request::new(crate::grpc_impl::grpc_api_stubs::DomainId { domain_id }))
             .await;
         match ret {
             Ok(ret) => return super::workflow_instance::parse_domain_capabilities_list(&ret.into_inner()),
@@ -124,7 +124,7 @@ pub struct WorkflowInstanceAPIServer {
 }
 
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for WorkflowInstanceAPIServer {
+impl crate::grpc_impl::grpc_api_stubs::workflow_instance_server::WorkflowInstance for WorkflowInstanceAPIServer {
     async fn start(
         &self,
         request: tonic::Request<crate::grpc_impl::api::SpawnWorkflowRequest>,
@@ -132,8 +132,8 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
         let req = match super::workflow_instance::parse_workflow_spawn_request(&request.into_inner()) {
             Ok(val) => val,
             Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::SpawnWorkflowResponse {
-                    response_error: Some(crate::grpc_impl::api::ResponseError {
+                return Ok(tonic::Response::new(crate::grpc_impl::grpc_api_stubs::SpawnWorkflowResponse {
+                    response_error: Some(crate::grpc_impl::grpc_api_stubs::ResponseError {
                         summary: "Invalid request".to_string(),
                         detail: Some(err.to_string()),
                     }),
@@ -168,10 +168,10 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
         }
     }
 
-    async fn list(&self, _request: tonic::Request<()>) -> Result<tonic::Response<crate::grpc_impl::api::WorkflowIdList>, tonic::Status> {
+    async fn list(&self, _request: tonic::Request<()>) -> Result<tonic::Response<crate::grpc_impl::grpc_api_stubs::WorkflowIdList>, tonic::Status> {
         let ret = self.root_api.lock().await.list().await;
         match ret {
-            Ok(identifiers) => Ok(tonic::Response::new(crate::grpc_impl::api::WorkflowIdList {
+            Ok(identifiers) => Ok(tonic::Response::new(crate::grpc_impl::grpc_api_stubs::WorkflowIdList {
                 identifiers: identifiers.iter().map(|x| x.to_string()).collect(),
             })),
             Err(err) => Err(tonic::Status::internal(format!("Internal error when listing workflows: {}", err))),
@@ -198,8 +198,8 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
 
     async fn domains(
         &self,
-        domain_id: tonic::Request<crate::grpc_impl::api::DomainId>,
-    ) -> Result<tonic::Response<crate::grpc_impl::api::DomainCapabilitiesList>, tonic::Status> {
+        domain_id: tonic::Request<crate::grpc_impl::grpc_api_stubs::DomainId>,
+    ) -> Result<tonic::Response<crate::grpc_impl::grpc_api_stubs::DomainCapabilitiesList>, tonic::Status> {
         match self.root_api.lock().await.domains(domain_id.into_inner().domain_id).await {
             Ok(instances) => Ok(tonic::Response::new(super::workflow_instance::serialize_domain_capabilities_list(
                 &instances,
