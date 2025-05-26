@@ -6,14 +6,7 @@
 pub mod api {
     tonic::include_proto!("edgeless_api");
 }
-pub mod common;
-pub mod domain_registration;
-pub mod function_instance;
-pub mod guest_api_function;
-pub mod guest_api_host;
-pub mod invocation;
-pub mod node_management;
-pub mod node_registration;
 pub mod outer;
-pub mod resource_configuration;
-pub mod workflow_instance;
+mod inner;
+mod common;
+

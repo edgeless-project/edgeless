@@ -374,7 +374,7 @@ async fn main() -> anyhow::Result<()> {
                     payload,
                 } => {
                     log::info!("invoking function: {} {} {} {}", event_type, node_id, function_id, payload);
-                    let mut client = edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&invocation_url).await;
+                    let mut client = edgeless_api::grpc_impl::outer::invocation::InvocationAPIClient::new(&invocation_url).await;
                     let event = edgeless_api::invocation::Event {
                         target: edgeless_api::function_instance::InstanceId {
                             node_id: uuid::Uuid::parse_str(&node_id)?,

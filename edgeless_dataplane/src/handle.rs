@@ -187,7 +187,7 @@ impl DataplaneProvider {
         let (_, _, port) = edgeless_api::util::parse_http_host(&invocation_url.clone()).unwrap();
 
         let clone_provider = remote_provider.clone();
-        let _server = tokio::spawn(edgeless_api::grpc_impl::invocation::InvocationAPIServer::run(
+        let _server = tokio::spawn(edgeless_api::grpc_impl::outer::invocation::InvocationAPIServer::run(
             clone_provider.lock().await.incomming_api().await,
             invocation_url,
         ));
@@ -237,7 +237,7 @@ impl DataplaneProvider {
             edgeless_api::util::Proto::COAP => {
                 Box::new(edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port)).await)
             }
-            _ => Box::new(edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&target.invocation_url).await),
+            _ => Box::new(edgeless_api::grpc_impl::outer::invocation::InvocationAPIClient::new(&target.invocation_url).await),
         }
     }
 }

@@ -83,7 +83,7 @@ impl CommonConverters {
         api_instance: &crate::grpc_impl::api::StartComponentResponse,
     ) -> anyhow::Result<crate::common::StartComponentResponse<ResourceIdType>>
     where
-        super::api::InstanceIdVariant: ParseableId<ResourceIdType>,
+        crate::grpc_impl::api::InstanceIdVariant: ParseableId<ResourceIdType>,
     {
         match api_instance.instance_id.as_ref() {
             Some(val) => match ParseableId::<ResourceIdType>::parse(val) {
