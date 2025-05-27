@@ -2,13 +2,14 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-use super::common::CommonConverters;
+use crate::grpc_impl::common::CommonConverters;
+use crate::grpc_impl::api as grpc_stubs;
 
 pub struct FunctonInstanceConverters {}
 
 impl FunctonInstanceConverters {
     pub fn parse_function_class_specification(
-        api_spec: &crate::grpc_impl::api::FunctionClassSpecification,
+        api_spec: &grpc_stubs::FunctionClassSpecification,
     ) -> anyhow::Result<crate::function_instance::FunctionClassSpecification> {
         Ok(crate::function_instance::FunctionClassSpecification {
             function_class_id: api_spec.function_class_id.clone(),
@@ -126,10 +127,11 @@ impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + 
 }
 
 #[async_trait::async_trait]
-impl<FunctionIdType: super::common::SerializeableId + Clone + Send + Sync + 'static> crate::function_instance::FunctionInstanceAPI<FunctionIdType>
+impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + Sync + 'static> crate::function_instance::FunctionInstanceAPI<FunctionIdType>
     for FunctionInstanceAPIClient<FunctionIdType>
 where
-    super::api::InstanceIdVariant: super::common::ParseableId<FunctionIdType>,
+// TODO: refactor
+    grpc_stubs::InstanceIdVariant: crate::grpc_impl::common::ParseableId<FunctionIdType>,
 {
     async fn start(
         &mut self,
@@ -166,7 +168,7 @@ where
         match self.try_connect().await {
             Ok(_) => {
                 if let Some(client) = &mut self.client {
-                    match client.stop(tonic::Request::new(super::common::SerializeableId::serialize(&id))).await {
+                    match client.stop(tonic::Request::new(crate::grpc_impl::common::SerializeableId::serialize(&id))).await {
                         Ok(_) => Ok(()),
                         Err(err) => {
                             self.disconnect();
@@ -256,7 +258,7 @@ where
         }
     }
 
-    async fn stop(&self, request: tonic::Request<super::api::InstanceIdVariant>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn stop(&self, request: tonic::Request<grpc_stubs::InstanceIdVariant>) -> Result<tonic::Response<()>, tonic::Status> {
         let stop_function_id = match crate::grpc_impl::common::ParseableId::<FunctionIdType>::parse(&request.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {

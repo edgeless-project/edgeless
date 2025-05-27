@@ -45,13 +45,13 @@ impl crate::guest_api_host::GuestAPIHost for GuestAPIHostClient {
     }
     async fn call(&mut self, event: crate::guest_api_host::OutputEventData) -> anyhow::Result<crate::guest_api_function::CallReturn> {
         match self.client.call(tonic::Request::new(serialize_output_event_data(&event))).await {
-            Ok(msg) => crate::grpc_impl::guest_api_function::parse_call_return(&msg.into_inner()),
+            Ok(msg) => super::guest_api_function::parse_call_return(&msg.into_inner()),
             Err(err) => Err(anyhow::anyhow!("Communication error while calling a function: {}", err.to_string())),
         }
     }
     async fn call_raw(&mut self, event: crate::guest_api_host::OutputEventDataRaw) -> anyhow::Result<crate::guest_api_function::CallReturn> {
         match self.client.call_raw(tonic::Request::new(serialize_output_event_data_raw(&event))).await {
-            Ok(msg) => crate::grpc_impl::guest_api_function::parse_call_return(&msg.into_inner()),
+            Ok(msg) => super::guest_api_function::parse_call_return(&msg.into_inner()),
             Err(err) => Err(anyhow::anyhow!("Communication error while raw-calling a function: {}", err.to_string())),
         }
     }
@@ -136,7 +136,7 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
             }
         };
         match self.guest_api_host.lock().await.call(parsed_request).await {
-            Ok(msg) => Ok(tonic::Response::new(crate::grpc_impl::guest_api_function::serialize_call_return(&msg))),
+            Ok(msg) => Ok(tonic::Response::new(super::guest_api_function::serialize_call_return(&msg))),
             Err(err) => Err(tonic::Status::internal(format!("Error when calling a function: {}", err))),
         }
     }
@@ -155,7 +155,7 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
             }
         };
         match self.guest_api_host.lock().await.call_raw(parsed_request).await {
-            Ok(msg) => Ok(tonic::Response::new(crate::grpc_impl::guest_api_function::serialize_call_return(&msg))),
+            Ok(msg) => Ok(tonic::Response::new(super::guest_api_function::serialize_call_return(&msg))),
             Err(err) => Err(tonic::Status::internal(format!("Error when raw-calling a function: {}", err))),
         }
     }

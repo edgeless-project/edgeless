@@ -8,7 +8,7 @@ pub struct DomainRegisterAPIClient {
 impl DomainRegisterAPIClient {
     pub async fn new(api_addr: String) -> Self {
         Self {
-            domain_registration_client: Box::new(crate::grpc_impl::domain_registration::DomainRegistrationAPIClient::new(api_addr)),
+            domain_registration_client: Box::new(crate::grpc_impl::inner::domain_registration::DomainRegistrationAPIClient::new(api_addr)),
         }
     }
 }
@@ -27,7 +27,7 @@ impl DomainRegistrationAPIServer {
         domain_registration_url: String,
     ) -> futures::future::BoxFuture<'static, ()> {
         let mut domain_register_api = domain_register_api;
-        let domain_registration_api = crate::grpc_impl::domain_registration::DomainRegistrationAPIServer {
+        let domain_registration_api = crate::grpc_impl::inner::domain_registration::DomainRegistrationAPIServer {
             domain_registration_api: tokio::sync::Mutex::new(domain_register_api.domain_registration_api()),
         };
         Box::pin(async move {
