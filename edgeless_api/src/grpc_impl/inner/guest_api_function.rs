@@ -151,7 +151,7 @@ impl crate::grpc_impl::api::guest_api_function_server::GuestApiFunction for Gues
     }
 }
 
-pub fn parse_boot_data(api_instance: &crate::grpc_impl::api::BootData) -> anyhow::Result<crate::guest_api_function::BootData> {
+fn parse_boot_data(api_instance: &crate::grpc_impl::api::BootData) -> anyhow::Result<crate::guest_api_function::BootData> {
     Ok(crate::guest_api_function::BootData {
         guest_api_host_endpoint: api_instance.guest_api_host_endpoint.clone(),
         instance_id: match &api_instance.instance_id {
@@ -164,7 +164,7 @@ pub fn parse_boot_data(api_instance: &crate::grpc_impl::api::BootData) -> anyhow
     })
 }
 
-pub fn parse_function_instance_init(
+fn parse_function_instance_init(
     api_instance: &crate::grpc_impl::api::FunctionInstanceInit,
 ) -> anyhow::Result<crate::guest_api_function::FunctionInstanceInit> {
     Ok(crate::guest_api_function::FunctionInstanceInit {
@@ -173,7 +173,7 @@ pub fn parse_function_instance_init(
     })
 }
 
-pub fn parse_input_event_data(api_instance: &crate::grpc_impl::api::InputEventData) -> anyhow::Result<crate::guest_api_function::InputEventData> {
+fn parse_input_event_data(api_instance: &crate::grpc_impl::api::InputEventData) -> anyhow::Result<crate::guest_api_function::InputEventData> {
     match &api_instance.src {
         Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
             Ok(src) => Ok(crate::guest_api_function::InputEventData {
