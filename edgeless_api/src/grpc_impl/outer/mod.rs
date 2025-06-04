@@ -8,6 +8,6 @@ pub mod container_function;
 pub mod container_runtime;
 pub mod controller;
 pub mod domain_register;
+pub mod invocation;
 pub mod node_register;
 pub mod orc;
-pub mod invocation;
