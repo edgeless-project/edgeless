@@ -111,7 +111,7 @@ impl crate::grpc_impl::api::node_management_server::NodeManagement for NodeManag
     }
 }
 
-pub fn parse_update_peers_request(
+fn parse_update_peers_request(
     api_instance: &crate::grpc_impl::api::UpdatePeersRequest,
 ) -> anyhow::Result<crate::node_management::UpdatePeersRequest> {
     match api_instance.request_type {
