@@ -233,7 +233,7 @@ fn serialize_resource_provider_specification(
     }
 }
 
-pub fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealthStatus) -> crate::node_registration::NodeHealthStatus {
+fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealthStatus) -> crate::node_registration::NodeHealthStatus {
     crate::node_registration::NodeHealthStatus {
         mem_free: api_instance.mem_free,
         mem_used: api_instance.mem_used,
@@ -285,7 +285,7 @@ fn serialize_node_health_status(req: &crate::node_registration::NodeHealthStatus
     }
 }
 
-pub fn parse_sample(api_instance: &crate::grpc_impl::api::Sample) -> crate::node_registration::Sample {
+fn parse_sample(api_instance: &crate::grpc_impl::api::Sample) -> crate::node_registration::Sample {
     crate::node_registration::Sample {
         timestamp_sec: api_instance.timestamp_sec,
         timestamp_ns: api_instance.timestamp_ns,
@@ -293,7 +293,7 @@ pub fn parse_sample(api_instance: &crate::grpc_impl::api::Sample) -> crate::node
     }
 }
 
-pub fn parse_function_log_entry(api_instance: &crate::grpc_impl::api::FunctionLogEntry) -> crate::node_registration::FunctionLogEntry {
+fn parse_function_log_entry(api_instance: &crate::grpc_impl::api::FunctionLogEntry) -> crate::node_registration::FunctionLogEntry {
     crate::node_registration::FunctionLogEntry {
         timestamp_sec: api_instance.timestamp_sec,
         timestamp_ns: api_instance.timestamp_ns,
@@ -302,9 +302,7 @@ pub fn parse_function_log_entry(api_instance: &crate::grpc_impl::api::FunctionLo
     }
 }
 
-pub fn parse_node_performance_samples(
-    api_instance: &crate::grpc_impl::api::NodePerformanceSamples,
-) -> crate::node_registration::NodePerformanceSamples {
+fn parse_node_performance_samples(api_instance: &crate::grpc_impl::api::NodePerformanceSamples) -> crate::node_registration::NodePerformanceSamples {
     crate::node_registration::NodePerformanceSamples {
         function_execution_times: api_instance
             .function_execution_times

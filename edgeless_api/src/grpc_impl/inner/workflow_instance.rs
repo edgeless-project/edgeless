@@ -4,246 +4,6 @@
 // SPDX-License-Identifier: MIT
 
 use std::str::FromStr;
-pub struct WorkflowInstanceConverters {}
-
-impl WorkflowInstanceConverters {
-    pub fn parse_workflow_id(api_id: &crate::grpc_impl::api::WorkflowId) -> anyhow::Result<crate::workflow_instance::WorkflowId> {
-        Ok(crate::workflow_instance::WorkflowId {
-            workflow_id: uuid::Uuid::parse_str(&api_id.workflow_id)?,
-        })
-    }
-
-    pub fn parse_workflow_function(
-        api_function: &crate::grpc_impl::api::WorkflowFunction,
-    ) -> anyhow::Result<crate::workflow_instance::WorkflowFunction> {
-        Ok(crate::workflow_instance::WorkflowFunction {
-            name: api_function.name.clone(),
-            function_class_specification: super::function_instance::FunctonInstanceConverters::parse_function_class_specification(
-                match &api_function.class_spec.as_ref() {
-                    Some(val) => val,
-                    None => return Err(anyhow::anyhow!("Missing Workflow FunctionClass")),
-                },
-            )?,
-            output_mapping: api_function.output_mapping.clone(),
-            annotations: api_function.annotations.clone(),
-        })
-    }
-
-    pub fn parse_workflow_resource(
-        api_workflow: &crate::grpc_impl::api::WorkflowResource,
-    ) -> anyhow::Result<crate::workflow_instance::WorkflowResource> {
-        Ok(crate::workflow_instance::WorkflowResource {
-            name: api_workflow.name.clone(),
-            class_type: api_workflow.class_type.clone(),
-            output_mapping: api_workflow.output_mapping.clone(),
-            configurations: api_workflow.configurations.clone(),
-        })
-    }
-
-    pub fn parse_workflow_spawn_request(
-        api_request: &crate::grpc_impl::api::SpawnWorkflowRequest,
-    ) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowRequest> {
-        Ok(crate::workflow_instance::SpawnWorkflowRequest {
-            workflow_functions: api_request
-                .workflow_functions
-                .iter()
-                .map(WorkflowInstanceConverters::parse_workflow_function)
-                .filter_map(|f| match f {
-                    Ok(val) => Some(val),
-                    Err(_) => None,
-                })
-                .collect(),
-            workflow_resources: api_request
-                .workflow_resources
-                .iter()
-                .filter_map(|f| match WorkflowInstanceConverters::parse_workflow_resource(f) {
-                    Ok(val) => Some(val),
-                    Err(_) => None,
-                })
-                .collect(),
-            annotations: api_request.annotations.clone(),
-        })
-    }
-
-    pub fn parse_workflow_function_mapping(
-        api_mapping: &crate::grpc_impl::api::WorkflowFunctionMapping,
-    ) -> anyhow::Result<crate::workflow_instance::WorkflowFunctionMapping> {
-        Ok(crate::workflow_instance::WorkflowFunctionMapping {
-            name: api_mapping.name.to_string(),
-            function_id: uuid::Uuid::from_str(api_mapping.function_id.as_str())?,
-            domain_id: api_mapping.domain_id.to_string(),
-        })
-    }
-
-    pub fn parse_workflow_instance(
-        api_instance: &crate::grpc_impl::api::WorkflowInstanceStatus,
-    ) -> anyhow::Result<crate::workflow_instance::WorkflowInstance> {
-        Ok(crate::workflow_instance::WorkflowInstance {
-            workflow_id: WorkflowInstanceConverters::parse_workflow_id(match api_instance.workflow_id.as_ref() {
-                Some(val) => val,
-                None => {
-                    return Err(anyhow::anyhow!("WorkflowId Missing"));
-                }
-            })?,
-            domain_mapping: api_instance
-                .domain_mapping
-                .iter()
-                .map(WorkflowInstanceConverters::parse_workflow_function_mapping)
-                .filter_map(|x| match x {
-                    Ok(val) => Some(val),
-                    Err(_) => None,
-                })
-                .collect(),
-        })
-    }
-
-    pub fn parse_workflow_spawn_response(
-        api_instance: &crate::grpc_impl::api::SpawnWorkflowResponse,
-    ) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowResponse> {
-        match api_instance.workflow_status.as_ref() {
-            Some(val) => match WorkflowInstanceConverters::parse_workflow_instance(val) {
-                Ok(val) => Ok(crate::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val)),
-                Err(err) => Err(anyhow::anyhow!(err.to_string())),
-            },
-            None => match api_instance.response_error.as_ref() {
-                Some(val) => match crate::grpc_impl::common::CommonConverters::parse_response_error(val) {
-                    Ok(val) => Ok(crate::workflow_instance::SpawnWorkflowResponse::ResponseError(val)),
-                    Err(err) => Err(anyhow::anyhow!(err.to_string())),
-                },
-                None => Err(anyhow::anyhow!(
-                    "Ill-formed SpawnWorkflowResponse message: both ResponseError and WorkflowInstance are empty"
-                )),
-            },
-        }
-    }
-
-    pub fn parse_domain_capabilities_list(
-        api_instance: &crate::grpc_impl::api::DomainCapabilitiesList,
-    ) -> anyhow::Result<std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>> {
-        let mut ret = std::collections::HashMap::new();
-        for entry in &api_instance.domain_capabilities {
-            if let Some(domain_capabilities) = &entry.domain_capabilities {
-                ret.insert(
-                    entry.domain_id.clone(),
-                    super::domain_registration::parse_domain_capabilities(domain_capabilities),
-                );
-            }
-        }
-        Ok(ret)
-    }
-
-    pub fn parse_migrate_workflow_request(
-        api_workflow: &crate::grpc_impl::api::MigrateWorkflowRequest,
-    ) -> anyhow::Result<crate::workflow_instance::MigrateWorkflowRequest> {
-        if let (Some(workflow_id), Some(domain_id)) = (&api_workflow.workflow_id, &api_workflow.domain_id) {
-            Ok(crate::workflow_instance::MigrateWorkflowRequest {
-                workflow_id: Self::parse_workflow_id(workflow_id)?,
-                domain_id: domain_id.domain_id.clone(),
-            })
-        } else {
-            anyhow::bail!("missing workflow_id or domain_id in MigrateWorkflowRequest");
-        }
-    }
-
-    pub fn serialize_workflow_id(crate_id: &crate::workflow_instance::WorkflowId) -> crate::grpc_impl::api::WorkflowId {
-        crate::grpc_impl::api::WorkflowId {
-            workflow_id: crate_id.workflow_id.to_string(),
-        }
-    }
-
-    pub fn serialize_workflow_function(crate_function: &crate::workflow_instance::WorkflowFunction) -> crate::grpc_impl::api::WorkflowFunction {
-        crate::grpc_impl::api::WorkflowFunction {
-            name: crate_function.name.clone(),
-            annotations: crate_function.annotations.clone(),
-            class_spec: Some(
-                super::function_instance::FunctonInstanceConverters::serialize_function_class_specification(
-                    &crate_function.function_class_specification,
-                ),
-            ),
-            output_mapping: crate_function.output_mapping.clone(),
-        }
-    }
-
-    pub fn serialize_workflow_resource(crate_resource: &crate::workflow_instance::WorkflowResource) -> crate::grpc_impl::api::WorkflowResource {
-        crate::grpc_impl::api::WorkflowResource {
-            name: crate_resource.name.clone(),
-            class_type: crate_resource.class_type.clone(),
-            output_mapping: crate_resource.output_mapping.clone(),
-            configurations: crate_resource.configurations.clone(),
-        }
-    }
-
-    pub fn serialize_workflow_spawn_request(
-        crate_request: &crate::workflow_instance::SpawnWorkflowRequest,
-    ) -> crate::grpc_impl::api::SpawnWorkflowRequest {
-        crate::grpc_impl::api::SpawnWorkflowRequest {
-            workflow_functions: crate_request.workflow_functions.iter().map(Self::serialize_workflow_function).collect(),
-            workflow_resources: crate_request.workflow_resources.iter().map(Self::serialize_workflow_resource).collect(),
-            annotations: crate_request.annotations.clone(),
-        }
-    }
-
-    pub fn serialize_workflow_spawn_response(
-        crate_request: &crate::workflow_instance::SpawnWorkflowResponse,
-    ) -> crate::grpc_impl::api::SpawnWorkflowResponse {
-        match crate_request {
-            crate::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => crate::grpc_impl::api::SpawnWorkflowResponse {
-                response_error: Some(crate::grpc_impl::common::CommonConverters::serialize_response_error(err)),
-                workflow_status: None,
-            },
-            crate::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(instance) => crate::grpc_impl::api::SpawnWorkflowResponse {
-                response_error: None,
-                workflow_status: Some(Self::serialize_workflow_instance(instance)),
-            },
-        }
-    }
-
-    pub fn serialize_workflow_instance(crate_instance: &crate::workflow_instance::WorkflowInstance) -> crate::grpc_impl::api::WorkflowInstanceStatus {
-        crate::grpc_impl::api::WorkflowInstanceStatus {
-            workflow_id: Some(Self::serialize_workflow_id(&crate_instance.workflow_id)),
-            domain_mapping: crate_instance
-                .domain_mapping
-                .iter()
-                .map(Self::serialize_workflow_function_mapping)
-                .collect(),
-        }
-    }
-
-    pub fn serialize_domain_capabilities_list(
-        domains: &std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>,
-    ) -> crate::grpc_impl::api::DomainCapabilitiesList {
-        crate::grpc_impl::api::DomainCapabilitiesList {
-            domain_capabilities: domains
-                .iter()
-                .map(|(domain_id, caps)| crate::grpc_impl::api::DomainCapabilitiesEntry {
-                    domain_id: domain_id.clone(),
-                    domain_capabilities: Some(super::domain_registration::serialize_domain_capabilities(caps)),
-                })
-                .collect(),
-        }
-    }
-
-    pub fn serialize_workflow_function_mapping(
-        crate_mapping: &crate::workflow_instance::WorkflowFunctionMapping,
-    ) -> crate::grpc_impl::api::WorkflowFunctionMapping {
-        crate::grpc_impl::api::WorkflowFunctionMapping {
-            name: crate_mapping.name.to_string(),
-            function_id: crate_mapping.function_id.to_string(),
-            domain_id: crate_mapping.domain_id.to_string(),
-        }
-    }
-
-    pub fn serialize_migrate_workflow_request(
-        crate_mapping: &crate::workflow_instance::MigrateWorkflowRequest,
-    ) -> crate::grpc_impl::api::MigrateWorkflowRequest {
-        crate::grpc_impl::api::MigrateWorkflowRequest {
-            workflow_id: Some(Self::serialize_workflow_id(&crate_mapping.workflow_id)),
-            domain_id: Some(crate::grpc_impl::api::DomainId {
-                domain_id: crate_mapping.domain_id.clone(),
-            }),
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct WorkflowInstanceAPIClient {
@@ -274,21 +34,17 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
     ) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowResponse> {
         let ret = self
             .client
-            .start(tonic::Request::new(
-                super::workflow_instance::WorkflowInstanceConverters::serialize_workflow_spawn_request(&request),
-            ))
+            .start(tonic::Request::new(super::workflow_instance::serialize_workflow_spawn_request(&request)))
             .await;
         match ret {
-            Ok(ret) => return super::workflow_instance::WorkflowInstanceConverters::parse_workflow_spawn_response(&ret.into_inner()),
+            Ok(ret) => return super::workflow_instance::parse_workflow_spawn_response(&ret.into_inner()),
             Err(err) => Err(anyhow::anyhow!("Communication error while starting a workflow: {}", err.to_string())),
         }
     }
     async fn stop(&mut self, id: crate::workflow_instance::WorkflowId) -> anyhow::Result<()> {
         let ret = self
             .client
-            .stop(tonic::Request::new(
-                super::workflow_instance::WorkflowInstanceConverters::serialize_workflow_id(&id),
-            ))
+            .stop(tonic::Request::new(super::workflow_instance::serialize_workflow_id(&id)))
             .await;
         match ret {
             Ok(_) => return Ok(()),
@@ -314,19 +70,17 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
     async fn inspect(&mut self, id: crate::workflow_instance::WorkflowId) -> anyhow::Result<crate::workflow_instance::WorkflowInfo> {
         let ret = self
             .client
-            .inspect(tonic::Request::new(
-                super::workflow_instance::WorkflowInstanceConverters::serialize_workflow_id(&id),
-            ))
+            .inspect(tonic::Request::new(super::workflow_instance::serialize_workflow_id(&id)))
             .await;
         match ret {
             Ok(ret) => {
                 let ret = ret.into_inner();
                 let request = match &ret.request {
-                    Some(request) => super::workflow_instance::WorkflowInstanceConverters::parse_workflow_spawn_request(request)?,
+                    Some(request) => super::workflow_instance::parse_workflow_spawn_request(request)?,
                     None => anyhow::bail!("Workflow request not present"),
                 };
                 let status = match &ret.status {
-                    Some(status) => super::workflow_instance::WorkflowInstanceConverters::parse_workflow_instance(status)?,
+                    Some(status) => super::workflow_instance::parse_workflow_instance(status)?,
                     None => anyhow::bail!("Workflow status not present"),
                 };
 
@@ -344,7 +98,7 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             .domains(tonic::Request::new(crate::grpc_impl::api::DomainId { domain_id }))
             .await;
         match ret {
-            Ok(ret) => return super::workflow_instance::WorkflowInstanceConverters::parse_domain_capabilities_list(&ret.into_inner()),
+            Ok(ret) => return super::workflow_instance::parse_domain_capabilities_list(&ret.into_inner()),
             Err(err) => Err(anyhow::anyhow!("Communication error while listing workflows: {}", err.to_string())),
         }
     }
@@ -354,12 +108,12 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
     ) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowResponse> {
         let ret = self
             .client
-            .migrate(tonic::Request::new(
-                super::workflow_instance::WorkflowInstanceConverters::serialize_migrate_workflow_request(&request),
-            ))
+            .migrate(tonic::Request::new(super::workflow_instance::serialize_migrate_workflow_request(
+                &request,
+            )))
             .await;
         match ret {
-            Ok(ret) => return super::workflow_instance::WorkflowInstanceConverters::parse_workflow_spawn_response(&ret.into_inner()),
+            Ok(ret) => return super::workflow_instance::parse_workflow_spawn_response(&ret.into_inner()),
             Err(err) => Err(anyhow::anyhow!("Communication error while migrating a workflow: {}", err.to_string())),
         }
     }
@@ -375,7 +129,7 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
         &self,
         request: tonic::Request<crate::grpc_impl::api::SpawnWorkflowRequest>,
     ) -> Result<tonic::Response<crate::grpc_impl::api::SpawnWorkflowResponse>, tonic::Status> {
-        let req = match super::workflow_instance::WorkflowInstanceConverters::parse_workflow_spawn_request(&request.into_inner()) {
+        let req = match super::workflow_instance::parse_workflow_spawn_request(&request.into_inner()) {
             Ok(val) => val,
             Err(err) => {
                 return Ok(tonic::Response::new(crate::grpc_impl::api::SpawnWorkflowResponse {
@@ -389,9 +143,9 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
         };
         let ret = self.root_api.lock().await.start(req).await;
         match ret {
-            Ok(response) => Ok(tonic::Response::new(
-                super::workflow_instance::WorkflowInstanceConverters::serialize_workflow_spawn_response(&response),
-            )),
+            Ok(response) => Ok(tonic::Response::new(super::workflow_instance::serialize_workflow_spawn_response(
+                &response,
+            ))),
             Err(err) => Ok(tonic::Response::new(crate::grpc_impl::api::SpawnWorkflowResponse {
                 response_error: Some(crate::grpc_impl::api::ResponseError {
                     summary: "Request rejected".to_string(),
@@ -403,7 +157,7 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
     }
 
     async fn stop(&self, request_id: tonic::Request<crate::grpc_impl::api::WorkflowId>) -> Result<tonic::Response<()>, tonic::Status> {
-        let req = match super::workflow_instance::WorkflowInstanceConverters::parse_workflow_id(&request_id.into_inner()) {
+        let req = match super::workflow_instance::parse_workflow_id(&request_id.into_inner()) {
             Ok(val) => val,
             Err(err) => return Err(tonic::Status::internal(format!("Internal error when stopping a workflow: {}", err))),
         };
@@ -428,15 +182,15 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
         &self,
         request_id: tonic::Request<crate::grpc_impl::api::WorkflowId>,
     ) -> Result<tonic::Response<crate::grpc_impl::api::WorkflowInstanceInfo>, tonic::Status> {
-        let req = match super::workflow_instance::WorkflowInstanceConverters::parse_workflow_id(&request_id.into_inner()) {
+        let req = match super::workflow_instance::parse_workflow_id(&request_id.into_inner()) {
             Ok(val) => val,
             Err(err) => return Err(tonic::Status::internal(format!("Internal error when inspecting a workflow: {}", err))),
         };
         let ret = self.root_api.lock().await.inspect(req).await;
         match ret {
             Ok(info) => Ok(tonic::Response::new(crate::grpc_impl::api::WorkflowInstanceInfo {
-                request: Some(super::workflow_instance::WorkflowInstanceConverters::serialize_workflow_spawn_request(&info.request)),
-                status: Some(super::workflow_instance::WorkflowInstanceConverters::serialize_workflow_instance(&info.status)),
+                request: Some(super::workflow_instance::serialize_workflow_spawn_request(&info.request)),
+                status: Some(super::workflow_instance::serialize_workflow_instance(&info.status)),
             })),
             Err(err) => Err(tonic::Status::internal(format!("Internal error when inspecting a workflow: {}", err))),
         }
@@ -447,9 +201,9 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
         domain_id: tonic::Request<crate::grpc_impl::api::DomainId>,
     ) -> Result<tonic::Response<crate::grpc_impl::api::DomainCapabilitiesList>, tonic::Status> {
         match self.root_api.lock().await.domains(domain_id.into_inner().domain_id).await {
-            Ok(instances) => Ok(tonic::Response::new(
-                super::workflow_instance::WorkflowInstanceConverters::serialize_domain_capabilities_list(&instances),
-            )),
+            Ok(instances) => Ok(tonic::Response::new(super::workflow_instance::serialize_domain_capabilities_list(
+                &instances,
+            ))),
             Err(err) => Err(tonic::Status::internal(format!(
                 "Internal error when listing domain capabilities: {}",
                 err
@@ -461,15 +215,15 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
         &self,
         request: tonic::Request<crate::grpc_impl::api::MigrateWorkflowRequest>,
     ) -> Result<tonic::Response<crate::grpc_impl::api::SpawnWorkflowResponse>, tonic::Status> {
-        let request = match super::workflow_instance::WorkflowInstanceConverters::parse_migrate_workflow_request(&request.into_inner()) {
+        let request = match super::workflow_instance::parse_migrate_workflow_request(&request.into_inner()) {
             Ok(val) => val,
             Err(err) => return Err(tonic::Status::internal(format!("Internal error when migrating a workflow: {}", err))),
         };
         let ret = self.root_api.lock().await.migrate(request).await;
         match ret {
-            Ok(response) => Ok(tonic::Response::new(
-                super::workflow_instance::WorkflowInstanceConverters::serialize_workflow_spawn_response(&response),
-            )),
+            Ok(response) => Ok(tonic::Response::new(super::workflow_instance::serialize_workflow_spawn_response(
+                &response,
+            ))),
             Err(err) => Ok(tonic::Response::new(crate::grpc_impl::api::SpawnWorkflowResponse {
                 response_error: Some(crate::grpc_impl::api::ResponseError {
                     summary: "Request rejected".to_string(),
@@ -481,11 +235,234 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
     }
 }
 
+fn parse_workflow_id(api_id: &crate::grpc_impl::api::WorkflowId) -> anyhow::Result<crate::workflow_instance::WorkflowId> {
+    Ok(crate::workflow_instance::WorkflowId {
+        workflow_id: uuid::Uuid::parse_str(&api_id.workflow_id)?,
+    })
+}
+
+fn parse_workflow_function(api_function: &crate::grpc_impl::api::WorkflowFunction) -> anyhow::Result<crate::workflow_instance::WorkflowFunction> {
+    Ok(crate::workflow_instance::WorkflowFunction {
+        name: api_function.name.clone(),
+        function_class_specification: super::function_instance::parse_function_class_specification(match &api_function.class_spec.as_ref() {
+            Some(val) => val,
+            None => return Err(anyhow::anyhow!("Missing Workflow FunctionClass")),
+        })?,
+        output_mapping: api_function.output_mapping.clone(),
+        annotations: api_function.annotations.clone(),
+    })
+}
+
+fn parse_workflow_resource(api_workflow: &crate::grpc_impl::api::WorkflowResource) -> anyhow::Result<crate::workflow_instance::WorkflowResource> {
+    Ok(crate::workflow_instance::WorkflowResource {
+        name: api_workflow.name.clone(),
+        class_type: api_workflow.class_type.clone(),
+        output_mapping: api_workflow.output_mapping.clone(),
+        configurations: api_workflow.configurations.clone(),
+    })
+}
+
+fn parse_workflow_spawn_request(
+    api_request: &crate::grpc_impl::api::SpawnWorkflowRequest,
+) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowRequest> {
+    Ok(crate::workflow_instance::SpawnWorkflowRequest {
+        workflow_functions: api_request
+            .workflow_functions
+            .iter()
+            .map(parse_workflow_function)
+            .filter_map(|f| match f {
+                Ok(val) => Some(val),
+                Err(_) => None,
+            })
+            .collect(),
+        workflow_resources: api_request
+            .workflow_resources
+            .iter()
+            .filter_map(|f| match parse_workflow_resource(f) {
+                Ok(val) => Some(val),
+                Err(_) => None,
+            })
+            .collect(),
+        annotations: api_request.annotations.clone(),
+    })
+}
+
+fn parse_workflow_function_mapping(
+    api_mapping: &crate::grpc_impl::api::WorkflowFunctionMapping,
+) -> anyhow::Result<crate::workflow_instance::WorkflowFunctionMapping> {
+    Ok(crate::workflow_instance::WorkflowFunctionMapping {
+        name: api_mapping.name.to_string(),
+        function_id: uuid::Uuid::from_str(api_mapping.function_id.as_str())?,
+        domain_id: api_mapping.domain_id.to_string(),
+    })
+}
+
+fn parse_workflow_instance(
+    api_instance: &crate::grpc_impl::api::WorkflowInstanceStatus,
+) -> anyhow::Result<crate::workflow_instance::WorkflowInstance> {
+    Ok(crate::workflow_instance::WorkflowInstance {
+        workflow_id: parse_workflow_id(match api_instance.workflow_id.as_ref() {
+            Some(val) => val,
+            None => {
+                return Err(anyhow::anyhow!("WorkflowId Missing"));
+            }
+        })?,
+        domain_mapping: api_instance
+            .domain_mapping
+            .iter()
+            .map(parse_workflow_function_mapping)
+            .filter_map(|x| match x {
+                Ok(val) => Some(val),
+                Err(_) => None,
+            })
+            .collect(),
+    })
+}
+
+fn parse_workflow_spawn_response(
+    api_instance: &crate::grpc_impl::api::SpawnWorkflowResponse,
+) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowResponse> {
+    match api_instance.workflow_status.as_ref() {
+        Some(val) => match parse_workflow_instance(val) {
+            Ok(val) => Ok(crate::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val)),
+            Err(err) => Err(anyhow::anyhow!(err.to_string())),
+        },
+        None => match api_instance.response_error.as_ref() {
+            Some(val) => match crate::grpc_impl::common::CommonConverters::parse_response_error(val) {
+                Ok(val) => Ok(crate::workflow_instance::SpawnWorkflowResponse::ResponseError(val)),
+                Err(err) => Err(anyhow::anyhow!(err.to_string())),
+            },
+            None => Err(anyhow::anyhow!(
+                "Ill-formed SpawnWorkflowResponse message: both ResponseError and WorkflowInstance are empty"
+            )),
+        },
+    }
+}
+
+fn parse_domain_capabilities_list(
+    api_instance: &crate::grpc_impl::api::DomainCapabilitiesList,
+) -> anyhow::Result<std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>> {
+    let mut ret = std::collections::HashMap::new();
+    for entry in &api_instance.domain_capabilities {
+        if let Some(domain_capabilities) = &entry.domain_capabilities {
+            ret.insert(
+                entry.domain_id.clone(),
+                super::domain_registration::parse_domain_capabilities(domain_capabilities),
+            );
+        }
+    }
+    Ok(ret)
+}
+
+fn parse_migrate_workflow_request(
+    api_workflow: &crate::grpc_impl::api::MigrateWorkflowRequest,
+) -> anyhow::Result<crate::workflow_instance::MigrateWorkflowRequest> {
+    if let (Some(workflow_id), Some(domain_id)) = (&api_workflow.workflow_id, &api_workflow.domain_id) {
+        Ok(crate::workflow_instance::MigrateWorkflowRequest {
+            workflow_id: parse_workflow_id(workflow_id)?,
+            domain_id: domain_id.domain_id.clone(),
+        })
+    } else {
+        anyhow::bail!("missing workflow_id or domain_id in MigrateWorkflowRequest");
+    }
+}
+
+fn serialize_workflow_id(crate_id: &crate::workflow_instance::WorkflowId) -> crate::grpc_impl::api::WorkflowId {
+    crate::grpc_impl::api::WorkflowId {
+        workflow_id: crate_id.workflow_id.to_string(),
+    }
+}
+
+fn serialize_workflow_function(crate_function: &crate::workflow_instance::WorkflowFunction) -> crate::grpc_impl::api::WorkflowFunction {
+    crate::grpc_impl::api::WorkflowFunction {
+        name: crate_function.name.clone(),
+        annotations: crate_function.annotations.clone(),
+        class_spec: Some(super::function_instance::serialize_function_class_specification(
+            &crate_function.function_class_specification,
+        )),
+        output_mapping: crate_function.output_mapping.clone(),
+    }
+}
+
+fn serialize_workflow_resource(crate_resource: &crate::workflow_instance::WorkflowResource) -> crate::grpc_impl::api::WorkflowResource {
+    crate::grpc_impl::api::WorkflowResource {
+        name: crate_resource.name.clone(),
+        class_type: crate_resource.class_type.clone(),
+        output_mapping: crate_resource.output_mapping.clone(),
+        configurations: crate_resource.configurations.clone(),
+    }
+}
+
+fn serialize_workflow_spawn_request(crate_request: &crate::workflow_instance::SpawnWorkflowRequest) -> crate::grpc_impl::api::SpawnWorkflowRequest {
+    crate::grpc_impl::api::SpawnWorkflowRequest {
+        workflow_functions: crate_request.workflow_functions.iter().map(serialize_workflow_function).collect(),
+        workflow_resources: crate_request.workflow_resources.iter().map(serialize_workflow_resource).collect(),
+        annotations: crate_request.annotations.clone(),
+    }
+}
+
+fn serialize_workflow_spawn_response(
+    crate_request: &crate::workflow_instance::SpawnWorkflowResponse,
+) -> crate::grpc_impl::api::SpawnWorkflowResponse {
+    match crate_request {
+        crate::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => crate::grpc_impl::api::SpawnWorkflowResponse {
+            response_error: Some(crate::grpc_impl::common::CommonConverters::serialize_response_error(err)),
+            workflow_status: None,
+        },
+        crate::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(instance) => crate::grpc_impl::api::SpawnWorkflowResponse {
+            response_error: None,
+            workflow_status: Some(serialize_workflow_instance(instance)),
+        },
+    }
+}
+
+fn serialize_workflow_instance(crate_instance: &crate::workflow_instance::WorkflowInstance) -> crate::grpc_impl::api::WorkflowInstanceStatus {
+    crate::grpc_impl::api::WorkflowInstanceStatus {
+        workflow_id: Some(serialize_workflow_id(&crate_instance.workflow_id)),
+        domain_mapping: crate_instance.domain_mapping.iter().map(serialize_workflow_function_mapping).collect(),
+    }
+}
+
+fn serialize_domain_capabilities_list(
+    domains: &std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>,
+) -> crate::grpc_impl::api::DomainCapabilitiesList {
+    crate::grpc_impl::api::DomainCapabilitiesList {
+        domain_capabilities: domains
+            .iter()
+            .map(|(domain_id, caps)| crate::grpc_impl::api::DomainCapabilitiesEntry {
+                domain_id: domain_id.clone(),
+                domain_capabilities: Some(super::domain_registration::serialize_domain_capabilities(caps)),
+            })
+            .collect(),
+    }
+}
+
+fn serialize_workflow_function_mapping(
+    crate_mapping: &crate::workflow_instance::WorkflowFunctionMapping,
+) -> crate::grpc_impl::api::WorkflowFunctionMapping {
+    crate::grpc_impl::api::WorkflowFunctionMapping {
+        name: crate_mapping.name.to_string(),
+        function_id: crate_mapping.function_id.to_string(),
+        domain_id: crate_mapping.domain_id.to_string(),
+    }
+}
+
+fn serialize_migrate_workflow_request(
+    crate_mapping: &crate::workflow_instance::MigrateWorkflowRequest,
+) -> crate::grpc_impl::api::MigrateWorkflowRequest {
+    crate::grpc_impl::api::MigrateWorkflowRequest {
+        workflow_id: Some(serialize_workflow_id(&crate_mapping.workflow_id)),
+        domain_id: Some(crate::grpc_impl::api::DomainId {
+            domain_id: crate_mapping.domain_id.clone(),
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::collections::HashMap;
 
-    use super::*;
     use crate::function_instance::FunctionClassSpecification;
     use crate::workflow_instance::SpawnWorkflowRequest;
     use crate::workflow_instance::SpawnWorkflowResponse;
@@ -502,7 +479,7 @@ mod tests {
         }];
 
         for msg in messages {
-            match WorkflowInstanceConverters::parse_workflow_id(&WorkflowInstanceConverters::serialize_workflow_id(&msg)) {
+            match parse_workflow_id(&serialize_workflow_id(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }
@@ -525,7 +502,7 @@ mod tests {
         }];
 
         for msg in messages {
-            match WorkflowInstanceConverters::parse_workflow_function(&WorkflowInstanceConverters::serialize_workflow_function(&msg)) {
+            match parse_workflow_function(&serialize_workflow_function(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }
@@ -542,7 +519,7 @@ mod tests {
         }];
 
         for msg in messages {
-            match WorkflowInstanceConverters::parse_workflow_resource(&WorkflowInstanceConverters::serialize_workflow_resource(&msg)) {
+            match parse_workflow_resource(&serialize_workflow_resource(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }
@@ -574,7 +551,7 @@ mod tests {
         }];
 
         for msg in messages {
-            match WorkflowInstanceConverters::parse_workflow_spawn_request(&WorkflowInstanceConverters::serialize_workflow_spawn_request(&msg)) {
+            match parse_workflow_spawn_request(&serialize_workflow_spawn_request(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }
@@ -590,8 +567,7 @@ mod tests {
         }];
 
         for msg in messages {
-            match WorkflowInstanceConverters::parse_workflow_function_mapping(&WorkflowInstanceConverters::serialize_workflow_function_mapping(&msg))
-            {
+            match parse_workflow_function_mapping(&serialize_workflow_function_mapping(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }
@@ -619,7 +595,7 @@ mod tests {
         }];
 
         for msg in messages {
-            match WorkflowInstanceConverters::parse_workflow_instance(&WorkflowInstanceConverters::serialize_workflow_instance(&msg)) {
+            match parse_workflow_instance(&serialize_workflow_instance(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }
@@ -647,7 +623,7 @@ mod tests {
         })];
 
         for msg in messages {
-            match WorkflowInstanceConverters::parse_workflow_spawn_response(&WorkflowInstanceConverters::serialize_workflow_spawn_response(&msg)) {
+            match parse_workflow_spawn_response(&serialize_workflow_spawn_response(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }
