@@ -139,10 +139,7 @@ async fn workflow_info_or_none(
     id: &str,
 ) -> Option<edgeless_api::workflow_instance::WorkflowInfo> {
     let workflow_id = if let Ok(id) = uuid::Uuid::parse_str(id) { id } else { return None };
-    match wf_client.inspect(edgeless_api::workflow_instance::WorkflowId { workflow_id }).await {
-        Ok(info) => Some(info),
-        Err(_) => None,
-    }
+    wf_client.inspect(edgeless_api::workflow_instance::WorkflowId { workflow_id }).await.ok()
 }
 
 async fn workflow_inspect(wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>, id: &str) -> anyhow::Result<()> {

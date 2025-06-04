@@ -159,11 +159,11 @@ impl OllamaResourceProvider {
     /// - `dataplane_provider`: handle to the EDGELESS data plane
     /// - `telemetry_hangle`: handle to the node's telemetry sub-system
     /// - `resource_provider_id`: identifier of this resource provider,
-    ///    also containing the identifier of the node hosting it
+    ///   also containing the identifier of the node hosting it
     /// - `ollama_host`: address of the ollama server
     /// - `ollama_port`: port number of the ollama server
     /// - `ollama_messages_number_limit`: maximum number of messages per
-    ///    chat conversation
+    ///   chat conversation
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,

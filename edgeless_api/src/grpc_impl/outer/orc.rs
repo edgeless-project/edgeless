@@ -12,7 +12,9 @@ pub struct OrchestratorAPIClient {
 impl OrchestratorAPIClient {
     pub async fn new(api_addr: &str) -> anyhow::Result<Self> {
         Ok(Self {
-            function_instance_client: Box::new(crate::grpc_impl::inner::function_instance::FunctionInstanceAPIClient::new(api_addr.to_string())),
+            function_instance_client: Box::new(crate::grpc_impl::inner::function_instance::FunctionInstanceAPIClient::new(
+                api_addr.to_string(),
+            )),
             resource_configuration_client: Box::new(crate::grpc_impl::inner::resource_configuration::ResourceConfigurationClient::new(
                 api_addr.to_string(),
             )),
@@ -40,10 +42,11 @@ impl OrchestratorAPIServer {
         let function_api = crate::grpc_impl::inner::function_instance::FunctionInstanceAPIServer::<crate::function_instance::DomainManagedInstanceId> {
             root_api: tokio::sync::Mutex::new(agent_api.function_instance_api()),
         };
-        let resource_configuration_api =
-            crate::grpc_impl::inner::resource_configuration::ResourceConfigurationServerHandler::<crate::function_instance::DomainManagedInstanceId> {
-                root_api: tokio::sync::Mutex::new(agent_api.resource_configuration_api()),
-            };
+        let resource_configuration_api = crate::grpc_impl::inner::resource_configuration::ResourceConfigurationServerHandler::<
+            crate::function_instance::DomainManagedInstanceId,
+        > {
+            root_api: tokio::sync::Mutex::new(agent_api.resource_configuration_api()),
+        };
         Box::pin(async move {
             let function_api = function_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&orchestrator_url) {
