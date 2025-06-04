@@ -152,7 +152,7 @@ impl ServerlessResourceProvider {
     /// - `dataplane_provider`: handle to the EDGELESS data plane
     /// - `telemetry_hangle`: handle to the node's telemetry sub-system
     /// - `resource_provider_id`: identifier of this resource provider,
-    ///    also containing the identifier of the node hosting it
+    ///   also containing the identifier of the node hosting it
     /// - `function_url`: the serverless function entry point as an HTTP URL
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,

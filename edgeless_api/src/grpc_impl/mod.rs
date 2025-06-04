@@ -6,7 +6,6 @@
 pub mod api {
     tonic::include_proto!("edgeless_api");
 }
-pub mod outer;
-mod inner;
 mod common;
-
+mod inner;
+pub mod outer;

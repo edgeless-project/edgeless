@@ -270,18 +270,12 @@ fn parse_workflow_spawn_request(
             .workflow_functions
             .iter()
             .map(parse_workflow_function)
-            .filter_map(|f| match f {
-                Ok(val) => Some(val),
-                Err(_) => None,
-            })
+            .filter_map(|f| f.ok())
             .collect(),
         workflow_resources: api_request
             .workflow_resources
             .iter()
-            .filter_map(|f| match parse_workflow_resource(f) {
-                Ok(val) => Some(val),
-                Err(_) => None,
-            })
+            .filter_map(|f| parse_workflow_resource(f).ok())
             .collect(),
         annotations: api_request.annotations.clone(),
     })
@@ -311,10 +305,7 @@ fn parse_workflow_instance(
             .domain_mapping
             .iter()
             .map(parse_workflow_function_mapping)
-            .filter_map(|x| match x {
-                Ok(val) => Some(val),
-                Err(_) => None,
-            })
+            .filter_map(|x| x.ok())
             .collect(),
     })
 }
