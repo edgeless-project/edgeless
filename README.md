@@ -90,6 +90,7 @@ Basics:
 Advanced topics:
 
 - [Repository layout](documentation/repository_layout.md)
+- [EDGELESS APIs](edgeless_api/README.md)
 - [How to create a new function](documentation/rust_functions.md)
 - [Local orchestration](documentation/local_orchestration.md)
 - [Benchmarking EDGELESS](documentation/benchmark.md)
