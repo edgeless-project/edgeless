@@ -232,6 +232,7 @@ fn generate_configs(
                 performance_samples: false,
             },
             wasm_runtime: None,
+            native_runtime: None,
             container_runtime: None,
             resources: Some(EdgelessNodeResourceSettings {
                 http_ingress_url: None,

@@ -30,6 +30,7 @@ pub fn workflow_spec_to_request(
             .map(|func_spec| {
                 let function_class_code = match func_spec.class_specification.function_type.as_str() {
                     "RUST_WASM" => std::fs::read(parent_path.join(func_spec.class_specification.code.unwrap())).unwrap(),
+                    "RUST_NATIVE" => std::fs::read(parent_path.join(func_spec.class_specification.code.unwrap())).unwrap(),
                     "CONTAINER" => func_spec.class_specification.code.unwrap().as_bytes().to_vec(),
                     _ => panic!("unknown function class type: {}", func_spec.class_specification.function_type),
                 };
