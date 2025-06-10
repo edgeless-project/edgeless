@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: MIT
 use edgeless_function::*;
 struct PongerFun;
-//use rand::prelude::*;
 
 impl EdgeFunction for PongerFun {
     fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
@@ -11,10 +10,8 @@ impl EdgeFunction for PongerFun {
     }
 
     fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
-        let x: u16 = rand::random();
-        let pong = format!("PONG-{}", x);
         log::info!("Ponger: 'Call' called, MSG: {:?}", encoded_message);
-        CallRet::Reply(OwnedByteBuff::new_from_slice(pong.as_bytes()))
+        CallRet::Reply(OwnedByteBuff::new_from_slice(b"PONG"))
     }
 
     fn handle_init(_payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {

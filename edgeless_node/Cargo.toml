@@ -73,7 +73,6 @@ dda = { path = "../edgeless_dda" }
 rand = "0.8.5"
 # note use sqlx 0.8.1 will inccur cargo issue
 sqlx = { version = "0.8.0", features = ["runtime-tokio-native-tls", "sqlite", "json",]}
-edgeless_function = { path = "../edgeless_function" }
 
 [build-dependencies]
 tonic-build = "0.11"

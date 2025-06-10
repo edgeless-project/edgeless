@@ -78,7 +78,7 @@ pub struct WorkflowSpec {
     pub annotations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(serde::Deserialize, Clone)]
 pub struct RepoEndpoint {
     pub url: Url,
     pub credential: Credential,
@@ -86,18 +86,18 @@ pub struct RepoEndpoint {
 }
 
 // Config struct holds to data from the `[config]` section.
-#[derive(Deserialize, Clone)]
+#[derive(serde::Deserialize, Clone)]
 pub struct Binary {
     pub name: String,
     pub id: String, // the id appear in repo
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(serde::Deserialize, Clone)]
 pub struct Url {
     pub name: String,
 }
 
-#[derive(Deserialize, Clone)]
+#[derive(serde::Deserialize, Clone)]
 pub struct Credential {
     pub basic_auth_user: String,
     pub basic_auth_pass: String,

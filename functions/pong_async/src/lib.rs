@@ -7,8 +7,8 @@ struct PongerFun;
 impl EdgeFunction for PongerFun {
     fn handle_cast(src: InstanceId, encoded_message: &[u8]) {
         log::info!("AsyncPonger: 'Cast' called, MSG: {:?}", encoded_message);
-        cast_raw(src, b"PONG2");
-        //OR cast("pinger", b"PONG2");
+        //cast_raw(src, b"PONG2");
+        cast("pinger", b"PONG2");
     }
 
     fn handle_call(_src: InstanceId, encoded_message: &[u8]) -> CallRet {
@@ -27,4 +27,3 @@ impl EdgeFunction for PongerFun {
 }
 
 edgeless_function::export!(PongerFun);
-

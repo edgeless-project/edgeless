@@ -327,6 +327,27 @@ async fn main() -> anyhow::Result<()> {
                     let context = GlobalContext::default().expect("Could not construct a global context for the workspace");
                     let mut ws = cargo::core::Workspace::new(&cargo_manifest, &context)?;
                     ws.set_target_dir(cargo::util::Filesystem::new(build_dir.clone()));
+                    
+                    let platform = Platform::from_string(architecture.as_str());
+                    let pack = ws.current()?;
+
+                    let lib_name = match pack.library() {
+                        Some(val) => val.name(),
+                        None => {
+                            return Err(anyhow::anyhow!("Cargo package does not contain library."));
+                        }
+                    };
+
+                    let raw_result = build_dir
+                        .join(format!("{}/release/lib{}.{}", platform.target(), lib_name, platform.suffix()))
+                        .to_str()
+                        .unwrap()
+                        .to_string();
+                    let out_file = cargo_project_path
+                        .join(format!("{}.{}", function_spec.id, platform.suffix()))
+                        .to_str()
+                        .unwrap()
+                        .to_string(); 
 
                     // check if function.json, Cargo.toml, Cargo.lock or src/
                     // have been modified since the last time the function has
@@ -363,20 +384,7 @@ async fn main() -> anyhow::Result<()> {
                         } else {
                             log::info!("Building the function for the first time.")
                         }
-                        let pack = ws.current()?;
-
-                        let lib_name = match pack.library() {
-                            Some(val) => val.name(),
-                            None => {
-                                return Err(anyhow::anyhow!("Cargo package does not contain library."));
-                            }
-                        };
-
-
-                        let pack = ws.current()?;
-
-                        let platform = Platform::from_string(architecture.as_str());
-
+                        
                         let profile = BuildProfile::from_string(build_profile.as_str());
 
                         println!("Building profile {} for architecture {} using {} target.", profile.name(), platform.name(), platform.target());
@@ -436,15 +444,16 @@ async fn main() -> anyhow::Result<()> {
 
                         match platform {
                             Platform::WASM => println!(
-                            "{:?}",
-                            std::process::Command::new("wasm-opt")
-                                .args(["-Oz", &raw_result, "-o", &out_file])
-                                .status()?
-                        ),
-                        _ => println!(
-                            "{:?}",
-                            std::fs::copy(&raw_result, out_file)?
-                        ),
+                                "{:?}",
+                                std::process::Command::new("wasm-opt")
+                                    .args(["-Oz", &raw_result, "-o", &out_file])
+                                    .status()?
+                            ),
+                            _ => println!(
+                                "{:?}",
+                                std::fs::copy(&raw_result, out_file)?
+                            ),
+                        }
                     }
                 }
                 FunctionCommands::Invoke {
