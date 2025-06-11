@@ -11,6 +11,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for HttpEgressResourc
         String::from("http-egress")
     }
 
+    fn description(&self) -> String {
+        r"Execute HTTP commands on external web servers".to_string()
+    }
+
     fn outputs(&self) -> Vec<String> {
         vec![]
     }

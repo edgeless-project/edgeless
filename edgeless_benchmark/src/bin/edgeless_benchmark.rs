@@ -20,7 +20,7 @@ struct Args {
     /// Arrival model, one of {poisson, incremental, incr-and-keep, single, trace}
     #[arg(long, default_value_t = String::from("poisson"))]
     arrival_model: String,
-    /// Warmup duration, in s
+    /// Workflow warmup duration, in s
     #[arg(long, default_value_t = 0.0)]
     warmup: f64,
     /// Duration of the benchmarking experiment, in s
@@ -44,16 +44,10 @@ struct Args {
     /// Workflow type, use "help" to list possible examples.
     #[arg(short, long, default_value_t = String::from("single;functions/noop/function.json;functions/noop/noop.wasm"))]
     wf_type: String,
-    /// Location of the single_trigger function.
-    #[arg(long, default_value_t = String::from("functions/single_trigger/single_trigger.wasm"))]
-    single_trigger_wasm: String,
-    /// URL of the Redis server to use for metrics.
-    #[arg(short, long, default_value_t = String::from(""))]
-    redis_url: String,
-    /// Path where to save the output CSV datasets. If empty, do not save them.
+    /// File where to save the events in CSV format. If empty, do not save them.
     #[arg(long, default_value_t = String::from(""))]
-    dataset_path: String,
-    /// Append to the output dataset files.
+    output: String,
+    /// Append to the output file.
     #[arg(long, default_value_t = false)]
     append: bool,
     /// Additional fields recorded in the CSV output file.
@@ -105,13 +99,12 @@ async fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
 
-    if args.warmup >= args.duration {
-        log::warn!(
-            "metrics will not be collected since warm-up period ({} s) >= experiment duration ({} s)",
-            args.warmup,
-            args.duration
-        );
-    }
+    anyhow::ensure!(
+        args.warmup <= args.duration,
+        "workflow warm-up ({} s) >= experiment duration ({} s)",
+        args.warmup,
+        args.duration
+    );
 
     // Parse the worflow type from command line option.
     if args.wf_type.to_lowercase() == "help" {
@@ -153,22 +146,12 @@ async fn main() -> anyhow::Result<()> {
     additional_fields.push(&seed);
     additional_header.push("seed");
 
-    // Start the Redis dumper
-    let (metrics_collection, redis_client) = match args.redis_url.is_empty() {
-        true => (false, None),
-        false => {
-            match edgeless_benchmark::redis_dumper::RedisDumper::new(&args.redis_url, additional_fields.join(","), additional_header.join(",")) {
-                Ok(val) => (true, Some(val)),
-                Err(err) => {
-                    log::error!("could not connect to Redis at {}: {}", &args.redis_url, err);
-                    (true, None)
-                }
-            }
-        }
-    };
+    // Create the CSV dumper.
+    let csv_dumper =
+        edgeless_benchmark::csv_dumper::CsvDumper::new(additional_fields.join(","), additional_header.join(","), &args.output, args.append)?;
 
     // Create the engine for the creation/termination of workflows.
-    let mut engine = Engine::new(&args.controller_url, wf_type, args.seed + 1000, redis_client).await;
+    let mut engine = Engine::new(&args.controller_url, wf_type, args.seed + 1000, csv_dumper).await;
 
     // event queue
     let mut events = BinaryHeap::new();
@@ -180,15 +163,6 @@ async fn main() -> anyhow::Result<()> {
 
     // add the end-of-experiment event
     events.push(Event::WfExperimentEnd(utils::to_microseconds(args.duration)));
-
-    // if metrics collection is enabled, reset the metrics-collector resource
-    let single_trigger_workflow_id = match metrics_collection {
-        true => match edgeless_benchmark::engine::setup_metrics_collector(&mut engine, &args.single_trigger_wasm, args.warmup).await {
-            Ok(workflow_id) => workflow_id,
-            Err(err) => anyhow::bail!("error when setting up the metrics collector: {} ", err),
-        },
-        false => String::default(),
-    };
 
     // main experiment loop
     let mut wf_started = 0;
@@ -256,15 +230,6 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }
-    }
-
-    if metrics_collection {
-        let _ = engine.stop_workflow(&single_trigger_workflow_id).await;
-    }
-
-    // dump data collected in Redis
-    if !args.dataset_path.is_empty() {
-        engine.dump(&args.dataset_path, args.append);
     }
 
     // output metrics

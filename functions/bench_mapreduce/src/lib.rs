@@ -90,6 +90,7 @@ impl Message {
 }
 
 struct Conf {
+    init_id_from_redis: bool,
     is_first: bool,
     is_last: bool,
     use_base64: bool,
@@ -116,12 +117,16 @@ static STATE: std::sync::OnceLock<std::sync::Mutex<State>> = std::sync::OnceLock
 ///
 /// Outputs:
 ///
-/// - `metric`: where the first and last elements trace the workflow latency
+/// - `redis`: the last element saves the identifier of the last message
+///   correctly received, which is read from the first element during the
+///   initialization phase, if this feature is enabled
 /// - `err`: errors are sent here as human-readable string messages
 /// - `out-x`: the output channel to which the event is generated
 ///
 /// Init-payload: a comma-separated list of K=V values, with the following keys:
 ///
+/// - init_id_from_redis: true if the transaction identifier of the first
+///   element is retrieved from a redis resource
 /// - is_first: true if this is the first element of the workflow
 /// - is_last: true if this is the last element of the workflow
 /// - use_base64: true if the messages are base64-encoded/decoded
@@ -134,6 +139,19 @@ impl EdgeFunction for BenchMapReduce {
     fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
         let conf = CONF.get().unwrap();
         let mut state = STATE.get().unwrap().lock().unwrap();
+
+        // If we are the first element and this is the very first invocation,
+        // then we try to read the initial transaction identifier from a
+        // Redis resource, if requested
+        if conf.is_first && conf.init_id_from_redis && state.transaction_id == 0 {
+            state.transaction_id = match call("redis", "last_transaction_id".as_bytes()) {
+                CallRet::Reply(owned_byte_buff) => core::str::from_utf8(&owned_byte_buff)
+                    .unwrap_or_default()
+                    .parse::<u32>()
+                    .unwrap_or_default(),
+                _ => 0,
+            };
+        }
 
         // Decode the message:
         // - first element: the entire payload is assumed as data input;
@@ -151,7 +169,7 @@ impl EdgeFunction for BenchMapReduce {
         };
 
         if conf.is_first {
-            cast("metric", format!("workflow:begin:{}", state.transaction_id).as_bytes());
+            telemetry_log(5, "tbegin", &state.transaction_id.to_string());
             message.transaction_id = state.transaction_id;
             state.transaction_id += 1;
             for output in &conf.outputs {
@@ -183,11 +201,14 @@ impl EdgeFunction for BenchMapReduce {
             state.pending.retain(|_, m| m.transaction_id == last_transaction_id);
 
             // If the transaction is complete:
-            // - last element: save the end of the transaction to metric;
+            // - last element: log the end of the transaction;
             // - otherwise: sum the vectors and invoke the downstream outputs.
             if state.pending.len() == conf.inputs.len() {
                 if conf.is_last {
-                    cast("metric", format!("workflow:end:{}", last_transaction_id).as_bytes());
+                    telemetry_log(5, "tend", &last_transaction_id.to_string());
+                    if conf.init_id_from_redis {
+                        cast("redis", format!("{}", last_transaction_id).as_bytes())
+                    }
                 } else {
                     // Reduce.
                     let mut iter = state.pending.iter_mut();
@@ -222,6 +243,7 @@ impl EdgeFunction for BenchMapReduce {
 
         // parse initialization string
         let arguments = edgeless_function::init_payload_to_args(payload);
+        let init_id_from_redis = edgeless_function::arg_to_bool("init_id_from_redis", &arguments);
         let is_first = edgeless_function::arg_to_bool("is_first", &arguments);
         let is_last = edgeless_function::arg_to_bool("is_last", &arguments);
         let use_base64 = edgeless_function::arg_to_bool("use_base64", &arguments);
@@ -247,6 +269,7 @@ impl EdgeFunction for BenchMapReduce {
 
         // save configuration
         let _ = CONF.set(Conf {
+            init_id_from_redis,
             is_first,
             is_last,
             use_base64,

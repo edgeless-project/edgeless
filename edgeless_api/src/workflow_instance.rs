@@ -12,6 +12,11 @@ pub struct WorkflowId {
 }
 
 impl WorkflowId {
+    pub fn new(s: &str) -> anyhow::Result<Self> {
+        Ok(Self {
+            workflow_id: uuid::Uuid::from_str(s)?,
+        })
+    }
     pub fn from_string(s: &str) -> Self {
         Self {
             workflow_id: uuid::Uuid::from_str(s).unwrap(),
@@ -50,7 +55,7 @@ pub struct WorkflowInstance {
     pub domain_mapping: Vec<WorkflowFunctionMapping>,
 }
 
-#[derive(Clone, Debug, serde::Serialize, PartialEq)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct WorkflowResource {
     pub name: String,
     pub class_type: String,
@@ -58,7 +63,7 @@ pub struct WorkflowResource {
     pub configurations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Clone, Debug, serde::Serialize, PartialEq)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct WorkflowFunction {
     pub name: String,
     pub function_class_specification: crate::function_instance::FunctionClassSpecification,
@@ -66,7 +71,7 @@ pub struct WorkflowFunction {
     pub annotations: std::collections::HashMap<String, String>,
 }
 
-#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SpawnWorkflowRequest {
     pub workflow_functions: Vec<WorkflowFunction>,
     pub workflow_resources: Vec<WorkflowResource>,
@@ -85,6 +90,12 @@ pub enum SpawnWorkflowResponse {
     WorkflowInstance(WorkflowInstance),
 }
 
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+pub struct MigrateWorkflowRequest {
+    pub workflow_id: WorkflowId,
+    pub domain_id: String,
+}
+
 #[async_trait::async_trait]
 pub trait WorkflowInstanceAPI: WorkflowInstanceAPIClone + Send + Sync {
     async fn start(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<SpawnWorkflowResponse>;
@@ -95,6 +106,7 @@ pub trait WorkflowInstanceAPI: WorkflowInstanceAPIClone + Send + Sync {
         &mut self,
         domain_id: String,
     ) -> anyhow::Result<std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>>;
+    async fn migrate(&mut self, request: MigrateWorkflowRequest) -> anyhow::Result<SpawnWorkflowResponse>;
 }
 
 // https://stackoverflow.com/a/30353928

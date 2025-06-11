@@ -45,4 +45,8 @@ for func in $(find $(dirname "$0")/../functions -type f -name function.json) ; d
     fi
 done
 
+if [ $RC -eq 0 ] ; then
+    rm -f build_functions.log 2> /dev/null
+fi
+
 exit ${RC}

@@ -90,6 +90,7 @@ Basics:
 Advanced topics:
 
 - [Repository layout](documentation/repository_layout.md)
+- [EDGELESS APIs](edgeless_api/README.md)
 - [How to create a new function](documentation/rust_functions.md)
 - [Local orchestration](documentation/local_orchestration.md)
 - [Benchmarking EDGELESS](documentation/benchmark.md)
@@ -107,7 +108,6 @@ Currently there are several known limitations, including the following ones:
   the same domain.
 - No workflow-level annotations are supported.
 - The payload of events is not encrypted.
-- There is no persistence of the soft states of the various components.
 - There currently are no guarantees on stability and API stability.
 
 The full list of issues is tracked on

@@ -70,9 +70,9 @@ The value of the following keys are updated with a timestamp when the
 corresponding data structure is updated:
 
 - `nodes:capabilities:last_update`
-- `provider:last_update           `
-- `instance:last_update           `
-- `dependency:last_update         `
+- `provider:last_update`
+- `instance:last_update`
+- `dependency:last_update`
 
 #### Sorted sets
 
@@ -80,14 +80,45 @@ The values below are stored as sorted sets, with a score equal to
 the timestamp of when they have been retrieved.
 They are all updated when the node refreshes its registration with the ε-ORC.
 
-| Key                                       | Element value                                                                                                                                                       | Data type          |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| node:health:`node_id`                     | JSON object representing the health status of the node identifier specified in the key                                                                              | `NodeHealthStatus` |
-| performance:function_execution_time:`pid` | Execution time of the function with the given `pid`, in fractional seconds, each associated with the timestamp of when the function execution completed at the node | `timestamp:value`  |
+| Key                                       | Element value                                                                                                                                                                         | Data type          |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| node:health:`node_id`                     | JSON object representing the health status of the node identifier specified in the key                                                                                                | `NodeHealthStatus` |
+| performance:function_execution_time:`pid` | Execution time of the function/resource with the given `pid`, in fractional seconds, each associated with the timestamp of when the function/resource execution completed at the node | `timestamp:value`  |
+| performance:function_transfer_time:`pid`  | Transfer time of the function/resource with the given `pid`, in fractional seconds, each associated with the timestamp of when the function/resource execution began at the node      | `timestamp:value`  |
+| performance:`target`:`value`              | Custom log entries emitted by the node                                                                                                                                                | `timestamp:value`  |
 
 Old values in the sorted sets above are periodically purged from the proxy,
 with the period configured in the ε-ORC's configuration file as
 `proxy.proxy_gc_period_seconds`.
+
+
+##### Function execution vs. transfer time
+
+For every event handled by a function or resource, the node tracks the time it
+takes to handle it (_execution time_) and the time needed for the event to
+reach the handler, including both the network latency and the time spent by the
+event in queue if there are other events currently being handled by the same
+instance (_transfer time_).
+This is illustrated in the following diagram, which shows function _f()_
+invoking its successor function _g()_.
+
+![](diagrams-function_metrics.png)
+
+_Note that the transfer time is only accurate if the two nodes involved in the
+invocation are synchronized in time_.
+
+##### Custom log entries
+
+Functions can emit custom log entried by means of the `telemetry_log` method,
+which has three arguments:
+
+- `level`: the log level
+- `target`: name of the performance metric
+- `value`: value to be emitted
+
+If the performance samples are enabled for a node, then all the `telemetry_log`
+events are transmitted from that node to the ε-ORC, regardless of the `level`.
+The latter only controls local logging at the node.
 
 #### Identifiers and other types
 
@@ -107,3 +138,33 @@ All the timestamps are represented as `secs.nsecs` where:
 
 - `secs`: number of non-leap seconds since UNIX timestamp
 - `nsecs`: number of nanoseconds since the last second boundary
+
+## Dataset creation
+
+The ε-ORC has the ability to save on the local filesystem the same information
+made available to the proxy.
+This feature requires the Redis proxy to be enabled and is configured in the
+`[proxy.dataset_settings]` section:
+
+```ini
+[proxy.dataset_settings]
+dataset_path = "dataset/"
+append = true
+additional_fields = "experiment_name"
+additional_header = "my-first-one"
+```
+
+The dataset files produced in `dataset/` are the following:
+
+| Filename                   | Format                                         |
+| -------------------------- | ---------------------------------------------- |
+| health_status.csv          | timestamp,node_id,node_health_status           |
+| capabilities.csv           | timestamp,node_id,node_capabilities            |
+| mapping_to_instance_id.csv | timestamp,logical_id,node_id1,physical_id1,... |
+| performance_samples.csv    | metric,identifier,value,timestamp              |
+
+Notes:
+
+- The timestamp format is always A.B, where A is the Unix epoch in seconds and
+B the fractional part in nanoseconds.
+- All the identifiers (node_id, logical_id, and physical_id) are UUID.
