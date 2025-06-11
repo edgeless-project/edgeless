@@ -1,7 +1,7 @@
 {
     "id": "counter",
     "function_type": "RUST_WASM",
-    "version": "0.1",
+    "version": "0.2",
     "build": "Cargo.toml",
     "outputs": [
         "output"

@@ -233,7 +233,7 @@ fn serialize_resource_provider_specification(
     }
 }
 
-pub fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealthStatus) -> crate::node_registration::NodeHealthStatus {
+fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealthStatus) -> crate::node_registration::NodeHealthStatus {
     crate::node_registration::NodeHealthStatus {
         mem_free: api_instance.mem_free,
         mem_used: api_instance.mem_used,
@@ -255,6 +255,7 @@ pub fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealth
         disk_tot_writes: api_instance.disk_tot_writes,
         gpu_load_perc: api_instance.gpu_load_perc,
         gpu_temp_cels: api_instance.gpu_temp_cels,
+        active_power: api_instance.active_power,
     }
 }
 
@@ -280,10 +281,11 @@ fn serialize_node_health_status(req: &crate::node_registration::NodeHealthStatus
         disk_tot_writes: req.disk_tot_writes,
         gpu_load_perc: req.gpu_load_perc,
         gpu_temp_cels: req.gpu_temp_cels,
+        active_power: req.active_power,
     }
 }
 
-pub fn parse_sample(api_instance: &crate::grpc_impl::api::Sample) -> crate::node_registration::Sample {
+fn parse_sample(api_instance: &crate::grpc_impl::api::Sample) -> crate::node_registration::Sample {
     crate::node_registration::Sample {
         timestamp_sec: api_instance.timestamp_sec,
         timestamp_ns: api_instance.timestamp_ns,
@@ -291,9 +293,16 @@ pub fn parse_sample(api_instance: &crate::grpc_impl::api::Sample) -> crate::node
     }
 }
 
-pub fn parse_node_performance_samples(
-    api_instance: &crate::grpc_impl::api::NodePerformanceSamples,
-) -> crate::node_registration::NodePerformanceSamples {
+fn parse_function_log_entry(api_instance: &crate::grpc_impl::api::FunctionLogEntry) -> crate::node_registration::FunctionLogEntry {
+    crate::node_registration::FunctionLogEntry {
+        timestamp_sec: api_instance.timestamp_sec,
+        timestamp_ns: api_instance.timestamp_ns,
+        target: api_instance.target.clone(),
+        message: api_instance.msg.clone(),
+    }
+}
+
+fn parse_node_performance_samples(api_instance: &crate::grpc_impl::api::NodePerformanceSamples) -> crate::node_registration::NodePerformanceSamples {
     crate::node_registration::NodePerformanceSamples {
         function_execution_times: api_instance
             .function_execution_times
@@ -311,6 +320,14 @@ pub fn parse_node_performance_samples(
                 _ => None,
             })
             .collect(),
+        function_log_entries: api_instance
+            .function_log_entries
+            .iter()
+            .filter_map(|x| match uuid::Uuid::from_str(&x.id) {
+                Ok(val) => Some((val, x.entries.iter().map(parse_function_log_entry).collect())),
+                _ => None,
+            })
+            .collect(),
     }
 }
 
@@ -319,6 +336,15 @@ fn serialize_sample(req: &crate::node_registration::Sample) -> crate::grpc_impl:
         timestamp_sec: req.timestamp_sec,
         timestamp_ns: req.timestamp_ns,
         sample: req.sample,
+    }
+}
+
+fn serialize_function_log_entry(req: &crate::node_registration::FunctionLogEntry) -> crate::grpc_impl::api::FunctionLogEntry {
+    crate::grpc_impl::api::FunctionLogEntry {
+        timestamp_sec: req.timestamp_sec,
+        timestamp_ns: req.timestamp_ns,
+        target: req.target.clone(),
+        msg: req.message.clone(),
     }
 }
 
@@ -340,12 +366,21 @@ fn serialize_node_performance_samples(req: &crate::node_registration::NodePerfor
                 samples: samples.iter().map(serialize_sample).collect(),
             })
             .collect(),
+        function_log_entries: req
+            .function_log_entries
+            .iter()
+            .map(|(id, entries)| crate::grpc_impl::api::FunctionLogEntries {
+                id: id.to_string(),
+                entries: entries.iter().map(serialize_function_log_entry).collect(),
+            })
+            .collect(),
     }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::node_registration::FunctionLogEntry;
     use crate::node_registration::NodeCapabilities;
     use crate::node_registration::NodeHealthStatus;
     use crate::node_registration::NodePerformanceSamples;
@@ -356,13 +391,24 @@ mod test {
 
     #[test]
     fn serialize_deserialize_update_node_request() {
-        let mut cnt = 0;
+        let mut sample_cnt = 0;
         let mut new_sample = |value| {
-            cnt += 2;
+            sample_cnt += 2;
             Sample {
-                timestamp_sec: cnt as i64,
-                timestamp_ns: (cnt + 1) as u32,
+                timestamp_sec: sample_cnt as i64,
+                timestamp_ns: (sample_cnt + 1) as u32,
                 sample: value,
+            }
+        };
+
+        let mut log_cnt = 0;
+        let mut new_log = |value| {
+            log_cnt += 2;
+            FunctionLogEntry {
+                timestamp_sec: log_cnt as i64,
+                timestamp_ns: (log_cnt + 1) as u32,
+                target: String::from("target"),
+                message: format!("value={}", value),
             }
         };
 
@@ -413,6 +459,7 @@ mod test {
                 disk_tot_writes: 22,
                 gpu_load_perc: 23,
                 gpu_temp_cels: 24,
+                active_power: 25,
             },
             performance_samples: NodePerformanceSamples {
                 function_execution_times: std::collections::HashMap::from([
@@ -425,6 +472,7 @@ mod test {
                     (uuid::Uuid::new_v4(), vec![]),
                     (uuid::Uuid::new_v4(), vec![new_sample(0.1), new_sample(0.2), new_sample(999.0)]),
                 ]),
+                function_log_entries: std::collections::HashMap::from([(uuid::Uuid::new_v4(), vec![new_log(100.0), new_log(200.1)])]),
             },
         }];
         for msg in messages {

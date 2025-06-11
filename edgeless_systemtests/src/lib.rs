@@ -73,10 +73,11 @@ mod system_tests {
 
             // The first node in each domain is also assigned a file-log resource.
             for node_i in 0..num_nodes_per_domain {
-                let file_log_provider = match node_i {
-                    0 => Some("file-log-1".to_string()),
-                    _ => None,
-                };
+                let mut resources = edgeless_node::EdgelessNodeResourceSettings::default();
+                if node_i == 0 {
+                    resources.file_log_provider = Some("file-log-1".to_string());
+                }
+                let resources = Some(resources);
                 let node_id = uuid::Uuid::new_v4();
                 let agent_url = format!("http://{}:{}", address, next_port());
                 let invocation_url = format!("http://{}:{}", address, next_port());
@@ -94,24 +95,13 @@ mod system_tests {
                     },
                     telemetry: edgeless_node::EdgelessNodeTelemetrySettings {
                         metrics_url: format!("http://{}:{}", address, next_port()),
-                        log_level: None,
                         performance_samples: false,
                     },
                     wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
                     container_runtime: None,
-                    resources: Some(edgeless_node::EdgelessNodeResourceSettings {
-                        http_ingress_url: None,
-                        http_ingress_provider: None,
-                        http_egress_provider: None,
-                        file_log_provider,
-                        redis_provider: None,
-                        dda_provider: None,
-                        ollama_provider: None,
-                        kafka_egress_provider: None,
-                        metrics_collector_provider: None,
-                        sqlx_provider: None,
-                    }),
+                    resources,
                     user_node_capabilities: None,
+                    power_info: None,
                 }));
                 tokio::spawn(task);
                 abort_handles_nodes.insert(node_id, handle);
@@ -121,6 +111,7 @@ mod system_tests {
         let (task, abort_handle_controller) = futures::future::abortable(edgeless_con::edgeless_con_main(edgeless_con::EdgelessConSettings {
             controller_url: controller_url.clone(),
             domain_register_url: domain_register_url.clone(),
+            persistence_filename: String::default(),
         }));
         tokio::spawn(task);
 

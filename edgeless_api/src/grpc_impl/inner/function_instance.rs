@@ -2,89 +2,8 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-use super::common::CommonConverters;
-
-pub struct FunctonInstanceConverters {}
-
-impl FunctonInstanceConverters {
-    pub fn parse_function_class_specification(
-        api_spec: &crate::grpc_impl::api::FunctionClassSpecification,
-    ) -> anyhow::Result<crate::function_instance::FunctionClassSpecification> {
-        Ok(crate::function_instance::FunctionClassSpecification {
-            function_class_id: api_spec.function_class_id.clone(),
-            function_class_type: api_spec.function_class_type.clone(),
-            function_class_version: api_spec.function_class_version.clone(),
-            function_class_code: api_spec.function_class_code().to_vec(),
-            function_class_outputs: api_spec.function_class_outputs.clone(),
-        })
-    }
-
-    pub fn parse_spawn_function_request(
-        api_request: &crate::grpc_impl::api::SpawnFunctionRequest,
-    ) -> anyhow::Result<crate::function_instance::SpawnFunctionRequest> {
-        Ok(crate::function_instance::SpawnFunctionRequest {
-            code: Self::parse_function_class_specification(match api_request.code.as_ref() {
-                Some(val) => val,
-                None => {
-                    return Err(anyhow::anyhow!("Request does not contain actor class."));
-                }
-            })?,
-            annotations: api_request.annotations.clone(),
-            state_specification: Self::parse_state_specification(match &api_request.state_specification {
-                Some(val) => val,
-                None => {
-                    return Err(anyhow::anyhow!("Request does not contain state_spec."));
-                }
-            })?,
-            workflow_id: api_request.workflow_id.clone(),
-        })
-    }
-
-    pub fn parse_state_specification(
-        api_spec: &crate::grpc_impl::api::StateSpecification,
-    ) -> anyhow::Result<crate::function_instance::StateSpecification> {
-        Ok(crate::function_instance::StateSpecification {
-            state_id: uuid::Uuid::parse_str(&api_spec.state_id)?,
-            state_policy: match api_spec.policy {
-                1 => crate::function_instance::StatePolicy::NodeLocal,
-                2 => crate::function_instance::StatePolicy::Global,
-                _ => crate::function_instance::StatePolicy::Transient,
-            },
-        })
-    }
-
-    pub fn serialize_function_class_specification(
-        spec: &crate::function_instance::FunctionClassSpecification,
-    ) -> crate::grpc_impl::api::FunctionClassSpecification {
-        crate::grpc_impl::api::FunctionClassSpecification {
-            function_class_id: spec.function_class_id.clone(),
-            function_class_type: spec.function_class_type.clone(),
-            function_class_version: spec.function_class_version.clone(),
-            function_class_code: Some(spec.function_class_code.clone()),
-            function_class_outputs: spec.function_class_outputs.clone(),
-        }
-    }
-
-    pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFunctionRequest) -> crate::grpc_impl::api::SpawnFunctionRequest {
-        crate::grpc_impl::api::SpawnFunctionRequest {
-            code: Some(Self::serialize_function_class_specification(&req.code)),
-            annotations: req.annotations.clone(),
-            state_specification: Some(Self::serialize_state_specification(&req.state_specification)),
-            workflow_id: req.workflow_id.clone(),
-        }
-    }
-
-    pub fn serialize_state_specification(crate_spec: &crate::function_instance::StateSpecification) -> crate::grpc_impl::api::StateSpecification {
-        crate::grpc_impl::api::StateSpecification {
-            state_id: crate_spec.state_id.to_string(),
-            policy: match crate_spec.state_policy {
-                crate::function_instance::StatePolicy::Transient => crate::grpc_impl::api::StatePolicy::Transient as i32,
-                crate::function_instance::StatePolicy::Global => crate::grpc_impl::api::StatePolicy::Global as i32,
-                crate::function_instance::StatePolicy::NodeLocal => crate::grpc_impl::api::StatePolicy::NodeLocal as i32,
-            },
-        }
-    }
-}
+use crate::grpc_impl::api as grpc_stubs;
+use crate::grpc_impl::common::CommonConverters;
 
 #[derive(Clone)]
 pub struct FunctionInstanceAPIClient<FunctionIdType> {
@@ -126,10 +45,11 @@ impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + 
 }
 
 #[async_trait::async_trait]
-impl<FunctionIdType: super::common::SerializeableId + Clone + Send + Sync + 'static> crate::function_instance::FunctionInstanceAPI<FunctionIdType>
-    for FunctionInstanceAPIClient<FunctionIdType>
+impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + Sync + 'static>
+    crate::function_instance::FunctionInstanceAPI<FunctionIdType> for FunctionInstanceAPIClient<FunctionIdType>
 where
-    super::api::InstanceIdVariant: super::common::ParseableId<FunctionIdType>,
+    // TODO: refactor
+    grpc_stubs::InstanceIdVariant: crate::grpc_impl::common::ParseableId<FunctionIdType>,
 {
     async fn start(
         &mut self,
@@ -138,10 +58,7 @@ where
         match self.try_connect().await {
             Ok(_) => {
                 if let Some(client) = &mut self.client {
-                    match client
-                        .start(tonic::Request::new(FunctonInstanceConverters::serialize_spawn_function_request(&request)))
-                        .await
-                    {
+                    match client.start(tonic::Request::new(serialize_spawn_function_request(&request))).await {
                         Ok(res) => CommonConverters::parse_start_component_response::<FunctionIdType>(&res.into_inner()),
                         Err(err) => {
                             self.disconnect();
@@ -166,7 +83,10 @@ where
         match self.try_connect().await {
             Ok(_) => {
                 if let Some(client) = &mut self.client {
-                    match client.stop(tonic::Request::new(super::common::SerializeableId::serialize(&id))).await {
+                    match client
+                        .stop(tonic::Request::new(crate::grpc_impl::common::SerializeableId::serialize(&id)))
+                        .await
+                    {
                         Ok(_) => Ok(()),
                         Err(err) => {
                             self.disconnect();
@@ -230,7 +150,7 @@ where
         request: tonic::Request<crate::grpc_impl::api::SpawnFunctionRequest>,
     ) -> Result<tonic::Response<crate::grpc_impl::api::StartComponentResponse>, tonic::Status> {
         let inner_request = request.into_inner();
-        let parsed_request = match FunctonInstanceConverters::parse_spawn_function_request(&inner_request) {
+        let parsed_request = match parse_spawn_function_request(&inner_request) {
             Ok(val) => val,
             Err(err) => {
                 return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
@@ -256,7 +176,7 @@ where
         }
     }
 
-    async fn stop(&self, request: tonic::Request<super::api::InstanceIdVariant>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn stop(&self, request: tonic::Request<grpc_stubs::InstanceIdVariant>) -> Result<tonic::Response<()>, tonic::Status> {
         let stop_function_id = match crate::grpc_impl::common::ParseableId::<FunctionIdType>::parse(&request.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
@@ -294,6 +214,84 @@ where
     }
 }
 
+pub fn parse_function_class_specification(
+    api_spec: &grpc_stubs::FunctionClassSpecification,
+) -> anyhow::Result<crate::function_instance::FunctionClassSpecification> {
+    Ok(crate::function_instance::FunctionClassSpecification {
+        function_class_id: api_spec.function_class_id.clone(),
+        function_class_type: api_spec.function_class_type.clone(),
+        function_class_version: api_spec.function_class_version.clone(),
+        function_class_code: api_spec.function_class_code().to_vec(),
+        function_class_outputs: api_spec.function_class_outputs.clone(),
+    })
+}
+
+pub fn parse_spawn_function_request(
+    api_request: &crate::grpc_impl::api::SpawnFunctionRequest,
+) -> anyhow::Result<crate::function_instance::SpawnFunctionRequest> {
+    Ok(crate::function_instance::SpawnFunctionRequest {
+        code: parse_function_class_specification(match api_request.code.as_ref() {
+            Some(val) => val,
+            None => {
+                return Err(anyhow::anyhow!("Request does not contain actor class."));
+            }
+        })?,
+        annotations: api_request.annotations.clone(),
+        state_specification: parse_state_specification(match &api_request.state_specification {
+            Some(val) => val,
+            None => {
+                return Err(anyhow::anyhow!("Request does not contain state_spec."));
+            }
+        })?,
+        workflow_id: api_request.workflow_id.clone(),
+    })
+}
+
+pub fn parse_state_specification(
+    api_spec: &crate::grpc_impl::api::StateSpecification,
+) -> anyhow::Result<crate::function_instance::StateSpecification> {
+    Ok(crate::function_instance::StateSpecification {
+        state_id: uuid::Uuid::parse_str(&api_spec.state_id)?,
+        state_policy: match api_spec.policy {
+            1 => crate::function_instance::StatePolicy::NodeLocal,
+            2 => crate::function_instance::StatePolicy::Global,
+            _ => crate::function_instance::StatePolicy::Transient,
+        },
+    })
+}
+
+pub fn serialize_function_class_specification(
+    spec: &crate::function_instance::FunctionClassSpecification,
+) -> crate::grpc_impl::api::FunctionClassSpecification {
+    crate::grpc_impl::api::FunctionClassSpecification {
+        function_class_id: spec.function_class_id.clone(),
+        function_class_type: spec.function_class_type.clone(),
+        function_class_version: spec.function_class_version.clone(),
+        function_class_code: Some(spec.function_class_code.clone()),
+        function_class_outputs: spec.function_class_outputs.clone(),
+    }
+}
+
+pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFunctionRequest) -> crate::grpc_impl::api::SpawnFunctionRequest {
+    crate::grpc_impl::api::SpawnFunctionRequest {
+        code: Some(serialize_function_class_specification(&req.code)),
+        annotations: req.annotations.clone(),
+        state_specification: Some(serialize_state_specification(&req.state_specification)),
+        workflow_id: req.workflow_id.clone(),
+    }
+}
+
+pub fn serialize_state_specification(crate_spec: &crate::function_instance::StateSpecification) -> crate::grpc_impl::api::StateSpecification {
+    crate::grpc_impl::api::StateSpecification {
+        state_id: crate_spec.state_id.to_string(),
+        policy: match crate_spec.state_policy {
+            crate::function_instance::StatePolicy::Transient => crate::grpc_impl::api::StatePolicy::Transient as i32,
+            crate::function_instance::StatePolicy::Global => crate::grpc_impl::api::StatePolicy::Global as i32,
+            crate::function_instance::StatePolicy::NodeLocal => crate::grpc_impl::api::StatePolicy::NodeLocal as i32,
+        },
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -322,7 +320,7 @@ mod tests {
             workflow_id: "workflow_1".to_string(),
         }];
         for msg in messages {
-            match FunctonInstanceConverters::parse_spawn_function_request(&FunctonInstanceConverters::serialize_spawn_function_request(&msg)) {
+            match parse_spawn_function_request(&serialize_spawn_function_request(&msg)) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }

@@ -40,13 +40,12 @@ impl EdgeFunction for MatrixMulFunction {
                 if conf.inter_arrival > 0 {
                     delayed_cast(conf.inter_arrival, "self", b"");
                 }
-                cast("metric", format!("workflow:begin:{}", state.next_id).as_bytes());
+                telemetry_log(5, "tbegin", &state.next_id.to_string());
                 state.next_id += 1;
                 state.next_id - 1
             }
             false => core::str::from_utf8(encoded_message).unwrap_or("0").parse::<usize>().unwrap_or(0),
         };
-        cast("metric", format!("function:begin:{}", id).as_bytes());
 
         // Fill a new matrix with random numbers.
         let n = conf.matrix_size;
@@ -69,9 +68,8 @@ impl EdgeFunction for MatrixMulFunction {
 
         // Save metrics at the end of the execution.
         if conf.is_last {
-            cast("metric", format!("workflow:end:{}", id).as_bytes());
+            telemetry_log(5, "tend", &id.to_string());
         }
-        cast("metric", format!("function:end:{}", id).as_bytes());
 
         // Call outputs
         for output in &conf.outputs {

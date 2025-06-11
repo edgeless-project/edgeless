@@ -8,7 +8,7 @@ pub struct ContainerFunctionAPIClient {
 impl ContainerFunctionAPIClient {
     pub async fn new(api_addr: &str, timeout: std::time::Duration) -> anyhow::Result<Self> {
         Ok(Self {
-            guest_api_function: match crate::grpc_impl::guest_api_function::GuestAPIFunctionClient::new(api_addr, timeout).await {
+            guest_api_function: match crate::grpc_impl::inner::guest_api_function::GuestAPIFunctionClient::new(api_addr, timeout).await {
                 Ok(val) => Box::new(val),
                 Err(err) => return Err(err),
             },
@@ -30,7 +30,7 @@ impl GuestAPIFunctionServer {
         container_function_url: String,
     ) -> futures::future::BoxFuture<'static, ()> {
         let mut container_function_api = container_function_api;
-        let workflow_api = crate::grpc_impl::guest_api_function::GuestAPIFunctionService {
+        let workflow_api = crate::grpc_impl::inner::guest_api_function::GuestAPIFunctionService {
             guest_api_function: tokio::sync::Mutex::new(container_function_api.guest_api_function()),
         };
         Box::pin(async move {

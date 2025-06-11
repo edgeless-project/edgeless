@@ -7,10 +7,10 @@ pub mod http_egress;
 pub mod http_ingress;
 #[cfg(feature = "rdkafka")]
 pub mod kafka_egress;
-pub mod metrics_collector;
 pub mod ollama;
 pub mod redis;
 pub mod resource_provider_specs;
+pub mod serverless;
 pub mod sqlx;
 
 fn observe_transfer(

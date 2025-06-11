@@ -1,0 +1,50 @@
+{
+    "functions": [
+        {
+            "name": "counter",
+            "class_specification": {
+                "id": "counter",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/counter/counter.wasm",
+                "outputs": []
+            },
+            "output_mapping": {
+                "output": "double"
+            },
+            "annotations": {
+                "init-payload": "42"
+            }
+        }
+    ],
+    "resources": [
+        {
+            "name": "double",
+            "class_type": "double",
+            "output_mapping": {
+                "out": "my-out-log",
+                "err": "my-err-log"
+            },
+            "configurations": {}
+        },
+        {
+            "name": "my-out-log",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "my-out.log",
+                "add-timestamp": "true"
+            }
+        },
+        {
+            "name": "my-err-log",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "my-err.log",
+                "add-timestamp": "true"
+            }
+        }
+    ],
+    "annotations": {}
+}

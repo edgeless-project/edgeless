@@ -178,6 +178,24 @@ message Samples {
     repeated Sample samples = 10;
 }
 
+// Data structure representing a function log entry with timestamp.
+message FunctionLogEntry {
+    // Number of seconds since Unix epoch.
+    int64  timestamp_sec = 1;
+    // Number of nanoseconds since the last second boundary.
+    uint32 timestamp_ns  = 2;
+    // Target specified by the log directive.
+    string target        = 3;
+    // Message specified by the log directive.
+    string msg           = 4;
+}
+
+// Data structure representing function log entries associated with an identifier.
+message FunctionLogEntries {
+    string                    id      = 1;
+    repeated FunctionLogEntry entries = 10;
+}
+
 // Node health status.
 message NodeHealthStatus {
     // Global CPU usage, in percentage.
@@ -239,6 +257,9 @@ message NodeHealthStatus {
     int32 gpu_load_perc = 80;
     // GPU instantaneous temp in Celsius multiplied by 1000
     int32 gpu_temp_cels = 81;
+
+    // Active power measured, in mW.
+    int32 active_power = 90;
 }
 
 // Node performance samples.
@@ -252,6 +273,11 @@ message NodePerformanceSamples {
     // The samples are transfer times, in fractional seconds, from when the
     // event was created and when it was executed.
     repeated Samples function_transfer_times  = 110;
+    /// Function log entries.
+    // The identifier is the physical component identifier.
+    // The log entries have an associated timestamp and consist of a target and
+    // message specified by the function.
+    repeated FunctionLogEntries function_log_entries  = 200;
 }
 
 // Message to request the update of a function instance.
@@ -424,7 +450,13 @@ message UpdateDomainResponse {
     bool reset = 2;
 }
 
-// message Domain
+// Message to request the migration of a workflow to another domain.
+message MigrateWorkflowRequest {
+    // The workflow to be migrated.
+    WorkflowId workflow_id = 1;
+    // The domain to which the workflow should be migrated.
+    DomainId domain_id     = 2;
+}
 
 // Event types.
 enum EventType {
@@ -550,7 +582,7 @@ message CallReturn {
     // Return type.
     CallRetType type  = 1;
 
-    // Reply message. Can only be empty with type = Type::REPLY.
+    // Reply message. Can only be non-empty with type = Type::REPLY.
     bytes msg        = 2;
 }
 

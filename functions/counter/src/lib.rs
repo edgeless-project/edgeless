@@ -19,14 +19,17 @@ impl EdgeFunction for Counter {
 
     fn handle_init(init_message: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
         edgeless_function::init_logger();
-        if let Some(init_message) = init_message {
+        let message = if let Some(init_message) = init_message {
             let init_msg_str = core::str::from_utf8(init_message).unwrap();
-            let message = match init_msg_str.parse::<i32>() {
-                Ok(_) => init_message,
-                Err(_) => b"0",
-            };
-            cast("self", &message);
-        }
+            if init_msg_str.parse::<i32>().is_ok() {
+                init_message
+            } else {
+                b"0"
+            }
+        } else {
+            b"0"
+        };
+        cast("self", message);
     }
 
     fn handle_stop() {

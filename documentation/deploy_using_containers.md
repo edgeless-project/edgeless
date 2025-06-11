@@ -68,7 +68,6 @@ Default values are provided, but these can be overridden as needed.
 - `NODE_REGISTER_URL`: No default
 - `TELEMETRY_METRICS_HOST`: Default `0.0.0.0`
 - `TELEMETRY_METRICS_PORT`: Default `7003`
-- `TELEMETRY_LOG_LEVEL`: Default `info`
 - `TELEMETRY_PERFORMANCE_SAMPLES`: Default `true`
 - `WASM_RUNTIME_ENABLED`: Default `true`
 - `CONTAINER_RUNTIME_ENABLED`: Default `false`

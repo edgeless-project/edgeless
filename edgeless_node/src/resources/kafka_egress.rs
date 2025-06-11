@@ -8,6 +8,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for KafkaEgressResour
         String::from("kafka-egress")
     }
 
+    fn description(&self) -> String {
+        r"Send a message to an external Apache Kafka server -- see https://kafka.apache.org/".to_string()
+    }
+
     fn outputs(&self) -> Vec<String> {
         vec![]
     }

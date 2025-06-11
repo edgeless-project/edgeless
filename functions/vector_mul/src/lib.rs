@@ -34,7 +34,7 @@ impl EdgeFunction for VectorMulFunction {
         if conf.is_client {
             let id = state.next_id;
             if id > 0 {
-                cast("metric", format!("workflow:end:{}", id).as_bytes());
+                telemetry_log(5, "tend", &id.to_string());
             }
 
             state.next_id += 1;
@@ -45,7 +45,7 @@ impl EdgeFunction for VectorMulFunction {
                 random_input.iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(",")
             );
 
-            cast("metric", format!("workflow:begin:{}", state.next_id).as_bytes());
+            telemetry_log(5, "tbegin", &state.next_id.to_string());
             cast("out", payload.as_bytes());
 
         //
@@ -60,7 +60,6 @@ impl EdgeFunction for VectorMulFunction {
             let n = conf.input_size;
             assert!(input.len() == (1 + n));
             let id = input[0] as usize;
-            cast("metric", format!("function:begin:{}", id).as_bytes());
 
             // Produce the output by multiplying the internal matrix by the input.
             let mut output = vec![0.0_f32; n];
@@ -73,7 +72,6 @@ impl EdgeFunction for VectorMulFunction {
                 "out",
                 format!("{},{}", id, output.iter().map(|x| format!("{}", x)).collect::<Vec<String>>().join(",")).as_bytes(),
             );
-            cast("metric", format!("function:end:{}", id).as_bytes());
         }
     }
 

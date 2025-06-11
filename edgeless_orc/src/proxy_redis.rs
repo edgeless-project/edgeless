@@ -109,23 +109,37 @@ impl ProxyRedis {
     ) -> (Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>) {
         let filenames = ["performance_samples", "mapping_to_instance_id", "capabilities", "health_status"];
         let headers = [
-            "metric,identifier,timestamp,value".to_string(),
-            "timestamp,logical_id,node_id,physical_id".to_string(),
+            "identifier,metric,timestamp,value".to_string(),
+            "timestamp,logical_id,workflow_id,node_id,physical_id".to_string(),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeCapabilities::csv_header()),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeHealthStatus::csv_header()),
         ];
+
         let mut outfiles = vec![];
         for (filename, header) in filenames.iter().zip(headers.iter()) {
             let filename = format!("{}{}.csv", dataset_path, filename);
-            match ProxyRedis::open_file(filename.as_str(), append, header, &additional_header) {
-                Ok(outfile) => outfiles.push(Some(outfile)),
-                Err(err) => {
-                    log::error!("could not open '{}' for writing: {}", filename, err);
-                    outfiles.push(None);
+
+            // create the path to write the file, if needed
+            let path = std::path::Path::new(&filename);
+            let mut ancestors = path.ancestors();
+            ancestors.next();
+            let base_dir = ancestors.next().unwrap();
+            let res = if let Err(err) = std::fs::create_dir_all(base_dir) {
+                log::warn!("could not create the directory where to dump the dataset '{}': {}", filename, err);
+                None
+            } else {
+                match ProxyRedis::open_file(filename.as_str(), append, header, &additional_header) {
+                    Ok(outfile) => Some(outfile),
+                    Err(err) => {
+                        log::error!("could not open '{}' for writing: {}", filename, err);
+                        None
+                    }
                 }
             };
+            outfiles.push(res);
         }
         assert_eq!(4, outfiles.len());
+
         (
             outfiles.pop().unwrap(),
             outfiles.pop().unwrap(),
@@ -343,10 +357,11 @@ impl super::proxy::Proxy for ProxyRedis {
                 if write {
                     let _ = writeln!(
                         outfile,
-                        "{},{},{},{}",
+                        "{},{},{},{},{}",
                         self.additional_fields,
                         timestamp,
                         lid,
+                        active_instance.workflow_id(),
                         new_instance_ids
                             .iter()
                             .map(|x| format!("{},{}", x.node_id, x.function_id))
@@ -419,13 +434,13 @@ impl super::proxy::Proxy for ProxyRedis {
     }
 
     fn push_performance_samples(&mut self, _node_id: &uuid::Uuid, performance_samples: edgeless_api::node_registration::NodePerformanceSamples) {
-        let all_series = vec![
+        let all_sample_series = vec![
             ("function_execution_time", &performance_samples.function_execution_times),
             ("function_transfer_time", &performance_samples.function_transfer_times),
         ];
-        for (name, series) in all_series {
+        for (name, series) in all_sample_series {
             for (function_id, values) in series {
-                let key = format!("performance:{}:{}", name, function_id);
+                let key = format!("performance:{}:{}", function_id, name);
                 for value in values {
                     // Save to Redis.
                     let _ = redis::Cmd::zadd(&key, value.to_string(), value.score()).exec(&mut self.connection);
@@ -436,11 +451,32 @@ impl super::proxy::Proxy for ProxyRedis {
                             outfile,
                             "{},{},{},{}",
                             self.additional_fields,
-                            name,
                             function_id,
+                            name,
                             value.to_string().replacen(":", ",", 1)
                         );
                     }
+                }
+            }
+        }
+
+        for (function_id, log_entries) in &performance_samples.function_log_entries {
+            for log_entry in log_entries {
+                let key = format!("performance:{}:{}", function_id, log_entry.target);
+
+                // Save to Redis.
+                let _ = redis::Cmd::zadd(&key, log_entry.to_string(), log_entry.score()).exec(&mut self.connection);
+
+                // Save to dataset output.
+                if let Some(outfile) = &mut self.performance_samples_file {
+                    let _ = writeln!(
+                        outfile,
+                        "{},{},{},{}",
+                        self.additional_fields,
+                        function_id,
+                        log_entry.target,
+                        log_entry.to_string().replacen(":", ",", 1)
+                    );
                 }
             }
         }
@@ -544,12 +580,15 @@ impl super::proxy::Proxy for ProxyRedis {
             assert_eq!("node", tokens[0]);
             assert_eq!("health", tokens[1]);
             if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2]) {
-                if let Ok((value, _timestamp)) =
-                    self.connection
-                        .zrangebyscore_limit_withscores::<&str, f64, f64, (String, f64)>(&node_key, f64::NEG_INFINITY, f64::INFINITY, 0, 1)
-                {
-                    if let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(&value) {
-                        health.insert(node_id, val);
+                if let Ok(values) = self.connection.zrange::<&str, Vec<String>>(&node_key, -1, -1) {
+                    assert!(
+                        values.len() <= 1,
+                        "Invalid number of elements for ZRANGE command that should return 0 or 1 elements"
+                    );
+                    if let Some(value) = values.first() {
+                        if let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(value) {
+                            health.insert(node_id, val);
+                        }
                     }
                 }
             }
@@ -606,14 +645,11 @@ impl super::proxy::Proxy for ProxyRedis {
                     if tokens.len() != 2 {
                         continue;
                     }
-                    let sub_tokens: Vec<&str> = tokens[0].split(".").collect();
-                    if sub_tokens.len() != 2 {
-                        continue;
-                    }
-                    if let (Ok(secs), Ok(nsecs), Ok(metric)) = (sub_tokens[0].parse::<i64>(), sub_tokens[1].parse::<u32>(), tokens[1].parse::<f64>())
-                    {
-                        if let Some(timestamp) = chrono::DateTime::from_timestamp(secs, nsecs) {
-                            sub_entry.push((timestamp, metric));
+                    if let Ok(timestamp) = tokens[0].parse::<f64>() {
+                        let secs = timestamp as i64;
+                        let nsecs = (timestamp.fract() * 1e9) as u32;
+                        if let Some(date_time) = chrono::DateTime::from_timestamp(secs, nsecs) {
+                            sub_entry.push((date_time, tokens[1].to_string()));
                         }
                     }
                 }
@@ -924,13 +960,24 @@ mod test {
             None => return,
         };
 
-        let mut cnt = 0;
+        let mut sample_cnt = 0;
         let mut new_sample = |value| {
-            cnt += 2;
+            sample_cnt += 2;
             edgeless_api::node_registration::Sample {
-                timestamp_sec: cnt as i64,
-                timestamp_ns: (cnt + 1) as u32,
+                timestamp_sec: sample_cnt as i64,
+                timestamp_ns: (sample_cnt + 1) as u32,
                 sample: value,
+            }
+        };
+
+        let mut log_cnt = 0;
+        let mut new_log = |value| {
+            log_cnt += 2;
+            edgeless_api::node_registration::FunctionLogEntry {
+                timestamp_sec: log_cnt as i64,
+                timestamp_ns: (log_cnt + 1) as u32,
+                target: String::from("target"),
+                message: format!("value={}", value),
             }
         };
 
@@ -956,11 +1003,16 @@ mod test {
             disk_tot_writes: 22,
             gpu_load_perc: 23,
             gpu_temp_cels: 24,
+            active_power: 25,
         };
         let samples_1_values: Vec<f64> = vec![100.0, 101.0, 102.0, 103.0];
         let samples_2_values: Vec<f64> = vec![200.0, 201.0];
         let samples_1: Vec<edgeless_api::node_registration::Sample> = samples_1_values.iter().map(|x| new_sample(*x)).collect();
         let samples_2: Vec<edgeless_api::node_registration::Sample> = samples_2_values.iter().map(|x| new_sample(*x)).collect();
+        let log_1_values: Vec<f64> = vec![100.0, 101.0, 102.0, 103.0];
+        let log_2_values: Vec<f64> = vec![200.0, 201.0];
+        let log_1: Vec<edgeless_api::node_registration::FunctionLogEntry> = log_1_values.iter().map(|x| new_log(*x)).collect();
+        let log_2: Vec<edgeless_api::node_registration::FunctionLogEntry> = log_2_values.iter().map(|x| new_log(*x)).collect();
         let node_id_perf = uuid::Uuid::new_v4();
         let fid_perf_1 = uuid::Uuid::new_v4();
         let fid_perf_2 = uuid::Uuid::new_v4();
@@ -976,18 +1028,19 @@ mod test {
             edgeless_api::node_registration::NodePerformanceSamples {
                 function_execution_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
                 function_transfer_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
+                function_log_entries: std::collections::HashMap::from([(fid_perf_1, log_1.clone()), (fid_perf_2, log_2.clone())]),
             },
         );
 
         // Node's last health.
         let node_health_res = redis_proxy.fetch_node_health();
-        health_status.mem_free -= 2;
         assert_eq!(std::collections::HashMap::from([(node_id_perf, health_status.clone())]), node_health_res);
 
         // Node's health history.
         let node_healths_res = redis_proxy.fetch_node_healths();
         let health_history = node_healths_res.get(&node_id_perf).unwrap();
         assert_eq!(3, health_history.len());
+        health_status.mem_free -= 2;
         assert_eq!(health_status, health_history[0].1);
         health_status.mem_free += 1;
         assert_eq!(health_status, health_history[1].1);
@@ -998,12 +1051,42 @@ mod test {
 
         // Performance samples
         let samples = redis_proxy.fetch_performance_samples();
-        let entry = samples.get("function_execution_time").unwrap();
-        assert_eq!(2, entry.len());
-        let samples_1_res = entry.get(&fid_perf_1.to_string()).unwrap();
-        let samples_2_res = entry.get(&fid_perf_2.to_string()).unwrap();
-        assert_eq!(samples_1_values, samples_1_res.iter().map(|x| x.1).collect::<Vec<f64>>());
-        assert_eq!(samples_2_values, samples_2_res.iter().map(|x| x.1).collect::<Vec<f64>>());
+
+        let entry = samples.get(&fid_perf_1.to_string()).unwrap();
+        assert_eq!(3, entry.len());
+        let actual_values = entry.get("function_execution_time").unwrap();
+        assert_eq!(
+            samples_1_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+        let actual_values = entry.get("function_transfer_time").unwrap();
+        assert_eq!(
+            samples_1_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+        let actual_values = entry.get("target").unwrap();
+        assert_eq!(
+            log_1_values.iter().map(|x| format!("value={}", x)).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+
+        let entry = samples.get(&fid_perf_2.to_string()).unwrap();
+        assert_eq!(3, entry.len());
+        let actual_values = entry.get("function_execution_time").unwrap();
+        assert_eq!(
+            samples_2_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+        let actual_values = entry.get("function_transfer_time").unwrap();
+        assert_eq!(
+            samples_2_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+        let actual_values = entry.get("target").unwrap();
+        assert_eq!(
+            log_2_values.iter().map(|x| format!("value={}", x)).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
 
         // Purge the proxy.
         std::thread::sleep(std::time::Duration::from_millis(10));

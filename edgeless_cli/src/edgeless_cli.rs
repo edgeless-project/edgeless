@@ -22,6 +22,7 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 enum WorkflowCommands {
     Start { spec_file: String },
     Stop { id: String },
+    Migrate { id: String, domain: String },
     List {},
     Inspect { id: String },
 }
@@ -122,6 +123,60 @@ async fn wf_client(config_file: &str) -> anyhow::Result<Box<dyn edgeless_api::wo
     Ok(con_client.workflow_instance_api())
 }
 
+async fn workflow_stop(wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>, id: &str) -> anyhow::Result<()> {
+    anyhow::ensure!(workflow_info_or_none(wf_client, id).await.is_some(), "unknown or invalid workflow {}", id);
+    wf_client
+        .stop(edgeless_api::workflow_instance::WorkflowId {
+            workflow_id: uuid::Uuid::parse_str(id)?,
+        })
+        .await?;
+    println!("Workflow {} stopped", id);
+    Ok(())
+}
+
+async fn workflow_info_or_none(
+    wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>,
+    id: &str,
+) -> Option<edgeless_api::workflow_instance::WorkflowInfo> {
+    let workflow_id = if let Ok(id) = uuid::Uuid::parse_str(id) { id } else { return None };
+    wf_client.inspect(edgeless_api::workflow_instance::WorkflowId { workflow_id }).await.ok()
+}
+
+async fn workflow_inspect(wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>, id: &str) -> anyhow::Result<()> {
+    let info = workflow_info_or_none(wf_client, id).await;
+    anyhow::ensure!(info.is_some(), "unknown or invalid workflow {}", id);
+    let info = info.unwrap();
+    assert_eq!(id, info.status.workflow_id.to_string());
+    for fun in info.request.workflow_functions {
+        println!("* function {}", fun.name);
+        println!("{}", fun.function_class_specification.to_short_string());
+        for (out, next) in fun.output_mapping {
+            println!("OUT {} -> {}", out, next);
+        }
+        for (name, annotation) in fun.annotations {
+            println!("F_ANN {} -> {}", name, annotation);
+        }
+    }
+    for res in info.request.workflow_resources {
+        println!("* resource {}", res.name);
+        println!("{}", res.class_type);
+        for (out, next) in res.output_mapping {
+            println!("OUT {} -> {}", out, next);
+        }
+        for (name, annotation) in res.configurations {
+            println!("CONF {} -> {}", name, annotation);
+        }
+    }
+    println!("* mapping");
+    for (name, annotation) in info.request.annotations {
+        println!("W_ANN {} -> {}", name, annotation);
+    }
+    for mapping in info.status.domain_mapping {
+        println!("MAP {} -> {} [logical ID {}]", mapping.name, mapping.domain_id, mapping.function_id);
+    }
+    Ok(())
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
@@ -164,62 +219,45 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                     WorkflowCommands::Stop { id } => {
-                        match wf_client
-                            .stop(edgeless_api::workflow_instance::WorkflowId {
-                                workflow_id: uuid::Uuid::parse_str(&id)?,
-                            })
-                            .await
-                        {
-                            Ok(_) => println!("Workflow Stopped"),
-                            Err(err) => println!("{}", err),
+                        if id.to_lowercase() == "all" {
+                            for wf_id in wf_client.list().await? {
+                                workflow_stop(&mut wf_client, &wf_id.workflow_id.to_string()).await?
+                            }
+                        } else {
+                            workflow_stop(&mut wf_client, &id).await?
                         }
                     }
-                    WorkflowCommands::List {} => match wf_client.list().await {
-                        Ok(identifiers) => {
-                            for wf_id in identifiers {
-                                println!("{}", wf_id);
-                            }
-                        }
-                        Err(err) => println!("{}", err),
-                    },
-                    WorkflowCommands::Inspect { id } => {
+                    WorkflowCommands::Migrate { id, domain } => {
                         match wf_client
-                            .inspect(edgeless_api::workflow_instance::WorkflowId {
-                                workflow_id: uuid::Uuid::parse_str(&id)?,
+                            .migrate(edgeless_api::workflow_instance::MigrateWorkflowRequest {
+                                workflow_id: edgeless_api::workflow_instance::WorkflowId::new(&id)?,
+                                domain_id: domain.clone(),
                             })
-                            .await
+                            .await?
                         {
-                            Ok(info) => {
-                                assert_eq!(id, info.status.workflow_id.to_string());
-                                for fun in info.request.workflow_functions {
-                                    println!("* function {}", fun.name);
-                                    println!("{}", fun.function_class_specification.to_short_string());
-                                    for (out, next) in fun.output_mapping {
-                                        println!("OUT {} -> {}", out, next);
-                                    }
-                                    for (name, annotation) in fun.annotations {
-                                        println!("F_ANN {} -> {}", name, annotation);
-                                    }
-                                }
-                                for res in info.request.workflow_resources {
-                                    println!("* resource {}", res.name);
-                                    println!("{}", res.class_type);
-                                    for (out, next) in res.output_mapping {
-                                        println!("OUT {} -> {}", out, next);
-                                    }
-                                    for (name, annotation) in res.configurations {
-                                        println!("CONF {} -> {}", name, annotation);
-                                    }
-                                }
-                                println!("* mapping");
-                                for (name, annotation) in info.request.annotations {
-                                    println!("W_ANN {} -> {}", name, annotation);
-                                }
-                                for mapping in info.status.domain_mapping {
-                                    println!("MAP {} -> {} [logical ID {}]", mapping.name, mapping.domain_id, mapping.function_id);
-                                }
+                            SpawnWorkflowResponse::ResponseError(response_error) => println!(
+                                "migration of {} to {} failed: {} ({})",
+                                id,
+                                domain,
+                                response_error.summary,
+                                response_error.detail.unwrap_or_default()
+                            ),
+                            SpawnWorkflowResponse::WorkflowInstance(_workflow_instance) => println!("migration of {} to {} successful", id, domain),
+                        }
+                    }
+                    WorkflowCommands::List {} => {
+                        for wf_id in wf_client.list().await? {
+                            println!("{}", wf_id);
+                        }
+                    }
+                    WorkflowCommands::Inspect { id } => {
+                        if id.to_lowercase() == "all" {
+                            for wf_id in wf_client.list().await? {
+                                println!("** workflow {}", wf_id);
+                                workflow_inspect(&mut wf_client, &wf_id.workflow_id.to_string()).await?
                             }
-                            Err(err) => println!("{}", err),
+                        } else {
+                            workflow_inspect(&mut wf_client, &id).await?
                         }
                     }
                 }
@@ -333,7 +371,7 @@ async fn main() -> anyhow::Result<()> {
                     payload,
                 } => {
                     log::info!("invoking function: {} {} {} {}", event_type, node_id, function_id, payload);
-                    let mut client = edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&invocation_url).await;
+                    let mut client = edgeless_api::grpc_impl::outer::invocation::InvocationAPIClient::new(&invocation_url).await;
                     let event = edgeless_api::invocation::Event {
                         target: edgeless_api::function_instance::InstanceId {
                             node_id: uuid::Uuid::parse_str(&node_id)?,
@@ -502,10 +540,17 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                     DomainCommands::Inspect { id } => {
-                        let domains = wf_client.domains(id.clone()).await?;
-                        match domains.get(&id) {
-                            None => println!("domain {} not found", id),
-                            Some(caps) => println!("{}", caps),
+                        if id.to_lowercase() == "all" {
+                            let domains = wf_client.domains(Default::default()).await?;
+                            for (domain, caps) in domains {
+                                println!("domain {},{}", domain, caps);
+                            }
+                        } else {
+                            let domains = wf_client.domains(id.clone()).await?;
+                            match domains.get(&id) {
+                                None => println!("domain {} not found", id),
+                                Some(caps) => println!("domain {},{}", id, caps),
+                            }
                         }
                     }
                 }

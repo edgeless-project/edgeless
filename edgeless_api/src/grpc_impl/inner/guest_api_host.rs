@@ -45,13 +45,13 @@ impl crate::guest_api_host::GuestAPIHost for GuestAPIHostClient {
     }
     async fn call(&mut self, event: crate::guest_api_host::OutputEventData) -> anyhow::Result<crate::guest_api_function::CallReturn> {
         match self.client.call(tonic::Request::new(serialize_output_event_data(&event))).await {
-            Ok(msg) => crate::grpc_impl::guest_api_function::parse_call_return(&msg.into_inner()),
+            Ok(msg) => super::guest_api_function::parse_call_return(&msg.into_inner()),
             Err(err) => Err(anyhow::anyhow!("Communication error while calling a function: {}", err.to_string())),
         }
     }
     async fn call_raw(&mut self, event: crate::guest_api_host::OutputEventDataRaw) -> anyhow::Result<crate::guest_api_function::CallReturn> {
         match self.client.call_raw(tonic::Request::new(serialize_output_event_data_raw(&event))).await {
-            Ok(msg) => crate::grpc_impl::guest_api_function::parse_call_return(&msg.into_inner()),
+            Ok(msg) => super::guest_api_function::parse_call_return(&msg.into_inner()),
             Err(err) => Err(anyhow::anyhow!("Communication error while raw-calling a function: {}", err.to_string())),
         }
     }
@@ -136,7 +136,7 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
             }
         };
         match self.guest_api_host.lock().await.call(parsed_request).await {
-            Ok(msg) => Ok(tonic::Response::new(crate::grpc_impl::guest_api_function::serialize_call_return(&msg))),
+            Ok(msg) => Ok(tonic::Response::new(super::guest_api_function::serialize_call_return(&msg))),
             Err(err) => Err(tonic::Status::internal(format!("Error when calling a function: {}", err))),
         }
     }
@@ -155,7 +155,7 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
             }
         };
         match self.guest_api_host.lock().await.call_raw(parsed_request).await {
-            Ok(msg) => Ok(tonic::Response::new(crate::grpc_impl::guest_api_function::serialize_call_return(&msg))),
+            Ok(msg) => Ok(tonic::Response::new(super::guest_api_function::serialize_call_return(&msg))),
             Err(err) => Err(tonic::Status::internal(format!("Error when raw-calling a function: {}", err))),
         }
     }
@@ -215,7 +215,7 @@ impl crate::grpc_impl::api::guest_api_host_server::GuestApiHost for GuestAPIHost
     }
 }
 
-pub fn parse_output_event_data(api_instance: &crate::grpc_impl::api::OutputEventData) -> anyhow::Result<crate::guest_api_host::OutputEventData> {
+fn parse_output_event_data(api_instance: &crate::grpc_impl::api::OutputEventData) -> anyhow::Result<crate::guest_api_host::OutputEventData> {
     Ok(crate::guest_api_host::OutputEventData {
         originator: match &api_instance.originator {
             Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
@@ -229,7 +229,7 @@ pub fn parse_output_event_data(api_instance: &crate::grpc_impl::api::OutputEvent
     })
 }
 
-pub fn parse_output_event_data_raw(
+fn parse_output_event_data_raw(
     api_instance: &crate::grpc_impl::api::OutputEventDataRaw,
 ) -> anyhow::Result<crate::guest_api_host::OutputEventDataRaw> {
     match &api_instance.dst {
@@ -251,9 +251,7 @@ pub fn parse_output_event_data_raw(
     }
 }
 
-pub fn parse_telemetry_log_event(
-    api_instance: &crate::grpc_impl::api::TelemetryLogEvent,
-) -> anyhow::Result<crate::guest_api_host::TelemetryLogEvent> {
+fn parse_telemetry_log_event(api_instance: &crate::grpc_impl::api::TelemetryLogEvent) -> anyhow::Result<crate::guest_api_host::TelemetryLogEvent> {
     Ok(crate::guest_api_host::TelemetryLogEvent {
         originator: match &api_instance.originator {
             Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
@@ -275,7 +273,7 @@ pub fn parse_telemetry_log_event(
     })
 }
 
-pub fn parse_delayed_event_data(api_instance: &crate::grpc_impl::api::DelayedEventData) -> anyhow::Result<crate::guest_api_host::DelayedEventData> {
+fn parse_delayed_event_data(api_instance: &crate::grpc_impl::api::DelayedEventData) -> anyhow::Result<crate::guest_api_host::DelayedEventData> {
     Ok(crate::guest_api_host::DelayedEventData {
         originator: match &api_instance.originator {
             Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {
@@ -290,7 +288,7 @@ pub fn parse_delayed_event_data(api_instance: &crate::grpc_impl::api::DelayedEve
     })
 }
 
-pub fn parse_sync_data(api_instance: &crate::grpc_impl::api::SyncData) -> anyhow::Result<crate::guest_api_host::SyncData> {
+fn parse_sync_data(api_instance: &crate::grpc_impl::api::SyncData) -> anyhow::Result<crate::guest_api_host::SyncData> {
     Ok(crate::guest_api_host::SyncData {
         originator: match &api_instance.originator {
             Some(instance_id) => match crate::grpc_impl::common::CommonConverters::parse_instance_id(instance_id) {

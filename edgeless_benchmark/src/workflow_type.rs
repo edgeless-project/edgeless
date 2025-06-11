@@ -70,6 +70,7 @@ pub struct MapReduceData {
     pub min_memory_bytes: u32,
     pub max_memory_bytes: u32,
     pub functions_path: String,
+    pub redis_url: String,
 }
 
 impl Default for MapReduceData {
@@ -88,6 +89,7 @@ impl Default for MapReduceData {
             min_memory_bytes: 0,
             max_memory_bytes: 0,
             functions_path: "functions/".to_string(),
+            redis_url: Default::default(),
         }
     }
 }
@@ -223,9 +225,5 @@ impl WorkflowType {
             "map-reduce (*)".to_string(),
             "json-spec".to_string(),
         ]
-    }
-
-    pub fn metrics_collector(&self) -> bool {
-        !matches!(self, WorkflowType::None | WorkflowType::Single(_, _))
     }
 }
