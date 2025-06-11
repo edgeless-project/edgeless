@@ -6,6 +6,7 @@ import re
 import redis
 import pandas as pd
 import schedule
+from datetime import datetime
 
 ### Definition of environmen definition variables
 LOOP_PERIOD = 2
@@ -16,6 +17,9 @@ TIME_WINDOW = 60            # metrics collected up to TIME_WINDOW seconds old
 MONITOR_NODE_HEALTH = True
 MONITOR_FUNCTION_PERFORMANCE = True
 CLEAN_CLI = True
+OUTPUT_WRITE_TO_CSV = True
+OUTPUT_EXPERIMENT_NAME = "mapreduce_flat"
+OUTPUT_COLUMNS = True
 
 ### Columns for the pandas dataframes
 node_health_columns = [
@@ -218,6 +222,44 @@ def anomaly_detection(redis_client, df_node_health, df_function_performance):
     print("\nWait 2 seconds...\n")
 
 
+# WORK IN PROGRESS: Saving to Parquet files is not implemented yet
+# import pyarrow as pa
+# import pyarrow.parquet as pq
+
+# def save_to_parquet(df, file_path):
+#     """
+#     Append data to an existing Parquet file or create a new one if it doesn't exist.
+#     """
+
+#     table = pa.Table.from_pandas(df)
+#     if os.path.exists(file_path):
+#         # Append mode: Read existing data, concatenate, and overwrite
+#         existing_table = pq.read_table(file_path)
+#         new_table = pa.concat_tables([existing_table, table])
+#         pq.write_table(new_table, file_path)
+#     else:
+#         pq.write_table(table, file_path)
+
+
+def write_datasets_to_disk(df_node_health, df_function_performance):
+    """
+    Store the generated dataframes to disk in CSV format for offline analysis.
+    """
+
+    output_dir = datetime.now().strftime("%Y_m_%d-%H_%M-")+OUTPUT_EXPERIMENT_NAME
+    os.makedirs(output_dir, exist_ok=True)
+
+    if df_node_health is not None:
+        file_path_node = output_dir+"/output_node"
+        df_node_health.to_csv(file_path_node+'.csv', mode='a', header=OUTPUT_COLUMNS, index=False)
+        #save_to_parquet(df_node_health, file_path_node+'parquet')
+
+    if df_function_performance is not None:
+        file_path_func = output_dir+"/output_func"
+        df_function_performance.to_csv(file_path_func+'.csv', mode='a', header=OUTPUT_COLUMNS, index=False)
+        #save_to_parquet(df_function_performance, file_path_func+'parquet')
+
+
 def loop_function(redis_client):
  
     os.system('clear') if CLEAN_CLI else None
@@ -225,6 +267,8 @@ def loop_function(redis_client):
     functions_info = get_functions_info(redis_client)
     df_node_health = get_df_node_health(redis_client) if MONITOR_NODE_HEALTH else None
     df_function_performance = get_df_function_performance(redis_client, functions_info) if MONITOR_FUNCTION_PERFORMANCE else None
+
+    write_datasets_to_disk(df_node_health, df_function_performance) if OUTPUT_WRITE_TO_CSV else None
 
     anomaly_detection(redis_client, df_node_health, df_function_performance)
 
