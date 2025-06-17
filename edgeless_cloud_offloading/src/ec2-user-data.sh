@@ -9,6 +9,9 @@ EDGELESS_DIR=/home/ubuntu/edgeless
 # Orchestrator URL (Without http://)
 ORCHESTRATOR_URL=__ORCHESTRATOR_URL_PLACEHOLDER__
 
+# node Id
+NODE_ID=__NODE_ID_PLACEHOLDER__
+
 # Obtain EC2 instance Public IPv4 DNS (NODE_URL)
 
 # Function to get a session token for IMDSv2
@@ -77,6 +80,7 @@ $EDGELESS_DIR/target/debug/edgeless_node_d -t $EDGELESS_DIR/target/debug/node.to
 
 # Update the node.toml configuration file
 sed -i.bak \
+    -e "s#^\\(\\s*node_id\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1${NODE_ID}\\2#" \
     -e "s#^\\(\\s*node_register_url\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1http://${ORCHESTRATOR_URL}:7004\\2#" \
     -e 's#^\(\s*agent_url\s*=\s*"\)[^"]*\(".*\)#\1http://0.0.0.0:7021\2#' \
     -e "s#^\\(\\s*agent_url_announced\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1http://${NODE_URL}:7021\\2#" \

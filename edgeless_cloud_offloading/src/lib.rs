@@ -4,7 +4,9 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use log;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
+use uuid::Uuid;
 
+#[derive(Debug, Clone)]
 pub struct CloudNodeInputData {
     pub aws_region: String,
     pub aws_ami_id: String,
@@ -13,10 +15,13 @@ pub struct CloudNodeInputData {
     pub orchestrator_url: String,
 }
 
+#[derive(Debug, Clone)]
 pub struct CloudNodeData {
     aws_region: String,
     instance_id: String,
     instance_name: String,
+    pub node_id: String,
+    pub active: bool,
 }
 
 fn generate_instance_name() -> String {
@@ -25,15 +30,20 @@ fn generate_instance_name() -> String {
 }
 
 pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNodeData, Box<dyn std::error::Error>> {
-    // Config for AWS SDK
-    let config = aws_config::from_env().region(Region::new(input_data.aws_region.clone())).load().await;
-    let client = aws_sdk_ec2::Client::new(&config);
+        // Config for AWS SDK
+        let config = aws_config::from_env().region(Region::new(input_data.aws_region.clone())).load().await;
+        let client = aws_sdk_ec2::Client::new(&config);
 
-    // Get the user data script from the file and convert it to to Base64
-    const SCRIPT_CONTENT: &str = include_str!("ec2-user-data.sh");
-    let script_content_modified = SCRIPT_CONTENT.replace("__ORCHESTRATOR_URL_PLACEHOLDER__", &input_data.orchestrator_url);
-    let script_content_as_string = script_content_modified.to_string();
-    let encoded_user_data = STANDARD.encode(script_content_as_string);
+        // Define a node id
+        let node_id = Uuid::new_v4().to_string();
+
+        // Get the user data script from the file and convert it to to Base64
+        const SCRIPT_CONTENT: &str = include_str!("ec2-user-data.sh");
+        let script_content_modified = SCRIPT_CONTENT
+            .replace("__ORCHESTRATOR_URL_PLACEHOLDER__", &input_data.orchestrator_url)
+            .replace("__NODE_ID_PLACEHOLDER__", &node_id);
+        let script_content_as_string = script_content_modified.to_string();
+        let encoded_user_data = STANDARD.encode(script_content_as_string);
 
     // Create an EC2 instance
     let run_instances = client
@@ -62,13 +72,15 @@ pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNo
         .send()
         .await?;
 
-    log::info!("EDGELESS Node deployed on AWS Instance: {instance_id}, with name: {instance_name} has been created.");
+    log::info!("EDGELESS Node deployed on AWS Instance: {instance_id}, instance name: {instance_name}, with node_id: {node_id} has been created.");
 
     // Build the CloudNode struct
     let cloud_node = CloudNodeData {
         aws_region: input_data.aws_region,
         instance_id: instance_id.to_string(),
         instance_name,
+        node_id,
+        active: false
     };
 
     Ok(cloud_node)
