@@ -1,7 +1,6 @@
 - [Local orchestration in EDGELESS](#local-orchestration-in-edgeless)
   - [Delegated orchestration through a proxy](#delegated-orchestration-through-a-proxy)
   - [Node's telemetry](#nodes-telemetry)
-    - [Collection of application metrics](#collection-of-application-metrics)
   - [Step-by-step examples](#step-by-step-examples)
     - [Prerequisites](#prerequisites)
     - [Preparation steps](#preparation-steps)
@@ -111,7 +110,6 @@ section of the node configuration file, for instance:
 ```ini
 [telemetry]
 metrics_url = "http://127.0.0.1:7003"
-log_level = "info"
 performance_samples = true
 ```
 
@@ -123,59 +121,9 @@ Where:
   within a given orchestration domain by means of a process independent from
   the core EDGELESS ecosystem of tools; the web server can be disabled by
   specifying an empty string.
-- `log_level`: defines the logging level of the events that are not captured
-  by the Prometheus-like web server above, which are appended to the regular
-  `edgeless_node` logs; logging can be disabled by specyfing an empty string.
-- `performance_samples`: if true, then sends the function execution times
-  to the ε-ORC as part of the response to keep-alive messages (see
-  `performance:function_execution_time:UUID` in the table above).
-
-### Collection of application metrics
-
-This feature currently requires an external Redis in-memory database, which is
-used to store the metrics, and it is enabled by adding one node to the
-orchestration domain that exposes a `metrics-collector` resource provider via
-the following section in `node.toml`: 
-
-```ini
-[resources.metrics_collector_provider]
-collector_type = "Redis"
-redis_url = "redis://localhost:6379"
-provider = "metrics-collector-1"
-```
-
-Currently two types of metrics are supported: `workflow` and `function`.
-For both types the developer is responsible for:
-
-- associating samples with a unique numerical identifier;
-- indicating the beginning and end of the process being measured.
-
-This can be done through the following invocations:
-
-| Event                                                        | Code                                                           |
-| ------------------------------------------------------------ | -------------------------------------------------------------- |
-| A function-related process uniquely identified by `id` began | `cast("metric", format!("function:begin:{}", id).as_bytes());` |
-| A function-related process uniquely identified by `id` ended | `cast("metric", format!("function:end:{}", id).as_bytes());`   |
-| A workflow-related process uniquely identified by `id` began | `cast("metric", format!("workflow:begin:{}", id).as_bytes());` |
-| A workflow-related process uniquely identified by `id` ended | `cast("metric", format!("workflow:end:{}", id).as_bytes());`   |
-
-In the workflow composition, the application developer is responsible for
-mapping the output with name `"metric"` of the function to `metrics-collector`.
-The configuration of the latter includes a field `wf_name` which allows
-specifying an identifier of the workflow.
-
-The content of the in-memory database is the following.
-
-| Key                      | Value                                                                                                                                                                                                                                                                                                |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| function:UUID:average    | A smoothed average of input samples received for the function with logical identifier UUID                                                                                                                                                                                                           |
-| function:UUID:samples    | A list of values _sample_,_timestamp_, where _sample_ is the time (in ms) between function:begin and function:end for the function with physical identifier UUID and _timestamp_ is the time when function:end was received in fractional seconds since the Unix epoch with milliseconds granularity |
-| workflow:WF_NAME:average | A smoothed average of input samples received for the workflow with identifier WF_NAME                                                                                                                                                                                                                |
-| workflow:WF_NAME:samples | Same as function:UUID:samples but for the workflow with identifier WF_NAME                                                                                                                                                                                                                           |
-
-Note that the metrics-collector automatically adds the _physical_ identifier of function instances for function-related metrics.
-Multiple physical identifiers can be associated with a logical function during its lifetime.
-The current mapping logical and physical identifier(s) can be found in the proxy information (instance:UUID entries).
+- `performance_samples`: if true, then sends the function execution/trasfer
+  times and other custom log events via `telemetry_log` to the ε-ORC when
+  refreshing the registration to the orchestration domain.
 
 ## Step-by-step examples
 
@@ -186,7 +134,6 @@ The current mapping logical and physical identifier(s) can be found in the proxy
 - A Redis is reachable at 127.0.0.1:6379, see
   [online instructions](https://redis.io/docs/latest/operate/oss_and_stack/install/install-redis/).
 - The current working directory is the root of the repository.
-- The command-line utility `redis-cli` is installed.
 - [optional] `RUST_LOG=info ; export RUST_LOG`
 
 ### Preparation steps
@@ -197,12 +144,20 @@ Create the default configuration files:
 
 ```bash
 target/debug/edgeless_cli -t cli.toml
-target/debug/edgeless_inabox -t -n 2 --metrics-collector
+target/debug/edgeless_inabox -t -n 2
 ```
 
-The latter will create the configuration files for the ε-CON, the ε-ORC, two
-nodes with WebAssembly run-times, and one node with no function run-time but
-a metrics-collector resource provider.
+The latter will create the configuration files for the ε-CON, the ε-ORC, and two
+nodes with WebAssembly run-times.
+
+Modify `orchestrator.toml` so that the `[proxy]` section is the following:
+
+```ini
+[proxy]
+proxy_type = "Redis"
+redis_url = "redis://127.0.0.1:6379/"
+proxy_gc_period_seconds = 0
+```
 
 Modify the configuration of node0 and node1 so that performance samples are
 also shared with the ε-ORC (this is disabled by default when creating the
@@ -236,17 +191,8 @@ Start a workflow consisting of three `vector_mul` functions in a chain:
 target/debug/edgeless_cli workflow start examples/vector_mul/workflow-chain.json
 ```
 
-The full status of the in-memory database, including a mirror of the ε-ORC
-internal data structures of the application metrics sampled, can be dumped with
-a script provided:
-
-```bash
-scripts/redis_dump.sh
-```
-
-Or, more conveniently, it is possible to selective query the Redis through the
-`proxy_cli` command-line utility provided.
-For example, to show the nodes' heath status:
+The `proxy_cli` command-line utility can be used to show the orchestration
+domain status, e.g., nodes' health:
 
 ```shell
 target/debug/proxy_cli show node health
@@ -255,9 +201,8 @@ target/debug/proxy_cli show node health
 Example of output:
 
 ```
-4595df5d-21c9-43a5-8b69-006b85eced96 -> memory free 307984 kb, used 24581664 kb, available 4496208 kb, process cpu usage 105%, memory 878432 kb, vmemory 437445216 kb, load avg 1 minute 361% 5 minutes 329% 15 minutes 290%, network tot rx 6656099328 bytes (43499471 pkts) 0 errs, tot tx 25220091 bytes (4136598528 pkts) 0 errs, disk available 994662584320 bytes, tot disk reads 193711325184 writes 119523094528, gpu_load_perc -1%, gpu_temp_cels -1.00°
-c422eb3d-98e4-4a6f-855e-45b879ab3e40 -> memory free 21696 kb, used 24831328 kb, available 4073872 kb, process cpu usage 0%, memory 878384 kb, vmemory 437443152 kb, load avg 1 minute 363% 5 minutes 328% 15 minutes 289%, network tot rx 6652385280 bytes (43495784 pkts) 0 errs, tot tx 25217790 bytes (4133952512 pkts) 0 errs, disk available 994662584320 bytes, tot disk reads 193711267840 writes 119525015552, gpu_load_perc -1%, gpu_temp_cels -1.00°
-faaf87ba-9b46-4ff6-ac42-3fca12523128 -> memory free 307984 kb, used 24581664 kb, available 4496208 kb, process cpu usage 105%, memory 878480 kb, vmemory 437445216 kb, load avg 1 minute 361% 5 minutes 329% 15 minutes 290%, network tot rx 6656099328 bytes (43499471 pkts) 0 errs, tot tx 25220091 bytes (4136598528 pkts) 0 errs, disk available 994662584320 bytes, tot disk reads 193711325184 writes 119523094528, gpu_load_perc -1%, gpu_temp_cels -1.00°
+248ee9ad-0f27-44db-a0d8-702a5d5bcb7e -> memory free 850272 kb, used 22024192 kb, available 11853056 kb, process cpu usage 164%, memory 90832 kb, vmemory 412283456 kb, load avg 1 minute 150% 5 minutes 163% 15 minutes 181%, network tot rx 6316177408 bytes (75740707 pkts) 0 errs, tot tx 43359494 bytes (4881335296 pkts) 0 errs, disk available 994662584320 bytes, tot disk reads 125773818880 writes 84491526144, gpu_load_perc -1%, gpu_temp_cels -1.00°, active_power -1 mW
+487ed9ee-2912-455e-9518-694a5731b05a -> memory free 850272 kb, used 22024192 kb, available 11853056 kb, process cpu usage 164%, memory 90832 kb, vmemory 412283456 kb, load avg 1 minute 150% 5 minutes 163% 15 minutes 181%, network tot rx 6316177408 bytes (75740707 pkts) 0 errs, tot tx 43359494 bytes (4881335296 pkts) 0 errs, disk available 994662584320 bytes, tot disk reads 125773818880 writes 84491526144, gpu_load_perc -1%, gpu_temp_cels -1.00°, active_power -1 mW
 ```
 
 To show the current mapping of functions/resources to nodes:
@@ -269,75 +214,30 @@ target/debug/proxy_cli show node instances
 Example of output:
 
 ```
-4595df5d-21c9-43a5-8b69-006b85eced96
-[F] 7fdfea80-2a12-4b0b-9658-08525452bc22
-[F] 1f427c5f-a491-4347-854d-ea846b80bf3d
-c422eb3d-98e4-4a6f-855e-45b879ab3e40
-[R] 4dd4c855-5702-477d-b97d-76475b6f0767
-faaf87ba-9b46-4ff6-ac42-3fca12523128
-[F] b615f0b3-4d0e-4df8-87b4-3fea0200682b
+248ee9ad-0f27-44db-a0d8-702a5d5bcb7e
+[F] 9972cffd-4da8-4480-a5cb-b5ca1760f4b8
+[F] a7a90f5a-f6c5-4f6c-9b04-99b0498dd1e1
+487ed9ee-2912-455e-9518-694a5731b05a
+[F] 44e2570b-bede-493e-bafe-e41f798bcc40
 ```
 
-As you can see, the metrics-collector node is only assigned one instance of
-type `R`, i.e., resource, while the three functions (`F`) are split between the
-two nodes with a WebAssembly run-time.
+The three functions (`F`) in the chain are split between the two nodes with a
+WebAssembly run-time.
 
-With regard to performance samples (collected by the nodes' telemetry), they can
-dumped to files with:
+The performance samples (collected by the nodes' telemetry) can dumped with:
 
 ```shell
 target/debug/proxy_cli dump performance
 ```
 
-The command will create one file for each function instance containing the
-timeseries of the execution times, for example (first 5 entries only):
+The command will create several files:
 
-```
-0.243379291,1725557090.92
-0.245919917,1725557090.92
-0.238143375,1725557090.92
-0.237986959,1725557090.92
-0.241142625,1725557092.9
-```
-
-Where the first column contains the execution time, in fractional seconds,
-and the second one the timestamp of when the performance sample was received
-by the ε-ORC in response to a keep-alive.
-
-Finally, since the `vector_mul` function supports application-related metrics,
-these are also saved in Redis.
-
-For instance, the average latency of the workflow can be queried with the
-`redis-cli` command-line utility:
-
-```bash
-redis-cli get workflow:vector_mul_wf_chain:average
-```
-
-Where `vector_mul_wf_chain` is the name assigned to the workflow in
-`workflow-chain.json`.
-
-Example of output:
-
-```
-"930.679962190782"
-```
-
-Instead, the last 5 samples, with timestamps, are given by:
-
-```bash
-redis-cli lrange workflow:vector_mul_wf_chain:samples 0 4
-```
-
-Example of output:
-
-```
-1) "849,1718287852.177"
-2) "958,1718287851.316"
-3) "911,1718287850.347"
-4) "896,1718287849.425"
-5) "843,1718287848.516"
-```
+- for each function there will be two files `UUID-function-execution_time.dat`
+  and `UUID-function-transfer_time.dat`, with time series of the execution vs.
+  transfer time of events
+- one file ending with `tbegin.dat` and another with `tend.dat`: those files
+  track the transaction vs. end, as emitted by custom `telemetry_log` calls
+  in the `vector_mul` functions
 
 ### Example#2: delegated orchestration
 

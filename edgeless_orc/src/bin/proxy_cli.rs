@@ -12,10 +12,32 @@ use edgeless_orc::proxy::Proxy;
 struct Args {
     #[command(subcommand)]
     command: Commands,
+    /// Orchestrator proxy type. One of: Redis.
     #[arg(short, long, default_value_t = String::from("Redis"))]
     proxy_type: String,
+    /// URL of the Redis server used as orchestrator's proxy.
     #[arg(short, long, default_value_t = String::from("redis://localhost:6379"))]
     redis_url: String,
+    /// How to print the node identifiers. One of: uuid, labels
+    #[arg(long, default_value_t = String::from("uuid"))]
+    node_print_format: String,
+}
+
+enum NodePrintFormat {
+    Uuid,
+    Labels,
+}
+
+impl NodePrintFormat {
+    fn from(str: &str) -> anyhow::Result<Self> {
+        if str == "uuid" {
+            Ok(Self::Uuid)
+        } else if str == "labels" {
+            Ok(Self::Labels)
+        } else {
+            anyhow::bail!("invalid node-print-format value: {}", str)
+        }
+    }
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -76,6 +98,17 @@ fn main() -> anyhow::Result<()> {
         Err(err) => anyhow::bail!("could not connect to a Redis at {}: {}", args.redis_url, err),
     };
 
+    let node_print_format = NodePrintFormat::from(&args.node_print_format)?;
+    let mut node_to_names = std::collections::HashMap::new();
+    if matches!(node_print_format, NodePrintFormat::Labels) {
+        for (node_id, caps) in proxy.fetch_node_capabilities() {
+            let labels = caps.labels.join(",");
+            let name = if labels.is_empty() { node_id.to_string() } else { labels };
+            node_to_names.insert(node_id, name);
+        }
+    }
+    let map_node = |node_id: &uuid::Uuid| node_to_names.get(node_id).unwrap_or(&node_id.to_string()).to_string();
+
     match args.command {
         Commands::Show { show_command } => match show_command {
             ShowCommands::Functions {} => {
@@ -89,7 +122,7 @@ fn main() -> anyhow::Result<()> {
             }
             ShowCommands::Resources {} => {
                 for (resource, node) in proxy.fetch_resource_instances_to_nodes().iter().sorted_by_key(|x| x.0.to_string()) {
-                    println!("{} -> {}", resource, node);
+                    println!("{} -> {}", resource, map_node(node));
                 }
             }
             ShowCommands::LogicalToPhysical {} => {
@@ -109,7 +142,7 @@ fn main() -> anyhow::Result<()> {
             ShowCommands::Node { node_command } => match node_command {
                 NodeCommands::Capabilities {} => {
                     for (node, capabilities) in proxy.fetch_node_capabilities().iter().sorted_by_key(|x| x.0.to_string()) {
-                        println!("{} -> {}", node, capabilities);
+                        println!("{} -> {}", map_node(node), capabilities);
                     }
                 }
                 NodeCommands::ResourceProviders {} => {
@@ -119,12 +152,12 @@ fn main() -> anyhow::Result<()> {
                 }
                 NodeCommands::Health {} => {
                     for (node, health) in proxy.fetch_node_health().iter().sorted_by_key(|x| x.0.to_string()) {
-                        println!("{} -> {}", node, health);
+                        println!("{} -> {}", map_node(node), health);
                     }
                 }
                 NodeCommands::Instances {} => {
                     for (node, instances) in proxy.fetch_nodes_to_instances().iter().sorted_by_key(|x| x.0.to_string()) {
-                        println!("{}", node);
+                        println!("{}", map_node(node));
                         for instance in instances {
                             match instance {
                                 edgeless_orc::proxy::Instance::Function(id) => println!("[F] {}", id),

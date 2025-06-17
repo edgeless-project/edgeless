@@ -8,7 +8,7 @@ pub struct ContainerRuntimeAPIClient {
 impl ContainerRuntimeAPIClient {
     pub async fn new(api_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
         Ok(Self {
-            guest_api_host: match crate::grpc_impl::guest_api_host::GuestAPIHostClient::new(api_addr, retry_interval).await {
+            guest_api_host: match crate::grpc_impl::inner::guest_api_host::GuestAPIHostClient::new(api_addr, retry_interval).await {
                 Ok(val) => Box::new(val),
                 Err(err) => return Err(err),
             },
@@ -30,7 +30,7 @@ impl GuestAPIHostServer {
         container_runtime_url: String,
     ) -> futures::future::BoxFuture<'static, ()> {
         let mut container_runtime_api = container_runtime_api;
-        let workflow_api = crate::grpc_impl::guest_api_host::GuestAPIHostService {
+        let workflow_api = crate::grpc_impl::inner::guest_api_host::GuestAPIHostService {
             guest_api_host: tokio::sync::Mutex::new(container_runtime_api.guest_api_host()),
         };
         Box::pin(async move {

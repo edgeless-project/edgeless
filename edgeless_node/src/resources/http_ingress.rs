@@ -13,6 +13,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for HttpIngressResour
         String::from("http-ingress")
     }
 
+    fn description(&self) -> String {
+        r"Ingest HTTP commands from external web clients".to_string()
+    }
+
     fn outputs(&self) -> Vec<String> {
         vec!["new_request".to_string()]
     }

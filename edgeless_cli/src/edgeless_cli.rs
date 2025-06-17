@@ -22,6 +22,7 @@ use tokio_util::codec::{BytesCodec, FramedRead};
 enum WorkflowCommands {
     Start { spec_file: String },
     Stop { id: String },
+    Migrate { id: String, domain: String },
     List {},
     Inspect { id: String },
 }
@@ -138,10 +139,7 @@ async fn workflow_info_or_none(
     id: &str,
 ) -> Option<edgeless_api::workflow_instance::WorkflowInfo> {
     let workflow_id = if let Ok(id) = uuid::Uuid::parse_str(id) { id } else { return None };
-    match wf_client.inspect(edgeless_api::workflow_instance::WorkflowId { workflow_id }).await {
-        Ok(info) => Some(info),
-        Err(_) => None,
-    }
+    wf_client.inspect(edgeless_api::workflow_instance::WorkflowId { workflow_id }).await.ok()
 }
 
 async fn workflow_inspect(wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>, id: &str) -> anyhow::Result<()> {
@@ -227,6 +225,24 @@ async fn main() -> anyhow::Result<()> {
                             }
                         } else {
                             workflow_stop(&mut wf_client, &id).await?
+                        }
+                    }
+                    WorkflowCommands::Migrate { id, domain } => {
+                        match wf_client
+                            .migrate(edgeless_api::workflow_instance::MigrateWorkflowRequest {
+                                workflow_id: edgeless_api::workflow_instance::WorkflowId::new(&id)?,
+                                domain_id: domain.clone(),
+                            })
+                            .await?
+                        {
+                            SpawnWorkflowResponse::ResponseError(response_error) => println!(
+                                "migration of {} to {} failed: {} ({})",
+                                id,
+                                domain,
+                                response_error.summary,
+                                response_error.detail.unwrap_or_default()
+                            ),
+                            SpawnWorkflowResponse::WorkflowInstance(_workflow_instance) => println!("migration of {} to {} successful", id, domain),
                         }
                     }
                     WorkflowCommands::List {} => {
@@ -355,7 +371,7 @@ async fn main() -> anyhow::Result<()> {
                     payload,
                 } => {
                     log::info!("invoking function: {} {} {} {}", event_type, node_id, function_id, payload);
-                    let mut client = edgeless_api::grpc_impl::invocation::InvocationAPIClient::new(&invocation_url).await;
+                    let mut client = edgeless_api::grpc_impl::outer::invocation::InvocationAPIClient::new(&invocation_url).await;
                     let event = edgeless_api::invocation::Event {
                         target: edgeless_api::function_instance::InstanceId {
                             node_id: uuid::Uuid::parse_str(&node_id)?,

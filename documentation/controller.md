@@ -22,11 +22,14 @@ It has the following main responsibilities:
    resources of the workflow are met by at least one domain. If multiple such
    domains are available, then the target domain is selected at random. If no
    domain is available with sufficient capabilities, then the workflow is
-   rejected. Once a workflow is accepted, the ε-CON is responsible for
+   rejected.
+   - Once a workflow is accepted, the ε-CON is responsible for
    continuously meeting the deployment requirements: if the hosting domain
    disconnects or its capabilities change, then the ε-CON may migrate the
    workflow to another domain or, if none are available, keep it in stand-by
    until the conditions allow it to be deployed again.
+   - It is also possible for a client to trigger the migration of a workflow
+   from its current domain to a target one.
 
 The ε-CON has the following interfaces, also illustrated in the diagram below:
 
@@ -37,3 +40,6 @@ The ε-CON has the following interfaces, also illustrated in the diagram below:
 
 ![](diagrams-con.png)
 
+The ε-CON saves the information on the active workflows on a local file,
+specified in the configuration, which is loaded upon the next start of the
+service.

@@ -5,7 +5,7 @@
             "class_specification": {
                 "id": "counter",
                 "function_type": "RUST_WASM",
-                "version": "0.1",
+                "version": "0.2",
                 "code": "../../functions/counter/counter.wasm",
                 "outputs": []
             },
