@@ -24,7 +24,7 @@ nc -l 10000
 and in another use curl to emulate an external source:
 
 ```bash
-curl -v -H "Host: demo.edgeless-project.eu" http://127.0.0.1:7035/read_number -d 42
+curl -v -H "Host: demo.edgeless-project.eu" http://127.0.0.1:7008/read_number -d 42
 ```
 
 In the sink you will receive the number `86=(42+1)*2`.
