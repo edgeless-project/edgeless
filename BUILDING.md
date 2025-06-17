@@ -37,20 +37,23 @@ Install the dependencies:
 
 ```bash
 source "$HOME/.cargo/env"
-sudo apt update && sudo apt install gcc libssl-dev pkg-config unzip make g++ -y
+sudo apt update && sudo apt install gcc libssl-dev pkg-config unzip make g++ rustup protobuf-compiler libprotobuf-dev -y
 rustup target add wasm32-unknown-unknown
 cargo install wasm-opt
 ```
-Install a modern release of the Protocol Buffers binaries (v28.2 is the latest stable release as of 22/10/2024)
-The available binaries in the default ubuntu repositories have proven to be too old for some EDGELESS crates.
+
+If using Ubuntu 22.04 LTS or older versions, you might need to install a modern release of the Protocol Buffers binaries
+(v31.1 is the latest stable release as of 16/06/2025)
+The available binaries in the default Ubuntu 22.04 repositories have proven to be too old for some EDGELESS crates.
 
 ```bash
-wget https://github.com/protocolbuffers/protobuf/releases/download/v28.2/protoc-28.2-linux-x86_64.zip
-cd /usr/local
-unzip $OLDPWD/protoc-28.2-linux-x86_64.zip
-rm -f readme.txt
-cd -
-rm protoc-28.2-linux-x86_64.zip
+# Get latest TAG
+PROTOC_VERSION=$(curl -s "https://api.github.com/repos/protocolbuffers/protobuf/releases/latest" | grep -Po '"tag_name": "v\K[0-9.]+')
+wget -qO protoc.zip https://github.com/protocolbuffers/protobuf/releases/latest/download/protoc-${PROTOC_VERSION}-linux-x86_64.zip
+sudo unzip -q protoc.zip bin/include -d /usr/local
+sudo unzip -q protoc.zip bin/protoc -d /usr/local
+sudo chmod a+x /usr/local/bin/protoc
+rm -rf protoc.zip
 ```
 
 At this point you may have to logout/login to let your shell know of the new executable, just try `protoc --version` to see if it works.

@@ -10,13 +10,14 @@ from datetime import datetime
 
 ### Definition of environmen definition variables
 LOOP_PERIOD = 2
-REDIS_HOST = "10.95.82.178"
+REDIS_HOST = "10.95.82.180"
 REDIS_PORT = 6379
 REDIS_DB = 0
 TIME_WINDOW = 60            # metrics collected up to TIME_WINDOW seconds old
 MONITOR_NODE_HEALTH = True
 MONITOR_FUNCTION_PERFORMANCE = True
 CLEAN_CLI = True
+
 OUTPUT_WRITE_TO_CSV = True
 OUTPUT_EXPERIMENT_NAME = "mapreduce_flat"
 OUTPUT_COLUMNS = True
