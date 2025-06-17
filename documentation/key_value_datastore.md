@@ -3,52 +3,30 @@
 EDGELESS uses a noSQL key-value datastore to expose and import different types of data between some of its components.
 The current go-to solution is Redis, but a migration into another solution with a more OpenSource license is expected (eg. Valkey)
 
-## How to explore the KV-datastore
-To interact with the Redis server, there are thre aproaches:
-- Use the `redis-cli` tool directly
-- Use the utility script at `edgeless/scripts/redis_dump.sh`
-- The tool you need to buld, i dont remember the name
-
-
-```bash
-redis-cli --scan --pattern '*' | sort
-redis-cli type list
-redis-cli --raw lrange <list> 0 -1 | tr '\n' ' '  # cambiar --raw con --csv
-
-redis-cli type string
-redis-cli get <string> |jq
-```
-
-### AI-based Orchestration
-**DOCUMENTAR MEJOR**: Remember you can migrate a *function instance* (FID) to other node (UUID), updating two entries:
-- Asign `intent:migrate:FID` a `NODE`
-- Add `intent:migrate:FID` to list `intents`
-
-
-
 ## ε-ORC Data Structures
 
+During EDGELESS execution,the ε-ORC preiodically updates the KV-datastore with multiple key-value objects following different data types
+These objects are organized using "namespaces", which are name prefixes that try to mimic a directory structure (e.g. `domain_info:domain_id`).
 
-| Clave                                                 | Valor                                                                                  | Data type                              | .csv                         |
-| ----------------------------------------------------- | -------------------------------------------------------------------------------------- | -------------------------------------- | ---------------------------- |
-| `domain_info:domain_id`                               | Valor **domain_id** del ε-ORC que publicó la métrica                                   | String                                 |                              |
-| `node:capabilities:<node_UUID>`                       | Objeto JSON con las **capabilities** de un nodo                                        | `NodeCapabilities`                     | `capabilities.csv`           |
-| `node:capabilities:last_update`                       | Timestamp unix epoch con milisegundos                                                  | String                                 |                              |
-| `node:health:<node_UUID>`                             | Objeto JSON con el **health status** de un nodo.                                       | **SORTED SET**: `NodeHealthStatus`     | `health_status.csv`          |
-| `provider:<provider_ID>`                              | Objeto JSON describiendo un **resource provider**                                      | `ResourceProvider`                     |                              |
-| `provider:last_update`                                | Timestamp unix epoch con milisegundos                                                  | String                                 |                              |
-|                                                       | **AL APLICAR UN WORKFLOW**                                                             |                                        |                              |
-| `instance:<logical_UUID>`                             | Objeto JSON con información sobre una function o resource **instance**                 | `ActiveInstance`                       | `mapping_to_instance_id.csv` |
-| `dependency:<logical_UUID>`                           | Objeto JSON con los outputs de una instancia, y su *<logical_UUID>*                    | `HashMap<Uuid, HashMap<String, Uuid>>` | NADA! Y sí que hace falta!!  |
-| `dependency:last_update`                              | Timestamp unix epoch con milisegundos                                                  | String                                 |                              |
-| `performance:function_execution_time:<physical_UUID>` | Lista de tiempos de ejecución de la función, con timestamp unich epox con milisegundos | `NodePerformanceSamples`               | `performance_samples.csv`    |
 
-Y luego, el [[EDGELESS BENCHMARK]] me puede generar métricas adicionales `workflow:` para debugging.
-Se crea el fichero **`application_metrics.csv`** con el contenido de `NodePerformanceSamples` de *Workflows*
-	- `entity`: Siempre `w`, aunque debería ser `w` ó `f`.
-	- `name`: Nombre del *workflow*. e.g. `wf46`
-	- `value`: duración de la ejecución del *workflow*
-	- `timestamp`: unix epoch en milisegundos
+| Namespace            | Key                                         | Value                                                                                                  | Data Type                                                                                 | Example              |
+| -------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- | -------------------- |
+| `domain_info`        | `domain_id`                                 | Value **`domain_id`** of the orchestration domain's ε-ORC                                              | String                                                                                    | `domain-7000`        |
+| `node:capabilities:` | `<node_UUID>`                               | JSON object with the *capabilities* of a node registered in the orchestration domain                   | String (`NodeCapabilities` JSON object)                                                   | Down below           |
+| `node:capabilities:` | `last_update`                               | Unix epoch timestamp with miliseconds. Last update of the `node:capabilities` namespace                | String                                                                                    | `1750160496.85848`   |
+| `node:health:`       | `<node_UUID>`                               | JSON object with the *health status* of a node registered in the orchestration domain                  | Sorted Set (`NodeHealthStatus` JSON objects with a unix epoch timestamp with miliseconds) | Down below           |
+| `provider:`          | `<node_hostname>-<resource_provider_name>`  | JSON object with the *metadata* of a resource provider from a registered node                          | String (`ResourceProvider` JSON object)                                                   | Down below           |
+| `provider:`          | `last_update`                               | Unix epoch timestamp with miliseconds. Last update of the `provider:` namespace                        | String                                                                                    | `1750160496.8589296` |
+| `instance:`          | `<logical_UUID>`                            | JSON object with information about a function or resource instance                                     | String (`ActiveInstance` JSON object)                                                     | Down below           |
+| `instance:`          | `last_update`                               | Unix epoch timestamp with miliseconds. Last update of the `instance:` namespace                        | String                                                                                    | `1750159583.7702973` |
+| `dependency:`        | `<logical_UUID>`                            | JSON object with the correlation between the function/resource instance outputs, and the next instance where they should be forwarded | String (`{"<output_name>":<logical_UUID>}`) | `{"external_sink":"dd321cf0-e04e-4f88-9710-628cb6cc4faf"}`           |
+| `dependency:`        | `last_update`                               | Unix epoch timestamp with miliseconds. Last update of the `dependency:` namespace                      | String                                                                                    | `1750175781.717148`  |
+
+
+<!-- | | `performance:function_execution_time:<physical_UUID>` | Lista de tiempos de ejecución de la función, con timestamp unich epox con milisegundos | `NodePerformanceSamples`               |  -->
+
+The [[benchmark.md|edgeless_benchmark]] CLI tool can create additional metrics for debugging in the `workflow:` namespace.
+
 
 
 ## Structs
@@ -152,14 +130,6 @@ El `<logical_UUID>` asocia una función con un workflow, mientras que el `<physi
 ```
 El fichero **`mapping_to_instance_id.csv`** tiene las columnas `<additional_header>,timestamp,logical_id,node_id,physical_id`
 
-####  `HashMap<Uuid, HashMap<String, Uuid>>`
-Dependencias de cada instancia con otras.
-```json
-{
-    "ponger":"60d247be-73c8-4117-acf1-a1e7fee0a428"
-}
-```
-
 ####  `NodePerformanceSamples`
 
 | Index | Element                    |
@@ -170,6 +140,27 @@ Dependencias de cada instancia con otras.
 El fichero **`performance_samples.csv`** tiene las columnas `<additional_header>,metric,identifier,value,timestamp`
 `metric` siempre es `function_execution_time`, e `identifier` es el `<physical_UUID>`.
 
+## AI-based Orchestration
+**DOCUMENTAR MEJOR**: Remember you can migrate a *function instance* (FID) to other node (UUID), updating two entries:
+- Asign `intent:migrate:FID` a `NODE`
+- Add `intent:migrate:FID` to list `intents`
 
 
+## How to explore the KV-datastore
+To interact with the Redis server, there are thre aproaches:
+- Use the `redis-cli` tool directly
+- Use the utility script at `edgeless/scripts/redis_dump.sh`
+- Use `proxy_cli`, a tool developed for this project with some utility commands
 
+#### `redis-cli`
+```bash
+redis-cli --scan --pattern '*' | sort
+redis-cli type list
+redis-cli --raw lrange <list> 0 -1 | tr '\n' ' '  # cambiar --raw con --csv
+
+redis-cli type string
+redis-cli get <string> |jq
+```
+#### `redis_dump.sh`
+
+#### `proxy_cli`
