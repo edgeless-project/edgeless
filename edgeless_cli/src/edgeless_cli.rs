@@ -358,7 +358,7 @@ async fn main() -> anyhow::Result<()> {
                         println!(
                             "{:?}",
                             std::process::Command::new("wasm-opt")
-                                .args(["-Oz", &raw_result, "-o", &out_file])
+                                .args(["--enable-bulk-memory", "-Oz", &raw_result, "-o", &out_file])
                                 .status()?
                         );
                     }
