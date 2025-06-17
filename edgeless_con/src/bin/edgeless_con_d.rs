@@ -7,8 +7,10 @@ use clap::Parser;
 #[derive(Debug, clap::Parser)]
 #[command(long_about = None)]
 struct Args {
+    /// Path of the configuration file.
     #[arg(short, long, default_value_t = String::from("controller.toml"))]
     config_file: String,
+    /// Create a template configuration file and quit immediately.
     #[arg(short, long, default_value_t = String::from(""))]
     template: String,
 }

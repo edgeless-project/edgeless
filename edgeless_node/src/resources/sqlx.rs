@@ -5,6 +5,30 @@ use edgeless_dataplane::core::Message;
 use sqlx::{migrate::MigrateDatabase, FromRow, Sqlite, SqlitePool};
 use tokio;
 
+pub struct SqlxResourceSpec {}
+
+impl super::resource_provider_specs::ResourceProviderSpecs for SqlxResourceSpec {
+    fn class_type(&self) -> String {
+        String::from("sqlx")
+    }
+
+    fn description(&self) -> String {
+        r"Perform operations on an SQLite database".to_string()
+    }
+
+    fn outputs(&self) -> Vec<String> {
+        vec![]
+    }
+
+    fn configurations(&self) -> std::collections::HashMap<String, String> {
+        std::collections::HashMap::from([(String::from("url"), String::from("URL of the SQLite database"))])
+    }
+
+    fn version(&self) -> String {
+        String::from("1.1")
+    }
+}
+
 #[derive(Clone)]
 pub struct SqlxResourceProvider {
     inner: std::sync::Arc<tokio::sync::Mutex<SqlxResourceProviderInner>>,
@@ -176,11 +200,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
-        if let (Some(url), Some(_key), workflow_id) = (
-            instance_specification.configuration.get("url"),
-            instance_specification.configuration.get("key"),
-            instance_specification.workflow_id,
-        ) {
+        if let (Some(url), workflow_id) = (instance_specification.configuration.get("url"), instance_specification.workflow_id) {
             let mut lck = self.inner.lock().await;
             let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;

@@ -285,7 +285,7 @@ impl OrchestratorTask {
     /// Apply patches on node's run-time agents.
     ///
     /// * `origin_lids` - The logical resource identifiers for which patches
-    ///    must be applied.
+    ///   must be applied.
     async fn apply_patches(&mut self, origin_lids: Vec<edgeless_api::function_instance::ComponentId>) {
         for origin_lid in origin_lids.iter() {
             let logical_output_mapping = match self.dependency_graph.get(origin_lid) {

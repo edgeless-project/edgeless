@@ -1,0 +1,33 @@
+{
+    "functions": [
+        {
+            "name": "counter",
+            "class_specification": {
+                "id": "counter",
+                "function_type": "RUST_WASM",
+                "version": "0.2",
+                "code": "../../functions/counter/counter.wasm",
+                "outputs": []
+            },
+            "output_mapping": {
+                "output": "redis"
+            },
+            "annotations": {
+                "init-payload": "42"
+            }
+        }
+    ],
+    "resources": [
+        {
+            "name": "redis",
+            "class_type": "redis",
+            "output_mapping": {},
+            "configurations": {
+                "url": "redis://127.0.0.1:6379/",
+                "key": "example-redis",
+                "add-workflow-id": "true"
+            }
+        }
+    ],
+    "annotations": {}
+}

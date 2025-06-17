@@ -129,9 +129,9 @@ Install the protobuf binaries:
 ```bash
 wget https://github.com/protocolbuffers/protobuf/releases/download/v25.1/protoc-25.1-linux-x86_64.zip
 cd /usr/local
-unzip -t $OLDPWD/protoc-25.1-linux-x86_64.zip
-rm -f readme.txt
+sudo unzip $OLDPWD/protoc-25.1-linux-x86_64.zip && sudo rm -f readme.txt
 cd -
+rm -f protoc-25.1-linux-x86_64.zip
 ```
 
 At this point you may have to logout/login to let your shell know of the new executable, just try `protoc` to see if it works.

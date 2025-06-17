@@ -3,6 +3,7 @@
 
 pub trait ResourceProviderSpecs {
     fn class_type(&self) -> String;
+    fn description(&self) -> String;
     fn outputs(&self) -> Vec<String>;
     fn configurations(&self) -> std::collections::HashMap<String, String>;
     fn version(&self) -> String;
@@ -11,6 +12,7 @@ pub trait ResourceProviderSpecs {
 #[derive(serde::Serialize)]
 pub struct ResourceProviderSpecOutput {
     class_type: String,
+    description: String,
     version: String,
     outputs: Vec<String>,
     configurations: std::collections::HashMap<String, String>,
@@ -20,6 +22,7 @@ impl dyn ResourceProviderSpecs {
     pub fn to_output(&self) -> ResourceProviderSpecOutput {
         ResourceProviderSpecOutput {
             class_type: self.class_type(),
+            description: self.description(),
             version: self.version(),
             outputs: self.outputs(),
             configurations: self.configurations(),

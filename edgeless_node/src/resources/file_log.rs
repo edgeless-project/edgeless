@@ -12,6 +12,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for FileLogResourceSp
         String::from("file-log")
     }
 
+    fn description(&self) -> String {
+        r"Save log lines to a node-local file".to_string()
+    }
+
     fn outputs(&self) -> Vec<String> {
         vec![]
     }

@@ -41,8 +41,7 @@
             "class_type": "sqlx",
             "output_mapping": {},
             "configurations": {
-                "url": "sqlite://sqlite.db",
-                "key": "random"
+                "url": "sqlite://sqlite.db"
             }
         }
     ],

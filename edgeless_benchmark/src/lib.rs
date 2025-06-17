@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 pub mod arrival_model;
+pub mod csv_dumper;
 pub mod engine;
-pub mod redis_dumper;
 pub mod utils;
 pub mod workflow_type;

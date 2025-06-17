@@ -29,7 +29,7 @@ enum BoardType {
 ///
 /// # Returns
 /// * `f32` - The GPU temperature in Celsius, or a negative number if the operation fails.
-///           See: each board-specific implementation for the error number (negative value)
+///   See: each board-specific implementation for the error number (negative value)
 pub fn get_gpu_temp() -> f32 {
     match board_type() {
         BoardType::Jetson => jetson::jetson_get_gpu_temp(),
@@ -44,7 +44,7 @@ pub fn get_gpu_temp() -> f32 {
 ///
 /// # Returns
 /// * `i32` - The instantaneous GPU load in percentage [%], or a negative number if the operation fails.
-///           See: each board-specific implementation for the error number (negative value)
+///   See: each board-specific implementation for the error number (negative value)
 pub fn get_gpu_load() -> i32 {
     match board_type() {
         BoardType::Jetson => jetson::jetson_get_gpu_load(),
@@ -59,7 +59,7 @@ pub fn get_gpu_load() -> i32 {
 ///
 /// # Returns
 /// * `i32` - The number of available GPUs in the system, or a negative number if the operation fails.
-///           See: each board-specific implementation for the error number (negative value)
+///   See: each board-specific implementation for the error number (negative value)
 pub fn get_num_gpus() -> i32 {
     match board_type() {
         BoardType::Jetson => jetson::jetson_get_num_gpus(),
@@ -88,7 +88,7 @@ pub fn get_model_name_gpu() -> String {
 ///
 /// # Returns
 /// * `i32` - The number of available GPU memory, or a negative number if the operation fails.
-///           See: each board-specific implementation for the error number (negative value)
+///   See: each board-specific implementation for the error number (negative value)
 pub fn get_mem_size_gpu() -> i32 {
     match board_type() {
         BoardType::Jetson => jetson::jetson_get_mem_size_gpu(),
