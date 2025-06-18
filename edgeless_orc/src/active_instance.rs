@@ -3,6 +3,7 @@
 
 use serde::ser::SerializeTupleVariant;
 
+/// Activeinstance of a function or resource.
 #[derive(Clone)]
 pub enum ActiveInstance {
     // 0: request
@@ -21,16 +22,28 @@ pub enum ActiveInstance {
 }
 
 impl ActiveInstance {
+    /// Return the physical identifier(s) associated with this instance.
     pub fn instance_ids(&self) -> Vec<edgeless_api::function_instance::InstanceId> {
         match self {
             Self::Function(_, ids) => ids.clone(),
             Self::Resource(_, id) => vec![*id],
         }
     }
+    /// Return the workflow identifier of this instance.
     pub fn workflow_id(&self) -> String {
         match &self {
             Self::Function(spawn_function_request, _) => spawn_function_request.workflow_id.clone(),
             Self::Resource(resource_instance_specification, _) => resource_instance_specification.workflow_id.clone(),
+        }
+    }
+    /// Return a stripped copy of the instance.
+    /// The return value is different from the original one only if it is
+    /// a function instance of type RUST_WASM, in which case the bytecode of the
+    /// function is removed from the return value.
+    pub fn strip(&self) -> Self {
+        match self {
+            Self::Function(spec, ids) => Self::Function(spec.strip(), ids.clone()),
+            Self::Resource(_, _) => self.clone(),
         }
     }
 }
