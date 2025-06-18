@@ -345,7 +345,7 @@ impl super::proxy::Proxy for ProxyRedis {
         for (lid, active_instance) in active_instances {
             let _ = self.connection.set::<&str, &str, usize>(
                 format!("instance:{}", lid).as_str(),
-                serde_json::to_string(&active_instance).unwrap_or_default().as_str(),
+                serde_json::to_string(&active_instance.strip()).unwrap_or_default().as_str(),
             );
             let new_instance_ids = active_instance.instance_ids();
             if let Some(outfile) = &mut self.mapping_to_instance_id_file {
@@ -557,14 +557,15 @@ impl super::proxy::Proxy for ProxyRedis {
         self.local_timestamp_update(&crate::proxy::Category::ResourceProviders);
         let mut resource_providers = std::collections::HashMap::new();
         for node_key in self.connection.keys::<&str, Vec<String>>("provider:*").unwrap_or(vec![]) {
-            let tokens: Vec<&str> = node_key.split(':').collect();
-            assert_eq!(tokens.len(), 2);
-            assert_eq!("provider", tokens[0]);
-            let provider_id = tokens[1];
-            if let Ok(val) = self.connection.get::<&str, String>(&node_key) {
-                if let Ok(val) = serde_json::from_str::<crate::resource_provider::ResourceProvider>(&val) {
-                    resource_providers.insert(provider_id.to_string(), val);
+            if let Some((provider, provider_id)) = node_key.split_once(':') {
+                assert_eq!("provider", provider);
+                if let Ok(val) = self.connection.get::<&str, String>(&node_key) {
+                    if let Ok(val) = serde_json::from_str::<crate::resource_provider::ResourceProvider>(&val) {
+                        resource_providers.insert(provider_id.to_string(), val);
+                    }
                 }
+            } else {
+                panic!("invalid Redis key for a resource provider: {}", node_key);
             }
         }
         resource_providers
