@@ -241,7 +241,7 @@ file_log_provider = "file-log-1"
 redis_provider = "redis-1"
 dda_provider = "dda-1"
 kafka_egress_provider = ""
-sqlx_provider = "sqlite://sqlite.db"
+sqlx_provider = "sqlx-1"
 
 [resources.ollama_provider]
 host = "localhost"
