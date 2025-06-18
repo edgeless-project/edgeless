@@ -345,7 +345,7 @@ impl super::proxy::Proxy for ProxyRedis {
         for (lid, active_instance) in active_instances {
             let _ = self.connection.set::<&str, &str, usize>(
                 format!("instance:{}", lid).as_str(),
-                serde_json::to_string(&active_instance).unwrap_or_default().as_str(),
+                serde_json::to_string(&active_instance.strip()).unwrap_or_default().as_str(),
             );
             let new_instance_ids = active_instance.instance_ids();
             if let Some(outfile) = &mut self.mapping_to_instance_id_file {
