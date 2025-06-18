@@ -43,6 +43,7 @@ impl NodePrintFormat {
 #[derive(Debug, clap::Subcommand)]
 enum DumpCommands {
     Performance {},
+    Instances {},
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -84,6 +85,16 @@ enum Commands {
         #[command(subcommand)]
         dump_command: DumpCommands,
     },
+}
+
+fn open_file(filename: &str) -> anyhow::Result<std::fs::File> {
+    println!("saving to {}", filename);
+    Ok(std::fs::OpenOptions::new()
+        .write(true)
+        .append(false)
+        .create(true)
+        .truncate(true)
+        .open(filename)?)
 }
 
 fn main() -> anyhow::Result<()> {
@@ -186,19 +197,25 @@ fn main() -> anyhow::Result<()> {
                 for (metric, inner_map) in proxy.fetch_performance_samples() {
                     for (id, values) in inner_map {
                         let filename = format!("{}-{}.dat", metric, id);
-                        println!("saving to {}", filename);
-                        let mut outfile = std::fs::OpenOptions::new()
-                            .write(true)
-                            .append(false)
-                            .create(true)
-                            .truncate(true)
-                            .open(filename.clone())?;
+                        let mut outfile = open_file(&filename)?;
                         for value in values {
                             outfile
                                 .write_all(format!("{},{}\n", value.0, value.1).as_bytes())
                                 .unwrap_or_else(|_| panic!("could not write to file '{}'", filename));
                         }
                     }
+                }
+            }
+            DumpCommands::Instances {} => {
+                for (lid, spec) in proxy.fetch_function_instance_requests() {
+                    let filename = format!("fun-{}.json", lid);
+                    let outfile = open_file(&filename)?;
+                    serde_json::to_writer_pretty(outfile, &spec).unwrap_or_else(|_| panic!("could not write to file '{}'", filename));
+                }
+                for (lid, spec) in proxy.fetch_resource_instance_configurations() {
+                    let filename = format!("res-{}.json", lid);
+                    let outfile = open_file(&filename)?;
+                    serde_json::to_writer_pretty(outfile, &spec).unwrap_or_else(|_| panic!("could not write to file '{}'", filename));
                 }
             }
         },
