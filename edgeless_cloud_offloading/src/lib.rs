@@ -6,6 +6,7 @@ use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use uuid::Uuid;
 
+pub mod rebalancer;
 #[derive(Debug, Clone)]
 pub struct CloudNodeInputData {
     pub aws_region: String,
@@ -17,8 +18,8 @@ pub struct CloudNodeInputData {
 
 #[derive(Debug, Clone)]
 pub struct CloudNodeData {
-    aws_region: String,
-    instance_id: String,
+    pub aws_region: String,
+    pub instance_id: String,
     instance_name: String,
     pub node_id: String,
     pub active: bool,
@@ -30,20 +31,20 @@ fn generate_instance_name() -> String {
 }
 
 pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNodeData, Box<dyn std::error::Error>> {
-        // Config for AWS SDK
-        let config = aws_config::from_env().region(Region::new(input_data.aws_region.clone())).load().await;
-        let client = aws_sdk_ec2::Client::new(&config);
+    // Config for AWS SDK
+    let config = aws_config::from_env().region(Region::new(input_data.aws_region.clone())).load().await;
+    let client = aws_sdk_ec2::Client::new(&config);
 
-        // Define a node id
-        let node_id = Uuid::new_v4().to_string();
+    // Define a node id
+    let node_id = Uuid::new_v4().to_string();
 
-        // Get the user data script from the file and convert it to to Base64
-        const SCRIPT_CONTENT: &str = include_str!("ec2-user-data.sh");
-        let script_content_modified = SCRIPT_CONTENT
-            .replace("__ORCHESTRATOR_URL_PLACEHOLDER__", &input_data.orchestrator_url)
-            .replace("__NODE_ID_PLACEHOLDER__", &node_id);
-        let script_content_as_string = script_content_modified.to_string();
-        let encoded_user_data = STANDARD.encode(script_content_as_string);
+    // Get the user data script from the file and convert it to to Base64
+    const SCRIPT_CONTENT: &str = include_str!("ec2-user-data.sh");
+    let script_content_modified = SCRIPT_CONTENT
+        .replace("__ORCHESTRATOR_URL_PLACEHOLDER__", &input_data.orchestrator_url)
+        .replace("__NODE_ID_PLACEHOLDER__", &node_id);
+    let script_content_as_string = script_content_modified.to_string();
+    let encoded_user_data = STANDARD.encode(script_content_as_string);
 
     // Create an EC2 instance
     let run_instances = client

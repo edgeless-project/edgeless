@@ -33,3 +33,5 @@ log = "0.4"
 env_logger = "0.10"
 uuid = "1.17.0"
 edgeless_orc = { version = "1.0.0", path = "../edgeless_orc" }
+edgeless_api = { version = "1.0.0", path = "../edgeless_api" }
+anyhow = "1.0"
