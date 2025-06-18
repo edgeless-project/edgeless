@@ -26,21 +26,21 @@ fi
 rm -f build_functions.log 2> /dev/null
 RC=0
 
-for func in $(find $(dirname "$0")/../functions -type f -name function.json) ; do
+for func in $(find $(dirname "$0")/../functions -type f -name function.json | sort) ; do
     name=$(basename $(dirname $func))
     echo -n "$name: "
 
     wasm_name="$(dirname $func)/$(grep "\"id\"" $func | cut -f 4 -d '"').wasm"
-    if [ -r $wasm_name ] ; then
-        echo_g "[OK]"
+    RUST_LOG=info ${CLI} function build $func >> build_functions.log 2>&1
+        
+    if [ ! -r $wasm_name ] ; then
+        echo_r "[FAILED]"
+        RC=$(( RC + 1 ))
     else
-        echo -n "building."
-        ${CLI} function build $func >> build_functions.log 2>&1
-        if [ "$?" -ne 0 ] ; then
-            echo_r ".[FAILED]"
-            RC=$(( RC + 1 ))
+        if [ "$(tail -n 1 build_functions.log | grep Skipping)" != "" ] ; then
+            echo_y "[SKIPPED]"
         else
-            echo_g ".[OK]"
+            echo_g "[OK]"
         fi
     fi
 done
