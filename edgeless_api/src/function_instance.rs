@@ -59,6 +59,29 @@ pub struct SpawnFunctionRequest {
     pub workflow_id: String,
 }
 
+impl SpawnFunctionRequest {
+    /// Remove the function_class_code from the return value if RUST_WASM.
+    pub fn strip(&self) -> Self {
+        let function_class_code = if self.code.function_class_type == "RUST_WASM" {
+            vec![]
+        } else {
+            self.code.function_class_code.clone()
+        };
+        Self {
+            code: FunctionClassSpecification {
+                function_class_id: self.code.function_class_id.clone(),
+                function_class_type: self.code.function_class_type.clone(),
+                function_class_version: self.code.function_class_version.clone(),
+                function_class_code,
+                function_class_outputs: self.code.function_class_outputs.clone(),
+            },
+            annotations: self.annotations.clone(),
+            state_specification: self.state_specification.clone(),
+            workflow_id: self.workflow_id.clone(),
+        }
+    }
+}
+
 #[async_trait::async_trait]
 pub trait FunctionInstanceAPI<FunctionIdType: Clone>: FunctionInstanceAPIClone<FunctionIdType> + Sync + Send {
     async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse<FunctionIdType>>;
