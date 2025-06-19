@@ -193,16 +193,15 @@ impl Rebalancer {
         num_migrations
     }
 
-    pub fn should_create_node(
-        &self,
-        credit_threshold: f64,
-        cpu_threshold: f64,
-        mem_threshold: f64,
-    ) -> bool {
+    pub fn should_create_node(&self, credit_threshold: f64, cpu_threshold: f64, mem_threshold: f64) -> bool {
         // Option 1: Relative overload across the cluster
         let total_overload: f64 = self.nodes.values().map(|n| n.credit()).filter(|c| *c > 0.0).sum();
         if total_overload > credit_threshold {
-            log::warn!("SCALE-UP decision: Relative overload detected (credit sum {} > {})", total_overload, credit_threshold);
+            log::warn!(
+                "SCALE-UP decision: Relative overload detected (credit sum {} > {})",
+                total_overload,
+                credit_threshold
+            );
             return true;
         }
 
@@ -210,13 +209,23 @@ impl Rebalancer {
         for (id, node) in &self.nodes {
             if let Some(cpu_usage) = node.cpu_usage_percent() {
                 if cpu_usage > cpu_threshold {
-                    log::warn!("SCALE-UP decision: Absolute CPU saturation on node {} ({}% > {}%)", id, cpu_usage, cpu_threshold);
+                    log::warn!(
+                        "SCALE-UP decision: Absolute CPU saturation on node {} ({}% > {}%)",
+                        id,
+                        cpu_usage,
+                        cpu_threshold
+                    );
                     return true;
                 }
             }
             if let Some(mem_usage) = node.memory_usage_percent() {
                 if mem_usage > mem_threshold {
-                    log::warn!("SCALE-UP decision: Absolute Memory saturation on node {} ({}% > {}%)", id, mem_usage, mem_threshold);
+                    log::warn!(
+                        "SCALE-UP decision: Absolute Memory saturation on node {} ({}% > {}%)",
+                        id,
+                        mem_usage,
+                        mem_threshold
+                    );
                     return true;
                 }
             }
@@ -267,17 +276,12 @@ impl Rebalancer {
         num_migrations
     }
 
-    pub fn find_node_to_delete(
-        &self,
-        cloud_node_ids: &HashSet<String>,
-        cpu_threshold: f64,
-        mem_threshold: f64,
-    ) -> Option<String> {
+    pub fn find_node_to_delete(&self, cloud_node_ids: &HashSet<String>, cpu_threshold: f64, mem_threshold: f64) -> Option<String> {
         for (node_id, node_desc) in &self.nodes {
             let node_id_str = node_id.to_string();
 
             if !cloud_node_ids.contains(&node_id_str) {
-                continue; 
+                continue;
             }
 
             let is_cpu_low = node_desc.cpu_usage_percent().map_or(false, |cpu| cpu < cpu_threshold);
@@ -286,7 +290,9 @@ impl Rebalancer {
             if is_cpu_low && is_mem_low {
                 log::warn!(
                     "SCALE-DOWN decision: Node {} is empty and underutilized (CPU < {}%, Mem < {}%). Targeting for deletion.",
-                    node_id_str, cpu_threshold, mem_threshold
+                    node_id_str,
+                    cpu_threshold,
+                    mem_threshold
                 );
                 return Some(node_id_str);
             }
