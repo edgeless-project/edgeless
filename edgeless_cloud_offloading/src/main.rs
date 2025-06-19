@@ -58,7 +58,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // Only create a new node if there isn't one already being created.
         // If there are no nodes, we also create a new node to ensure the cluster has at least one node.
         let is_creating_node = cloud_nodes.iter().any(|n| !n.active);
-        if !is_creating_node && (rebalancer.should_create_node(CREATE_NODE_OVERLOAD_THRESHOLD, CREATE_NODE_CPU_THRESHOLD_PERCENT, CREATE_NODE_MEM_THRESHOLD_PERCENT) || active_orc_nodes.is_empty()) {
+        if !is_creating_node
+            && (rebalancer.should_create_node(
+                CREATE_NODE_OVERLOAD_THRESHOLD,
+                CREATE_NODE_CPU_THRESHOLD_PERCENT,
+                CREATE_NODE_MEM_THRESHOLD_PERCENT,
+            ) || active_orc_nodes.is_empty())
+        {
             log::warn!("Cluster is overloaded. Creating a new cloud node...");
             match create_cloud_node(cloud_input_data.clone()).await {
                 Ok(new_node) => {
@@ -95,7 +101,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             if active_orc_nodes.len() > 1 {
                 // If there's no node being created or emptied, check if we can find an underutilized node to delete
                 let managed_cloud_node_ids: HashSet<String> = cloud_nodes.iter().map(|n| n.node_id.clone()).collect();
-                if let Some(victim_id) = rebalancer.find_node_to_delete(&managed_cloud_node_ids, DELETE_NODE_CPU_THRESHOLD_PERCENT, DELETE_NODE_MEM_THRESHOLD_PERCENT) {
+                if let Some(victim_id) = rebalancer.find_node_to_delete(
+                    &managed_cloud_node_ids,
+                    DELETE_NODE_CPU_THRESHOLD_PERCENT,
+                    DELETE_NODE_MEM_THRESHOLD_PERCENT,
+                ) {
                     log::warn!("Found underutilized node {}. Attempting to empty it for deletion.", victim_id);
                     rebalancer.empty_node(&victim_id);
                     node_being_emptied = Some((victim_id, std::time::Instant::now()));
