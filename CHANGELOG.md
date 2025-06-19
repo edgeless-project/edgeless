@@ -29,6 +29,8 @@ New features:
   specified in the node's configuration. The resource has two output channels:
   "out" for the result of the function and "err" for functon execution errors.
 - Add ε-CON support to workflow migration to a target domain.
+- Add proxy_cli dump instances, which saves to JSON files the active
+  resource/function instances
 
 Improvements:
 

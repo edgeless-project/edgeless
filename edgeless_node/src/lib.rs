@@ -807,7 +807,7 @@ pub fn edgeless_node_default_conf() -> String {
             ollama_provider: Some(OllamaProviderSettings::default()),
             serverless_provider: Some(vec![ServerlessProviderSettings::default()]),
             kafka_egress_provider: Some(String::default()),
-            sqlx_provider: Some(String::from("sqlite://sqlite.db")),
+            sqlx_provider: Some("sqlx-1".to_string()),
         }),
         user_node_capabilities: Some(NodeCapabilitiesUser::default()),
         power_info: None,
