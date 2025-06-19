@@ -1,7 +1,7 @@
 // Rebalancer based on the one developed by CNR: https://github.com/edgeless-project/cnr-experiments/blob/main/delegated_orc/src/rebalancer.rs
 
 use edgeless_api::function_instance::{ComponentId, NodeId};
-use edgeless_api::node_registration::NodeCapabilities;
+use edgeless_api::node_registration::{NodeCapabilities, NodeHealthStatus};
 use edgeless_orc::proxy::Proxy;
 use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
@@ -10,12 +10,28 @@ struct NodeDesc {
     function_instances: Vec<ComponentId>,
     capabilities: NodeCapabilities,
     resource_providers: HashSet<String>,
+    pub health_status: Option<NodeHealthStatus>,
     fair_share: f64,
 }
 
 impl NodeDesc {
     fn credit(&self) -> f64 {
         self.function_instances.len() as f64 - self.fair_share
+    }
+
+    pub fn memory_usage_percent(&self) -> Option<f64> {
+        self.health_status.as_ref().and_then(|health| {
+            let total_memory = health.mem_used + health.mem_available;
+            if total_memory > 0 {
+                Some((health.mem_used as f64 * 100.0) / total_memory as f64)
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn cpu_usage_percent(&self) -> Option<f64> {
+        self.health_status.as_ref().map(|health| health.proc_cpu_usage as f64)
     }
 }
 
@@ -48,6 +64,7 @@ impl Rebalancer {
         self.instances.clear();
 
         let node_capabilities = self.proxy.fetch_node_capabilities();
+        let health_data = self.proxy.fetch_node_health();
         let active_node_ids: HashSet<String> = node_capabilities.keys().map(|id| id.to_string()).collect();
 
         for (node_id, capabilities) in node_capabilities {
@@ -57,6 +74,7 @@ impl Rebalancer {
                     function_instances: vec![],
                     capabilities,
                     resource_providers: HashSet::new(),
+                    health_status: health_data.get(&node_id).cloned(),
                     fair_share: 0.0,
                 },
             );
@@ -175,11 +193,36 @@ impl Rebalancer {
         num_migrations
     }
 
-    pub fn should_create_node(&self, threshold: f64) -> bool {
-        let total_overload: f64 = self.nodes.values().map(|node| node.credit()).filter(|credit| *credit > 0.0).sum();
+    pub fn should_create_node(
+        &self,
+        credit_threshold: f64,
+        cpu_threshold: f64,
+        mem_threshold: f64,
+    ) -> bool {
+        // Option 1: Relative overload across the cluster
+        let total_overload: f64 = self.nodes.values().map(|n| n.credit()).filter(|c| *c > 0.0).sum();
+        if total_overload > credit_threshold {
+            log::warn!("SCALE-UP decision: Relative overload detected (credit sum {} > {})", total_overload, credit_threshold);
+            return true;
+        }
 
-        log::debug!("Cluster total overload (positive credit sum): {}", total_overload);
-        total_overload > threshold
+        // Option 2: Absolute saturation of individual nodes (CPU or memory)
+        for (id, node) in &self.nodes {
+            if let Some(cpu_usage) = node.cpu_usage_percent() {
+                if cpu_usage > cpu_threshold {
+                    log::warn!("SCALE-UP decision: Absolute CPU saturation on node {} ({}% > {}%)", id, cpu_usage, cpu_threshold);
+                    return true;
+                }
+            }
+            if let Some(mem_usage) = node.memory_usage_percent() {
+                if mem_usage > mem_threshold {
+                    log::warn!("SCALE-UP decision: Absolute Memory saturation on node {} ({}% > {}%)", id, mem_usage, mem_threshold);
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     pub fn empty_node(&mut self, node_to_empty_id: &str) -> usize {
@@ -224,14 +267,31 @@ impl Rebalancer {
         num_migrations
     }
 
-    pub fn find_node_to_delete(&self, cloud_node_ids: &HashSet<String>) -> Option<String> {
+    pub fn find_node_to_delete(
+        &self,
+        cloud_node_ids: &HashSet<String>,
+        cpu_threshold: f64,
+        mem_threshold: f64,
+    ) -> Option<String> {
         for (node_id, node_desc) in &self.nodes {
             let node_id_str = node_id.to_string();
-            if cloud_node_ids.contains(&node_id_str) && node_desc.function_instances.is_empty() && node_desc.credit() <= 0.0 {
-                log::info!("Found candidate for deletion: Node ID {}, Credit: {:.2}", node_id_str, node_desc.credit());
+
+            if !cloud_node_ids.contains(&node_id_str) {
+                continue; 
+            }
+
+            let is_cpu_low = node_desc.cpu_usage_percent().map_or(false, |cpu| cpu < cpu_threshold);
+            let is_mem_low = node_desc.memory_usage_percent().map_or(false, |mem| mem < mem_threshold);
+
+            if is_cpu_low && is_mem_low {
+                log::warn!(
+                    "SCALE-DOWN decision: Node {} is empty and underutilized (CPU < {}%, Mem < {}%). Targeting for deletion.",
+                    node_id_str, cpu_threshold, mem_threshold
+                );
                 return Some(node_id_str);
             }
         }
+
         None
     }
 

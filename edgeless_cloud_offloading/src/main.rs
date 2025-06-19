@@ -7,6 +7,10 @@ use tokio::time::sleep;
 
 const CHECK_INTERVAL_SECONDS: u64 = 15; // Interval to check the cluster state
 const CREATE_NODE_OVERLOAD_THRESHOLD: f64 = 1.0; // If the total overload exceeds this threshold, a new node will be created
+const CREATE_NODE_CPU_THRESHOLD_PERCENT: f64 = 80.0; // If the CPU usage exceeds this percentage, a new node will be created
+const CREATE_NODE_MEM_THRESHOLD_PERCENT: f64 = 80.0; // If the memory usage exceeds this percentage, a new node will be created
+const DELETE_NODE_CPU_THRESHOLD_PERCENT: f64 = 30.0; // If the CPU usage is below this percentage, the node will be considered for deletion
+const DELETE_NODE_MEM_THRESHOLD_PERCENT: f64 = 40.0; // If the memory usage is below this percentage, the node will be considered for deletion
 const NODE_COOLDOWN_PERIOD_SECONDS: u64 = 300; // Wait time before deleting a newly emptied node
 
 #[tokio::main]
@@ -17,10 +21,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // TODO: Load these values from a config file or environment variables
     let cloud_input_data = CloudNodeInputData {
         aws_region: "eu-west-1".to_string(),
-        aws_ami_id: "ami-035085b5449b038a".to_string(), // Asegúrate de que esta AMI es correcta
+        aws_ami_id: "ami-035085b5449b0383a".to_string(),
         aws_instance_type: "t2.medium".to_string(),
         aws_security_group_id: "sg-09dcfc636643d2868".to_string(),
-        orchestrator_url: "3.253.97.217".to_string(),
+        orchestrator_url: "34.243.215.5".to_string(),
     };
     let redis_url = "redis://localhost:6379";
     let mut rebalancer = Rebalancer::new(redis_url)?;
@@ -52,15 +56,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // 2. DECIDE WHETHER TO CREATE A NEW NODE
         // Only create a new node if there isn't one already being created.
+        // If there are no nodes, we also create a new node to ensure the cluster has at least one node.
         let is_creating_node = cloud_nodes.iter().any(|n| !n.active);
-        if !is_creating_node && rebalancer.should_create_node(CREATE_NODE_OVERLOAD_THRESHOLD) {
+        if !is_creating_node && (rebalancer.should_create_node(CREATE_NODE_OVERLOAD_THRESHOLD, CREATE_NODE_CPU_THRESHOLD_PERCENT, CREATE_NODE_MEM_THRESHOLD_PERCENT) || active_orc_nodes.is_empty()) {
             log::warn!("Cluster is overloaded. Creating a new cloud node...");
             match create_cloud_node(cloud_input_data.clone()).await {
                 Ok(new_node) => {
                     log::info!("Successfully initiated creation of new node: {}", new_node.node_id);
                     cloud_nodes.push(new_node);
                 }
-                Err(e) => log::error!("Failed to create cloud node: {}", e),
+                Err(e) => log::error!("Failed to create cloud node. Full error: {:?}", e),
             }
         }
 
@@ -86,12 +91,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 rebalancer.empty_node(emptying_id);
             }
         } else if !is_creating_node {
-            // If there's no node being created or emptied, check if we can find an underutilized node to delete
-            let managed_cloud_node_ids: HashSet<String> = cloud_nodes.iter().map(|n| n.node_id.clone()).collect();
-            if let Some(victim_id) = rebalancer.find_node_to_delete(&managed_cloud_node_ids) {
-                log::warn!("Found underutilized node {}. Attempting to empty it for deletion.", victim_id);
-                rebalancer.empty_node(&victim_id);
-                node_being_emptied = Some((victim_id, std::time::Instant::now()));
+            // We only delete a node if there are more nodes available
+            if active_orc_nodes.len() > 1 {
+                // If there's no node being created or emptied, check if we can find an underutilized node to delete
+                let managed_cloud_node_ids: HashSet<String> = cloud_nodes.iter().map(|n| n.node_id.clone()).collect();
+                if let Some(victim_id) = rebalancer.find_node_to_delete(&managed_cloud_node_ids, DELETE_NODE_CPU_THRESHOLD_PERCENT, DELETE_NODE_MEM_THRESHOLD_PERCENT) {
+                    log::warn!("Found underutilized node {}. Attempting to empty it for deletion.", victim_id);
+                    rebalancer.empty_node(&victim_id);
+                    node_being_emptied = Some((victim_id, std::time::Instant::now()));
+                }
             }
         }
 
