@@ -81,7 +81,7 @@ pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNo
         instance_id: instance_id.to_string(),
         instance_name,
         node_id,
-        active: false
+        active: false,
     };
 
     Ok(cloud_node)

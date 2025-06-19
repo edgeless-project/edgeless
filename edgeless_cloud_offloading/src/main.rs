@@ -68,19 +68,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some((emptying_id, start_time)) = &node_being_emptied {
             // If there's a node being emptied, check if it's empty and if the cooldown period has passed
             if rebalancer.is_node_empty(emptying_id) {
-                 if start_time.elapsed().as_secs() >= NODE_COOLDOWN_PERIOD_SECONDS {
+                if start_time.elapsed().as_secs() >= NODE_COOLDOWN_PERIOD_SECONDS {
                     log::info!("Node {} is empty and cooldown period is over. Deleting it.", emptying_id);
                     let node_id_to_remove = emptying_id.clone();
                     if let Some(pos) = cloud_nodes.iter().position(|n| n.node_id == node_id_to_remove) {
                         let node_to_delete = cloud_nodes.remove(pos);
                         if let Err(e) = delete_cloud_node(node_to_delete).await {
-                             log::error!("Failed to delete cloud node {}: {}", node_id_to_remove, e);
+                            log::error!("Failed to delete cloud node {}: {}", node_id_to_remove, e);
                         }
                     }
                     node_being_emptied = None;
-                 } else {
+                } else {
                     log::info!("Node {} is empty, waiting for cooldown period to finish...", emptying_id);
-                 }
+                }
             } else {
                 // Keey trying to empty the node
                 rebalancer.empty_node(emptying_id);
@@ -96,7 +96,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Log the current state of the cloud nodes
-        log::info!("Managed cloud nodes: {} active, {} total.", cloud_nodes.iter().filter(|n| n.active).count(), cloud_nodes.len());
+        log::info!(
+            "Managed cloud nodes: {} active, {} total.",
+            cloud_nodes.iter().filter(|n| n.active).count(),
+            cloud_nodes.len()
+        );
         log::debug!("{:#?}", cloud_nodes);
 
         sleep(Duration::from_secs(CHECK_INTERVAL_SECONDS)).await;

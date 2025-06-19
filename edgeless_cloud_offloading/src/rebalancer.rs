@@ -42,7 +42,7 @@ impl Rebalancer {
             instances: HashMap::new(),
         })
     }
-    
+
     pub fn update_state(&mut self) -> HashSet<String> {
         self.nodes.clear();
         self.instances.clear();
@@ -72,7 +72,7 @@ impl Rebalancer {
                 }
             }
         }
-        
+
         let providers = self.proxy.fetch_resource_providers();
         for (provider_id, resource_provider) in providers {
             if let Some(node) = self.nodes.get_mut(&resource_provider.node_id) {
@@ -81,10 +81,10 @@ impl Rebalancer {
         }
 
         self.assign_fair_share();
-        
+
         active_node_ids
     }
-    
+
     fn assign_fair_share(&mut self) {
         let mut fair_shares = HashMap::new();
         for node_id in self.nodes.keys() {
@@ -94,22 +94,30 @@ impl Rebalancer {
         let mut instances = self.proxy.fetch_function_instance_requests();
         for (lid, req) in &mut instances {
             let runtime = req.code.function_class_type.clone();
-            let deployment_requirements =
-                edgeless_orc::deployment_requirements::DeploymentRequirements::from_annotations(
-                    &req.annotations,
-                );
-            
-            let feasible_nodes: Vec<_> = self.nodes.iter().filter(|(node_id, node_desc)| 
-                edgeless_orc::orchestration_logic::OrchestrationLogic::is_node_feasible(
-                    &runtime,
-                    &deployment_requirements,
-                    node_id,
-                    &node_desc.capabilities,
-                    &node_desc.resource_providers,
-                )
-            ).map(|(node_id, _)| *node_id).collect();
+            let deployment_requirements = edgeless_orc::deployment_requirements::DeploymentRequirements::from_annotations(&req.annotations);
 
-            self.instances.insert(*lid, InstanceDesc { runtime, deployment_requirements });
+            let feasible_nodes: Vec<_> = self
+                .nodes
+                .iter()
+                .filter(|(node_id, node_desc)| {
+                    edgeless_orc::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                        &runtime,
+                        &deployment_requirements,
+                        node_id,
+                        &node_desc.capabilities,
+                        &node_desc.resource_providers,
+                    )
+                })
+                .map(|(node_id, _)| *node_id)
+                .collect();
+
+            self.instances.insert(
+                *lid,
+                InstanceDesc {
+                    runtime,
+                    deployment_requirements,
+                },
+            );
 
             if !feasible_nodes.is_empty() {
                 let share = 1.0 / feasible_nodes.len() as f64;
@@ -127,25 +135,29 @@ impl Rebalancer {
             }
         }
     }
-    
+
     pub fn rebalance_cluster(&mut self) -> usize {
         let mut credits: HashMap<_, _> = self.nodes.iter().map(|(id, desc)| (*id, desc.credit())).collect();
         let mut migrations = vec![];
 
         for (node_id, node_desc) in &self.nodes {
             for lid in &node_desc.function_instances {
-                if credits[node_id] <= 0.0 { break; }
+                if credits[node_id] <= 0.0 {
+                    break;
+                }
 
                 let instance_desc = self.instances.get(lid).unwrap();
 
                 for (target_node_id, target_node_desc) in &self.nodes {
-                    if credits[target_node_id] < 0.0 && edgeless_orc::orchestration_logic::OrchestrationLogic::is_node_feasible(
-                        &instance_desc.runtime,
-                        &instance_desc.deployment_requirements,
-                        target_node_id,
-                        &target_node_desc.capabilities,
-                        &target_node_desc.resource_providers,
-                    ) {
+                    if credits[target_node_id] < 0.0
+                        && edgeless_orc::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                            &instance_desc.runtime,
+                            &instance_desc.deployment_requirements,
+                            target_node_id,
+                            &target_node_desc.capabilities,
+                            &target_node_desc.resource_providers,
+                        )
+                    {
                         migrations.push(edgeless_orc::deploy_intent::DeployIntent::Migrate(*lid, vec![*target_node_id]));
                         *credits.get_mut(node_id).unwrap() -= 1.0;
                         *credits.get_mut(target_node_id).unwrap() += 1.0;
@@ -164,11 +176,8 @@ impl Rebalancer {
     }
 
     pub fn should_create_node(&self, threshold: f64) -> bool {
-        let total_overload: f64 = self.nodes.values()
-            .map(|node| node.credit())
-            .filter(|credit| *credit > 0.0)
-            .sum();
-        
+        let total_overload: f64 = self.nodes.values().map(|node| node.credit()).filter(|credit| *credit > 0.0).sum();
+
         log::debug!("Cluster total overload (positive credit sum): {}", total_overload);
         total_overload > threshold
     }
@@ -180,7 +189,7 @@ impl Rebalancer {
             log::warn!("Invalid UUID format for node_to_empty_id: {}", node_to_empty_id);
             return 0;
         };
-        
+
         let node_to_empty = if let Some(node) = self.nodes.get(&node_id_uuid) {
             node
         } else {
@@ -192,19 +201,21 @@ impl Rebalancer {
         for lid in &node_to_empty.function_instances {
             let instance_desc = self.instances.get(lid).unwrap();
             for (target_node_id, target_node_desc) in &self.nodes {
-                if target_node_id != &node_id_uuid && edgeless_orc::orchestration_logic::OrchestrationLogic::is_node_feasible(
-                    &instance_desc.runtime,
-                    &instance_desc.deployment_requirements,
-                    target_node_id,
-                    &target_node_desc.capabilities,
-                    &target_node_desc.resource_providers,
-                ) {
+                if target_node_id != &node_id_uuid
+                    && edgeless_orc::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                        &instance_desc.runtime,
+                        &instance_desc.deployment_requirements,
+                        target_node_id,
+                        &target_node_desc.capabilities,
+                        &target_node_desc.resource_providers,
+                    )
+                {
                     migrations.push(edgeless_orc::deploy_intent::DeployIntent::Migrate(*lid, vec![*target_node_id]));
                     break;
                 }
             }
         }
-        
+
         let num_migrations = migrations.len();
         if num_migrations > 0 {
             self.proxy.add_deploy_intents(migrations);
@@ -223,11 +234,10 @@ impl Rebalancer {
         }
         None
     }
-    
+
     pub fn is_node_empty(&self, node_id: &str) -> bool {
         if let Ok(uuid) = Uuid::parse_str(node_id) {
-            self.nodes.get(&uuid)
-                .map_or(true, |node| node.function_instances.is_empty())
+            self.nodes.get(&uuid).map_or(true, |node| node.function_instances.is_empty())
         } else {
             true
         }
