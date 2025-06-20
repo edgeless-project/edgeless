@@ -50,7 +50,7 @@ class EDGELESSAnomalyDetectionInferer:
         self.logger = logging.getLogger(__name__)
     
 
-    def signal_handler(self, signum):
+    def signal_handler(self, signum, frame):
         self.logger.info(f"Received signal {signum}, shutting down gracefully...")
         self.running = False
 
@@ -62,10 +62,7 @@ class EDGELESSAnomalyDetectionInferer:
         Args:
             health_df (pd.DataFrame): Health metrics DataFrame
             performance_df (pd.DataFrame): Performance metrics DataFrame
-        """
-        if not self.config.DEBUG:
-            return
-        
+        """        
         print("\n" + "-"*40)
         print("🔍 DEBUG: MONITORED DATA")
         print("-"*40)
@@ -139,23 +136,22 @@ class EDGELESSAnomalyDetectionInferer:
                 performance_df = self.data_processor.redis_data_to_dataframe(performance_data, "performance")
                 
                 # Display debug info if enabled
-                self.display_debug_info(health_df, performance_df)
+                self.display_debug_info(health_df, performance_df) if self.config.DEBUG else None
                 
                 # Save to CSV if enabled
-                timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
-                self.data_processor.save_to_csv(health_df, performance_df, timestamp_str)
+                self.data_processor.save_to_csv(health_df, performance_df) if self.config.OUTPUT_WRITE_TO_CSV else None
                 
-                # Prepare features for ML model
-                features = self.data_processor.prepare_features(health_df, performance_df)
+                # # Prepare features for ML model
+                # features = self.data_processor.prepare_features(health_df, performance_df)
                 
-                if features is not None:
-                    # Perform inference
-                    result = self.anomaly_detector.predict(features)
+                # if features is not None:
+                #     # Perform inference
+                #     result = self.anomaly_detector.predict(features)
                     
-                    # Display result immediately
-                    self.display_prediction_result(result)
-                else:
-                    print("\n⚠️  No data available for inference")
+                #     # Display result immediately
+                #     self.display_prediction_result(result)
+                # else:
+                #     print("\n⚠️  No data available for inference")
                 
                 # Wait for next inference period
                 elapsed = time.time() - inference_start

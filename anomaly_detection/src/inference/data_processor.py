@@ -55,7 +55,7 @@ class DataProcessor:
             return pd.DataFrame()
     
 
-
+    # Currently unused
     def prepare_features(self, health_df: pd.DataFrame, performance_df: pd.DataFrame) -> Optional[np.ndarray]:
         """
         Prepare feature matrix for ML model from health and performance DataFrames.
@@ -102,7 +102,9 @@ class DataProcessor:
             self.logger.error(f"Error preparing features: {str(e)}")
             return None
     
-    def save_to_csv(self, health_df: pd.DataFrame, performance_df: pd.DataFrame, timestamp: str):
+
+    # NOTE: The file is constantly being overwritten. It allows to analyze the dataframes where the model finded or not an anomaly
+    def save_to_csv(self, health_df: pd.DataFrame, performance_df: pd.DataFrame):
         """
         Save DataFrames to CSV files if enabled.
         
@@ -110,12 +112,10 @@ class DataProcessor:
             health_df (pd.DataFrame): Health metrics DataFrame
             performance_df (pd.DataFrame): Performance metrics DataFrame
             timestamp (str): Timestamp for file naming
-        """
-        if not self.config.OUTPUT_WRITE_TO_CSV:
-            return
-        
+        """        
         try:
             base_path = f"outputs/{self.config.OUTPUT_EXPERIMENT_NAME}"
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
             if not health_df.empty:
                 health_file = f"{base_path}/health_data_{timestamp}.csv"
