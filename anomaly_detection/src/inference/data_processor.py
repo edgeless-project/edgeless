@@ -4,12 +4,9 @@ import logging
 from typing import Dict, List, Tuple, Optional
 import pandas as pd
 from datetime import datetime
-
-# import numpy as np
+import numpy as np
 
 from config import Config
-
-
 
 
 class DataProcessor:    

@@ -2,12 +2,9 @@
 
 import logging
 import pickle
-
-# import logging
-# from datetime import datetime
-# from typing import Any, Dict
-
-# import numpy as np
+import numpy as np
+from typing import Any, Dict
+from datetime import datetime
 
 from config import Config
 
@@ -35,7 +32,6 @@ class AnomalyDetector:
             self.logger.error(f"Error loading Anomaly Detection Model: {str(e)}")
             raise
     
-
 
     def predict(self, features: np.ndarray) -> Dict[str, Any]:
         """

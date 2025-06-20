@@ -6,17 +6,12 @@ import signal
 import os
 import time
 import pandas as pd
-...
 import sys
 
 from config import Config
 from proxy_monitor import ProxyMonitor
 from data_processor import DataProcessor
 from anomaly_detector import AnomalyDetector
-
-
-# import pickle
-# import redis
 
 
 class EDGELESSAnomalyDetectionInferer:    
@@ -205,68 +200,6 @@ def main():
         logging.error(f"Failed to start system: {str(e)}")
         sys.exit(1)
 
-
-
-# # Fetch sorted set keys for a given pattern
-# def get_sorted_set_keys(r, pattern):
-#     return [k for k in redis_client.scan_iter(match=pattern)]
-
-# # Fetch data from sorted sets within a time window
-# def fetch_metrics(r, keys, time_window):
-#     now = int(time.time())
-#     min_score = now - time_window
-#     data = []
-#     for key in keys:
-#         values = redis_client.zrangebyscore(key, min_score, now, withscores=True)
-#         for value, score in values:
-#             data.append({'key': key, 'value': value, 'timestamp': int(score)})
-#     return pd.DataFrame(data)
-
-# # Optionally write dataframe to CSV
-# def write_dataframe_to_csv(df, metric_type):
-#     if not os.path.exists(f'outputs/{OUTPUT_EXPERIMENT_NAME}'):
-#         os.makedirs(f'outputs/{OUTPUT_EXPERIMENT_NAME}')
-#     filename = f'outputs/{OUTPUT_EXPERIMENT_NAME}/{metric_type}_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-#     df.to_csv(filename, index=False, header=OUTPUT_COLUMNS)
-
-    
-
-    # logger.info("\n=== Starting Anomaly Detection... ===")
-    # detector.run_continuous_detection(
-    #     data_generator=example_data_generator(),
-    #     interval=2.0,
-    #     max_iterations=20
-    # )
-
-    # while True:
-    #     os.system('clear') if CLEAN_CLI else None 
-
-    #     # Fetch health and performance metrics
-    #     health_keys = get_sorted_set_keys(r, 'health:status:*')
-    #     perf_keys = get_sorted_set_keys(r, 'performance:*')
-    #     health_df = fetch_metrics(r, health_keys, AD_TIME_WINDOW)
-    #     perf_df = fetch_metrics(r, perf_keys, AD_TIME_WINDOW)
-
-    #     # Optionally show dataframes
-    #     if DEBUG:
-    #         print("[DEBUG] Health metrics:")
-    #         print(health_df)
-    #         print("[DEBUG] Performance metrics:")
-    #         print(perf_df)
-    #     # Optionally write to CSV
-    #     if OUTPUT_WRITE_TO_CSV:
-    #         write_dataframe_to_csv(health_df, 'health')
-    #         write_dataframe_to_csv(perf_df, 'performance')
-    #     # Inference (if there is data)
-    #     for df, metric_type in [(health_df, 'health'), (perf_df, 'performance')]:
-    #         if not df.empty:
-    #             try:
-    #                 # Assume model expects a dataframe or similar structure
-    #                 result = anomaly_detector.predict(df)
-    #                 print(f"[INFERENCE][{metric_type}] {result}")
-    #             except Exception as e:
-    #                 print(f"[ERROR] Inference failed for {metric_type}: {e}")
-    #     time.sleep(AD_INFERENCE_PERIOD)
 
 if __name__ == "__main__":
     main()
