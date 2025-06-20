@@ -6,7 +6,7 @@ import signal
 import os
 import time
 import pandas as pd
-from typing import Dict
+from typing import Dict, Any
 import sys
 
 from config import Config
