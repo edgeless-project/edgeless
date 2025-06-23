@@ -164,8 +164,13 @@ class EDGELESSAnomalyDetectionInferer:
             health_df (pd.DataFrame): Health metrics DataFrame
             performance_df (pd.DataFrame): Performance metrics DataFrame
         """     
+<<<<<<< HEAD
         self.logger.debug("-"*40)
         self.logger.debug("🔍 DEBUG: MONITORED DATA")
+=======
+        self.logger.debug("\n" + "-"*40)
+        self.logger.debug("🔍 DEBUG: MONITORED DATA"
+>>>>>>> 2513474 (Progress)
         self.logger.debug("-"*40)
         
         self.logger.debug(f"Node Health Data:")
@@ -176,6 +181,7 @@ class EDGELESSAnomalyDetectionInferer:
             self.logger.debug(f"  Total records: {len(health_df)}")
             self.logger.debug(f"  Time range: {health_df['timestamp'].min()} to {health_df['timestamp'].max()}")
 
+<<<<<<< HEAD
         self.logger.debug(f"Performance Data:")
         if performance_df.empty:
             self.logger.debug("No performance data available")
@@ -185,6 +191,17 @@ class EDGELESSAnomalyDetectionInferer:
             self.logger.debug(f"  Time range: {performance_df['timestamp'].min()} to {performance_df['timestamp'].max()}")
 
         self.logger.debug("-"*40)
+=======
+        # print(f"\nPerformance Data:")
+        # if performance_df.empty:
+        #     print("  No performance data available")
+        # else:
+        #     print(f"  Unique keys: {performance_df['key'].nunique()}")
+        #     print(f"  Records: {len(performance_df)}")
+        #     print(f"  Time range: {performance_df['datetime'].min()} to {performance_df['datetime'].max()}")
+        
+        # print("-"*40)
+>>>>>>> 2513474 (Progress)
 
 
     def display_prediction_result(self, result: Dict[str, Any]):
@@ -231,6 +248,7 @@ class EDGELESSAnomalyDetectionInferer:
                 self.proxy_monitor.update_data()
 
                 node_health_data = self.proxy_monitor.get_data("node_health")
+<<<<<<< HEAD
                 instance_data = self.proxy_monitor.get_data("instance")
                 performance_function_execution_time_data = self.proxy_monitor.get_data("performance_function_execution_time")
                 performance_function_transfer_time_data = self.proxy_monitor.get_data("performance_function_transfer_time")
@@ -241,10 +259,21 @@ class EDGELESSAnomalyDetectionInferer:
                 performance_df = self.data_processor.performance_data_to_dataframe(performance_function_execution_time_data, performance_function_transfer_time_data, instance_df)
                 enriched_df = self.data_processor.merge_performance_with_node_health(performance_df, node_health_df)
 
+=======
+                performance_function_execution_time_data = self.proxy_monitor.get_data("performance_function_execution_time")
+                performance_function_transfer_time_data = self.proxy_monitor.get_data("performance_function_transfer_time")
+         
+                
+                # Convert to DataFrames
+                node_health_df = self.data_processor.node_health_data_to_dataframe(node_health_data)
+                performance_df = self.data_processor.performance_data_to_dataframe(performance_function_execution_time_data, performance_function_transfer_time_data)
+                
+>>>>>>> 2513474 (Progress)
                 # Display debug info if enabled
                 self.display_debug_info(node_health_df, performance_df) if self.config.DEBUG else None
                 
                 # Save to CSV if enabled
+<<<<<<< HEAD
                 self.data_processor.save_to_csv(node_health_df, "node_health_df") if self.config.OUTPUT_WRITE_TO_CSV else None
                 self.data_processor.save_to_csv(performance_df, "performance_df") if self.config.OUTPUT_WRITE_TO_CSV else None
                 self.data_processor.save_to_csv(enriched_df, "enriched_df") if self.config.OUTPUT_WRITE_TO_CSV else None
@@ -253,6 +282,10 @@ class EDGELESSAnomalyDetectionInferer:
                 self.data_processor.save_to_parquet(performance_df, "performance_df") if self.config.OUTPUT_WRITE_TO_PARQUET else None
                 self.data_processor.save_to_parquet(enriched_df, "enriched_df") if self.config.OUTPUT_WRITE_TO_PARQUET else None
 
+=======
+                self.data_processor.save_to_csv(node_health_df, performance_df) if self.config.OUTPUT_WRITE_TO_CSV else None
+                
+>>>>>>> 2513474 (Progress)
                 # # Prepare features for ML model
                 # features = self.data_processor.prepare_features(node_health_df, performance_df)
                 

@@ -8,8 +8,12 @@ from typing import Any, Dict
 from datetime import datetime
 
 from config import Config
+<<<<<<< HEAD
 from models.random_binary_model import RandomBinaryModel
 
+=======
+# Me queda importar la clase con el modelo del pkl, o probar dill
+>>>>>>> 2513474 (Progress)
 
 class AnomalyDetector:    
     def __init__(self, config: Config):

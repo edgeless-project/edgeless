@@ -47,6 +47,7 @@ class DataProcessor:
 
         match = uuid_pattern.search(key)
         return match.group(0) if match else None
+<<<<<<< HEAD
         
 
     def function_performance_parse(self, entry: str) -> Optional[float]:
@@ -55,6 +56,8 @@ class DataProcessor:
             return value
         except ValueError:
             return None
+=======
+>>>>>>> 2513474 (Progress)
         
     def instance_data_to_dataframe(self, instances_dict: Dict[str, List[Tuple[str, float]]]) -> pd.DataFrame:
         """
@@ -112,6 +115,14 @@ class DataProcessor:
         return df
 
 
+    def function_performance_parse(self, entry: str) -> Optional[float]:
+        try:
+            _, value = map(float, entry.split(":"))
+            return value
+        except ValueError:
+            return None
+
+
     def node_health_data_to_dataframe(self, data_dict: Dict[str, List[Tuple[str, float]]]) -> pd.DataFrame:
         """
         Convert node health data into a pandas DataFrame.
@@ -167,23 +178,34 @@ class DataProcessor:
             return pd.DataFrame()
         
 
+<<<<<<< HEAD
     def performance_data_to_dataframe(
         self,
         function_execution_time_dict: Dict[str, List[Tuple[str, float]]],
         function_transfer_time_dict: Dict[str, List[Tuple[str, float]]],
         instance_df: pd.DataFrame
     ) -> pd.DataFrame:
+=======
+    def performance_data_to_dataframe(self, function_execution_time_dict: Dict[str, List[Tuple[str, float]]], function_transfer_time_dict: Dict[str, List[Tuple[str, float]]]) -> pd.DataFrame:
+>>>>>>> 2513474 (Progress)
         """
         Convert performance data into a pandas DataFrame.
         
         Args:
             function_execution_time_dict (Dict): Dictionary with function execution time data
             function_transfer_time_dict (Dict): Dictionary with function transfer time data
+<<<<<<< HEAD
             instance_df (pd.DataFrame): DataFrame with instance information
         Returns:
             pd.DataFrame: Processed DataFrame
         """
 
+=======
+            
+        Returns:
+            pd.DataFrame: Processed DataFrame
+        """        
+>>>>>>> 2513474 (Progress)
         try:
             all_records = []
 
@@ -196,8 +218,13 @@ class DataProcessor:
                     time = self.function_performance_parse(member)
                     all_records.append({
                         'timestamp': score,
+<<<<<<< HEAD
                         'performance_measurement_type': 'function_execution_time',
                         'value': time,
+=======
+                        'performance_measurement': 'function_execution_time',
+                        'duration': time,
+>>>>>>> 2513474 (Progress)
                         'physical_uuid': physical_uuid,
                     })
 
@@ -210,8 +237,13 @@ class DataProcessor:
                     time = self.function_performance_parse(member)
                     all_records.append({
                         'timestamp': score,
+<<<<<<< HEAD
                         'performance_measurement_type': 'function_transfer_time',
                         'value': time,
+=======
+                        'performance_measurement': 'function_transfer_time',
+                        'duration': time,
+>>>>>>> 2513474 (Progress)
                         'physical_uuid': physical_uuid,
                     })
             
@@ -235,6 +267,7 @@ class DataProcessor:
             return pd.DataFrame()
     
 
+<<<<<<< HEAD
     def merge_performance_with_node_health(
         self,
         performance_df: pd.DataFrame,
@@ -332,6 +365,51 @@ class DataProcessor:
             
     #         return np.array(features).reshape(1, -1)
             
+=======
+    # # Currently unused
+    # def prepare_features(self, health_df: pd.DataFrame, performance_df: pd.DataFrame) -> Optional[np.ndarray]:
+    #     """
+    #     Prepare feature matrix for ML model from health and performance DataFrames.
+        
+    #     Args:
+    #         health_df (pd.DataFrame): Health metrics DataFrame
+    #         performance_df (pd.DataFrame): Performance metrics DataFrame
+            
+    #     Returns:
+    #         Optional[np.ndarray]: Feature matrix or None if no data
+    #     """
+    #     try:
+    #         features = []
+            
+    #         # Basic statistics from health data
+    #         if not health_df.empty:
+    #             features.extend([
+    #                 len(health_df),  # Number of health records
+    #                 health_df['key'].nunique(),  # Number of unique health keys
+    #                 health_df['timestamp'].max() - health_df['timestamp'].min() if len(health_df) > 1 else 0,  # Time span
+    #             ])
+    #         else:
+    #             features.extend([0, 0, 0])
+            
+    #         # Basic statistics from performance data
+    #         if not performance_df.empty:
+    #             features.extend([
+    #                 len(performance_df),  # Number of performance records
+    #                 performance_df['key'].nunique(),  # Number of unique performance keys
+    #                 performance_df['timestamp'].max() - performance_df['timestamp'].min() if len(performance_df) > 1 else 0,  # Time span
+    #             ])
+    #         else:
+    #             features.extend([0, 0, 0])
+            
+    #         # Add more sophisticated features based on your specific needs
+    #         # For example: rate of change, patterns, etc.
+            
+    #         if not features or all(f == 0 for f in features):
+    #             return None
+            
+    #         return np.array(features).reshape(1, -1)
+            
+>>>>>>> 2513474 (Progress)
     #     except Exception as e:
     #         self.logger.error(f"Error preparing features: {str(e)}")
     #         return None
@@ -346,11 +424,27 @@ class DataProcessor:
             df (pd.DataFrame): DataFrame to save
             file_name (str): Name of the DataFrame (e.g., "node_health_data", "performance_data")
         """        
+<<<<<<< HEAD
         try:            
             if not df.empty:
                 csv_file = f"{self.outputs_path}/{file_name}_{self.timestamp}.csv"
                 df.to_csv(csv_file, index=False, header=self.config.OUTPUT_COLUMNS)
                 self.logger.debug(f"Saved health data to {csv_file}")
+=======
+        try:
+            base_path = f"outputs/{self.config.OUTPUT_EXPERIMENT_NAME}"
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            if not health_df.empty:
+                health_file = f"{base_path}/node_health_data_{timestamp}.csv"
+                health_df.to_csv(health_file, index=False, header=self.config.OUTPUT_COLUMNS)
+                self.logger.debug(f"Saved health data to {health_file}")
+            
+            if not performance_df.empty:
+                performance_file = f"{base_path}/performance_data_{timestamp}.csv"
+                performance_df.to_csv(performance_file, index=False, header=self.config.OUTPUT_COLUMNS)
+                self.logger.debug(f"Saved performance data to {performance_file}")
+>>>>>>> 2513474 (Progress)
                 
         except Exception as e:
             self.logger.error(f"Error saving CSV files: {str(e)}")
