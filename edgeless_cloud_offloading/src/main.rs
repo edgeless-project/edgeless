@@ -1,33 +1,62 @@
+mod config;
+
+use anyhow::anyhow;
+use clap::Parser;
 use cloud_offloading::rebalancer::Rebalancer;
 use cloud_offloading::{create_cloud_node, delete_cloud_node, CloudNodeData, CloudNodeInputData};
+use config::Config;
 use log;
 use std::collections::HashSet;
+use std::fs;
+use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::sleep;
 
-const CHECK_INTERVAL_SECONDS: u64 = 15; // Interval to check the cluster state
-const CREATE_NODE_OVERLOAD_THRESHOLD: f64 = 1.0; // If the total overload exceeds this threshold, a new node will be created
-const CREATE_NODE_CPU_THRESHOLD_PERCENT: f64 = 80.0; // If the CPU usage exceeds this percentage, a new node will be created
-const CREATE_NODE_MEM_THRESHOLD_PERCENT: f64 = 80.0; // If the memory usage exceeds this percentage, a new node will be created
-const DELETE_NODE_CPU_THRESHOLD_PERCENT: f64 = 30.0; // If the CPU usage is below this percentage, the node will be considered for deletion
-const DELETE_NODE_MEM_THRESHOLD_PERCENT: f64 = 40.0; // If the memory usage is below this percentage, the node will be considered for deletion
-const NODE_COOLDOWN_PERIOD_SECONDS: u64 = 300; // Wait time before deleting a newly emptied node
+const DEFAULT_CONFIG_FILENAME: &str = "cloud_offloading.toml";
 
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    /// Generate templates instead of running the services.
+    #[arg(long, short)]
+    templates: bool,
+    /// Directory in which to save the configuration files.
+    #[arg(long, default_value_t = String::from("./"))]
+    config_path: String,
+}
+
+fn main() -> anyhow::Result<()> {
     env_logger::init();
+    let args = Args::parse();
 
-    // --- Config ---
-    // TODO: Load these values from a config file or environment variables
+    if args.templates {
+        generate_config(&args.config_path)?;
+        return Ok(());
+    }
+
+    let config = load_config(&args.config_path)?;
+
+    let async_runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
+
+    async_runtime.block_on(async {
+        if let Err(e) = run_cloud_offloading_delegated_orc(config).await {
+            log::error!("Application runtime error: {}", e);
+        }
+    });
+
+    Ok(())
+}
+
+async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()> {
     let cloud_input_data = CloudNodeInputData {
-        aws_region: "eu-west-1".to_string(),
-        aws_ami_id: "ami-035085b5449b0383a".to_string(),
-        aws_instance_type: "t2.medium".to_string(),
-        aws_security_group_id: "sg-09dcfc636643d2868".to_string(),
-        orchestrator_url: "34.243.215.5".to_string(),
+        aws_region: config.cloud_provider.aws.region,
+        aws_ami_id: config.cloud_provider.aws.ami_id,
+        aws_instance_type: config.cloud_provider.aws.instance_type,
+        aws_security_group_id: config.cloud_provider.aws.security_group_id,
+        orchestrator_url: config.cluster.orchestrator_url,
     };
-    let redis_url = "redis://localhost:6379";
-    let mut rebalancer = Rebalancer::new(redis_url)?;
+
+    let mut rebalancer = Rebalancer::new(&config.cluster.redis_url)?;
 
     // --- Cloud offloading state ---
     let mut cloud_nodes: Vec<CloudNodeData> = Vec::new();
@@ -56,14 +85,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // 2. DECIDE WHETHER TO CREATE A NEW NODE
         // Only create a new node if there isn't one already being created.
-        // If there are no nodes, we also create a new node to ensure the cluster has at least one node.
+        // If the total number of active nodes is less than the minimum required, we also create a new node.
         let is_creating_node = cloud_nodes.iter().any(|n| !n.active);
         if !is_creating_node
             && (rebalancer.should_create_node(
-                CREATE_NODE_OVERLOAD_THRESHOLD,
-                CREATE_NODE_CPU_THRESHOLD_PERCENT,
-                CREATE_NODE_MEM_THRESHOLD_PERCENT,
-            ) || active_orc_nodes.is_empty())
+                config.scaling.thresholds.credit_overload,
+                config.scaling.thresholds.cpu_high_percent,
+                config.scaling.thresholds.mem_high_percent,
+            ) || active_orc_nodes.len() < config.cluster.minimum_nodes)
         {
             log::warn!("Cluster is overloaded. Creating a new cloud node...");
             match create_cloud_node(cloud_input_data.clone()).await {
@@ -79,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some((emptying_id, start_time)) = &node_being_emptied {
             // If there's a node being emptied, check if it's empty and if the cooldown period has passed
             if rebalancer.is_node_empty(emptying_id) {
-                if start_time.elapsed().as_secs() >= NODE_COOLDOWN_PERIOD_SECONDS {
+                if start_time.elapsed().as_secs() >= config.scaling.thresholds.delete_cooldown_seconds {
                     log::info!("Node {} is empty and cooldown period is over. Deleting it.", emptying_id);
                     let node_id_to_remove = emptying_id.clone();
                     if let Some(pos) = cloud_nodes.iter().position(|n| n.node_id == node_id_to_remove) {
@@ -103,8 +132,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let managed_cloud_node_ids: HashSet<String> = cloud_nodes.iter().map(|n| n.node_id.clone()).collect();
                 if let Some(victim_id) = rebalancer.find_node_to_delete(
                     &managed_cloud_node_ids,
-                    DELETE_NODE_CPU_THRESHOLD_PERCENT,
-                    DELETE_NODE_MEM_THRESHOLD_PERCENT,
+                    config.scaling.thresholds.cpu_low_percent,
+                    config.scaling.thresholds.mem_low_percent,
                 ) {
                     log::warn!("Found underutilized node {}. Attempting to empty it for deletion.", victim_id);
                     rebalancer.empty_node(&victim_id);
@@ -121,6 +150,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         log::debug!("{:#?}", cloud_nodes);
 
-        sleep(Duration::from_secs(CHECK_INTERVAL_SECONDS)).await;
+        sleep(Duration::from_secs(config.general.check_interval_seconds)).await;
     }
+}
+
+fn generate_config(config_path: &str) -> anyhow::Result<()> {
+    let path = PathBuf::from(config_path).join(DEFAULT_CONFIG_FILENAME);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    let default_config = Config::default();
+    let toml_string = toml::to_string_pretty(&default_config)?;
+    fs::write(&path, toml_string)?;
+
+    log::info!("Default configuration template written to {:?}", path);
+    Ok(())
+}
+
+fn load_config(config_path: &str) -> anyhow::Result<Config> {
+    let path = PathBuf::from(config_path).join(DEFAULT_CONFIG_FILENAME);
+    let config_str = fs::read_to_string(&path).map_err(|e| anyhow!("Failed to read configuration file at {:?}: {}", path, e))?;
+    toml::from_str(&config_str).map_err(|e| anyhow!("Failed to parse configuration file at {:?}: {}", path, e))
 }

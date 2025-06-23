@@ -91,7 +91,7 @@ sed -i.bak \
     -e "s#^\\(\\s*file_log_provider\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1file-log-${INSTANCE_ID}\\2#" \
     -e "s#^\\(\\s*redis_provider\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1redis-${INSTANCE_ID}\\2#" \
     -e "s#^\\(\\s*dda_provider\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1dda-${INSTANCE_ID}\\2#" \
-    -e "s#^\\(\\s*sqlx_provider\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1sqlite://sqlite-${INSTANCE_ID}.db\\2#" \
+    -e "s#^\\(\\s*sqlx_provider\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1sqlite-${INSTANCE_ID}\\2#" \
     "$EDGELESS_DIR/target/debug/node.toml"
 
 # Start the node (it does not work without being in the directory)
