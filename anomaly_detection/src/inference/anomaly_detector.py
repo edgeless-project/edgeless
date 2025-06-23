@@ -7,7 +7,7 @@ from typing import Any, Dict
 from datetime import datetime
 
 from config import Config
-
+# Me queda importar la clase con el modelo del pkl, o probar dill
 
 class AnomalyDetector:    
     def __init__(self, config: Config):

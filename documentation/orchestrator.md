@@ -65,7 +65,7 @@ Current keys are only of one of two types: STRING or SORTED_SET
 | Namespace            | Key                                      | Value                                                                                              | Data Structure                             | Updated When                                                        | Example                              |
 | -------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------ |
 | `domain_info`        | `domain_id`                              | Value **`domain_id`** of the orchestration domain's ε-ORC                                          | String                                     | ε-ORC starts                                                        | `domain-7000`                        |
-| `node:capabilities:` | `<node_id>` | JSON object representing the *capabilities* of a node registered in the orchestration domain                       | `NodeCapabilities` JSON object | The node joins the orchestration domain or updates its capabilities | See [data structures reference](data_structures_reference.md) |
+| `node:capabilities:` | `<node_UUID>` | JSON object representing the *capabilities* of a node registered in the orchestration domain                       | `NodeCapabilities` JSON object | The node joins the orchestration domain or updates its capabilities | See [data structures reference](data_structures_reference.md) |
 | `node:capabilities:` | `last_update`                            | Last update of the `node:capabilities` namespace                                                   | Unix epoch timestamp with miliseconds      | Any node joins the orchestration domain or updates its capabilities | `1750160496.85848`                   |
 | `provider:`          | `<node_hostname>-<resource_provider_id>` | JSON object with the *configuration* of a resource provider from a registered node                 | `ResourceProvider` JSON object             | The resource provider is announced by its node | See [data structures reference](data_structures_reference.md) |
 | `provider:`          | `last_update`                            | Last update of the `provider:` namespace                                                           | Unix epoch timestamp with miliseconds      | Any resource provider is announced by its node                      | `1750159583.7702973`                 |
@@ -88,9 +88,9 @@ Thus, sorted sets allow the rest of the edgeless components to query information
 | Namespace                     | Key                                         | Element Value                                                                                                       | Data Structure                          | Example                              |
 | ----------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------ |
 | `node:health:`                | `<node_id>`                                 | JSON object with the *health status* of a node registered in the orchestration domain                               | `NodeHealthStatus` JSON object          | See [data structures reference](data_structures_reference.md) |
-| `performance:<logical_UUID>:` | `function_execution_time`                   | One execution time of the physical function instance                                                                | String (`<timestamp>:<execution_time>`) | `1750244172.3326447:0.040153383`     |
-| `performance:<logical_UUID>:` | `function_transfer_time`                    | One transfer time of the physical function instance. Time interval between the previous and this function execution | String (`<timestamp>:<transfer_time>`)  | `1750244172.2934487:0.000496695`     |
-| `performance:<logical_UUID>:` | `<function_name>`                           | Function specific. Allows for custom logging as sent with rust's system macro `log::info!();`                       | String (`<timestamp>:<custom>>`)        | `1750265138.603922:Pinger: 'Cast' called, MSG: wakeup` |
+| `performance:<physical_UUID>:` | `function_execution_time`                   | One execution time of the physical function instance                                                                | String (`<timestamp>:<execution_time>`) | `1750244172.3326447:0.040153383`     |
+| `performance:<physical_UUID>:` | `function_transfer_time`                    | One transfer time of the physical function instance. Time interval between the previous and this function execution | String (`<timestamp>:<transfer_time>`)  | `1750244172.2934487:0.000496695`     |
+| `performance:<physical_UUID>:` | `<function_name>`                           | Function specific. Allows for custom logging as sent with rust's system macro `log::info!();`                       | String (`<timestamp>:<custom>>`)        | `1750265138.603922:Pinger: 'Cast' called, MSG: wakeup` |
                                                                                                                                           | `timestamp:value`  |
 
 > NOTE: Old values in the sorted sets above are periodically purged from the proxy. Purge period can be configured with variable `proxy.proxy_gc_period_seconds` in the ε-ORC's TOML configuration file.
@@ -129,9 +129,9 @@ The latter only controls local logging at the node.
 The following identifiers are represented in
 [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier) format:
 
-- node's identifier (`node_id`)
-- logical function/resource instance identifier (`lid`)
-- physical function/resource instance identifier (`pid`)
+- node's identifier (`node_UUID`)
+- logical function/resource instance identifier (`logical_UUID`)
+- physical function/resource instance identifier (`physical_UUID`)
 
 The following identifiers are represented as free-text strings:
 

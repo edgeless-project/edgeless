@@ -21,8 +21,9 @@ class ProxyMonitor:
         self.node_capabilities_data = {}
         self.instance_data = {}
         self.dependency_data = {}
-        self.health_data = {}
-        self.performance_data = {}
+        self.node_health_data = {}
+        self.performance_function_execution_time_data = {}
+        self.performance_function_transfer_time_data = {}
         
 
     def connect(self) -> bool:
@@ -65,17 +66,18 @@ class ProxyMonitor:
         return None
 
 
-    def update_static_data(self, data: str, namespace: str) -> None:
+    def update_static_data(self, data: str, pattern: str, last_update_pattern: str) -> None:
         """
         Updates the cache for static data like node capabilities, instance info, and dependencies
         by checking their last update timestamp.
 
         Args:
             data (str): Type of data to update (e.g., "node_capabilities", "instance", "dependency")
-            namespace (str): Namespace in the PROXY server the data (e.g., "node:capabilities", "instance", "dependency")
+            pattern (str): Key pattern to match in the PROXY server (e.g., "node:capabilities:*", "instance:*", "dependency:*")
+            last_update_pattern (str): Key pattern for the last update timestamp in the PROXY server
         """
         try:
-            current_update = self.proxy_client.get(f"{namespace}:last_update")
+            current_update = self.proxy_client.get(f"{last_update_pattern}")
             last_update = getattr(self, f"{data}_last_update", None)
 
             if current_update == last_update:
@@ -83,12 +85,12 @@ class ProxyMonitor:
                 return
             
             # Data has changed, fetch all instance keys
-            keys = self.proxy_client.keys(f"{namespace}:*")
+            keys = self.proxy_client.keys(f"{pattern}")
             data_dict = {}
             
             for key in keys:
                 try:
-                    if key == f"{namespace}:last_update":
+                    if key.endswith(":last_update"):
                         continue
                     value = self.proxy_client.get(key)
                     if value is not None:
@@ -107,21 +109,21 @@ class ProxyMonitor:
             return
         
 
-    def update_sorted_set_data(self, data: str, namespace: str) -> None:
+    def update_sorted_set_data(self, data: str, pattern: str) -> None:
         """
         Updates the cache for sorted set data like node health and performance metrics
         by retrieving data within a specified time window.
 
         Args:
             data (str): Type of data to update (e.g., "node_health", "performance")
-            namespace (str): Namespace in the PROXY server for the data (e.g., "node:health", "performance")
+            pattern (str): Key pattern to match in the PROXY server (e.g., "node:health:*", "performance:*:function_execution_time")
         """
         try:
             current_time = time.time()
             cutoff_time = current_time - self.config.AD_TIME_WINDOW
             
             # Find all keys matching pattern
-            keys = self.proxy_client.keys(f"{namespace}:*")
+            keys = self.proxy_client.keys(f"{pattern}")
             
             data_dict = {}
             for key in keys:
@@ -157,12 +159,13 @@ class ProxyMonitor:
         """
         try:
         
-            self.update_static_data("node_capabilities", "node:capabilities")
-            self.update_static_data("instance", "instance")
-            self.update_static_data("dependency", "dependency")
+            self.update_static_data("node_capabilities", "node:capabilities:*", "node:capabilities:last_update")
+            self.update_static_data("instance", "instance:*", "instance:last_update")
+            self.update_static_data("dependency", "dependency:*", "dependency:last_update")
 
-            self.update_sorted_set_data("node_health", "node:health")
-            self.update_sorted_set_data("performance", "performance")
+            self.update_sorted_set_data("node_health", "node:health:*")
+            self.update_sorted_set_data("performance_function_execution_time", "performance:*:function_execution_time")
+            self.update_sorted_set_data("performance_function_transfer_time", "performance:*:function_transfer_time")
             
         except Exception as e:
             self.logger.error(f"Error retrieving metrics from the PROXY server: {str(e)}")

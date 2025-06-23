@@ -61,28 +61,28 @@ class EDGELESSAnomalyDetectionInferer:
         Args:
             health_df (pd.DataFrame): Health metrics DataFrame
             performance_df (pd.DataFrame): Performance metrics DataFrame
-        """        
-        print("\n" + "-"*40)
-        print("🔍 DEBUG: MONITORED DATA")
-        print("-"*40)
+        """     
+        self.logger.debug("\n" + "-"*40)
+        self.logger.debug("🔍 DEBUG: MONITORED DATA"
+        self.logger.debug("-"*40)
         
-        print(f"Health Data:")
+        self.logger.debug(f"Node Health Data:")
         if health_df.empty:
-            print("  No health data available")
+            self.logger.debug("No health data available")
         else:
-            print(f"  Unique Nodes: {health_df['key'].nunique()}")
-            print(f"  Records: {len(health_df)}")
-            print(f"  Time range: {health_df['datetime'].min()} to {health_df['datetime'].max()}")
+            self.logger.debug(f"  Number of nodes: {health_df['node_uuid'].nunique()}")
+            self.logger.debug(f"  Total records: {len(health_df)}")
+            self.logger.debug(f"  Time range: {health_df['timestamp'].min()} to {health_df['timestamp'].max()}")
+
+        # print(f"\nPerformance Data:")
+        # if performance_df.empty:
+        #     print("  No performance data available")
+        # else:
+        #     print(f"  Unique keys: {performance_df['key'].nunique()}")
+        #     print(f"  Records: {len(performance_df)}")
+        #     print(f"  Time range: {performance_df['datetime'].min()} to {performance_df['datetime'].max()}")
         
-        print(f"\nPerformance Data:")
-        if performance_df.empty:
-            print("  No performance data available")
-        else:
-            print(f"  Unique keys: {performance_df['key'].nunique()}")
-            print(f"  Records: {len(performance_df)}")
-            print(f"  Time range: {performance_df['datetime'].min()} to {performance_df['datetime'].max()}")
-        
-        print("-"*40)
+        # print("-"*40)
 
 
     def display_prediction_result(self, result: Dict[str, Any]):
@@ -128,21 +128,23 @@ class EDGELESSAnomalyDetectionInferer:
                 # Get current data from monitor
                 self.proxy_monitor.update_data()
 
-                health_data = self.proxy_monitor.get_data("node_health")
-                performance_data = self.proxy_monitor.get_data("performance")
+                node_health_data = self.proxy_monitor.get_data("node_health")
+                performance_function_execution_time_data = self.proxy_monitor.get_data("performance_function_execution_time")
+                performance_function_transfer_time_data = self.proxy_monitor.get_data("performance_function_transfer_time")
+         
                 
                 # Convert to DataFrames
-                health_df = self.data_processor.redis_data_to_dataframe(health_data, "node_health")
-                performance_df = self.data_processor.redis_data_to_dataframe(performance_data, "performance")
+                node_health_df = self.data_processor.node_health_data_to_dataframe(node_health_data)
+                performance_df = self.data_processor.performance_data_to_dataframe(performance_function_execution_time_data, performance_function_transfer_time_data)
                 
                 # Display debug info if enabled
-                self.display_debug_info(health_df, performance_df) if self.config.DEBUG else None
+                self.display_debug_info(node_health_df, performance_df) if self.config.DEBUG else None
                 
                 # Save to CSV if enabled
-                self.data_processor.save_to_csv(health_df, performance_df) if self.config.OUTPUT_WRITE_TO_CSV else None
+                self.data_processor.save_to_csv(node_health_df, performance_df) if self.config.OUTPUT_WRITE_TO_CSV else None
                 
                 # # Prepare features for ML model
-                # features = self.data_processor.prepare_features(health_df, performance_df)
+                # features = self.data_processor.prepare_features(node_health_df, performance_df)
                 
                 # if features is not None:
                 #     # Perform inference
