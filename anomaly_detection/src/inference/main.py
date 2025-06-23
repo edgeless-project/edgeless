@@ -138,6 +138,7 @@ class EDGELESSAnomalyDetectionInferer:
                 instance_df = self.data_processor.instance_data_to_dataframe(instance_data)
                 node_health_df = self.data_processor.node_health_data_to_dataframe(node_health_data)
                 performance_df = self.data_processor.performance_data_to_dataframe(performance_function_execution_time_data, performance_function_transfer_time_data, instance_df)
+                enriched_df = self.data_processor.merge_performance_with_node_health(performance_df, node_health_df)
                 # NOTE: It is really complex and time-consuming to include the health data in the performance_df, so we will not do it for now.
 
 
@@ -147,9 +148,11 @@ class EDGELESSAnomalyDetectionInferer:
                 # Save to CSV if enabled
                 self.data_processor.save_to_csv(node_health_df, "node_health_df") if self.config.OUTPUT_WRITE_TO_CSV else None
                 self.data_processor.save_to_csv(performance_df, "performance_df") if self.config.OUTPUT_WRITE_TO_CSV else None
+                self.data_processor.save_to_csv(enriched_df, "enriched_df") if self.config.OUTPUT_WRITE_TO_CSV else None
                 # Save to Parquet if enabled
                 self.data_processor.save_to_parquet(node_health_df, "node_health_df") if self.config.OUTPUT_WRITE_TO_PARQUET else None
                 self.data_processor.save_to_parquet(performance_df, "performance_df") if self.config.OUTPUT_WRITE_TO_PARQUET else None
+                self.data_processor.save_to_parquet(enriched_df, "enriched_df") if self.config.OUTPUT_WRITE_TO_PARQUET else None
 
                 # # Prepare features for ML model
                 # features = self.data_processor.prepare_features(node_health_df, performance_df)
