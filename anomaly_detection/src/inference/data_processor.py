@@ -294,7 +294,7 @@ class DataProcessor:
         """        
         try:            
             if not df.empty:
-                csv_file = f"{self.base_path}/{file_name}_{self.timestamp}.csv"
+                csv_file = f"{self.outputs_path}/{file_name}_{self.timestamp}.csv"
                 df.to_csv(csv_file, index=False, header=self.config.OUTPUT_COLUMNS)
                 self.logger.debug(f"Saved health data to {csv_file}")
                 
@@ -312,7 +312,7 @@ class DataProcessor:
         """        
         try:
             if not df.empty:
-                parquet_file = f"{self.base_path}/{file_name}_{self.timestamp}.parquet"
+                parquet_file = f"{self.outputs_path}/{file_name}_{self.timestamp}.parquet"
                 df.to_parquet(parquet_file, index=False)
                 self.logger.debug(f"Saved health data to {parquet_file}")
                 
