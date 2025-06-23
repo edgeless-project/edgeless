@@ -79,8 +79,8 @@ class EDGELESSAnomalyDetectionInferer:
         if performance_df.empty:
             self.logger.debug("No performance data available")
         else:
-            self.logger.debug(f"  Unique keys: {performance_df['key'].nunique()}")
-            self.logger.debug(f"  Records: {len(performance_df)}")
+            self.logger.debug(f"  Number of physical functions: {performance_df['physical_uuid'].nunique()}")
+            self.logger.debug(f"  Total Records: {len(performance_df)}")
             self.logger.debug(f"  Time range: {performance_df['timestamp'].min()} to {performance_df['timestamp'].max()}")
 
         self.logger.debug("-"*40)
@@ -130,13 +130,14 @@ class EDGELESSAnomalyDetectionInferer:
                 self.proxy_monitor.update_data()
 
                 node_health_data = self.proxy_monitor.get_data("node_health")
+                instance_data = self.proxy_monitor.get_data("instance")
                 performance_function_execution_time_data = self.proxy_monitor.get_data("performance_function_execution_time")
                 performance_function_transfer_time_data = self.proxy_monitor.get_data("performance_function_transfer_time")
-         
-                
+
                 # Convert to DataFrames
+                instance_df = self.data_processor.instance_data_to_dataframe(instance_data)
                 node_health_df = self.data_processor.node_health_data_to_dataframe(node_health_data)
-                performance_df = self.data_processor.performance_data_to_dataframe(performance_function_execution_time_data, performance_function_transfer_time_data)
+                performance_df = self.data_processor.performance_data_to_dataframe(performance_function_execution_time_data, performance_function_transfer_time_data, instance_df)
                 
                 # Display debug info if enabled
                 self.display_debug_info(node_health_df, performance_df) if self.config.DEBUG else None
@@ -147,7 +148,7 @@ class EDGELESSAnomalyDetectionInferer:
                 # Save to Parquet if enabled
                 self.data_processor.save_to_parquet(node_health_df, "node_health_df") if self.config.OUTPUT_WRITE_TO_PARQUET else None
                 self.data_processor.save_to_parquet(performance_df, "performance_df") if self.config.OUTPUT_WRITE_TO_PARQUET else None
-                
+
                 # # Prepare features for ML model
                 # features = self.data_processor.prepare_features(node_health_df, performance_df)
                 

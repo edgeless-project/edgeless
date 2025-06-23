@@ -53,6 +53,61 @@ class DataProcessor:
             return value
         except ValueError:
             return None
+        
+    def instance_data_to_dataframe(self, instances_dict: Dict[str, List[Tuple[str, float]]]) -> pd.DataFrame:
+        """
+        Convert instance data into a pandas DataFrame.
+        
+        Args:
+            instances_dict (Dict): Dictionary with key names and the instance data
+            
+        Returns:
+            pd.DataFrame: Processed DataFrame
+        """
+        processed_data = []
+
+        for key, instance in instances_dict.items():
+            try:
+                logical_uuid = self.extract_uuid(key)
+                decoded_instance = json.loads(instance)
+
+                # Discard 'resource' instances
+                if "Function" not in decoded_instance:
+                    continue
+    
+                function_info = decoded_instance["Function"][0]
+                physical_instances = decoded_instance["Function"][1]
+
+                workflow_uuid = function_info["workflow_id"]
+                class_id = function_info["code"]["function_class_id"]
+                
+                # Extraer physical_uuid y node_uuid de los InstanceId
+                physical_uuids = []
+                node_uuids = []
+
+                for instance_id in physical_instances:
+                        # Usar regex para extraer los UUIDs de la cadena InstanceId
+                        match = re.search(r'InstanceId\(node_id: ([^,]+), function_id: ([^)]+)\)', instance_id)
+                        if match:                            
+                            node_uuids.append(match.group(1))
+                            physical_uuids.append(match.group(2))
+
+                for i in range(len(physical_uuids)):
+                    row = {
+                        'physical_uuid': physical_uuids[i],
+                        'node_uuid': node_uuids[i],
+                        'logical_uuid': logical_uuid,
+                        'class_id': class_id,
+                        'workflow_uuid': workflow_uuid
+                    }
+                    processed_data.append(row)
+
+            except (json.JSONDecodeError, KeyError, IndexError) as e:
+                self.logger.warning(f"Failed to parse instance data for key {key}: {e}")
+                continue
+
+        df = pd.DataFrame(processed_data)
+        return df
 
 
     def node_health_data_to_dataframe(self, data_dict: Dict[str, List[Tuple[str, float]]]) -> pd.DataFrame:
@@ -110,17 +165,23 @@ class DataProcessor:
             return pd.DataFrame()
         
 
-    def performance_data_to_dataframe(self, function_execution_time_dict: Dict[str, List[Tuple[str, float]]], function_transfer_time_dict: Dict[str, List[Tuple[str, float]]]) -> pd.DataFrame:
+    def performance_data_to_dataframe(
+        self,
+        function_execution_time_dict: Dict[str, List[Tuple[str, float]]],
+        function_transfer_time_dict: Dict[str, List[Tuple[str, float]]],
+        instance_df: pd.DataFrame
+    ) -> pd.DataFrame:
         """
         Convert performance data into a pandas DataFrame.
         
         Args:
             function_execution_time_dict (Dict): Dictionary with function execution time data
             function_transfer_time_dict (Dict): Dictionary with function transfer time data
-            
+            instance_df (pd.DataFrame): DataFrame with instance information
         Returns:
             pd.DataFrame: Processed DataFrame
-        """        
+        """
+
         try:
             all_records = []
 
@@ -131,12 +192,14 @@ class DataProcessor:
                 for member, score in members:
 
                     time = self.function_performance_parse(member)
-                    all_records.append({
+                    row = ({
                         'timestamp': score,
                         'performance_measurement_type': 'function_execution_time',
                         'value': time,
                         'physical_uuid': physical_uuid,
                     })
+                    row.update(instance_df.get(physical_uuid, {}))
+                    all_records.append(row)
 
             for key, members in function_transfer_time_dict.items():
             
@@ -145,12 +208,14 @@ class DataProcessor:
                 for member, score in members:
 
                     time = self.function_performance_parse(member)
-                    all_records.append({
+                    row = ({
                         'timestamp': score,
                         'performance_measurement_type': 'function_transfer_time',
                         'value': time,
                         'physical_uuid': physical_uuid,
                     })
+                    row.update(instance_df.get(physical_uuid, {}))
+                    all_records.append(row)
             
             if not all_records:
                 return pd.DataFrame()
