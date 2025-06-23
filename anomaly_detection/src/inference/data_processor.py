@@ -30,6 +30,8 @@ class DataProcessor:
     def __init__(self, config: Config):
         self.config = config
         self.logger = logging.getLogger(__name__)
+        self.outputs_path = f"outputs/{self.config.OUTPUT_EXPERIMENT_NAME}"
+        self.timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
 
     def extract_uuid(self, key: str) -> Optional[str]:
@@ -192,14 +194,12 @@ class DataProcessor:
                 for member, score in members:
 
                     time = self.function_performance_parse(member)
-                    row = ({
+                    all_records.append({
                         'timestamp': score,
                         'performance_measurement_type': 'function_execution_time',
                         'value': time,
                         'physical_uuid': physical_uuid,
                     })
-                    row.update(instance_df.get(physical_uuid, {}))
-                    all_records.append(row)
 
             for key, members in function_transfer_time_dict.items():
             
@@ -208,19 +208,24 @@ class DataProcessor:
                 for member, score in members:
 
                     time = self.function_performance_parse(member)
-                    row = ({
+                    all_records.append({
                         'timestamp': score,
                         'performance_measurement_type': 'function_transfer_time',
                         'value': time,
                         'physical_uuid': physical_uuid,
                     })
-                    row.update(instance_df.get(physical_uuid, {}))
-                    all_records.append(row)
             
             if not all_records:
                 return pd.DataFrame()
             
             df = pd.DataFrame(all_records)
+            
+            # if 'physical_uuid' in instance_df.columns:
+            df = df.merge(instance_df, on='physical_uuid', how='left')
+            # else:
+            #     # Si physical_uuid es el índice de instance_df
+            #     df = df.merge(instance_df, left_on='physical_uuid', right_index=True, how='left')
+
             df = df.sort_values('timestamp')
             
             return df
@@ -287,12 +292,9 @@ class DataProcessor:
             df (pd.DataFrame): DataFrame to save
             file_name (str): Name of the DataFrame (e.g., "node_health_data", "performance_data")
         """        
-        try:
-            base_path = f"outputs/{self.config.OUTPUT_EXPERIMENT_NAME}"
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            
+        try:            
             if not df.empty:
-                csv_file = f"{base_path}/{file_name}_{timestamp}.csv"
+                csv_file = f"{self.base_path}/{file_name}_{self.timestamp}.csv"
                 df.to_csv(csv_file, index=False, header=self.config.OUTPUT_COLUMNS)
                 self.logger.debug(f"Saved health data to {csv_file}")
                 
@@ -309,11 +311,8 @@ class DataProcessor:
             file_name (str): Name of the DataFrame (e.g., "node_health_data", "performance_data")
         """        
         try:
-            base_path = f"outputs/{self.config.OUTPUT_EXPERIMENT_NAME}"
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            
             if not df.empty:
-                parquet_file = f"{base_path}/{file_name}_{timestamp}.parquet"
+                parquet_file = f"{self.base_path}/{file_name}_{self.timestamp}.parquet"
                 df.to_parquet(parquet_file, index=False)
                 self.logger.debug(f"Saved health data to {parquet_file}")
                 
