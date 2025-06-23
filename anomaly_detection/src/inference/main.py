@@ -139,8 +139,6 @@ class EDGELESSAnomalyDetectionInferer:
                 node_health_df = self.data_processor.node_health_data_to_dataframe(node_health_data)
                 performance_df = self.data_processor.performance_data_to_dataframe(performance_function_execution_time_data, performance_function_transfer_time_data, instance_df)
                 enriched_df = self.data_processor.merge_performance_with_node_health(performance_df, node_health_df)
-                # NOTE: It is really complex and time-consuming to include the health data in the performance_df, so we will not do it for now.
-
 
                 # Display debug info if enabled
                 self.display_debug_info(node_health_df, performance_df) if self.config.DEBUG else None
