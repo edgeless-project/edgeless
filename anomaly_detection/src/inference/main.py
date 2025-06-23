@@ -22,10 +22,9 @@ class EDGELESSAnomalyDetectionInferer:
         
         self.proxy_monitor = ProxyMonitor(self.config)
         self.data_processor = DataProcessor(self.config)
-        self.anomaly_detector = AnomalyDetector(self.config)
+        # self.anomaly_detector = AnomalyDetector(self.config)
         
         self.running = True
-        self.monitor_thread = None
         
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self.signal_handler)
@@ -71,19 +70,17 @@ class EDGELESSAnomalyDetectionInferer:
         if health_df.empty:
             print("  No health data available")
         else:
+            print(f"  Unique Nodes: {health_df['key'].nunique()}")
             print(f"  Records: {len(health_df)}")
-            print(f"  Unique keys: {health_df['key'].nunique()}")
             print(f"  Time range: {health_df['datetime'].min()} to {health_df['datetime'].max()}")
-            print(f"  Sample keys: {list(health_df['key'].unique()[:3])}")
         
         print(f"\nPerformance Data:")
         if performance_df.empty:
             print("  No performance data available")
         else:
-            print(f"  Records: {len(performance_df)}")
             print(f"  Unique keys: {performance_df['key'].nunique()}")
+            print(f"  Records: {len(performance_df)}")
             print(f"  Time range: {performance_df['datetime'].min()} to {performance_df['datetime'].max()}")
-            print(f"  Sample keys: {list(performance_df['key'].unique()[:3])}")
         
         print("-"*40)
 
@@ -129,10 +126,13 @@ class EDGELESSAnomalyDetectionInferer:
                 inference_start = time.time()
                 
                 # Get current data from monitor
-                health_data, performance_data = self.proxy_monitor.get_current_data()
+                self.proxy_monitor.update_data()
+
+                health_data = self.proxy_monitor.get_data("node_health")
+                performance_data = self.proxy_monitor.get_data("performance")
                 
                 # Convert to DataFrames
-                health_df = self.data_processor.redis_data_to_dataframe(health_data, "health")
+                health_df = self.data_processor.redis_data_to_dataframe(health_data, "node_health")
                 performance_df = self.data_processor.redis_data_to_dataframe(performance_data, "performance")
                 
                 # Display debug info if enabled
@@ -165,20 +165,25 @@ class EDGELESSAnomalyDetectionInferer:
     
 
     def run(self):
+        os.system('cls' if os.name == 'nt' else 'clear') if self.config.CLEAN_CLI else None
         self.logger.info("Starting EDGELESS Anomaly Detection System")
         self.logger.debug(f"Configuration: {self.config}")
-        
-        # Clear console
-        os.system('cls' if os.name == 'nt' else 'clear') if self.config.CLEAN_CLI else None
-        
+
         try:
             # Connect to the PROXY server (Redis)
             if not self.proxy_monitor.connect():
                 raise Exception(f"Failed to connect to the PROXY server at redis://{self.config.PROXY_HOST}:{self.config.PROXY_PORT}")
             
+            # Show orchestration domain ID
+            domain_id = self.proxy_monitor.get_domain_id()
+            if domain_id:
+                self.logger.info(f"Orchestration Domain ID: {domain_id}")
+            else:
+                self.logger.warning("Could not retrieve Orchestration Domain ID key from the PROXY server")
+            
             # Run inference loop
             self.run_inference_loop()
-            
+
         except KeyboardInterrupt:
             self.logger.info("Received keyboard interrupt, shutting down...")
         except Exception as e:
@@ -187,7 +192,7 @@ class EDGELESSAnomalyDetectionInferer:
         finally:
             self.running = False
             self.logger.info("EDGELESS Anomaly Detection Inferer stopped")
-
+        
 
 def main():
     try:

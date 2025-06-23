@@ -13,6 +13,14 @@ class ProxyMonitor:
         self.config = config
         self.logger = logging.getLogger(__name__)
         self.proxy_client = None
+
+        self.node_capabilities_last_update = None
+        self.instance_last_update = None
+        self.dependency_last_update = None
+
+        self.node_capabilities_data = {}
+        self.instance_data = {}
+        self.dependency_data = {}
         self.health_data = {}
         self.performance_data = {}
         
@@ -42,28 +50,80 @@ class ProxyMonitor:
         except Exception as e:
             self.logger.error(f"Failed to connect to PROXY server: {str(e)}")
             return False
-
-
-    def get_sorted_set_data(self, pattern: str, time_window: float) -> Dict[str, List[Tuple[str, float]]]:
-        """
-        Retrieve data from Redis sorted sets matching the pattern within time window.
         
-        Args:
-            pattern (str): Pattern to match Redis keys
-            time_window (float): Time window in seconds
-            
-        Returns:
-            Dict[str, List[Tuple[str, float]]]: Dictionary with key names and their data
+
+    def get_domain_id(self):
         """
-        # TODO: Code will most likely break here, due to format issues
+        Retrieve the domain ID from the PROXY server.
+        Returns:
+            str: Domain ID if available, None otherwise
+        """
+        try:
+            return self.proxy_client.get("domain_info:domain_id")
+        except Exception as e:
+            self.logger.error(f"Error retrieving domain_id from PROXY server: {str(e)}")
+        return None
+
+
+    def update_static_data(self, data: str, namespace: str) -> None:
+        """
+        Updates the cache for static data like node capabilities, instance info, and dependencies
+        by checking their last update timestamp.
+
+        Args:
+            data (str): Type of data to update (e.g., "node_capabilities", "instance", "dependency")
+            namespace (str): Namespace in the PROXY server the data (e.g., "node:capabilities", "instance", "dependency")
+        """
+        try:
+            current_update = self.redis_client.get(f"{namespace}:last_update")
+            last_update = getattr(self, f"{data}_last_update", None)
+
+            if current_update == last_update:
+                # Nothing changed. Proceed with cached data
+                return
+            
+            # Data has changed, fetch all instance keys
+            keys = self.redis_client.keys(f"{namespace}:*")
+            data_dict = {}
+            
+            for key in keys:
+                try:
+                    if key == f"{namespace}:last_update":
+                        continue
+                    value = self.redis_client.get(key)
+                    if value is not None:
+                        data_dict[key] = value
+                        
+                except Exception as e:
+                    self.logger.warning(f"Error retrieving instance data from key {key}: {str(e)}")
+            
+            # Update cache
+            setattr(self, f"{data}_data", data_dict)
+            setattr(self, f"{data}_last_update", current_update)
+            return
+            
+        except Exception as e:
+            self.logger.error(f"Error updating static data for {data}: {str(e)}")
+            return
+        
+
+    def update_sorted_set_data(self, data: str, namespace: str) -> None:
+        """
+        Updates the cache for sorted set data like node health and performance metrics
+        by retrieving data within a specified time window.
+
+        Args:
+            data (str): Type of data to update (e.g., "node_health", "performance")
+            namespace (str): Namespace in the PROXY server for the data (e.g., "node:health", "performance")
+        """
         try:
             current_time = time.time()
-            cutoff_time = current_time - time_window
+            cutoff_time = current_time - self.config.TIME_WINDOW
             
             # Find all keys matching pattern
-            keys = self.proxy_client.keys(f"{pattern}*")
+            keys = self.proxy_client.keys(f"{namespace}:*")
             
-            data = {}
+            data_dict = {}
             for key in keys:
                 try:
                     # Get data from sorted set within time window
@@ -76,35 +136,51 @@ class ProxyMonitor:
                     )
                     
                     if members:
-                        data[key] = members
+                        data_dict[key] = members
                         
                 except Exception as e:
                     self.logger.warning(f"Error retrieving data from key {key}: {str(e)}")
-                    
-            return data
+
+            # Update cache
+            setattr(self, f"{data}_data", data_dict)       
+            return
             
         except Exception as e:
-            self.logger.error(f"Error getting sorted set data for pattern {pattern}: {str(e)}")
-            return {}
+            self.logger.error(f"Error updating sorted set data for {data}: {str(e)}")
+            return
+    
     
 
-    def monitor_metrics(self):
-        self.logger.info("=== Starting PROXY server monitoring... ===")
-        
+    def update_data(self) -> Tuple[Dict, Dict]:
+        """
+        Updates the class attributes according to the latest data from the PROXY server.
+        """
         try:
-            # Get health and performance data
-            self.health_data = self.get_sorted_set_data("health:status:", self.config.AD_TIME_WINDOW)
-            self.performance_data = self.get_sorted_set_data("performance:", self.config.AD_TIME_WINDOW)
+        
+            self.update_static_data("node_capabilities", "node:capabilities")
+            self.update_static_data("instance", "instance")
+            self.update_static_data("dependency", "dependency")
+
+            self.update_sorted_set_data("node_health", "node:health")
+            self.update_sorted_set_data("performance", "performance")
             
         except Exception as e:
             self.logger.error(f"Error retrieving metrics from the PROXY server: {str(e)}")
-    
 
-    def get_current_data(self) -> Tuple[Dict, Dict]:
+        return
+    
+    def get_data(self, data: str) -> Dict[str, List[Tuple[str, float]]]:
         """
-        Get current snapshot of monitored data.
+        Retrieve data from the cache based on the type.
+        
+        Args:
+            data (str): Type of data to retrieve (e.g., "node_health", "performance")
         
         Returns:
-            Tuple[Dict, Dict]: Current health and performance data
+            Dict[str, List[Tuple[str, float]]]: Cached data for the specified type
         """
-        return self.health_data.copy(), self.performance_data.copy()
+        if hasattr(self, f"{data}_data"):
+            return getattr(self, f"{data}_data", {})
+        else:
+            self.logger.error(f"Unknown data type requested: {data}")
+            return {}
