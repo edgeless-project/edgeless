@@ -8,6 +8,7 @@ import time
 import pandas as pd
 from typing import Dict, Any
 import sys
+import random  # Delete this import in the future
 
 from config import Config
 from proxy_monitor import ProxyMonitor
@@ -63,7 +64,7 @@ class EDGELESSAnomalyDetectionInferer:
             performance_df (pd.DataFrame): Performance metrics DataFrame
         """     
         self.logger.debug("\n" + "-"*40)
-        self.logger.debug("🔍 DEBUG: MONITORED DATA"
+        self.logger.debug("🔍 DEBUG: MONITORED DATA")
         self.logger.debug("-"*40)
         
         self.logger.debug(f"Node Health Data:")
@@ -74,15 +75,15 @@ class EDGELESSAnomalyDetectionInferer:
             self.logger.debug(f"  Total records: {len(health_df)}")
             self.logger.debug(f"  Time range: {health_df['timestamp'].min()} to {health_df['timestamp'].max()}")
 
-        # print(f"\nPerformance Data:")
-        # if performance_df.empty:
-        #     print("  No performance data available")
-        # else:
-        #     print(f"  Unique keys: {performance_df['key'].nunique()}")
-        #     print(f"  Records: {len(performance_df)}")
-        #     print(f"  Time range: {performance_df['datetime'].min()} to {performance_df['datetime'].max()}")
-        
-        # print("-"*40)
+        self.logger.debug(f"Performance Data:")
+        if performance_df.empty:
+            self.logger.debug("No performance data available")
+        else:
+            self.logger.debug(f"  Unique keys: {performance_df['key'].nunique()}")
+            self.logger.debug(f"  Records: {len(performance_df)}")
+            self.logger.debug(f"  Time range: {performance_df['timestamp'].min()} to {performance_df['timestamp'].max()}")
+
+        self.logger.debug("-"*40)
 
 
     def display_prediction_result(self, result: Dict[str, Any]):
@@ -141,7 +142,11 @@ class EDGELESSAnomalyDetectionInferer:
                 self.display_debug_info(node_health_df, performance_df) if self.config.DEBUG else None
                 
                 # Save to CSV if enabled
-                self.data_processor.save_to_csv(node_health_df, performance_df) if self.config.OUTPUT_WRITE_TO_CSV else None
+                self.data_processor.save_to_csv(node_health_df, "node_health_df") if self.config.OUTPUT_WRITE_TO_CSV else None
+                self.data_processor.save_to_csv(performance_df, "performance_df") if self.config.OUTPUT_WRITE_TO_CSV else None
+                # Save to Parquet if enabled
+                self.data_processor.save_to_parquet(node_health_df, "node_health_df") if self.config.OUTPUT_WRITE_TO_PARQUET else None
+                self.data_processor.save_to_parquet(performance_df, "performance_df") if self.config.OUTPUT_WRITE_TO_PARQUET else None
                 
                 # # Prepare features for ML model
                 # features = self.data_processor.prepare_features(node_health_df, performance_df)
@@ -154,6 +159,10 @@ class EDGELESSAnomalyDetectionInferer:
                 #     self.display_prediction_result(result)
                 # else:
                 #     print("\n⚠️  No data available for inference")
+
+                # Delete in the future
+                is_anomaly = random.randint(0, 1)
+                self.proxy_monitor.set_data("anomaly_detection:is_anomaly", str(is_anomaly))
                 
                 # Wait for next inference period
                 elapsed = time.time() - inference_start

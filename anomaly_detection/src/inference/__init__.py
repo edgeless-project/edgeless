@@ -24,6 +24,7 @@ Environment Variables:
     - CLEAN_CLI: Clear CLI output between updates (default: true)
     - DEBUG: Enable debug output (default: false)
     - OUTPUT_WRITE_TO_CSV: Write output to CSV files (default: false)
+    - OUTPUT_WRITE_TO_PARQUET: Write output to Parquet files (default: false)
     - OUTPUT_EXPERIMENT_NAME: Name for output files (default: experiment)
     - OUTPUT_COLUMNS: Include column headers in CSV output (default: false)
 """

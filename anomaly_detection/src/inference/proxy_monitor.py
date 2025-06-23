@@ -52,6 +52,19 @@ class ProxyMonitor:
             self.logger.error(f"Failed to connect to PROXY server: {str(e)}")
             return False
         
+    def set_data(self, key: str, value: str) -> None:
+        """
+        Set data in the PROXY server.
+        
+        Args:
+            key (str): Key to set in the PROXY server
+            value (str): Value to set for the key
+        """
+        try:
+            self.proxy_client.set(key, value)
+        except Exception as e:
+            self.logger.error(f"Error setting {key} in PROXY server: {str(e)}")
+        
 
     def get_domain_id(self):
         """

@@ -133,8 +133,8 @@ class DataProcessor:
                     time = self.function_performance_parse(member)
                     all_records.append({
                         'timestamp': score,
-                        'performance_measurement': 'function_execution_time',
-                        'duration': time,
+                        'performance_measurement_type': 'function_execution_time',
+                        'value': time,
                         'physical_uuid': physical_uuid,
                     })
 
@@ -147,8 +147,8 @@ class DataProcessor:
                     time = self.function_performance_parse(member)
                     all_records.append({
                         'timestamp': score,
-                        'performance_measurement': 'function_transfer_time',
-                        'duration': time,
+                        'performance_measurement_type': 'function_transfer_time',
+                        'value': time,
                         'physical_uuid': physical_uuid,
                     })
             
@@ -213,29 +213,44 @@ class DataProcessor:
     #         return None
     
 
-    # NOTE: The file is constantly being overwritten. It allows to analyze the dataframes where the model finded or not an anomaly
-    def save_to_csv(self, health_df: pd.DataFrame, performance_df: pd.DataFrame):
+    # NOTE: The file is constantly being overwritten. It allows to analyze the dataframe where the model finded or not an anomaly
+    def save_to_csv(self, df: pd.DataFrame, file_name: str):
         """
         Save DataFrames to CSV files if enabled.
         
         Args:
-            health_df (pd.DataFrame): Health metrics DataFrame
-            performance_df (pd.DataFrame): Performance metrics DataFrame
-            timestamp (str): Timestamp for file naming
+            df (pd.DataFrame): DataFrame to save
+            file_name (str): Name of the DataFrame (e.g., "node_health_data", "performance_data")
         """        
         try:
             base_path = f"outputs/{self.config.OUTPUT_EXPERIMENT_NAME}"
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
-            if not health_df.empty:
-                health_file = f"{base_path}/node_health_data_{timestamp}.csv"
-                health_df.to_csv(health_file, index=False, header=self.config.OUTPUT_COLUMNS)
-                self.logger.debug(f"Saved health data to {health_file}")
-            
-            if not performance_df.empty:
-                performance_file = f"{base_path}/performance_data_{timestamp}.csv"
-                performance_df.to_csv(performance_file, index=False, header=self.config.OUTPUT_COLUMNS)
-                self.logger.debug(f"Saved performance data to {performance_file}")
+            if not df.empty:
+                csv_file = f"{base_path}/{file_name}_{timestamp}.csv"
+                df.to_csv(csv_file, index=False, header=self.config.OUTPUT_COLUMNS)
+                self.logger.debug(f"Saved health data to {csv_file}")
                 
         except Exception as e:
             self.logger.error(f"Error saving CSV files: {str(e)}")
+
+
+    def save_to_parquet(self, df: pd.DataFrame, file_name: str):
+        """
+        Save DataFrames to CSV files if enabled.
+        
+        Args:
+            df (pd.DataFrame): DataFrame to save
+            file_name (str): Name of the DataFrame (e.g., "node_health_data", "performance_data")
+        """        
+        try:
+            base_path = f"outputs/{self.config.OUTPUT_EXPERIMENT_NAME}"
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            if not df.empty:
+                parquet_file = f"{base_path}/{file_name}_{timestamp}.parquet"
+                df.to_parquet(parquet_file, index=False)
+                self.logger.debug(f"Saved health data to {parquet_file}")
+                
+        except Exception as e:
+            self.logger.error(f"Error saving Parquet files: {str(e)}")
