@@ -253,37 +253,37 @@ class DataProcessor:
         try:
             if performance_df.empty or node_health_df.empty:
                 self.logger.warning("One or both DataFrames are empty")
-                return performance_df.copy()
+                return None
             
             # Ensure timestamp columns are numeric for merging
-            performance_df = performance_df.copy()
-            node_health_df = node_health_df.copy()
-            performance_df['timestamp'] = pd.to_numeric(performance_df['timestamp'])
-            node_health_df['timestamp'] = pd.to_numeric(node_health_df['timestamp'])
+            performance_df_copy = performance_df.copy()
+            node_health_df_copy = node_health_df.copy()
+            performance_df_copy['timestamp'] = pd.to_numeric(performance_df['timestamp'])
+            node_health_df_copy['timestamp'] = pd.to_numeric(node_health_df['timestamp'])
             
             # Sort by timestamp (required for merge_asof)
-            performance_df = performance_df.sort_values('timestamp')
-            node_health_df = node_health_df.sort_values('timestamp')
+            performance_df_copy = performance_df_copy.sort_values('timestamp')
+            node_health_df_copy = node_health_df_copy.sort_values('timestamp')
 
             # Rename health columns with prefix node_
             health_columns_to_rename = {
-                col: f'node_{col}' for col in node_health_df.columns 
+                col: f'node_{col}' for col in node_health_df_copy.columns 
                 if col not in ['timestamp', 'node_uuid']
             }
-            node_health_df = node_health_df.rename(columns=health_columns_to_rename)
+            node_health_df_copy = node_health_df_copy.rename(columns=health_columns_to_rename)
             
             # Run merge_asof using node_uuid as grouping key
             # Use 'backward' direction to match the closest previous health record
             merged_df = pd.merge_asof(
-                performance_df,
-                node_health_df,
+                performance_df_copy,
+                node_health_df_copy,
                 on='timestamp',
                 by='node_uuid',
                 direction='backward'
             )
             
-            self.logger.debug(f"Successfully merged {len(performance_df)} performance records "
-                            f"with {len(node_health_df)} health records. "
+            self.logger.debug(f"Successfully merged {len(performance_df_copy)} performance records "
+                            f"with {len(node_health_df_copy)} health records. "
                             f"Result: {len(merged_df)} records")
             
             return merged_df
