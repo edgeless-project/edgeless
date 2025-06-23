@@ -75,7 +75,7 @@ class ProxyMonitor:
             namespace (str): Namespace in the PROXY server the data (e.g., "node:capabilities", "instance", "dependency")
         """
         try:
-            current_update = self.redis_client.get(f"{namespace}:last_update")
+            current_update = self.proxy_client.get(f"{namespace}:last_update")
             last_update = getattr(self, f"{data}_last_update", None)
 
             if current_update == last_update:
@@ -83,14 +83,14 @@ class ProxyMonitor:
                 return
             
             # Data has changed, fetch all instance keys
-            keys = self.redis_client.keys(f"{namespace}:*")
+            keys = self.proxy_client.keys(f"{namespace}:*")
             data_dict = {}
             
             for key in keys:
                 try:
                     if key == f"{namespace}:last_update":
                         continue
-                    value = self.redis_client.get(key)
+                    value = self.proxy_client.get(key)
                     if value is not None:
                         data_dict[key] = value
                         
@@ -118,7 +118,7 @@ class ProxyMonitor:
         """
         try:
             current_time = time.time()
-            cutoff_time = current_time - self.config.TIME_WINDOW
+            cutoff_time = current_time - self.config.AD_TIME_WINDOW
             
             # Find all keys matching pattern
             keys = self.proxy_client.keys(f"{namespace}:*")
