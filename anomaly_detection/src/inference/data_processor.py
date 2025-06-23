@@ -238,7 +238,7 @@ class DataProcessor:
     def merge_performance_with_node_health(
         self,
         performance_df: pd.DataFrame,
-        health_df: pd.DataFrame
+        node_health_df: pd.DataFrame
     ) -> pd.DataFrame:
         """
         Merge performance DataFrame with node health DataFrame based on timestamp proximity.
@@ -281,10 +281,6 @@ class DataProcessor:
                 by='node_uuid',
                 direction='backward'
             )
-            
-            self.logger.debug(f"Successfully merged {len(performance_df_copy)} performance records "
-                            f"with {len(node_health_df_copy)} health records. "
-                            f"Result: {len(merged_df)} records")
             
             return merged_df
         
