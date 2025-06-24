@@ -5,6 +5,7 @@ use log;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use uuid::Uuid;
+use std::time::Instant;
 
 pub mod rebalancer;
 #[derive(Debug, Clone)]
@@ -23,6 +24,7 @@ pub struct CloudNodeData {
     instance_name: String,
     pub node_id: String,
     pub active: bool,
+    pub creation_time: Instant,
 }
 
 fn generate_instance_name() -> String {
@@ -82,6 +84,7 @@ pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNo
         instance_name,
         node_id,
         active: false,
+        creation_time: Instant::now(),
     };
 
     Ok(cloud_node)
