@@ -91,7 +91,9 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
             if !node.active && node.creation_time.elapsed().as_secs() > NODE_ACTIVATION_TIMEOUT_SECS {
                 log::warn!(
                     "Node {} ({}) failed to become active within {} seconds. Marking for deletion.",
-                    node.node_id, node.instance_id, NODE_ACTIVATION_TIMEOUT_SECS
+                    node.node_id,
+                    node.instance_id,
+                    NODE_ACTIVATION_TIMEOUT_SECS
                 );
                 broken_nodes_to_delete.push(node.instance_id.clone());
             }
@@ -113,7 +115,7 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
                     true
                 }
             });
-            
+
             // After cleanup, it's better to restart the cycle to have a clean state.
             log::info!("Cleanup finished. Restarting check cycle...");
             sleep(Duration::from_secs(config.general.check_interval_seconds)).await;

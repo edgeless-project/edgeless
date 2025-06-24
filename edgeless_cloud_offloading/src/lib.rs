@@ -4,8 +4,8 @@ use base64::{engine::general_purpose::STANDARD, Engine as _};
 use log;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
-use uuid::Uuid;
 use std::time::Instant;
+use uuid::Uuid;
 
 pub mod rebalancer;
 #[derive(Debug, Clone)]
