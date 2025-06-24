@@ -83,6 +83,43 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
             }
         }
 
+        // CLEANUP: Find and delete any cloud nodes that failed to be active if 5 minutes have passed since creation
+        const NODE_ACTIVATION_TIMEOUT_SECS: u64 = 300;
+        let mut broken_nodes_to_delete = Vec::new();
+
+        for node in &cloud_nodes {
+            if !node.active && node.creation_time.elapsed().as_secs() > NODE_ACTIVATION_TIMEOUT_SECS {
+                log::warn!(
+                    "Node {} ({}) failed to become active within {} seconds. Marking for deletion.",
+                    node.node_id, node.instance_id, NODE_ACTIVATION_TIMEOUT_SECS
+                );
+                broken_nodes_to_delete.push(node.instance_id.clone());
+            }
+        }
+
+        if !broken_nodes_to_delete.is_empty() {
+            // Delete broken nodes from AWS
+            cloud_nodes.retain(|node| {
+                if broken_nodes_to_delete.contains(&node.instance_id) {
+                    let node_to_delete = node.clone();
+                    tokio::spawn(async move {
+                        log::info!("Deleting broken node from AWS: {}", node_to_delete.node_id);
+                        if let Err(e) = delete_cloud_node(node_to_delete).await {
+                            log::error!("Failed to delete broken node {}: {}", e, e);
+                        }
+                    });
+                    false
+                } else {
+                    true
+                }
+            });
+            
+            // After cleanup, it's better to restart the cycle to have a clean state.
+            log::info!("Cleanup finished. Restarting check cycle...");
+            sleep(Duration::from_secs(config.general.check_interval_seconds)).await;
+            continue;
+        }
+
         // 2. DECIDE WHETHER TO CREATE A NEW NODE
         // Only create a new node if there isn't one already being created.
         // If the total number of active nodes is less than the minimum required, we also create a new node.
@@ -124,6 +161,7 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
             } else {
                 // Keey trying to empty the node
                 rebalancer.empty_node(emptying_id);
+                // TODO: cordon the node to prevent new tasks from being assigned
             }
         } else if !is_creating_node {
             // We only delete a node if there are more nodes available
