@@ -165,7 +165,7 @@ class EDGELESSAnomalyDetectionInferer:
                 # else:
                 #     print("\n⚠️  No data available for inference")
 
-                # Delete in the future
+                ###### Delete in the future ######
                 example_df = pd.DataFrame({
                     "cpu_usage": [0.55, 0.32, 0.91],
                     "mem_usage": [0.70, 0.48, 0.85],
@@ -176,11 +176,10 @@ class EDGELESSAnomalyDetectionInferer:
                 result = self.anomaly_detector.predict(example_df.values)
                 self.display_prediction_result(result)
 
-
                 for key in ["is_anomaly", "anomaly_score"]:
                     value = result.get(key)
                     self.proxy_monitor.set_data(f"anomaly_detection:{key}", str(value) if value is not None else None)
-
+                ##################################
                 
                 # Wait for next inference period
                 elapsed = time.time() - inference_start
