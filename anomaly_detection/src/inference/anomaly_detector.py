@@ -3,11 +3,13 @@
 import logging
 import pickle
 import numpy as np
+import pandas as pd
 from typing import Any, Dict
 from datetime import datetime
 
 from config import Config
-# Me queda importar la clase con el modelo del pkl, o probar dill
+from models.random_binary_model import RandomBinaryModel
+
 
 class AnomalyDetector:    
     def __init__(self, config: Config):
@@ -21,7 +23,7 @@ class AnomalyDetector:
         try:
             with open(self.config.AD_MODEL_FILE, 'rb') as file:
                 self.model = pickle.load(file)
-            
+
             self.logger.info(f"Anomaly Detection Model loaded successfully from {self.config.AD_MODEL_FILE}")
             self.logger.info(f"Model type: {type(self.model).__name__}")
             
@@ -33,7 +35,7 @@ class AnomalyDetector:
             raise
     
 
-    def predict(self, features: np.ndarray) -> Dict[str, Any]:
+    def predict(self, features: pd.DataFrame | np.ndarray) -> Dict[str, Any]:
         """
         Perform anomaly detection on features.
         
@@ -52,22 +54,13 @@ class AnomalyDetector:
                 'timestamp': timestamp,
                 'features_shape': features.shape,
                 'is_anomaly': None,
-                'anomaly_score': None,
-                'prediction': None
+                'anomaly_score': None
             }
             
-            # Different model types have different prediction methods
             if hasattr(self.model, 'predict'):
                 prediction = self.model.predict(features)
-                result['prediction'] = prediction[0] if len(prediction) == 1 else prediction.tolist()
-                result['is_anomaly'] = prediction[0] == -1 if len(prediction) == 1 else (prediction == -1).tolist()
-            
-            if hasattr(self.model, 'decision_function'):
-                scores = self.model.decision_function(features)
-                result['anomaly_score'] = scores[0] if len(scores) == 1 else scores.tolist()
-            elif hasattr(self.model, 'score_samples'):
-                scores = self.model.score_samples(features)
-                result['anomaly_score'] = scores[0] if len(scores) == 1 else scores.tolist()
+                result['is_anomaly'] = prediction[0]
+                result['anomaly_score'] = prediction[1]
             
             return result
             

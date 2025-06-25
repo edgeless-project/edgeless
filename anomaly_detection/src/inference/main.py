@@ -14,17 +14,18 @@ from config import Config
 from proxy_monitor import ProxyMonitor
 from data_processor import DataProcessor
 from anomaly_detector import AnomalyDetector
+from models.random_binary_model import RandomBinaryModel
 
 
 class EDGELESSAnomalyDetectionInferer:    
     def __init__(self):
         self.config = Config()
         self.setup_logging()
+        os.system('cls' if os.name == 'nt' else 'clear') if self.config.CLEAN_CLI else None
         
         self.proxy_monitor = ProxyMonitor(self.config)
         self.data_processor = DataProcessor(self.config)
-        # self.anomaly_detector = AnomalyDetector(self.config)
-        
+        self.anomaly_detector = AnomalyDetector(self.config)
         self.running = True
         
         # Setup signal handlers for graceful shutdown
@@ -63,7 +64,7 @@ class EDGELESSAnomalyDetectionInferer:
             health_df (pd.DataFrame): Health metrics DataFrame
             performance_df (pd.DataFrame): Performance metrics DataFrame
         """     
-        self.logger.debug("\n" + "-"*40)
+        self.logger.debug("-"*40)
         self.logger.debug("🔍 DEBUG: MONITORED DATA")
         self.logger.debug("-"*40)
         
@@ -93,34 +94,34 @@ class EDGELESSAnomalyDetectionInferer:
         Args:
             result (Dict[str, Any]): Prediction result from ML model
         """
-        print("\n" + "="*60)
-        print("🤖 ANOMALY DETECTION RESULT")
-        print("="*60)
-        print(f"Timestamp: {result.get('timestamp', 'Unknown')}")
+        self.logger.info("="*60)
+        self.logger.info("🤖 ANOMALY DETECTION RESULT")
+        self.logger.info("="*60)
+        self.logger.info(f"Timestamp: {result.get('timestamp', 'Unknown')}")
         
         if 'error' in result:
-            print(f"❌ Error: {result['error']}")
+            self.logger.error(f"❌ Error: {result['error']}")
         else:
             is_anomaly = result.get('is_anomaly')
-            anomaly_score = result.get('anomaly_score')
-            
+            is_anomaly = result.get('anomaly_score')
+
             if is_anomaly is not None:
                 if is_anomaly:
-                    print("🚨 STATUS: ANOMALY DETECTED")
+                    self.logger.info("🚨 STATUS: ANOMALY DETECTED")
                 else:
-                    print("✅ STATUS: NORMAL")
+                    self.logger.info("✅ STATUS: NORMAL")
             
-            if anomaly_score is not None:
-                print(f"📊 Anomaly Score: {anomaly_score}")
+            if is_anomaly is not None:
+                self.logger.info(f"📊 Anomaly Score: {result['anomaly_score']}")
             
             if result.get('features_shape'):
-                print(f"📈 Features Shape: {result['features_shape']}")
-        
-        print("="*60)
+                self.logger.info(f"📈 Features Shape: {result['features_shape']}") 
+
+        self.logger.info("="*60)
     
 
     def run_inference_loop(self):
-        self.logger.info("=== Starting inference loop... ===")
+        self.logger.info("================ STARTING INFERENCE LOOP... ================")
         
         while self.running:
             try:
@@ -165,8 +166,21 @@ class EDGELESSAnomalyDetectionInferer:
                 #     print("\n⚠️  No data available for inference")
 
                 # Delete in the future
-                is_anomaly = random.randint(0, 1)
-                self.proxy_monitor.set_data("anomaly_detection:is_anomaly", str(is_anomaly))
+                example_df = pd.DataFrame({
+                    "cpu_usage": [0.55, 0.32, 0.91],
+                    "mem_usage": [0.70, 0.48, 0.85],
+                    "net_in_kbps": [120.5, 80.2, 300.1],
+                    "net_out_kbps": [115.4, 76.9, 310.2],
+                    "latency_ms": [12.3, 14.5, 19.8]
+                })
+                result = self.anomaly_detector.predict(example_df.values)
+                self.display_prediction_result(result)
+
+
+                for key in ["is_anomaly", "anomaly_score"]:
+                    value = result.get(key)
+                    self.proxy_monitor.set_data(f"anomaly_detection:{key}", str(value) if value is not None else None)
+
                 
                 # Wait for next inference period
                 elapsed = time.time() - inference_start
