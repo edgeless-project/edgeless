@@ -71,6 +71,8 @@ mem_low_percent = 20.0
 delete_cooldown_seconds = 30
 ```
 
+Please node that the `ami_id` must be set to a valid Amazon Machine Image (AMI) ID that has EDGELESS installed. You can configure your own AMI with EDGELESS or use a pre-configured one that is publicly available for the `eu-west-1` region, the AMI ID is: `ami-035085b5449b0383a` 
+
 ## AWS Credentials Configuration
 
 To interact with AWS services, you need to provide AWS credentials. Here are the recommended methods to configure these credentials securely:
