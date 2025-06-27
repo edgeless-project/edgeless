@@ -29,46 +29,46 @@ To generate the default configuration file, run the following command:
 The configuration file has the following structure:
 
 ```toml
-[General]
+[general]
 # Interval in seconds between each cluster check cycle
-CheckIntervalSeconds = 15
+check_interval_seconds = 15
 
-[Cluster]
+[cluster]
 # URL of the orchestrator's Redis proxy.
-RedisUrl = "redis://127.0.0.1:6379"
+redis_url = "redis://127.0.0.1:6379"
 # URL of the main orchestrator (used to configure new nodes)
-OrchestratorUrl = "127.0.0.1"
+orchestrator_url = "127.0.0.1"
 # Minimum number of nodes the system will attempt to keep active
-MinimumNodes = 1
+minimum_nodes = 1
 
-[CloudProvider]
-[CloudProvider.Aws]
+[cloud_provider]
+[cloud_provider.aws]
 # AWS region where instances will be created/deleted
-Region = "eu-west-1"
+region = "eu-west-1"
 # Amazon Machine Image (AMI) ID to be used for new nodes
-AmiId = "ami-xxxxxxxxxxxxxxxxx"
+ami_id = "ami-xxxxxxxxxxxxxxxxx"
 # EC2 instance type for new nodes
-InstanceType = "t2.medium"
+instance_type = "t2.medium"
 # ID of the Security Group to be assigned to new instances
-SecurityGroupId = "sg-xxxxxxxxxxxxxxxxx"
+security_group_id = "sg-xxxxxxxxxxxxxxxxx"
 
-[Scaling]
-[Scaling.Thresholds]
+[scaling]
+[scaling.thresholds]
 # --- Scale-Up Triggers ---
 # Sum of "credits" from overloaded nodes to trigger a scale-up
-CreditOverload = 1.0
+credit_overload = 1.0
 # CPU percentage above which a node is considered saturated
-CpuHighPercent = 80.0
+cpu_high_percent = 80.0
 # Memory percentage above which a node is considered saturated
-MemHighPercent = 80.0
+mem_high_percent = 80.0
 
 # --- Scale-Down Triggers ---
 # CPU percentage below which a node is considered underutilized
-CpuLowPercent = 10.0
+cpu_low_percent = 10.0
 # Memory percentage below which a node is considered underutilized
-MemLowPercent = 20.0
+mem_low_percent = 20.0
 # Time in seconds a node must remain underutilized before being deleted
-DeleteCooldownSeconds = 300
+delete_cooldown_seconds = 30
 ```
 
 ## AWS Credentials Configuration
