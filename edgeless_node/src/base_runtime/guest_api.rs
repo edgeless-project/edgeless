@@ -71,6 +71,7 @@ impl GuestAPIHost {
     }
 
     pub async fn telemetry_log(&mut self, lvl: edgeless_telemetry::telemetry_events::TelemetryLogLevel, target: &str, msg: &str) {
+        println!("executing telemetry_log: {}", msg);
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionLogEntry(lvl, target.to_string(), msg.to_string()),
             std::collections::BTreeMap::new(),

@@ -4,6 +4,7 @@
 use chrono::ParseWeekdayError;
 
 use libloading::{Library, Symbol};
+use serde_json::value::to_raw_value;
 use std::fs::File;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -94,7 +95,7 @@ impl crate::base_runtime::FunctionInstance for NativeFunctionInstance {
         unsafe {
             let set_guest_api_host_pointer: Symbol<SetGuestAPIHostPointer> = self.library.get(b"set_guest_api_host_pointer").unwrap();
             let ptr = self as *const NativeFunctionInstance as usize;
-            log::debug!("Nativer RT. Setting self pointer {:p}", ptr as *const usize); 
+            log::debug!("Native RT. Setting self pointer {:p}", ptr as *const usize); 
             set_guest_api_host_pointer(ptr as *const usize);
 
             let handle_init_fun: Symbol<HandleInitFun> = self.library.get(b"handle_init_asm").unwrap();
@@ -215,9 +216,15 @@ impl NativeFunctionInstance {
 
         let payload: &str = std::str::from_utf8(core::slice::from_raw_parts(payload_ptr, payload_len)).unwrap();
 
-        let handle = tokio::runtime::Handle::current();
-        let _ = handle.enter();
-        futures::executor::block_on(self.guest_api_host.call_raw(instance_id, payload));
+        let future = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                self.guest_api_host.call_raw(instance_id, payload).await
+            })
+        });
+
+        //let handle = tokio::runtime::Handle::current();
+        //let _ = handle.enter();
+        //futures::executor::block_on(self.guest_api_host.call_raw(instance_id, payload));
     }
 
     #[no_mangle]
@@ -233,9 +240,15 @@ impl NativeFunctionInstance {
 
         //println!("Native RT: Cast: Target: {} Payload: {}", target, payload);
         
-        let handle = tokio::runtime::Handle::current();
-        let _ = handle.enter();
-        futures::executor::block_on(self.guest_api_host.cast_alias(target, payload));
+        let future = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                self.guest_api_host.cast_alias(target, payload).await
+            })
+        });
+
+        //let handle = tokio::runtime::Handle::current();
+        //let _ = handle.enter();
+        //futures::executor::block_on(self.guest_api_host.cast_alias(target, payload));
     }
 
     #[no_mangle]
@@ -346,12 +359,13 @@ impl NativeFunctionInstance {
         let target: &str = std::str::from_utf8(core::slice::from_raw_parts(target_ptr, target_len)).unwrap();
         let msg: &str = std::str::from_utf8(core::slice::from_raw_parts(msg_ptr, msg_len)).unwrap();
 
-        log::debug!("Native RT: Log: Level: {} Target: {} msg: {}", level, target, msg);
+        log::info!("Native RT: Log: Level: {} Target: {} msg: {}", level, target, msg);
 
-        let handle = tokio::runtime::Handle::current();
-        let _ = handle.enter();
-
-        futures::executor::block_on(self.guest_api_host.telemetry_log(lvl, target, msg));
+        let future = tokio::task::block_in_place(|| { 
+            tokio::runtime::Handle::current().block_on( async {
+                self.guest_api_host.telemetry_log(lvl, target, msg).await
+            })
+        });
     }
     
     #[no_mangle]
@@ -387,9 +401,15 @@ impl NativeFunctionInstance {
         
         log::debug!("Native RT: Delayed Cast: Delay: {} Target: {} Payload: {}", delay_ms, target, payload);
         
-        let handle = tokio::runtime::Handle::current();
-        let _ = handle.enter();
-        futures::executor::block_on(self.guest_api_host.delayed_cast(delay_ms, &target, &payload));
+        let future = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on( async {
+                self.guest_api_host.delayed_cast(delay_ms, &target, &payload).await
+            })
+        });
+
+        //let handle = tokio::runtime::Handle::current();
+        //let _ = handle.enter();
+        //futures::executor::block_on(self.guest_api_host.delayed_cast(delay_ms, &target, &payload));
     }
 
     #[no_mangle]
@@ -401,8 +421,15 @@ impl NativeFunctionInstance {
         let state: &str = std::str::from_utf8(core::slice::from_raw_parts(data_ptr, data_len)).unwrap();
 
         log::debug!("Native RT: state: {}", state);
-        let handle = tokio::runtime::Handle::current();
-        let _ = handle.enter();
-        futures::executor::block_on(self.guest_api_host.sync(state));
+        
+        let future = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                self.guest_api_host.sync(state).await
+            })
+        });
+
+        //let handle = tokio::runtime::Handle::current();
+        //let _ = handle.enter();
+        //futures::executor::block_on(self.guest_api_host.sync(state));
     }
 }
