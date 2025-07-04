@@ -923,6 +923,7 @@ impl OrchestratorTask {
         proxy.update_resource_providers(&self.resource_providers);
     }
 
+    // TODO: this is the mechanism that in the baseline restarts stuff
     async fn refresh(&mut self) {
         //
         // Make sure that all active logical functions are assigned
