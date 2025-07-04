@@ -145,7 +145,6 @@ fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16
             },
             telemetry: EdgelessNodeTelemetrySettings {
                 metrics_url: next_url(false),
-                log_level: Some(String::from("info")),
                 performance_samples: false,
             },
             wasm_runtime: Some(edgeless_node::EdgelessNodeWasmRuntimeSettings { enabled: true }),
