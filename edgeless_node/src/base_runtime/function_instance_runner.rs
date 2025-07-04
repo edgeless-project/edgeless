@@ -198,11 +198,12 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
                     return self.stop().await;
                 },
                 // Receive a normal event from the dataplane and invoke the function instance
-                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message} =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, created} =  Box::pin(self.data_plane.receive_next()).fuse() => {
                     self.process_message(
                         source_id,
                         channel_id,
                         message,
+                        created
                     ).await?;
                 }
             }
@@ -214,7 +215,16 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         source_id: edgeless_api::function_instance::InstanceId,
         channel_id: u64,
         message: edgeless_dataplane::core::Message,
+        created: edgeless_api::function_instance::EventTimestamp,
     ) -> Result<(), super::FunctionInstanceError> {
+        let now = chrono::Utc::now();
+        let created = chrono::DateTime::from_timestamp(created.secs, created.nsecs).unwrap_or(chrono::DateTime::UNIX_EPOCH);
+        let elapsed = (now - created).to_std().unwrap_or(std::time::Duration::ZERO);
+        self.telemetry_handle.observe(
+            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionTransfer(elapsed),
+            std::collections::BTreeMap::new(),
+        );
+
         match message {
             edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, payload).await,
             edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, payload, channel_id).await,

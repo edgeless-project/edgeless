@@ -3,15 +3,19 @@
 
 use futures::{SinkExt, StreamExt};
 
-pub struct OllamasResourceSpec {}
+pub struct OllamaResourceSpec {}
 
-impl super::resource_provider_specs::ResourceProviderSpecs for OllamasResourceSpec {
+impl super::resource_provider_specs::ResourceProviderSpecs for OllamaResourceSpec {
     fn class_type(&self) -> String {
         String::from("ollama")
     }
 
+    fn description(&self) -> String {
+        r"Interact via an LLM ChatBot deployed on an external Ollama server -- see https://ollama.com/".to_string()
+    }
+
     fn outputs(&self) -> Vec<String> {
-        vec![String::from("new_request")]
+        vec![String::from("out")]
     }
 
     fn configurations(&self) -> std::collections::HashMap<String, String> {
@@ -19,7 +23,7 @@ impl super::resource_provider_specs::ResourceProviderSpecs for OllamasResourceSp
     }
 
     fn version(&self) -> String {
-        String::from("1.0")
+        String::from("1.1")
     }
 }
 
@@ -61,6 +65,7 @@ impl std::fmt::Display for OllamaCommand {
 pub struct OllamaResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     instances: std::collections::HashMap<edgeless_api::function_instance::ComponentId, OllamaResource>,
     sender: futures::channel::mpsc::UnboundedSender<OllamaCommand>,
     _handle: tokio::task::JoinHandle<()>,
@@ -79,18 +84,20 @@ impl Drop for OllamaResource {
 impl OllamaResource {
     /// Create a new Ollama resource.
     ///
-    /// - `resource_provider`: the resource provider.
-    /// - `dataplane_handle`: gives access to the EDGELESS dataplane.
-    /// - `model_name`: name of the AI model to use.
-    /// - `instance_id`: identifier of this resource instance.
-    /// - `sender`: channel to send commands to the resource task.
+    /// - `dataplane_provider`: handle to the EDGELESS data plane
+    /// - `telemetry_hangle`: handle to the node's telemetry sub-system
+    /// - `model_name`: name of the AI model to use
+    /// - `instance_id`: identifier of this resource instance
+    /// - `sender`: channel to send commands to the resource task
     async fn new(
         dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         model_name: String,
         instance_id: edgeless_api::function_instance::InstanceId,
         sender: futures::channel::mpsc::UnboundedSender<OllamaCommand>,
     ) -> anyhow::Result<Self> {
         let mut dataplane_handle = dataplane_handle;
+        let mut telemetry_handle = telemetry_handle;
         let mut sender = sender;
 
         let history_id = instance_id.function_id.to_string();
@@ -100,7 +107,9 @@ impl OllamaResource {
                     source_id: _,
                     channel_id: _,
                     message,
+                    created,
                 } = dataplane_handle.receive_next().await;
+                let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
 
                 // Ignore any non-cast messages.
                 let prompt = match message {
@@ -135,6 +144,8 @@ impl OllamaResource {
                         log::warn!("Communication error with ollama resource provider: {}", err)
                     }
                 }
+
+                crate::resources::observe_execution(started, &mut telemetry_handle, false);
             }
         });
 
@@ -146,14 +157,16 @@ impl OllamaResourceProvider {
     /// Create an Ollama resource provider:
     ///
     /// - `dataplane_provider`: handle to the EDGELESS data plane
+    /// - `telemetry_hangle`: handle to the node's telemetry sub-system
     /// - `resource_provider_id`: identifier of this resource provider,
-    ///    also containing the identifier of the node hosting it
+    ///   also containing the identifier of the node hosting it
     /// - `ollama_host`: address of the ollama server
     /// - `ollama_port`: port number of the ollama server
     /// - `ollama_messages_number_limit`: maximum number of messages per
-    ///    chat conversation
+    ///   chat conversation
     pub async fn new(
         dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
+        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         resource_provider_id: edgeless_api::function_instance::InstanceId,
         ollama_host: &str,
         ollama_port: u16,
@@ -206,6 +219,7 @@ impl OllamaResourceProvider {
             inner: std::sync::Arc::new(tokio::sync::Mutex::new(OllamaResourceProviderInner {
                 resource_provider_id,
                 dataplane_provider,
+                telemetry_handle,
                 instances: std::collections::HashMap::new(),
                 sender,
                 _handle,
@@ -223,6 +237,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         let mut lck = self.inner.lock().await;
         let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
         let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
+        let telemetry_handle = lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
+            "FUNCTION_ID".to_string(),
+            new_id.function_id.to_string(),
+        )]));
 
         // Read configuration
         let model = match instance_specification.configuration.get("model") {
@@ -237,7 +255,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             }
         };
 
-        match OllamaResource::new(dataplane_handle, model.to_string(), new_id, lck.sender.clone()).await {
+        match OllamaResource::new(dataplane_handle, telemetry_handle, model.to_string(), new_id, lck.sender.clone()).await {
             Ok(resource) => {
                 lck.instances.insert(new_id.function_id, resource);
                 return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));

@@ -102,7 +102,7 @@ impl CoapClient {
         }
     }
 
-    async fn call_with_reply<'a>(
+    async fn call_with_reply(
         &mut self,
         encode_request: impl Fn(u8, std::net::SocketAddrV4, &mut [u8]) -> ((&mut [u8], std::net::SocketAddrV4), &mut [u8]),
     ) -> Result<Vec<u8>, Vec<u8>> {

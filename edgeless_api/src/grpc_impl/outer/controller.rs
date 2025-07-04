@@ -9,7 +9,7 @@ pub struct ControllerAPIClient {
 impl ControllerAPIClient {
     pub async fn new(api_addr: &str) -> Self {
         Self {
-            workflow_instance_client: Box::new(crate::grpc_impl::workflow_instance::WorkflowInstanceAPIClient::new(api_addr).await),
+            workflow_instance_client: Box::new(crate::grpc_impl::inner::workflow_instance::WorkflowInstanceAPIClient::new(api_addr).await),
         }
     }
 }
@@ -28,7 +28,7 @@ impl WorkflowInstanceAPIServer {
         controller_url: String,
     ) -> futures::future::BoxFuture<'static, ()> {
         let mut controller_api = controller_api;
-        let workflow_api = crate::grpc_impl::workflow_instance::WorkflowInstanceAPIServer {
+        let workflow_api = crate::grpc_impl::inner::workflow_instance::WorkflowInstanceAPIServer {
             root_api: tokio::sync::Mutex::new(controller_api.workflow_instance_api()),
         };
         Box::pin(async move {

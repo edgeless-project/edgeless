@@ -8,7 +8,7 @@ pub struct NodeRegisterAPIClient {
 impl NodeRegisterAPIClient {
     pub async fn new(api_addr: String) -> Self {
         Self {
-            node_registration_client: Box::new(crate::grpc_impl::node_registration::NodeRegistrationClient::new(api_addr)),
+            node_registration_client: Box::new(crate::grpc_impl::inner::node_registration::NodeRegistrationClient::new(api_addr)),
         }
     }
 }
@@ -27,7 +27,7 @@ impl NodeRegisterAPIServer {
         node_register_url: String,
     ) -> futures::future::BoxFuture<'static, ()> {
         let mut agent_api = agent_api;
-        let node_registration_api = crate::grpc_impl::node_registration::NodeRegistrationAPIService {
+        let node_registration_api = crate::grpc_impl::inner::node_registration::NodeRegistrationAPIService {
             node_registration_api: tokio::sync::Mutex::new(agent_api.node_registration_api()),
         };
         Box::pin(async move {
@@ -50,7 +50,11 @@ impl NodeRegisterAPIServer {
                             log::error!("GRPC Server Failure");
                         }
                     }
+                } else {
+                    log::error!("NodeRegisterAPIServer parsing error")
                 }
+            } else {
+                log::error!("NodeRegisterAPIServer could not parse http host")
             }
 
             log::info!("Stop NodeRegisterAPIServer GRPC Server");

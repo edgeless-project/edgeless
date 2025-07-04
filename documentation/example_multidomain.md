@@ -186,6 +186,12 @@ MAP noop -> domain-7014 [logical ID 5dba5c7d-2c7f-46fd-be57-3e74b5482ed4]
 MAP noop -> domain-7000 [logical ID bcfe0ce2-6f3a-4de6-849c-23ec7d4889c6]
 ```
 
+You can migrate workflows from one domain to another, e.g.:
+
+```shell
+target/debug/edgeless_cli workflow migrate c46aa4e2-4731-4891-80fd-d1284f7a4639 domain-7014
+```
+
 ## Tearing down one orchestration domain
 
 Let us know stop all the `edgeless_inabox` in the `secondary` directory

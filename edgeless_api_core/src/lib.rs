@@ -10,6 +10,7 @@ extern crate alloc;
 
 pub mod coap_mapping;
 pub mod common;
+pub mod event_timestamp;
 pub mod instance_id;
 pub mod invocation;
 pub mod node_registration;

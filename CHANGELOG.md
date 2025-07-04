@@ -13,6 +13,24 @@ New features:
 - Add json-spec workflow type to edgeless_benchmark, which allows to create
   workflows based on a JSON template.
 - New WASM function dup: duplicates the cast payload over two output channels.
+- Add new proxy method to retrieve the domain identifier.
+- Add new telemetry metric: function transfer time, which measures the time
+  between when an event is generated and when it is handled by the intended
+  worker.
+- Add collection of execution/transfer time metrics for resources.
+- Implement persistence across restarts of active workflows in ε-CON.
+- Add CLI commands: workflow stop/inspect all, and domain inspect all.
+- Add telemetry event logs to the data transmitted by the nodes to the ε-ORC.
+- Add active power measurement to nodes from Modbus/TCP server intended for
+  Raritan PDUS.
+- Automatically add a label hostname:HOSTNAME to the node's capabilities.
+- Add a serverless resource provider, which allows a node to offer resource
+  instances that connect to an OpenFaaS-compatible function via an URL
+  specified in the node's configuration. The resource has two output channels:
+  "out" for the result of the function and "err" for functon execution errors.
+- Add ε-CON support to workflow migration to a target domain.
+- Add proxy_cli dump instances, which saves to JSON files the active
+  resource/function instances
 
 Improvements:
 
@@ -25,6 +43,13 @@ Improvements:
   IP address of the first non-loopback interface found.
 - Proxy: add methods to fetch the dependency graph and to know if some category
   of data have been updated since the last fetch.
+- Proxy: transform the performance samples and nodes' health into sorted sets
+  to keep a history of previous values in the database, with periodic garbage
+  collection done by the ε-ORC. Period duration is configurable.
+- ε-ORC: reject nodes with empty host in invocation/agent URLs.
+- Redis resource provider: add the option to read values from a Redis server.
+- Add a flag to the resource providers' section of the node's configuration
+  to prepend automatically the hostname to the resource providers' name.
 
 API changes:
 
@@ -37,6 +62,17 @@ API changes:
 - Remove unused fields:
   - ResourceInstanceSpecification::output_mapping
   - SpawnFunctionRequest::instance_id.
+- Updated the content of the Event message in FunctionInvocation to include
+  a timestamp of when the event was created.
+- Add active_power to node health status
+- Add WorkflowInstance::Migrate method, with associated messages.
+
+Removed features:
+
+- The metrics-collector resource was removed, since it is superseded by the
+  collection on nodes of `telemetry_log` events, which are then transfered to
+  ε-ORC, which makes them available via the proxy or dumps them to a dataset
+  on the local filesystem.
 
 ## [1.0.0] - 2024-11-12
 

@@ -20,6 +20,7 @@ impl DataPlaneLink for NodeLocalLink {
         target: &edgeless_api::function_instance::InstanceId,
         msg: Message,
         src: &edgeless_api::function_instance::InstanceId,
+        created: &edgeless_api::function_instance::EventTimestamp,
         stream_id: u64,
     ) -> LinkProcessingResult {
         if target.node_id == self.node_id {
@@ -38,6 +39,7 @@ impl DataPlaneLink for NodeLocalLink {
                         Message::CallNoRet => edgeless_api::invocation::EventData::CallNoRet,
                         Message::Err => edgeless_api::invocation::EventData::Err,
                     },
+                    created: *created,
                 })
                 .await
                 .unwrap();
@@ -68,6 +70,7 @@ impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
                     source_id: event.source,
                     channel_id: event.stream_id,
                     message: msg,
+                    created: event.created,
                 })
                 .await
             {
@@ -125,6 +128,7 @@ mod test {
         let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id);
         let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id);
         let fid_3 = edgeless_api::function_instance::InstanceId::new(node_id);
+        let ts = edgeless_api::function_instance::EventTimestamp::default();
 
         let provider = NodeLocalLinkProvider::new();
 
@@ -138,7 +142,7 @@ mod test {
         assert!(receiver_2.try_next().is_err());
 
         let ret_1 = handle_1
-            .handle_send(&fid_3, crate::core::Message::Cast("".to_string()), &fid_1, 0)
+            .handle_send(&fid_3, crate::core::Message::Cast("".to_string()), &fid_1, &ts, 0)
             .as_mut()
             .await;
 
@@ -147,7 +151,7 @@ mod test {
         assert!(receiver_2.try_next().is_err());
 
         let ret_2 = handle_1
-            .handle_send(&fid_2, crate::core::Message::Cast("".to_string()), &fid_1, 0)
+            .handle_send(&fid_2, crate::core::Message::Cast("".to_string()), &fid_1, &ts, 0)
             .as_mut()
             .await;
 

@@ -164,6 +164,7 @@ impl crate::invocation::InvocationAPI for EmbeddedAgent {
                         edgeless_api_core::invocation::EventData::CallNoRet => edgeless_api_core::invocation::EventData::CallNoRet,
                         edgeless_api_core::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,
                     },
+                    created: event.created,
                 };
             self.upstream_sender.send(AgentEvent::Invocation(new_event)).await;
             Ok(edgeless_api_core::invocation::LinkProcessingResult::FINAL)
@@ -197,7 +198,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         })
     }
 
-    #[allow(clippy::await_holding_refcell_ref)]
+    #[allow(clippy::await_holding_refcell_ref, clippy::needless_lifetimes)]
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
@@ -215,7 +216,7 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EmbeddedAgent {
         })
     }
 
-    #[allow(clippy::await_holding_refcell_ref)]
+    #[allow(clippy::await_holding_refcell_ref, clippy::needless_lifetimes)]
     async fn patch<'a>(
         &mut self,
         patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,

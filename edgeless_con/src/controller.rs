@@ -38,6 +38,11 @@ pub(crate) enum ControllerRequest {
         // Reply Channel
         tokio::sync::oneshot::Sender<anyhow::Result<std::collections::HashMap<String, edgeless_api::domain_registration::DomainCapabilities>>>,
     ),
+    Migrate(
+        edgeless_api::workflow_instance::MigrateWorkflowRequest,
+        // Reply Channel
+        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>,
+    ),
 }
 
 pub(crate) enum DomainRegisterRequest {
@@ -64,13 +69,18 @@ enum ComponentType {
 type Task = std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>;
 
 impl Controller {
-    pub fn new() -> (Self, Task, Task) {
+    pub fn new(persistence_filename: String) -> (Self, Task, Task) {
         let (workflow_instance_sender, workflow_instance_receiver) = futures::channel::mpsc::unbounded();
         let (domain_register_sender, domain_register_receiver) = futures::channel::mpsc::unbounded();
         let (internal_sender, internal_receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
-            let mut controller_task = controller_task::ControllerTask::new(workflow_instance_receiver, domain_register_receiver, internal_receiver);
+            let mut controller_task = controller_task::ControllerTask::new(
+                persistence_filename,
+                workflow_instance_receiver,
+                domain_register_receiver,
+                internal_receiver,
+            );
             controller_task.run().await;
         });
 

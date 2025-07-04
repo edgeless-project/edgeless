@@ -66,6 +66,13 @@ impl CommonConverters {
         })
     }
 
+    pub fn parse_event_timestamp(api_ts: &crate::grpc_impl::api::EventTimestamp) -> anyhow::Result<crate::function_instance::EventTimestamp> {
+        Ok(crate::function_instance::EventTimestamp {
+            secs: api_ts.secs,
+            nsecs: api_ts.nsecs,
+        })
+    }
+
     pub fn parse_domain_managed_instance_id(
         api_id: &crate::grpc_impl::api::DomainManagedInstanceId,
     ) -> anyhow::Result<crate::function_instance::DomainManagedInstanceId> {
@@ -76,7 +83,7 @@ impl CommonConverters {
         api_instance: &crate::grpc_impl::api::StartComponentResponse,
     ) -> anyhow::Result<crate::common::StartComponentResponse<ResourceIdType>>
     where
-        super::api::InstanceIdVariant: ParseableId<ResourceIdType>,
+        crate::grpc_impl::api::InstanceIdVariant: ParseableId<ResourceIdType>,
     {
         match api_instance.instance_id.as_ref() {
             Some(val) => match ParseableId::<ResourceIdType>::parse(val) {
@@ -120,6 +127,13 @@ impl CommonConverters {
         crate::grpc_impl::api::InstanceId {
             node_id: instance_id.node_id.to_string(),
             function_id: instance_id.function_id.to_string(),
+        }
+    }
+
+    pub fn serialize_event_timestamp(ts: &crate::function_instance::EventTimestamp) -> crate::grpc_impl::api::EventTimestamp {
+        crate::grpc_impl::api::EventTimestamp {
+            secs: ts.secs,
+            nsecs: ts.nsecs,
         }
     }
 

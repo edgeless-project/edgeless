@@ -1,0 +1,83 @@
+name: Build and Publish Docker Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      custom_tag:
+        description: 'Tag for manual build. If this field is empty, the latest Release tag will be used'
+        required: false
+  release:
+    types: [published]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: all
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.github_token }}
+
+      - name: Determine version tag
+        id: get_tag
+        run: |
+          if [ "${{ github.event_name }}" == "release" ]; then
+            echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_ENV
+          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ -z "${{ github.event.inputs.custom_tag }}" ]; then
+              echo "tag=manual-build" >> $GITHUB_ENV
+            else
+              echo "tag=${{ github.event.inputs.custom_tag }}" >> $GITHUB_ENV
+            fi
+            elif [ "${{ github.event_name }}" == "push" ]; then
+              latest_release_tag=$(curl -s https://api.github.com/repos/edgeless-project/edgeless/releases/latest | jq -r .tag_name)
+              echo "tag=${latest_release_tag}" >> $GITHUB_ENV
+          fi
+        shell: bash
+
+      - name: Build and push edgeless_con image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./edgeless_con/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/edgeless-project/edgeless_con:${{ env.tag }}
+            ghcr.io/edgeless-project/edgeless_con:latest
+
+      - name: Build and push edgeless_orc image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./edgeless_orc/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/edgeless-project/edgeless_orc:${{ env.tag }}
+            ghcr.io/edgeless-project/edgeless_orc:latest
+
+      - name: Build and push edgeless_node image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          file: ./edgeless_node/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/edgeless-project/edgeless_node:${{ env.tag }}
+            ghcr.io/edgeless-project/edgeless_node:latest
