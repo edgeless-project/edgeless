@@ -2,12 +2,18 @@ package main
 
 import (
 	"context"
+	"strconv"
 	"time"
 
 	"github.com/coatyio/dda/config"
 	"github.com/coatyio/dda/dda"
 	"github.com/coatyio/dda/services/com/api"
 )
+
+type Pair struct {
+	act   *api.ActionWithCallback
+	start *time.Time
+}
 
 func main() {
 	cfg := config.New()
@@ -33,24 +39,68 @@ func main() {
 	actions, err := inst.SubscribeAction(ctx, api.SubscriptionFilter{
 		Type: "com.actor",
 	})
+
 	if err != nil {
 		panic(err)
 	}
 
-	for act := range actions {
-		// start a new goroutine for each
-		go func() {
-			println("got an action")
+	answers := make(chan Pair)
+
+	go func() {
+		for act := range actions {
+			start := time.Now()
 			// seqNum, err := strconv.ParseInt(string(act.Params), 10, 64)
 			// if err != nil {
 			// 	panic(err)
 			// }
-			time.Sleep(40 * time.Millisecond)
-			// println("Received sensor action with seqNum:", seqNum)
-			act.Callback(api.ActionResult{
-				Context: "success",
-				Data:    []byte("ok"),
-			})
-		}()
-	}
+			timer := time.NewTimer(40 * time.Millisecond)
+			go func() {
+				<-timer.C
+				answers <- Pair{&act, &start}
+				// println("sleep," + strconv.Itoa(int(time.Since(start).Milliseconds())))
+				// println("Received sensor action with seqNum:", seqNum)
+				// println("time," + strconv.Itoa(int(time.Since(start).Milliseconds())))
+			}()
+		}
+	}()
+
+	go func() {
+		for pair := range answers {
+			go func() {
+				println("sleep," + strconv.Itoa(int(time.Since(*pair.start).Milliseconds())))
+				pair.act.Callback(api.ActionResult{
+					Context: "success",
+					Data:    []byte("ok"),
+				})
+			}()
+		}
+	}()
+
+	select {}
+
+	// 2nd attempt
+	// for {
+	// 	select {
+	// 	case act := <-actions:
+	// 		start := time.Now()
+	// 		// seqNum, err := strconv.ParseInt(string(act.Params), 10, 64)
+	// 		// if err != nil {
+	// 		// 	panic(err)
+	// 		// }
+	// 		timer := time.NewTimer(40 * time.Millisecond)
+	// 		go func() {
+	// 			<-timer.C
+	// 			answers <- Pair{&act, &start}
+	// 			// println("sleep," + strconv.Itoa(int(time.Since(start).Milliseconds())))
+	// 			// println("Received sensor action with seqNum:", seqNum)
+	// 			// println("time," + strconv.Itoa(int(time.Since(start).Milliseconds())))
+	// 		}()
+	// 	case pair := <-answers:
+	// 		println("sleep," + strconv.Itoa(int(time.Since(*pair.start).Milliseconds())))
+	// 		pair.act.Callback(api.ActionResult{
+	// 			Context: "success",
+	// 			Data:    []byte("ok"),
+	// 		})
+	// 	}
+	// }
 }

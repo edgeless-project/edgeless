@@ -51,9 +51,8 @@ services:
       - mqtt_broker
 
   actor:
+    image: actor
     container_name: actor
-    build:
-      context: ext/actor
     depends_on:
       - mqtt_broker
 

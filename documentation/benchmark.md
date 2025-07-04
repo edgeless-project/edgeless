@@ -99,7 +99,7 @@ B the fractional part in nanoseconds.
 - The field entity in the application metrics can be `f` (function) or `w`
   (workflow).
 - Check the difference between application metrics and performance samples
-  in the [orchestration documentation](./orchestration.md).
+  in the [orchestration documentation](./local_orchestration.md).
 
 
 ### Step by step example

@@ -5,6 +5,9 @@ go build -C tester
 go build -C actor
 cd ..
 
+# build the actor
+docker build -t actor --platform linux/arm64 -f ./ext/actor/Dockerfile ext/actor
+
 # build edgeless for docker containers
 cd ..
 cargo build --target=aarch64-unknown-linux-gnu --release

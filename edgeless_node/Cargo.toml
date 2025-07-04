@@ -6,7 +6,11 @@
 [package]
 name = "edgeless_node"
 version = "1.0.0"
-authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Lukasz Zalewski <zalewski.lukasz@siemens.com>", "Raphael Hetzel <hetzel@in.tum.de>" ]
+authors = [
+    "Claudio Cicconetti <c.cicconetti@iit.cnr.it>",
+    "Lukasz Zalewski <zalewski.lukasz@siemens.com>",
+    "Raphael Hetzel <hetzel@in.tum.de>",
+]
 edition = "2021"
 rust-version = "1.76"
 description = "Reference implementation of an EDGELESS node"
@@ -70,7 +74,11 @@ rdkafka = { version = "0.36.2", optional = true }
 dda = { path = "../edgeless_dda" }
 rand = "0.8.5"
 # note use sqlx 0.8.1 will inccur cargo issue
-sqlx = { version = "0.8.0", features = ["runtime-tokio-native-tls", "sqlite", "json",]}
+sqlx = { version = "0.8.0", features = [
+    "runtime-tokio-native-tls",
+    "sqlite",
+    "json",
+] }
 edgeless_function = { path = "../edgeless_function" }
 
 [build-dependencies]
