@@ -28,7 +28,7 @@ impl NodeManagementClient {
         if self.client.is_none() {
             self.client = match crate::grpc_impl::api::node_management_client::NodeManagementClient::connect(self.server_addr.clone()).await {
                 Ok(client) => {
-                    let client = client.max_decoding_message_size(usize::MAX);
+                    let mut client = client.max_decoding_message_size(usize::MAX);
                     Some(client)
                 }
                 Err(err) => anyhow::bail!(err),
