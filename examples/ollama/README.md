@@ -47,9 +47,9 @@ target/debug/edgeless_cli workflow stop $ID
 You can interact with the LLM via curl, e.g.:
 
 ```shell
-echo "how are you?" | curl -H "Host: demo.edgeless.com" -d@- http://127.0.0.1:7035/
-echo "what did I just ask" | curl -H "Host: demo.edgeless.com" -d@- http://127.0.0.1:7035/
-echo "are you sure?" | curl -H "Host: demo.edgeless.com" -d@- http://127.0.0.1:7035/
+echo "how are you?" | curl -H "Host: demo.edgeless.com" -d@- http://127.0.0.1:7008/
+echo "what did I just ask" | curl -H "Host: demo.edgeless.com" -d@- http://127.0.0.1:7008/
+echo "are you sure?" | curl -H "Host: demo.edgeless.com" -d@- http://127.0.0.1:7008/
 ```
 
 You will find three lines in the `ollama.log` file produced by the file-log

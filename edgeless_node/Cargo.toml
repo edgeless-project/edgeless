@@ -6,7 +6,11 @@
 [package]
 name = "edgeless_node"
 version = "1.0.0"
-authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Lukasz Zalewski <zalewski.lukasz@siemens.com>", "Raphael Hetzel <hetzel@in.tum.de>" ]
+authors = [
+    "Claudio Cicconetti <c.cicconetti@iit.cnr.it>",
+    "Lukasz Zalewski <zalewski.lukasz@siemens.com>",
+    "Raphael Hetzel <hetzel@in.tum.de>",
+]
 edition = "2021"
 rust-version = "1.76"
 description = "Reference implementation of an EDGELESS node"
@@ -57,8 +61,8 @@ redis = "*"
 openssl = { version = "0.10", features = ["vendored"] }
 sysinfo = "0.31.4"
 wasmi = { version = "0.31", default-features = false, optional = true }
-tonic = "0.11.0"
-prost = "0.12.6"
+tonic = "0.13.1"
+prost = "0.13"
 base64 = "0.22.1"
 # A fork is used instead of the actual crate code because Devices support is needed for Intel SGX
 # But is not implemented in the latest version of rs-docker "0.0.60"
@@ -70,9 +74,13 @@ rdkafka = { version = "0.36.2", optional = true }
 dda = { path = "../edgeless_dda" }
 rand = "0.8.5"
 # note use sqlx 0.8.1 will inccur cargo issue
-sqlx = { version = "0.8.0", features = ["runtime-tokio-native-tls", "sqlite", "json",]}
+sqlx = { version = "0.8.0", features = [
+    "runtime-tokio-native-tls",
+    "sqlite",
+    "json",
+] }
 edgeless_function = { path = "../edgeless_function" }
 tokio-modbus = "0.16.1"
 
 [build-dependencies]
-tonic-build = "0.11"
+tonic-build = {version = "0.13.1", features = ["prost"]}
