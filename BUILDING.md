@@ -1,7 +1,8 @@
 # EDGELESS building instructions
 
 The implementation relies on [Rust](https://www.rust-lang.org/).
-[gRPC](https://grpc.io/) and [protobuf](https://protobuf.dev/) are used for interprocess communication.
+[gRPC](https://grpc.io/) and [protobuf](https://protobuf.dev/) are used for
+interprocess communication.
 
 Once you have a working environment, building the core components and tools is done simply with the following command:
 
@@ -12,19 +13,21 @@ cargo build
 Below you will find instructions to create different flavors of your working environment.
 
 - [EDGELESS building instructions](#edgeless-building-instructions)
-  - [Quick start (Ubuntu 22.04/multipass VM)](#quick-start-ubuntu-2204multipass-vm)
+  - [Ubuntu 22.04/24.04](#ubuntu-22042404)
   - [Devcontainer](#devcontainer)
   - [NixOS](#nixos)
   - [Jetson Nano/Ubuntu 18.04](#jetson-nanoubuntu-1804)
   - [Mac OS](#mac-os)
 
-## Quick start (Ubuntu 22.04/multipass VM)
+## Ubuntu 22.04/24.04
 
-[Optional] You can install an Ubuntu 22.04 VM (5 cores, 8 GB RAM, 20 GB disk) very easily with [multipass](https://multipass.run/):
+Install the dependencies:
 
 ```bash
-multipass launch -n edgeless -c 5 -m 8G -d 20G 22.04
-multipass shell edgeless
+source "$HOME/.cargo/env"
+sudo apt update && sudo apt install curl git gcc libssl-dev pkg-config unzip make g++ -y
+rustup target add wasm32-unknown-unknown
+cargo install wasm-opt
 ```
 
 Install Rust (follow the interactive instructions):
@@ -33,17 +36,14 @@ Install Rust (follow the interactive instructions):
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-Install the dependencies:
+If using Ubuntu 24.04 or newer, you can install protobuf with apt:
 
 ```bash
-source "$HOME/.cargo/env"
-sudo apt update && sudo apt install gcc libssl-dev pkg-config unzip make g++ rustup protobuf-compiler libprotobuf-dev -y
-rustup target add wasm32-unknown-unknown
-cargo install wasm-opt
+sudo apt update && sudo apt install protobuf-compiler libprotobuf-dev -y
 ```
 
-If using Ubuntu 22.04 LTS or older versions, you might need to install a modern release of the Protocol Buffers binaries
-(v31.1 is the latest stable release as of 16/06/2025)
+Otherwise, with Ubuntu 22.04 or older, you must to install a modern release of the Protocol Buffers binaries
+(v31.1 is the latest stable release as of 16/06/2025).
 The available binaries in the default Ubuntu 22.04 repositories have proven to be too old for some EDGELESS crates.
 
 ```bash
@@ -56,17 +56,29 @@ sudo chmod a+x /usr/local/bin/protoc
 rm -rf protoc.zip
 ```
 
-At this point you may have to logout/login to let your shell know of the new executable, just try `protoc --version` to see if it works.
+At this point you may have to logout/login to let your shell know of the new
+executable, just try `protoc --version` to see if it works.
 
-Finally clone the repo and build the system:
+Finally clone the repo and have fun with EDGELESS:
 
 ```bash
 git clone https://github.com/edgeless-project/edgeless.git
 cd edgeless
+```
+
+To build the debug executables:
+
+```bash
 cargo build
 ```
 
-[Optional] Run the tests:
+To build the release executables:
+
+```bash
+cargo build --release
+```
+
+To run the tests:
 
 ```bash
 cargo test

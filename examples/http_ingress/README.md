@@ -15,5 +15,5 @@ target/debug/edgeless_cli workflow start examples/http_ingress/workflow.json
 and verify that it works with curl:
 
 ```
-curl -H "Host: demo.edgeless.com" -XPOST http://127.0.0.1:7035/hello
+curl -H "Host: demo.edgeless.com" -XPOST http://127.0.0.1:7008/hello
 ```
