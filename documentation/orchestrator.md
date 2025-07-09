@@ -38,7 +38,7 @@ The ε-ORC has the following interfaces, also illustrated in the diagram below:
 
 ## Proxy
 
-When used, the ε-ORC mirrors its internal data structures on the proxy.
+When used, the ε-ORC periodically pushes runtime metrics and mirrors its internal data structures to the proxy.
 
 Currently, we only support Redis, which is enabled by means of the following
 section in `orchestrator.toml`: 
@@ -49,47 +49,51 @@ proxy_type = "Redis"
 redis_url = "redis://127.0.0.1:6379"
 ```
 
-_The Redis database is flushed automatically by the ε-ORC when it starts._
+_Valkey is supported as a Redis alternative, as it shares the same functionality and default data structures. However, the `proxy_type` should still be `"Redis"`_
 
-We provide a command-line interface, called `proxy_cli`, which can be used
-as a convenient alternative to reading directly from the Redis database.
+To interact with the key-value datastore server (redis), there are three aproaches:
+- Use the `redis-cli` tool directly.
+- Use the utility script at `edgeless/scripts/redis_dump.sh`.
+- Use `proxy_cli`, a CLI tool developed for this project as a convenient alternative to reading directly from the Redis database.
 
 ### Schema
+Key-value datastores such as Redis don't follow a filesystem structure, and all keys are differenciated only by prefixes known as *namespaces* (e.g. `domain_info:domain_id`).
+Current keys are only of one of two types: STRING or SORTED_SET
 
-#### Scalars
+#### STRING keys
 
-| Key                          | Value                                                                                                                                                                                                             | Data type                              | When updated                                             |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------- |
-| domain_info:domain_id        | Identifier of the domain managed by this ε-ORC                                                                                                                                                                    | `String`                               | At service start                                         |
-| nodes:capabilities:`node_id` | JSON object representing the capabilities of the node with given node identifier                                                                                                                                  | `NodeCapabilities`                     | When a node joins the domain or updates its capabilities |
-| provider:`provider_id`       | JSON object representing the configuration of the resource provider with given identifier                                                                                                                         | `ResourceProvider`                     | When the resource provider is announced by the node      |
-| instance:`lid`               | JSON object representing an active instance with logical identifier `lid`, which can be either a function or a resource, and its currently instances (each with node identifier and physical function identifier) | `ActiveInstance`                       | When the function or resource is created or modified     |
-| dependency:`lid`             | JSON object representing the dependencies of the function with given logical identifier `lid` through a map of output channel names to logical function identifiers                                               | `HashMap<Uuid, HashMap<String, Uuid>>` | When the dependency is announced or modified             |
+| Namespace            | Key                                      | Value                                                                                              | Data Structure                             | Updated When                                                        | Example                              |
+| -------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------- | ------------------------------------ |
+| `domain_info`        | `domain_id`                              | Value **`domain_id`** of the orchestration domain's ε-ORC                                          | String                                     | ε-ORC starts                                                        | `domain-7000`                        |
+| `node:capabilities:` | `<node_UUID>` | JSON object representing the *capabilities* of a node registered in the orchestration domain                       | `NodeCapabilities` JSON object | The node joins the orchestration domain or updates its capabilities | See [data structures reference](data_structures_reference.md) |
+| `node:capabilities:` | `last_update`                            | Last update of the `node:capabilities` namespace                                                   | Unix epoch timestamp with miliseconds      | Any node joins the orchestration domain or updates its capabilities | `1750160496.85848`                   |
+| `provider:`          | `<node_hostname>-<resource_provider_id>` | JSON object with the *configuration* of a resource provider from a registered node                 | `ResourceProvider` JSON object             | The resource provider is announced by its node | See [data structures reference](data_structures_reference.md) |
+| `provider:`          | `last_update`                            | Last update of the `provider:` namespace                                                           | Unix epoch timestamp with miliseconds      | Any resource provider is announced by its node                      | `1750159583.7702973`                 |
+| `instance:`          | `<logical_UUID>` | JSON object with information about a logical function/resource instance and its physical instances | `ActiveInstance` JSON object               | The logical function/resource instance is created or modified | See [data structures reference](data_structures_reference.md) |
+| `instance:`          | `last_update`                            | Last update of the `instance:` namespace                                                           | Unix epoch timestamp with miliseconds.     | Any logical function/resource instance is created or modified       | `1750159583.7702973`                 |
+| `dependency:` | `<logical_UUID>` | JSON object with the mapping between the logical function/resource instance outputs, and the next logical instance where they should be forwarded | JSON object (`{"<output_name>":<logical_UUID>}`) | The logical function/resource instance is created or modified | `{"external_sink":"dd321cf0-e04e-4f88-9710-628cb6cc4faf"}` |
+| `dependency:`        | `last_update`                            | Last update of the `dependency:` namespace                                                         | Unix epoch timestamp with miliseconds.     | Any logical function/resource instance is created or modified       | `1750175781.717148`  |
 
-The value of the following keys are updated with a timestamp when the
-corresponding data structure is updated:
+#### SORTED_SET keys
 
-- `nodes:capabilities:last_update`
-- `provider:last_update`
-- `instance:last_update`
-- `dependency:last_update`
+The sorted set data type consists of a list of unique elements (string), with a numeric score associated to each one of them.
+These keys are used in EDGELESS for an efficient storage of system monitorization metrics, which are retrieved directly from the nodes by the ε-ORC.
 
-#### Sorted sets
+The ε-ORC assigns each element of the keys with a score corresponding to the unix epoch timestamp with miliseconds from when the values were retrieved from its node.
+Thus, sorted sets allow the rest of the edgeless components to query information of specific time ranges, reducing overheads.
 
-The values below are stored as sorted sets, with a score equal to
-the timestamp of when they have been retrieved.
-They are all updated when the node refreshes its registration with the ε-ORC.
+> NOTE: The timestamp inside the value is the same as in the element score
+> NOTE: The keys are flushed when the node refreshes its registration with the ε-ORC.
 
-| Key                                       | Element value                                                                                                                                                                         | Data type          |
-| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
-| node:health:`node_id`                     | JSON object representing the health status of the node identifier specified in the key                                                                                                | `NodeHealthStatus` |
-| performance:function_execution_time:`pid` | Execution time of the function/resource with the given `pid`, in fractional seconds, each associated with the timestamp of when the function/resource execution completed at the node | `timestamp:value`  |
-| performance:function_transfer_time:`pid`  | Transfer time of the function/resource with the given `pid`, in fractional seconds, each associated with the timestamp of when the function/resource execution began at the node      | `timestamp:value`  |
-| performance:`target`:`value`              | Custom log entries emitted by the node                                                                                                                                                | `timestamp:value`  |
+| Namespace                     | Key                                         | Element Value                                                                                                       | Data Structure                          | Example                              |
+| ----------------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------------------------------ |
+| `node:health:`                | `<node_id>`                                 | JSON object with the *health status* of a node registered in the orchestration domain                               | `NodeHealthStatus` JSON object          | See [data structures reference](data_structures_reference.md) |
+| `performance:<physical_UUID>:` | `function_execution_time`                   | One execution time of the physical function instance                                                                | String (`<timestamp>:<execution_time>`) | `1750244172.3326447:0.040153383`     |
+| `performance:<physical_UUID>:` | `function_transfer_time`                    | One transfer time of the physical function instance. Time interval between the previous and this function execution | String (`<timestamp>:<transfer_time>`)  | `1750244172.2934487:0.000496695`     |
+| `performance:<physical_UUID>:` | `<function_name>`                           | Function specific. Allows for custom logging as sent with rust's system macro `log::info!();`                       | String (`<timestamp>:<custom>>`)        | `1750265138.603922:Pinger: 'Cast' called, MSG: wakeup` |
+                                                                                                                                          | `timestamp:value`  |
 
-Old values in the sorted sets above are periodically purged from the proxy,
-with the period configured in the ε-ORC's configuration file as
-`proxy.proxy_gc_period_seconds`.
+> NOTE: Old values in the sorted sets above are periodically purged from the proxy. Purge period can be configured with variable `proxy.proxy_gc_period_seconds` in the ε-ORC's TOML configuration file.
 
 
 ##### Function execution vs. transfer time
@@ -125,9 +129,9 @@ The latter only controls local logging at the node.
 The following identifiers are represented in
 [UUID](https://en.wikipedia.org/wiki/Universally_unique_identifier) format:
 
-- node's identifier (`node_id`)
-- logical function/resource instance identifier (`lid`)
-- physical function/resource instance identifier (`pid`)
+- node's identifier (`node_UUID`)
+- logical function/resource instance identifier (`logical_UUID`)
+- physical function/resource instance identifier (`physical_UUID`)
 
 The following identifiers are represented as free-text strings:
 
@@ -165,6 +169,5 @@ The dataset files produced in `dataset/` are the following:
 
 Notes:
 
-- The timestamp format is always A.B, where A is the Unix epoch in seconds and
-B the fractional part in nanoseconds.
+- The timestamp format is always A.B, where A is the Unix epoch in seconds and B the fractional part in nanoseconds.
 - All the identifiers (node_id, logical_id, and physical_id) are UUID.
