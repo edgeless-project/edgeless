@@ -10,111 +10,11 @@ from typing import Dict, Any
 import sys
 import random  # Delete this import in the future
 
-<<<<<<< HEAD
 from config import Config
 from proxy_monitor import ProxyMonitor
 from data_processor import DataProcessor
 from anomaly_detector import AnomalyDetector
 from models.random_binary_model import RandomBinaryModel
-=======
-### Definition of environmen definition variables
-LOOP_PERIOD = 2
-REDIS_HOST = "10.95.82.180"
-REDIS_PORT = 6379
-REDIS_DB = 0
-TIME_WINDOW = 60            # metrics collected up to TIME_WINDOW seconds old
-MONITOR_NODE_HEALTH = True
-MONITOR_FUNCTION_PERFORMANCE = True
-CLEAN_CLI = True
-
-OUTPUT_WRITE_TO_CSV = True
-OUTPUT_EXPERIMENT_NAME = "mapreduce_flat"
-OUTPUT_COLUMNS = True
-
-### Columns for the pandas dataframes
-node_health_columns = [
-    "timestamp", "node_uuid", "mem_free", "mem_used", "mem_available",
-    "proc_cpu_usage", "proc_memory", "proc_vmemory",
-    "load_avg_1", "load_avg_5", "load_avg_15",
-    "tot_rx_bytes", "tot_rx_pkts", "tot_rx_errs",
-    "tot_tx_bytes", "tot_tx_pkts", "tot_tx_errs",
-    "disk_free_space", "disk_tot_reads", "disk_tot_writes",
-    "gpu_load_perc", "gpu_temp_cels"
-]
-function_performance_columns = [
-    "timestamp", "type", "duration", "physical_uuid",
-    "node_uuid", "logical_uuid", "workflow_uuid", "class_id"
-]
-
-### Aux function to extract UUIDs from a redis key
-def extract_uuid(key):
-    try:
-        return key.split(":")[-1]
-    except IndexError:
-        return None
-
-### Aux function to remove the timestamp from function performance metrics, as this information is already in the score
-def function_performance_parse(entry):
-    try:
-        _, value = map(float, entry.split(":"))
-        return value
-    except ValueError:
-        return None, None
-
-def get_functions_info(redis_client):
-    """
-    Retrieves function information from Redis and organizes it into a dictionary.
-    """
-    functions_info = {}
-
-    try:
-        if not (function_keys := redis_client.keys("instance:*")):
-            print("ERROR: No instance:* keys found. Exiting...")
-            return functions_info  # Empty dictionary
-
-        for key in function_keys:
-            logical_uuid = key.split(":")[-1]
-
-            # Skip last_update entry
-            if "last_update" in logical_uuid:
-                continue
-              
-            json_data = redis_client.get(key)
-
-            if not json_data:
-                print(f"ERROR: No data found for key {key}")
-                continue
-
-            try:
-                decoded_json = json.loads(json_data)
-            except json.JSONDecodeError:
-                print(f"ERROR: Failed to decode JSON for {key}")
-                continue
-
-            # Skip 'resource' instances
-            if "Function" not in decoded_json:
-                print(f"Skipping key {key}, does not contain 'Function'")
-                continue
-
-            original_data = decoded_json["Function"]
-            if not original_data or len(original_data) < 2:
-                print(f"ERROR: Unexpected structure in function data for key {key}")
-                continue
-
-            metadata = original_data[0]
-            instance_info = original_data[1]
-
-            if not isinstance(instance_info, list) or not instance_info:
-                print(f"ERROR: Missing instance information for key {key}")
-                continue
-
-            # Extract node_id and function_id using regex
-            match = re.search(r"node_id:\s*([\w-]+), function_id:\s*([\w-]+)", instance_info[0])
-            if not match:
-                print(f"ERROR: Failed to extract IDs from instance string: {instance_info[0]}")
-                continue
-            node_uuid, physical_uuid = match.groups()
->>>>>>> 257813b (Fix build issue)
 
 
 class EDGELESSAnomalyDetectionInferer:    
@@ -164,13 +64,8 @@ class EDGELESSAnomalyDetectionInferer:
             health_df (pd.DataFrame): Health metrics DataFrame
             performance_df (pd.DataFrame): Performance metrics DataFrame
         """     
-<<<<<<< HEAD
         self.logger.debug("-"*40)
         self.logger.debug("🔍 DEBUG: MONITORED DATA")
-=======
-        self.logger.debug("\n" + "-"*40)
-        self.logger.debug("🔍 DEBUG: MONITORED DATA"
->>>>>>> 2513474 (Progress)
         self.logger.debug("-"*40)
         
         self.logger.debug(f"Node Health Data:")
@@ -181,7 +76,6 @@ class EDGELESSAnomalyDetectionInferer:
             self.logger.debug(f"  Total records: {len(health_df)}")
             self.logger.debug(f"  Time range: {health_df['timestamp'].min()} to {health_df['timestamp'].max()}")
 
-<<<<<<< HEAD
         self.logger.debug(f"Performance Data:")
         if performance_df.empty:
             self.logger.debug("No performance data available")
@@ -191,17 +85,6 @@ class EDGELESSAnomalyDetectionInferer:
             self.logger.debug(f"  Time range: {performance_df['timestamp'].min()} to {performance_df['timestamp'].max()}")
 
         self.logger.debug("-"*40)
-=======
-        # print(f"\nPerformance Data:")
-        # if performance_df.empty:
-        #     print("  No performance data available")
-        # else:
-        #     print(f"  Unique keys: {performance_df['key'].nunique()}")
-        #     print(f"  Records: {len(performance_df)}")
-        #     print(f"  Time range: {performance_df['datetime'].min()} to {performance_df['datetime'].max()}")
-        
-        # print("-"*40)
->>>>>>> 2513474 (Progress)
 
 
     def display_prediction_result(self, result: Dict[str, Any]):
@@ -248,7 +131,6 @@ class EDGELESSAnomalyDetectionInferer:
                 self.proxy_monitor.update_data()
 
                 node_health_data = self.proxy_monitor.get_data("node_health")
-<<<<<<< HEAD
                 instance_data = self.proxy_monitor.get_data("instance")
                 performance_function_execution_time_data = self.proxy_monitor.get_data("performance_function_execution_time")
                 performance_function_transfer_time_data = self.proxy_monitor.get_data("performance_function_transfer_time")
@@ -259,21 +141,10 @@ class EDGELESSAnomalyDetectionInferer:
                 performance_df = self.data_processor.performance_data_to_dataframe(performance_function_execution_time_data, performance_function_transfer_time_data, instance_df)
                 enriched_df = self.data_processor.merge_performance_with_node_health(performance_df, node_health_df)
 
-=======
-                performance_function_execution_time_data = self.proxy_monitor.get_data("performance_function_execution_time")
-                performance_function_transfer_time_data = self.proxy_monitor.get_data("performance_function_transfer_time")
-         
-                
-                # Convert to DataFrames
-                node_health_df = self.data_processor.node_health_data_to_dataframe(node_health_data)
-                performance_df = self.data_processor.performance_data_to_dataframe(performance_function_execution_time_data, performance_function_transfer_time_data)
-                
->>>>>>> 2513474 (Progress)
                 # Display debug info if enabled
                 self.display_debug_info(node_health_df, performance_df) if self.config.DEBUG else None
                 
                 # Save to CSV if enabled
-<<<<<<< HEAD
                 self.data_processor.save_to_csv(node_health_df, "node_health_df") if self.config.OUTPUT_WRITE_TO_CSV else None
                 self.data_processor.save_to_csv(performance_df, "performance_df") if self.config.OUTPUT_WRITE_TO_CSV else None
                 self.data_processor.save_to_csv(enriched_df, "enriched_df") if self.config.OUTPUT_WRITE_TO_CSV else None
@@ -282,10 +153,6 @@ class EDGELESSAnomalyDetectionInferer:
                 self.data_processor.save_to_parquet(performance_df, "performance_df") if self.config.OUTPUT_WRITE_TO_PARQUET else None
                 self.data_processor.save_to_parquet(enriched_df, "enriched_df") if self.config.OUTPUT_WRITE_TO_PARQUET else None
 
-=======
-                self.data_processor.save_to_csv(node_health_df, performance_df) if self.config.OUTPUT_WRITE_TO_CSV else None
-                
->>>>>>> 2513474 (Progress)
                 # # Prepare features for ML model
                 # features = self.data_processor.prepare_features(node_health_df, performance_df)
                 
