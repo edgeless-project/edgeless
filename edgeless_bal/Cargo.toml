@@ -19,6 +19,9 @@ readme = "../README.md"
 name = "edgeless_bal"
 path = "src/lib.rs"
 
+[lints.clippy]
+uninlined_format_args = "allow"
+
 [[bin]]
 name = "edgeless_bal_d"
 path = "src/bin/edgeless_bal_d.rs"

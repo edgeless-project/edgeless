@@ -18,6 +18,9 @@ readme = "../README.md"
 name = "edgeless_container_function"
 path = "src/lib.rs"
 
+[lints.clippy]
+uninlined_format_args = "allow"
+
 [[bin]]
 name = "edgeless_container_function_d"
 path = "src/bin/edgeless_container_function_d.rs"

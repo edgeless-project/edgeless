@@ -15,6 +15,9 @@ license = "MIT"
 repository = "https://github.com/edgeless-project/edgeless/"
 readme = "../README.md"
 
+[lints.clippy]
+uninlined_format_args = "allow"
+
 [dependencies]
 log = { version = "0.4", default-features = false }
 env_logger = "0.10"

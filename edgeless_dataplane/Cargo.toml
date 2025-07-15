@@ -19,6 +19,9 @@ readme = "../README.md"
 name = "edgeless_dataplane"
 path = "src/lib.rs"
 
+[lints.clippy]
+uninlined_format_args = "allow"
+
 [dependencies]
 log = "0.4"
 env_logger = "0.10"

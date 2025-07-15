@@ -22,6 +22,9 @@ readme = "../README.md"
 name = "edgeless_api"
 path = "src/lib.rs"
 
+[lints.clippy]
+uninlined_format_args = "allow"
+
 [features]
 grpc_impl = [
     "dep:tokio",
