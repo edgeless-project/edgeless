@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-07-15
+
 New features:
 
 - Add ε-CON support to multiple orchestration domains.
