@@ -18,6 +18,9 @@ readme = "../README.md"
 name = "edgeless_benchmark"
 path = "src/lib.rs"
 
+[lints.clippy]
+uninlined_format_args = "allow"
+
 [[bin]]
 name = "edgeless_benchmark"
 path = "src/bin/edgeless_benchmark.rs"
