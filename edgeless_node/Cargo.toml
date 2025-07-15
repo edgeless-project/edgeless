@@ -23,6 +23,9 @@ readme = "../README.md"
 name = "edgeless_node"
 path = "src/lib.rs"
 
+[lints.clippy]
+uninlined_format_args = "allow"
+
 [[bin]]
 name = "edgeless_node_d"
 path = "src/bin/edgeless_node_d.rs"

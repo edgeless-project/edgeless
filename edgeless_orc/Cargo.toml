@@ -18,6 +18,9 @@ readme = "../README.md"
 name = "edgeless_orc"
 path = "src/lib.rs"
 
+[lints.clippy]
+uninlined_format_args = "allow"
+
 [[bin]]
 name = "edgeless_orc_d"
 path = "src/bin/edgeless_orc_d.rs"

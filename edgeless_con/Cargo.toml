@@ -19,6 +19,9 @@ readme = "../README.md"
 name = "edgeless_con"
 path = "src/lib.rs"
 
+[lints.clippy]
+uninlined_format_args = "allow"
+
 [[bin]]
 name = "edgeless_con_d"
 path = "src/bin/edgeless_con_d.rs"

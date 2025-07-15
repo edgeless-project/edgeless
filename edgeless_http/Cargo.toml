@@ -18,6 +18,9 @@ readme = "../README.md"
 name = "edgeless_http"
 path = "src/lib.rs"
 
+[lints.clippy]
+uninlined_format_args = "allow"
+
 [features]
 hyper = ["dep:hyper"]
 

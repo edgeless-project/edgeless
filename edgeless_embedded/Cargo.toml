@@ -19,6 +19,9 @@ readme = "../README.md"
 name = "edgeless_embedded"
 path = "src/lib.rs"
 
+[lints.clippy]
+uninlined_format_args = "allow"
+
 [dependencies]
 embedded-hal = "1"
 
