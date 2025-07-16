@@ -102,8 +102,7 @@ impl Default for CLiConfig {
 #[derive(serde::Deserialize, serde::Serialize, Default)]
 struct FunctionRepositoryConfig {
     pub url: String,
-    pub basic_auth_user: String,
-    pub basic_auth_pass: String,
+    pub api_key_token: String,
 }
 
 pub fn edgeless_cli_default_conf() -> String {
@@ -407,9 +406,9 @@ async fn main() -> anyhow::Result<()> {
 
                     let client = Client::new();
                     let response = client
-                        .get(function_repository_conf.url.to_string() + "/api/admin/function/" + function_name.as_str())
+                        .get(function_repository_conf.url.to_string() + "/function-repository-api/admin/function/" + function_name.as_str())
                         .header(ACCEPT, "application/json")
-                        .basic_auth(function_repository_conf.basic_auth_user, Some(function_repository_conf.basic_auth_pass))
+                        .header("Authorization", Some(function_repository_conf.api_key_token.clone()).unwrap().as_str())
                         .send()
                         .await
                         .expect("failed to get response")
@@ -436,9 +435,9 @@ async fn main() -> anyhow::Result<()> {
 
                     let client = Client::new();
                     let response = client
-                        .get(function_repository_conf.url.to_string() + "/api/admin/function/download/" + code_file_id.as_str())
+                        .get(function_repository_conf.url.to_string() + "/function-repository-api/admin/function/download/" + code_file_id.as_str())
                         .header(ACCEPT, "*/*")
-                        .basic_auth(function_repository_conf.basic_auth_user, Some(function_repository_conf.basic_auth_pass))
+                        .header("Authorization", Some(function_repository_conf.api_key_token.clone()).unwrap().as_str())
                         .send()
                         .await
                         .expect("failed to get header");
@@ -491,12 +490,9 @@ async fn main() -> anyhow::Result<()> {
                     let form = multipart::Form::new().part("file", some_file); // this is in curl -F "file"
 
                     let response = client
-                        .post(function_repository_conf.url.to_string() + "/api/admin/function/upload")
+                        .post(function_repository_conf.url.to_string() + "/function-repository-api/admin/function/upload")
                         .header(ACCEPT, "application/json")
-                        .basic_auth(
-                            function_repository_conf.basic_auth_user.clone(),
-                            Some(function_repository_conf.basic_auth_pass.clone()),
-                        )
+                        .header("Authorization", Some(function_repository_conf.api_key_token.clone()).unwrap().as_str())
                         .multipart(form)
                         .send()
                         .await
@@ -508,19 +504,24 @@ async fn main() -> anyhow::Result<()> {
                     let internal_id = &binary_name;
                     let r = serde_json::json!({
 
-                        "function_type": function_type,
+                        "function_types": [
+                            {
+                                "type": function_type,
+                                "code_file_id": json.get("id")
+                            }
+                        ],
                         "id": internal_id,
                         "version": "0.1",
-                        "code_file_id": json.get("id"), //get the id
-                        "outputs": [  "success_cb",
-                                      "failure_cb"
-                                   ],
+                        "outputs": [
+                            "success_cb",
+                            "failure_cb"
+                        ],
                     });
 
                     let post_response = client
-                        .post(function_repository_conf.url.to_string() + "/api/admin/function")
+                        .post(function_repository_conf.url.to_string() + "/function-repository-api/admin/function")
                         .header(ACCEPT, "application/json")
-                        .basic_auth(function_repository_conf.basic_auth_user, Some(function_repository_conf.basic_auth_pass))
+                        .header("Authorization", Some(function_repository_conf.api_key_token.clone()).unwrap().as_str())
                         .json(&r)
                         .send()
                         .await
