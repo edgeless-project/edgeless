@@ -7,6 +7,7 @@ mod workflow_spec;
 use cargo::GlobalContext;
 use clap::Parser;
 use edgeless_api::{outer::controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
+use tokio::time::{sleep, Duration};
 
 use mailparse::{parse_content_disposition, parse_header};
 use reqwest::header::ACCEPT;
@@ -47,7 +48,7 @@ enum FunctionCommands {
     },
     Push {
         binary_name: String,
-        function_type: String,
+        function_json: String,
     },
 }
 
@@ -102,7 +103,7 @@ impl Default for CLiConfig {
 #[derive(serde::Deserialize, serde::Serialize, Default)]
 struct FunctionRepositoryConfig {
     pub url: String,
-    pub api_key_token: String,
+    pub api_key: String,
 }
 
 pub fn edgeless_cli_default_conf() -> String {
@@ -408,7 +409,7 @@ async fn main() -> anyhow::Result<()> {
                     let response = client
                         .get(function_repository_conf.url.to_string() + "/function-repository-api/admin/function/" + function_name.as_str())
                         .header(ACCEPT, "application/json")
-                        .header("Authorization", Some(function_repository_conf.api_key_token.clone()).unwrap().as_str())
+                        .header("Authorization", "ApiKey_".to_owned() + function_repository_conf.api_key.clone().as_str())
                         .send()
                         .await
                         .expect("failed to get response")
@@ -437,7 +438,7 @@ async fn main() -> anyhow::Result<()> {
                     let response = client
                         .get(function_repository_conf.url.to_string() + "/function-repository-api/admin/function/download/" + code_file_id.as_str())
                         .header(ACCEPT, "*/*")
-                        .header("Authorization", Some(function_repository_conf.api_key_token.clone()).unwrap().as_str())
+                        .header("Authorization", "ApiKey_".to_owned() + function_repository_conf.api_key.clone().as_str())
                         .send()
                         .await
                         .expect("failed to get header");
@@ -462,7 +463,7 @@ async fn main() -> anyhow::Result<()> {
                     println!("File downloaded successfully.");
                 }
 
-                FunctionCommands::Push { binary_name, function_type } => {
+                FunctionCommands::Push { binary_name, function_json } => {
                     if std::fs::metadata(&args.config_file).is_err() {
                         return Err(anyhow::anyhow!(
                             "configuration file does not exist or cannot be accessed: {}",
@@ -478,6 +479,12 @@ async fn main() -> anyhow::Result<()> {
 
                     let client = Client::new();
                     let file = File::open(&binary_name).await?;
+                    let config_file = fs::read_to_string(&function_json)
+                        .expect("Failed to read function JSON file");
+
+                    // parse the JSON file
+                    let config_json: serde_json::Value =
+                        serde_json::from_str(&config_file).expect("JSON was not well-formatted");
 
                     // read file body stream
                     let stream = FramedRead::new(file, BytesCodec::new());
@@ -492,36 +499,35 @@ async fn main() -> anyhow::Result<()> {
                     let response = client
                         .post(function_repository_conf.url.to_string() + "/function-repository-api/admin/function/upload")
                         .header(ACCEPT, "application/json")
-                        .header("Authorization", Some(function_repository_conf.api_key_token.clone()).unwrap().as_str())
+                        .header("Authorization", "ApiKey_".to_owned() + function_repository_conf.api_key.clone().as_str())
                         .multipart(form)
                         .send()
                         .await
                         .expect("failed to get response");
 
+
                     let json = response.json::<HashMap<String, String>>().await?;
                     println!("receive code_file_id {:?}", json);
 
-                    let internal_id = &binary_name;
+                    let internal_id = config_json.get("id").unwrap_or(&serde_json::Value::Null);
                     let r = serde_json::json!({
-
                         "function_types": [
                             {
-                                "type": function_type,
-                                "code_file_id": json.get("id")
+                                "type": config_json.get("function_type").unwrap_or(&serde_json::Value::String("RUST_WASM".to_string())),
+                                "code_file_id": json.get("id").unwrap_or(&"".to_string()),
                             }
                         ],
                         "id": internal_id,
-                        "version": "0.1",
-                        "outputs": [
-                            "success_cb",
-                            "failure_cb"
-                        ],
+                        "version": config_json.get("version").unwrap_or(&serde_json::Value::String("0.1".to_string())),
+                        "outputs": config_json.get("outputs").unwrap_or(&serde_json::Value::Null),
                     });
+
+                    sleep(Duration::from_secs(1)).await;
 
                     let post_response = client
                         .post(function_repository_conf.url.to_string() + "/function-repository-api/admin/function")
                         .header(ACCEPT, "application/json")
-                        .header("Authorization", Some(function_repository_conf.api_key_token.clone()).unwrap().as_str())
+                        .header("Authorization", "ApiKey_".to_owned() + function_repository_conf.api_key.clone().as_str())
                         .json(&r)
                         .send()
                         .await
@@ -529,7 +535,15 @@ async fn main() -> anyhow::Result<()> {
                         .text()
                         .await
                         .expect("failed to get body");
-                    println!("post_response body: {:?}", post_response);
+
+                    let post_response_json: serde_json::Value = serde_json::from_str(&post_response)?;
+                    match post_response_json.get("id").and_then(|v| v.as_str()){
+                            None => {
+                                let error_msg = post_response_json.get("message").and_then(|v| v.as_str()).unwrap_or("Fatal error");
+                                eprintln!("Error: function not saved correctly. {}", error_msg);
+                            },
+                            Some(id) => println!("Function saved with id: {}", id),
+                        };
                 }
             },
             Commands::Domain { domain_command } => {
