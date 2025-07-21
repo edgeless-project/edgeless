@@ -407,7 +407,7 @@ async fn main() -> anyhow::Result<()> {
 
                     let client = Client::new();
                     let response = client
-                        .get(function_repository_conf.url.to_string() + "/function-repository-api/admin/function/" + function_name.as_str())
+                        .get(function_repository_conf.url.to_string() + "/function/" + function_name.as_str())
                         .header(ACCEPT, "application/json")
                         .header("Authorization", "ApiKey_".to_owned() + function_repository_conf.api_key.clone().as_str())
                         .send()
@@ -436,7 +436,7 @@ async fn main() -> anyhow::Result<()> {
 
                     let client = Client::new();
                     let response = client
-                        .get(function_repository_conf.url.to_string() + "/function-repository-api/admin/function/download/" + code_file_id.as_str())
+                        .get(function_repository_conf.url.to_string() + "/function/download/" + code_file_id.as_str())
                         .header(ACCEPT, "*/*")
                         .header("Authorization", "ApiKey_".to_owned() + function_repository_conf.api_key.clone().as_str())
                         .send()
@@ -495,7 +495,7 @@ async fn main() -> anyhow::Result<()> {
                     let form = multipart::Form::new().part("file", some_file); // this is in curl -F "file"
 
                     let response = client
-                        .post(function_repository_conf.url.to_string() + "/function-repository-api/admin/function/upload")
+                        .post(function_repository_conf.url.to_string() + "/function/upload")
                         .header(ACCEPT, "application/json")
                         .header("Authorization", "ApiKey_".to_owned() + function_repository_conf.api_key.clone().as_str())
                         .multipart(form)
@@ -522,7 +522,7 @@ async fn main() -> anyhow::Result<()> {
                     sleep(Duration::from_secs(1)).await;
 
                     let post_response = client
-                        .post(function_repository_conf.url.to_string() + "/function-repository-api/admin/function")
+                        .post(function_repository_conf.url.to_string() + "/function")
                         .header(ACCEPT, "application/json")
                         .header("Authorization", "ApiKey_".to_owned() + function_repository_conf.api_key.clone().as_str())
                         .json(&r)
