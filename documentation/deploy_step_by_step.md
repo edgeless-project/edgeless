@@ -171,7 +171,7 @@ The `[general]` section contains:
 - the domain name
 - the URLs exposes towards the nodes
 
-The other sections are explained in [orchestration guide](./orchestration.md).
+The other sections are explained in [orchestration guide](orchestrator.md).
 
 Then, deploy the ε-ORC:
 
@@ -306,7 +306,7 @@ and it contains:
   if any 
   - the labels assigned to this node, which can be used to force some nodes
   to be selected as candidates by the ε-ORC (see the
-  [orchestration documentation](orchestration.md) for more
+  [orchestration documentation](orchestrator.md) for more
   details)
 
 Then, deploy the node:
