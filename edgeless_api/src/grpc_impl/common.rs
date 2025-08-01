@@ -172,12 +172,34 @@ impl CommonConverters {
     }
 }
 
+impl From<&edgeless_api_core::event_metadata::EventMetadata> for crate::grpc_impl::api::EventSerializedMetadata {
+    fn from(value: &edgeless_api_core::event_metadata::EventMetadata) -> Self {
+        let _words = value.trace_id().to_bytes();
+        Self {
+            trace_id: _words.to_vec(),
+            span_id: value.span_id().to_bytes().to_vec(),
+        }
+    }
+}
+
+impl TryFrom<&crate::grpc_impl::api::EventSerializedMetadata> for edgeless_api_core::event_metadata::EventMetadata {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &crate::grpc_impl::api::EventSerializedMetadata) -> Result<Self, Self::Error> {
+        let trace_id: [u8; 16] = value.clone().trace_id.try_into().map_err(|_| anyhow::anyhow!("Mismatched length"))?;
+        let span_id: [u8; 8] = value.clone().span_id.try_into().map_err(|_| anyhow::anyhow!("Mismatched length"))?;
+        Ok(Self::from_bytes(trace_id, span_id))
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use edgeless_api_core::event_metadata::EventMetadata;
     use edgeless_api_core::instance_id::InstanceId;
 
     use super::*;
     use crate::common::PatchRequest;
+    use crate::grpc_impl::api::EventSerializedMetadata;
 
     #[test]
     fn serialize_deserialize_patch_request() {
@@ -226,6 +248,24 @@ mod tests {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }
+        }
+    }
+
+    #[test]
+    fn from_conversion_test() {
+        let inputs = vec![
+            EventMetadata::from_uints(0, 0),
+            EventMetadata::from_uints(0, 1),
+            EventMetadata::from_uints(1, 0),
+            EventMetadata::from_uints(1, 2),
+            EventMetadata::from_uints(0x42a42bdecaf00005u128, 0x42a42bdecaf00006u64),
+            EventMetadata::from_uints(std::u128::MAX, std::u64::MAX),
+        ];
+        for some_i in inputs {
+            let ser = EventSerializedMetadata::from(&some_i);
+            let some_o = EventMetadata::try_from(&ser);
+            assert!(some_o.is_ok(), "cannot be an error");
+            assert_eq!(some_i, some_o.unwrap(), "invalid identity transformation")
         }
     }
 }
