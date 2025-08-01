@@ -38,6 +38,7 @@ pub struct DelayedEventData {
     pub alias: String,
     pub msg: Vec<u8>,
     pub delay: u64,
+    pub metadata: edgeless_api_core::event_metadata::EventMetadata,
 }
 
 #[derive(Debug, Clone, PartialEq)]

@@ -19,6 +19,11 @@ impl InvocationConverters {
             stream_id: api_event.stream_id,
             data: Self::parse_api_event_data(api_event.msg.as_ref().unwrap())?,
             created: CommonConverters::parse_event_timestamp(api_event.created.as_ref().unwrap())?,
+            metadata: api_event
+                .metadata
+                .as_ref()
+                .ok_or(anyhow::anyhow!("the serialized metadata field is missing"))
+                .and_then(|x| x.try_into())?,
         })
     }
 
@@ -39,6 +44,7 @@ impl InvocationConverters {
             stream_id: crate_event.stream_id,
             msg: Some(Self::encode_crate_event_data(&crate_event.data)),
             created: Some(CommonConverters::serialize_event_timestamp(&crate_event.created)),
+            metadata: Some(crate::grpc_impl::api::EventSerializedMetadata::from(&crate_event.metadata)),
         }
     }
 
