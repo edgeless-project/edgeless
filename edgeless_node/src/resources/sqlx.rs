@@ -72,6 +72,7 @@ impl SqlxResource {
                     channel_id,
                     message,
                     created,
+                    metadata,
                 } = dataplane_handle.receive_next().await;
                 let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
 
@@ -123,6 +124,7 @@ impl SqlxResource {
                                         source_id,
                                         channel_id,
                                         edgeless_dataplane::core::CallRet::Reply(serde_json::to_string(&response).unwrap_or_default()),
+                                        &metadata,
                                     )
                                     .await;
                             }
@@ -130,7 +132,7 @@ impl SqlxResource {
                         Err(e) => {
                             log::info!("Response from database: {:?}", e.to_string());
                             dataplane_handle
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(e.to_string()))
+                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(e.to_string()), &metadata)
                                 .await;
                         }
                     }
@@ -149,7 +151,7 @@ impl SqlxResource {
                                     response.last_insert_rowid()
                                 );
                                 dataplane_handle
-                                    .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(res))
+                                    .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(res), &metadata)
                                     .await;
                             }
                         }
@@ -157,14 +159,14 @@ impl SqlxResource {
                         Err(e) => {
                             log::info!("Error from state management: {:?}", e);
                             dataplane_handle
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(e.to_string()))
+                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(e.to_string()), &metadata)
                                 .await;
                         }
                     }
                 } else {
                     log::info!("Unknow operation in state management");
                     dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
+                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err, &metadata)
                         .await;
                 };
 

@@ -315,7 +315,13 @@ impl DDAResource {
                 match target_function_id {
                     Some(target_function_id) => match dataplane_event_type.as_str() {
                         "cast" => {
-                            let _ = handle.send(target_function_id, encoded_event).await;
+                            let _ = handle
+                                .send(
+                                    target_function_id,
+                                    encoded_event,
+                                    &edgeless_api::function_instance::EventMetadata::empty_new_root(),
+                                )
+                                .await;
                         }
                         "call" => {
                             panic!("do not use calls - they will probably be removed later on");
@@ -494,6 +500,7 @@ impl DDAResource {
                     channel_id,
                     message,
                     created,
+                    metadata,
                 } = dataplane_handle.receive_next().await;
                 let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
                 let message: dda::DDA = match message {
@@ -511,7 +518,7 @@ impl DDAResource {
                 let mut handle = dataplane_handle.clone();
                 let respond = {
                     move |msg: edgeless_dataplane::core::CallRet| async move {
-                        let _ = handle.reply(source_id, channel_id, msg).await;
+                        let _ = handle.reply(source_id, channel_id, msg, &metadata).await;
                     }
                 };
 

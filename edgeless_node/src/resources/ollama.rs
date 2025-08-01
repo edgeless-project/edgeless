@@ -108,6 +108,7 @@ impl OllamaResource {
                     channel_id: _,
                     message,
                     created,
+                    metadata,
                 } = dataplane_handle.receive_next().await;
                 let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
 
@@ -134,7 +135,7 @@ impl OllamaResource {
                 match reply_receiver.await {
                     Ok(response) => match response {
                         Ok((target, response)) => {
-                            let _ = dataplane_handle.send(target, response).await;
+                            let _ = dataplane_handle.send(target, response, &metadata).await;
                         }
                         Err(err) => {
                             log::warn!("Error from ollama: {}", err)

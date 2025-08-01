@@ -101,7 +101,10 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                         .collect(),
                 };
                 let serialized_msg = serde_json::to_string(&msg)?;
-                let res = lck.dataplane.call(target, serialized_msg).await;
+                let res = lck
+                    .dataplane
+                    .call(target, serialized_msg, &edgeless_api::function_instance::EventMetadata::empty_new_root())
+                    .await;
                 if let edgeless_dataplane::core::CallRet::Reply(data) = res {
                     let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_str(&data)?;
                     let mut response_builder = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from(
