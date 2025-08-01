@@ -303,7 +303,9 @@ async fn is_telemetry_event_invocation_complete(receiver: &mut TelemetryReceiver
 #[tokio::test]
 async fn messaging_cast_raw_input() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
-    test_peer_handle.send(instance_id, "some_message".to_string()).await;
+    let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00026u128, 0x42a42bdecaf00027u64);
+
+    test_peer_handle.send(instance_id, "some_message".to_string(), &metad_1).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -317,8 +319,9 @@ async fn messaging_cast_raw_input() {
 #[tokio::test]
 async fn messaging_cast_raw_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
+    let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00028u128, 0x42a42bdecaf00029u64);
 
-    test_peer_handle.send(instance_id, "test_cast_raw_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_cast_raw_output".to_string(), &metad_1).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -331,14 +334,16 @@ async fn messaging_cast_raw_output() {
         test_message.message,
         edgeless_dataplane::core::Message::Cast("cast_raw_output".to_string())
     );
+    assert_eq!(metad_1, test_message.metadata);
 }
 
 // test output: call
 #[tokio::test]
 async fn messaging_call_raw_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
+    let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf0002au128, 0x42a42bdecaf0002bu64);
 
-    test_peer_handle.send(instance_id, "test_call_raw_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_call_raw_output".to_string(), &metad_1).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -352,9 +357,10 @@ async fn messaging_call_raw_output() {
         test_message.message,
         edgeless_dataplane::core::Message::Call("call_raw_output".to_string())
     );
+    assert_eq!(&metad_1, &test_message.metadata);
 
     test_peer_handle
-        .reply(test_message.source_id, test_message.channel_id, CallRet::NoReply)
+        .reply(test_message.source_id, test_message.channel_id, CallRet::NoReply, &test_message.metadata)
         .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -367,8 +373,9 @@ async fn messaging_call_raw_output() {
 async fn messaging_delayed_cast_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
+    let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf0002cu128, 0x42a42bdecaf0002du64);
 
-    test_peer_handle.send(instance_id, "test_delayed_cast_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_delayed_cast_output".to_string(), &metad_1).await;
     let start = tokio::time::Instant::now();
 
     let test_message = next_handle.receive_next().await;
@@ -379,6 +386,7 @@ async fn messaging_delayed_cast_output() {
         test_message.message,
         edgeless_dataplane::core::Message::Cast("delayed_cast_output".to_string())
     );
+    assert_eq!(&metad_1, &test_message.metadata);
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
@@ -392,8 +400,9 @@ async fn messaging_delayed_cast_output() {
 async fn messaging_cast_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
+    let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf0001fu128, 0x42a42bdecaf0002eu64);
 
-    test_peer_handle.send(instance_id, "test_cast_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_cast_output".to_string(), &metad_1).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -403,6 +412,7 @@ async fn messaging_cast_output() {
     let test_message = next_handle.receive_next().await;
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(test_message.message, edgeless_dataplane::core::Message::Cast("cast_output".to_string()));
+    assert_eq!(metad_1, test_message.metadata);
 }
 
 // test output: call
@@ -410,8 +420,9 @@ async fn messaging_cast_output() {
 async fn messaging_call_output() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
+    let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00030u128, 0x42a42bdecaf00031u64);
 
-    test_peer_handle.send(instance_id, "test_call_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_call_output".to_string(), &metad_1).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -422,8 +433,11 @@ async fn messaging_call_output() {
     let test_message = next_handle.receive_next().await;
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(test_message.message, edgeless_dataplane::core::Message::Call("call_output".to_string()));
+    assert_eq!(&metad_1, &test_message.metadata);
 
-    next_handle.reply(test_message.source_id, test_message.channel_id, CallRet::NoReply).await;
+    next_handle
+        .reply(test_message.source_id, test_message.channel_id, CallRet::NoReply, &test_message.metadata)
+        .await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_invocation_complete(&mut telemetry_mock_receiver).await);
@@ -435,8 +449,9 @@ async fn messaging_call_output() {
 async fn function_in_call_can_be_stopped() {
     let (mut client, instance_id, mut test_peer_handle, _test_peer_fid, mut next_handle, _next_fid, mut telemetry_mock_receiver) =
         messaging_test_setup().await;
+    let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00032u128, 0x42a42bdecaf00033u64);
 
-    test_peer_handle.send(instance_id, "test_call_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_call_output".to_string(), &metad_1).await;
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -447,6 +462,7 @@ async fn function_in_call_can_be_stopped() {
     let test_message = next_handle.receive_next().await;
     assert_eq!(test_message.source_id, instance_id);
     assert_eq!(test_message.message, edgeless_dataplane::core::Message::Call("call_output".to_string()));
+    assert_eq!(&metad_1, &test_message.metadata);
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
@@ -460,8 +476,9 @@ async fn function_in_call_can_be_stopped() {
 #[tokio::test]
 async fn messaging_call_raw_input_noreply() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
+    let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00034u128, 0x42a42bdecaf00035u64);
 
-    let ret = test_peer_handle.call(instance_id, "some_cast".to_string()).await;
+    let ret = test_peer_handle.call(instance_id, "some_cast".to_string(), &metad_1).await;
     assert_eq!(ret, CallRet::NoReply);
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -473,8 +490,9 @@ async fn messaging_call_raw_input_noreply() {
 #[tokio::test]
 async fn messaging_call_raw_input_reply() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
+    let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00036u128, 0x42a42bdecaf00037u64);
 
-    let ret = test_peer_handle.call(instance_id, "test_ret".to_string()).await;
+    let ret = test_peer_handle.call(instance_id, "test_ret".to_string(), &metad_1).await;
     assert_eq!(ret, CallRet::Reply("test_reply".to_string()));
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -486,8 +504,9 @@ async fn messaging_call_raw_input_reply() {
 #[tokio::test]
 async fn messaging_call_raw_input_err() {
     let (_, instance_id, mut test_peer_handle, _test_peer_fid, _next_handle, _next_fid, mut telemetry_mock_receiver) = messaging_test_setup().await;
+    let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00038u128, 0x42a42bdecaf00039u64);
 
-    let ret = test_peer_handle.call(instance_id, "test_err".to_string()).await;
+    let ret = test_peer_handle.call(instance_id, "test_err".to_string(), &metad_1).await;
     assert_eq!(ret, CallRet::Err);
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
@@ -500,6 +519,7 @@ async fn state_management() {
     let node_id = uuid::Uuid::new_v4();
     let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
     let instance_id_another = edgeless_api::function_instance::InstanceId::new(node_id);
+    let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf0003bu128, 0x42a42bdecaf0003au64);
 
     let output_mocks = std::sync::Arc::new(tokio::sync::Mutex::new(std::collections::HashMap::new()));
     let (state_mock_sender, mut state_mock_receiver) = futures::channel::mpsc::unbounded::<(uuid::Uuid, String)>();
@@ -569,7 +589,7 @@ async fn state_management() {
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
     // trigger sync
-    test_peer_handle.send(instance_id, "test_cast_raw_output".to_string()).await;
+    test_peer_handle.send(instance_id, "test_cast_raw_output".to_string(), &metad_1).await;
     tokio::time::sleep(Duration::from_millis(100)).await;
 
     let (state_set_id, state_set_value) = state_mock_receiver.try_next().unwrap().unwrap();
