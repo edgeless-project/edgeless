@@ -3,7 +3,8 @@
 // SPDX-FileCopyrightText: © 2024 Siemens AG
 // SPDX-License-Identifier: MIT
 use futures::{FutureExt, SinkExt};
-use std::marker::PhantomData;
+use std::{marker::PhantomData, sync::Arc};
+use tokio::sync::Mutex;
 
 use super::{FunctionInstance, FunctionInstanceError};
 
@@ -33,6 +34,7 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
     init_payload: Option<String>,
     runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
     instance_id: edgeless_api::function_instance::InstanceId,
+    event_metadata: Arc<Mutex<Option<edgeless_api::function_instance::EventMetadata>>>,
 }
 
 impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInstanceType> {
@@ -53,6 +55,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         let (poison_pill_sender, poison_pill_receiver) = tokio::sync::broadcast::channel::<()>(1);
         let serialized_state = state_handle.get().await;
 
+        let shared_ev_mt = Arc::new(Mutex::new(None));
+
         let guest_api_host = crate::base_runtime::guest_api::GuestAPIHost {
             instance_id,
             data_plane: data_plane.clone(),
@@ -60,6 +64,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
             state_handle,
             telemetry_handle: telemetry_handle.fork(std::collections::BTreeMap::new()),
             poison_pill_receiver: poison_pill_sender.subscribe(),
+            event_metadata: shared_ev_mt.clone(),
         };
 
         let task = Box::new(
@@ -74,6 +79,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
                 spawn_req.annotations.get("init-payload").cloned(),
                 runtime_api,
                 instance_id,
+                shared_ev_mt,
             )
             .await,
         );
@@ -117,6 +123,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         init_param: Option<String>,
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
         instance_id: edgeless_api::function_instance::InstanceId,
+        event_metadata: Arc<Mutex<Option<edgeless_api::function_instance::EventMetadata>>>,
     ) -> Self {
         Self {
             poison_pill_receiver,
@@ -130,6 +137,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             init_payload: init_param,
             runtime_api,
             instance_id,
+            event_metadata,
         }
     }
 
@@ -198,12 +206,13 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
                     return self.stop().await;
                 },
                 // Receive a normal event from the dataplane and invoke the function instance
-                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, created} =  Box::pin(self.data_plane.receive_next()).fuse() => {
+                edgeless_dataplane::core::DataplaneEvent{source_id, channel_id, message, created, metadata} =  Box::pin(self.data_plane.receive_next()).fuse() => {
                     self.process_message(
                         source_id,
                         channel_id,
                         message,
-                        created
+                        created,
+                        &metadata,
                     ).await?;
                 }
             }
@@ -216,6 +225,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         channel_id: u64,
         message: edgeless_dataplane::core::Message,
         created: edgeless_api::function_instance::EventTimestamp,
+        metadata: &edgeless_api::function_instance::EventMetadata,
     ) -> Result<(), super::FunctionInstanceError> {
         let now = chrono::Utc::now();
         let created = chrono::DateTime::from_timestamp(created.secs, created.nsecs).unwrap_or(chrono::DateTime::UNIX_EPOCH);
@@ -226,8 +236,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         );
 
         match message {
-            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, payload).await,
-            edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, payload, channel_id).await,
+            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, payload, metadata).await,
+            edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, payload, channel_id, metadata).await,
             _ => {
                 log::debug!("Unprocessed Message");
                 Ok(())
@@ -239,8 +249,14 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         &mut self,
         source_id: edgeless_api::function_instance::InstanceId,
         payload: String,
+        metadata: &edgeless_api::function_instance::EventMetadata,
     ) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
+
+        {
+            let mut locked_shared_metadata = self.event_metadata.lock().await;
+            *locked_shared_metadata = Some(metadata.clone())
+        }
 
         self.function_instance
             .as_mut()
@@ -260,8 +276,14 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         source_id: edgeless_api::function_instance::InstanceId,
         payload: String,
         channel_id: u64,
+        metadata: &edgeless_api::function_instance::EventMetadata,
     ) -> Result<(), super::FunctionInstanceError> {
         let start = tokio::time::Instant::now();
+
+        {
+            let mut locked_shared_metadata = self.event_metadata.lock().await;
+            *locked_shared_metadata = Some(metadata.clone())
+        }
 
         let res = self
             .function_instance
@@ -276,7 +298,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         );
 
         let mut wh = self.data_plane.clone();
-        wh.reply(source_id, channel_id, res).await;
+        wh.reply(source_id, channel_id, res, metadata).await;
         Ok(())
     }
 
