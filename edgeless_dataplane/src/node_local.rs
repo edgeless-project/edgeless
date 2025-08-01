@@ -22,6 +22,7 @@ impl DataPlaneLink for NodeLocalLink {
         src: &edgeless_api::function_instance::InstanceId,
         created: &edgeless_api::function_instance::EventTimestamp,
         stream_id: u64,
+        metadata: &edgeless_api::function_instance::EventMetadata,
     ) -> LinkProcessingResult {
         if target.node_id == self.node_id {
             return self
@@ -40,6 +41,7 @@ impl DataPlaneLink for NodeLocalLink {
                         Message::Err => edgeless_api::invocation::EventData::Err,
                     },
                     created: *created,
+                    metadata: metadata.clone(),
                 })
                 .await
                 .unwrap();
@@ -71,6 +73,7 @@ impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
                     channel_id: event.stream_id,
                     message: msg,
                     created: event.created,
+                    metadata: event.metadata,
                 })
                 .await
             {
@@ -129,6 +132,7 @@ mod test {
         let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id);
         let fid_3 = edgeless_api::function_instance::InstanceId::new(node_id);
         let ts = edgeless_api::function_instance::EventTimestamp::default();
+        let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00017u128, 0x42a42bdecaf00018u64);
 
         let provider = NodeLocalLinkProvider::new();
 
@@ -142,7 +146,7 @@ mod test {
         assert!(receiver_2.try_next().is_err());
 
         let ret_1 = handle_1
-            .handle_send(&fid_3, crate::core::Message::Cast("".to_string()), &fid_1, &ts, 0)
+            .handle_send(&fid_3, crate::core::Message::Cast("".to_string()), &fid_1, &ts, 0, &metad_1)
             .as_mut()
             .await;
 
@@ -151,12 +155,18 @@ mod test {
         assert!(receiver_2.try_next().is_err());
 
         let ret_2 = handle_1
-            .handle_send(&fid_2, crate::core::Message::Cast("".to_string()), &fid_1, &ts, 0)
+            .handle_send(&fid_2, crate::core::Message::Cast("".to_string()), &fid_1, &ts, 0, &metad_1)
             .as_mut()
             .await;
 
         assert_eq!(ret_2, crate::core::LinkProcessingResult::FINAL);
         assert!(receiver_1.try_next().is_err());
-        assert!(receiver_2.try_next().unwrap().is_some());
+        let result = {
+            let tmp = receiver_2.try_next();
+            assert!(tmp.is_ok());
+            assert!(tmp.as_ref().unwrap().is_some());
+            tmp.unwrap().unwrap()
+        };
+        assert_eq!(metad_1, result.metadata)
     }
 }
