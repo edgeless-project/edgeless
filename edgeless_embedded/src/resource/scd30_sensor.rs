@@ -155,7 +155,14 @@ pub async fn scd30_sensor_task(
             )
             .is_ok()
             {
-                dataplane_handle.send(instance_id, data_out_id, buffer.as_str()).await;
+                dataplane_handle
+                    .send(
+                        instance_id,
+                        data_out_id,
+                        buffer.as_str(),
+                        &edgeless_api_core::event_metadata::EventMetadata::from_uints(0x42a42bdecaf0000du128, 0x42a42bdecaf0000eu64),
+                    )
+                    .await;
             }
         }
     }
