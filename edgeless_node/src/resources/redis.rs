@@ -110,6 +110,7 @@ impl RedisResource {
                     channel_id,
                     message,
                     created,
+                    metadata,
                 } = dataplane_handle.receive_next().await;
                 let started = crate::resources::observe_transfer(created, &mut telemetry_handle);
 
@@ -127,13 +128,13 @@ impl RedisResource {
                     match connection.get::<&str, std::string::String>(&redis_key) {
                         Ok(res) => {
                             dataplane_handle
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(res))
+                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(res), &metadata)
                                 .await
                         }
                         Err(err) => {
                             log::error!("Could not get key '{}' from redis resource: {}", redis_key, err);
                             dataplane_handle
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err)
+                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err, &metadata)
                                 .await
                         }
                     };
