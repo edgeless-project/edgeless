@@ -27,6 +27,8 @@ pub struct Event<T> {
     pub data: EventData<T>,
     #[n(4)]
     pub created: crate::event_timestamp::EventTimestamp,
+    #[n(5)]
+    pub metadata: crate::event_metadata::EventMetadata,
 }
 
 #[derive(Debug, PartialEq, Eq)]

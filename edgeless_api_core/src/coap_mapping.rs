@@ -27,6 +27,7 @@ impl COAPEncoder {
                 crate::invocation::EventData::Err => crate::invocation::EventData::Err,
             },
             created: event.created,
+            metadata: event.metadata.clone(),
         };
         minicbor::encode(&new_event, &mut buffer[..]).unwrap();
         let len = minicbor::len(&event);
@@ -257,6 +258,7 @@ impl CoapDecoder {
                         crate::invocation::EventData::Err => crate::invocation::EventData::Err,
                     },
                     created: event.created,
+                    metadata: event.metadata,
                 };
                 Ok((CoapMessage::Invocation(new_event), packet.get_token()[0]))
             }
