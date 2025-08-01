@@ -116,7 +116,14 @@ pub async fn mock_sensor_task(
         };
         if let (Some(instance_id), Some(data_out_id)) = (instance_id, data_out_id) {
             log::info!("Sensor send!");
-            dataplane_handle.send(instance_id, data_out_id, "800.12345;50.12345;20.12345").await;
+            dataplane_handle
+                .send(
+                    instance_id,
+                    data_out_id,
+                    "800.12345;50.12345;20.12345",
+                    &edgeless_api_core::event_metadata::EventMetadata::from_uints(0x42a42bdecaf0000bu128, 0x42a42bdecaf0000cu64),
+                )
+                .await;
         }
         embassy_time::Timer::after(embassy_time::Duration::from_secs(delay as u64)).await;
     }

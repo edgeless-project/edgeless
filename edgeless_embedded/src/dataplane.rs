@@ -15,6 +15,7 @@ impl EmbeddedDataplaneHandle {
         target: edgeless_api_core::instance_id::InstanceId,
         msg: &str,
         // created: edgeless_api_core::event_timestamp::EventTimestamp,
+        metadata: &edgeless_api_core::event_metadata::EventMetadata,
     ) {
         let event = edgeless_api_core::invocation::Event::<&[u8]> {
             target,
@@ -22,6 +23,7 @@ impl EmbeddedDataplaneHandle {
             stream_id: 0,
             data: edgeless_api_core::invocation::EventData::Cast(msg.as_bytes()),
             created: edgeless_api_core::event_timestamp::EventTimestamp::default(),
+            metadata: metadata.clone(),
         };
         self.reg.handle(event).await.unwrap();
     }
