@@ -384,6 +384,7 @@ async fn main() -> anyhow::Result<()> {
                             _ => return Err(anyhow::anyhow!("invalid event type: {}", event_type)),
                         },
                         created: edgeless_api::function_instance::EventTimestamp::default(),
+                        metadata: edgeless_api::function_instance::EventMetadata::empty_new_root(),
                     };
                     match edgeless_api::invocation::InvocationAPI::handle(&mut client, event).await {
                         Ok(_) => println!("event casted"),
