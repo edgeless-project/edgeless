@@ -285,6 +285,10 @@ fn parse_delayed_event_data(api_instance: &crate::grpc_impl::api::DelayedEventDa
         delay: api_instance.delay,
         alias: api_instance.alias.clone(),
         msg: api_instance.msg.clone(),
+        metadata: match &api_instance.metadata {
+            Some(metadata) => metadata.try_into()?,
+            None => return Err(anyhow::anyhow!("the serialized metadata field is missing")),
+        },
     })
 }
 
@@ -338,6 +342,7 @@ fn serialize_delayed_event_data(event: &crate::guest_api_host::DelayedEventData)
         delay: event.delay,
         alias: event.alias.clone(),
         msg: event.msg.clone(),
+        metadata: Some(crate::grpc_impl::api::EventSerializedMetadata::from(&event.metadata)),
     }
 }
 
@@ -442,12 +447,14 @@ mod test {
                 delay: 0_u64,
                 alias: "".to_string(),
                 msg: vec![],
+                metadata: edgeless_api_core::event_metadata::EventMetadata::from_uints(0x42a42bdecaf00007u128, 0x42a42bdecaf00008u64),
             },
             DelayedEventData {
                 originator: edgeless_api_core::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
                 delay: 42_u64,
                 alias: "my-fun".to_string(),
                 msg: vec![0, 42, 0, 42, 99],
+                metadata: edgeless_api_core::event_metadata::EventMetadata::from_uints(0x42a42bdecaf00009u128, 0x42a42bdecaf0000au64),
             },
         ];
         for msg in messages {
