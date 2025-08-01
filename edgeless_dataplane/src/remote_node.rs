@@ -21,6 +21,7 @@ impl DataPlaneLink for RemoteLink {
         src: &edgeless_api::function_instance::InstanceId,
         created: &edgeless_api::function_instance::EventTimestamp,
         stream_id: u64,
+        metadata: &edgeless_api::function_instance::EventMetadata,
     ) -> LinkProcessingResult {
         return self
             .remotes
@@ -38,6 +39,7 @@ impl DataPlaneLink for RemoteLink {
                     Message::Err => edgeless_api::invocation::EventData::Err,
                 },
                 created: *created,
+                metadata: metadata.clone(),
             })
             .await
             .unwrap();
@@ -160,6 +162,7 @@ mod test {
             stream_id: 0,
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
             created: created.clone(),
+            metadata: edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00015u128, 0x42a42bdecaf00016u64),
         })
         .await
         .unwrap();
@@ -173,23 +176,29 @@ mod test {
                 stream_id: 0,
                 data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
                 created: created.clone(),
+                metadata: edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00013u128, 0x42a42bdecaf00014u64),
             })
             .await
             .is_err());
 
         assert!(receiver_1.try_next().is_err());
 
+        let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00011u128, 0x42a42bdecaf00012u64);
         api.handle(edgeless_api::invocation::Event {
             target: fid_target,
             source: fid_source,
             stream_id: 0,
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
             created: created.clone(),
+            metadata: metad_1.clone(),
         })
         .await
         .unwrap();
 
-        assert!(receiver_1.try_next().unwrap().is_some());
+        let result = receiver_1.try_next();
+        assert!(result.as_ref().is_ok_and(|o| o.is_some()));
+        let result = result.unwrap().unwrap();
+        assert_eq!(&metad_1, &result.metadata)
     }
 
     struct MockInvocationAPI {
@@ -216,6 +225,7 @@ mod test {
         let node_id_2 = uuid::Uuid::new_v4();
         let node_id_3 = uuid::Uuid::new_v4();
         let fid_source = edgeless_api::function_instance::InstanceId::new(node_id);
+        let metad_source = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf0000fu128, 0x42a42bdecaf00010u64);
 
         let fid_target = edgeless_api::function_instance::InstanceId::new(node_id_2);
         let fid_wrong_component_id = edgeless_api::function_instance::InstanceId::new(node_id_2);
@@ -238,25 +248,39 @@ mod test {
         let mut link = provider.new_link(fid_source, sender_1).await;
 
         let res = link
-            .handle_send(&fid_target, Message::Cast("Test".to_string()), &fid_source, &created, 0)
+            .handle_send(&fid_target, Message::Cast("Test".to_string()), &fid_source, &created, 0, &metad_source)
             .await;
         assert_eq!(res, LinkProcessingResult::FINAL);
         assert!(api_receiver_node_2.try_next().unwrap().is_some());
 
         let res = link
-            .handle_send(&fid_wrong_component_id, Message::Cast("Test".to_string()), &fid_source, &created, 0)
+            .handle_send(
+                &fid_wrong_component_id,
+                Message::Cast("Test".to_string()),
+                &fid_source,
+                &created,
+                0,
+                &metad_source,
+            )
             .await;
         assert_eq!(res, LinkProcessingResult::FINAL);
         assert!(api_receiver_node_2.try_next().unwrap().is_some());
 
         let res = link
-            .handle_send(&fid_wrong_node_id, Message::Cast("Test".to_string()), &fid_source, &created, 0)
+            .handle_send(
+                &fid_wrong_node_id,
+                Message::Cast("Test".to_string()),
+                &fid_source,
+                &created,
+                0,
+                &metad_source,
+            )
             .await;
         assert_eq!(res, LinkProcessingResult::PASSED);
         assert!(api_receiver_node_2.try_next().is_err());
 
         let res = link
-            .handle_send(&fid_target, Message::Cast("Test".to_string()), &fid_source, &created, 0)
+            .handle_send(&fid_target, Message::Cast("Test".to_string()), &fid_source, &created, 0, &metad_source)
             .await;
         assert_eq!(res, LinkProcessingResult::FINAL);
         assert!(api_receiver_node_2.try_next().unwrap().is_some());
