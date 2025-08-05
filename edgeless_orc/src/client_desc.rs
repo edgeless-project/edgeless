@@ -6,6 +6,7 @@ pub struct ClientDesc {
     pub invocation_url: String,
     pub api: Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
     pub capabilities: edgeless_api::node_registration::NodeCapabilities,
+    pub cordoned: bool,
 }
 
 impl ClientDesc {
@@ -39,6 +40,7 @@ impl ClientDesc {
                 }
             },
             capabilities: request.capabilities.clone(),
+            cordoned: false,
         })
     }
 
