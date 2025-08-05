@@ -68,7 +68,9 @@ enum ShowCommands {
 
 #[derive(Debug, clap::Subcommand)]
 enum IntentCommands {
-    Migrate { instance: String, node: String },
+    Migrate { instance: String, node_id: String },
+    Cordon { node_id: String },
+    Uncordon { node_id: String },
 }
 
 #[derive(Debug, clap::Subcommand)]
@@ -180,16 +182,30 @@ fn main() -> anyhow::Result<()> {
             },
         },
         Commands::Intent { intent_command } => match intent_command {
-            IntentCommands::Migrate { instance, node } => {
+            IntentCommands::Migrate { instance, node_id } => {
                 let instance_id = match uuid::Uuid::from_str(&instance) {
                     Ok(instance_id) => instance_id,
                     Err(err) => anyhow::bail!("invalid instance id {}: {}", instance, err),
                 };
-                let node_id = match uuid::Uuid::from_str(&node) {
+                let node_id = match uuid::Uuid::from_str(&node_id) {
                     Ok(node_id) => node_id,
-                    Err(err) => anyhow::bail!("invalid instance id {}: {}", node, err),
+                    Err(err) => anyhow::bail!("invalid node id {}: {}", node_id, err),
                 };
                 proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Migrate(instance_id, vec![node_id])]);
+            }
+            IntentCommands::Cordon { node_id } => {
+                let node_id = match uuid::Uuid::from_str(&node_id) {
+                    Ok(node_id) => node_id,
+                    Err(err) => anyhow::bail!("invalid node id {}: {}", node_id, err),
+                };
+                proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Cordon(node_id)]);
+            }
+            IntentCommands::Uncordon { node_id } => {
+                let node_id = match uuid::Uuid::from_str(&node_id) {
+                    Ok(node_id) => node_id,
+                    Err(err) => anyhow::bail!("invalid node id {}: {}", node_id, err),
+                };
+                proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Uncordon(node_id)]);
             }
         },
         Commands::Dump { dump_command } => match dump_command {

@@ -170,6 +170,7 @@ fn create_clients_resources(
                 sender: mock_node_sender,
             }) as Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
             capabilities,
+            cordoned: false,
         };
 
         let mut resources = vec![];
@@ -1327,6 +1328,7 @@ async fn test_orc_recreate_fun_after_disconnect() {
                     sender: mock_node_sender,
                 }) as Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
                 capabilities,
+                cordoned: false,
             },
             vec![],
         ))
@@ -1666,6 +1668,7 @@ async fn test_orc_invalid_migration() {
                 sender: mock_node_sender,
             }) as Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
             capabilities,
+            cordoned: false,
         };
 
         let mut resources = vec![];
