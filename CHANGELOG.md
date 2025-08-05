@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+New features:
+
+- Add intent to cordon/uncordon nodes at an ε-ORC. When a node is cordoned, new functions/resources are not assigned to it, irrespective of the orchestrator's policy and deployment constraints. Cordoning can be realized via `proxy_cli`.
+
 ## [1.1.0] - 2025-07-15
 
 New features:

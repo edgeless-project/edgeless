@@ -402,10 +402,15 @@ impl OrchestratorTask {
     /// Return the list of resource providers that are feasible for the given
     /// resource specification.
     fn feasible_providers(&self, resource_req: &edgeless_api::resource_configuration::ResourceInstanceSpecification) -> Vec<String> {
+        let cordoned_nodes = self
+            .nodes
+            .iter()
+            .filter_map(|(node_id, desc)| if desc.cordoned { Some(*node_id) } else { None })
+            .collect::<std::collections::HashSet<edgeless_api::function_instance::NodeId>>();
         self.resource_providers
             .iter()
             .filter_map(|(provider_id, provider)| {
-                if provider.class_type == resource_req.class_type {
+                if provider.class_type == resource_req.class_type && !cordoned_nodes.contains(&provider.node_id) {
                     Some(provider_id.clone())
                 } else {
                     None
@@ -420,6 +425,11 @@ impl OrchestratorTask {
         resource_req: &edgeless_api::resource_configuration::ResourceInstanceSpecification,
         node_id: &edgeless_api::function_instance::NodeId,
     ) -> bool {
+        if let Some(desc) = self.nodes.get(node_id) {
+            if desc.cordoned {
+                return false;
+            }
+        }
         for provider in self.resource_providers.values() {
             if resource_req.class_type == provider.class_type && *node_id == provider.node_id {
                 return true;
@@ -1033,6 +1043,7 @@ impl OrchestratorTask {
 
         // Check if there are intents from the proxy.
         let deploy_intents = self.proxy.lock().await.retrieve_deploy_intents();
+        let mut cordoned_uncordoned_nodes = false;
         for intent in deploy_intents {
             match intent {
                 crate::deploy_intent::DeployIntent::Migrate(lid, targets) => {
@@ -1054,7 +1065,26 @@ impl OrchestratorTask {
                         }
                     }
                 }
+                crate::deploy_intent::DeployIntent::Cordon(node_id) => {
+                    if let Some(desc) = self.nodes.get_mut(&node_id) {
+                        desc.cordoned = true;
+                        cordoned_uncordoned_nodes = true;
+                    } else {
+                        log::warn!("request to cordon unknown node '{}' ignored", node_id);
+                    }
+                }
+                crate::deploy_intent::DeployIntent::Uncordon(node_id) => {
+                    if let Some(desc) = self.nodes.get_mut(&node_id) {
+                        desc.cordoned = false;
+                        cordoned_uncordoned_nodes = true;
+                    } else {
+                        log::warn!("request to cordon unknown node '{}' ignored", node_id);
+                    }
+                }
             }
+        }
+        if cordoned_uncordoned_nodes {
+            self.orchestration_logic.update_nodes(&self.nodes, &self.resource_providers);
         }
 
         // Repatch everything that needs to be repatched.

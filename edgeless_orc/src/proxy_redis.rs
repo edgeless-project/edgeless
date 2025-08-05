@@ -484,15 +484,8 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn add_deploy_intents(&mut self, intents: Vec<crate::deploy_intent::DeployIntent>) {
         for intent in intents {
-            match intent {
-                crate::deploy_intent::DeployIntent::Migrate(instance, nodes) => {
-                    let key = format!("intent:migrate:{}", instance);
-                    let _ = self
-                        .connection
-                        .set::<&str, &str, usize>(&key, &nodes.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","));
-                    let _ = self.connection.rpush::<&str, &str, String>("intents", &key);
-                }
-            }
+            let _ = self.connection.set::<&str, &str, usize>(&intent.key(), &intent.value());
+            let _ = self.connection.rpush::<&str, &str, String>("intents", &intent.key());
         }
     }
 
@@ -1144,6 +1137,7 @@ mod test {
                     sender: mock_node_sender,
                 }) as Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
                 capabilities: edgeless_api::node_registration::NodeCapabilities::minimum(),
+                cordoned: false,
             },
         );
         assert!(!redis_proxy.updated(crate::proxy::Category::NodeCapabilities));
@@ -1221,6 +1215,8 @@ mod test {
             DeployIntent::Migrate(component2, vec![node1]),
             DeployIntent::Migrate(component3, vec![node1, node2]),
             DeployIntent::Migrate(component4, vec![node1, node2, node2]),
+            DeployIntent::Cordon(node1),
+            DeployIntent::Uncordon(node2),
         ];
         redis_proxy.add_deploy_intents(intents);
 
@@ -1239,6 +1235,12 @@ mod test {
                     } else {
                         panic!("unknown component: {}", component);
                     }
+                }
+                DeployIntent::Cordon(node_id) => {
+                    assert_eq!(node1, node_id);
+                }
+                DeployIntent::Uncordon(node_id) => {
+                    assert_eq!(node2, node_id);
                 }
             }
         }

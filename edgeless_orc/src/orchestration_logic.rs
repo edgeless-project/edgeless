@@ -54,7 +54,7 @@ impl OrchestrationLogic {
         self.resource_providers.clear();
         self.weights.clear();
         for (node, desc) in clients {
-            if desc.capabilities.do_not_use() {
+            if desc.capabilities.do_not_use() || desc.cordoned {
                 // Skip the node if it must not be used, no matter what.
                 continue;
             }

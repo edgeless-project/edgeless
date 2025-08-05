@@ -192,6 +192,70 @@ mod system_tests {
         }
     }
 
+    async fn create_single_function_workflows(
+        client: &mut Box<(dyn WorkflowInstanceAPI)>,
+        n: usize,
+    ) -> Vec<edgeless_api::workflow_instance::WorkflowId> {
+        let mut ret = vec![];
+        for i in 0..n {
+            if let Ok(res) = client
+                .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
+                    workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
+                        name: "f1".to_string(),
+                        function_class_specification: fixture_spec(),
+                        output_mapping: std::collections::HashMap::new(),
+                        annotations: std::collections::HashMap::new(),
+                    }],
+                    workflow_resources: vec![],
+                    annotations: std::collections::HashMap::new(),
+                })
+                .await
+            {
+                match res {
+                    edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(instance) => {
+                        ret.push(instance.workflow_id);
+                    }
+                    edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(_) => {}
+                }
+            } else {
+                panic!("cannot create {}-th workflow out of {}", i + 1, n);
+            }
+        }
+        ret
+    }
+
+    async fn create_single_resource_workflows(
+        client: &mut Box<(dyn WorkflowInstanceAPI)>,
+        n: usize,
+    ) -> Vec<edgeless_api::workflow_instance::WorkflowId> {
+        let mut ret = vec![];
+        for i in 0..n {
+            if let Ok(res) = client
+                .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
+                    workflow_functions: vec![],
+                    workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
+                        name: "log".to_string(),
+                        class_type: "file-log".to_string(),
+                        output_mapping: std::collections::HashMap::new(),
+                        configurations: std::collections::HashMap::from([("filename".to_string(), "removeme.log".to_string())]),
+                    }],
+                    annotations: std::collections::HashMap::new(),
+                })
+                .await
+            {
+                match res {
+                    edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(instance) => {
+                        ret.push(instance.workflow_id);
+                    }
+                    edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(_) => {}
+                }
+            } else {
+                panic!("cannot create {}-th workflow out of {}", i + 1, n);
+            }
+        }
+        ret
+    }
+
     #[tokio::test]
     #[serial_test::serial]
     async fn system_test_single_domain_single_node() -> anyhow::Result<()> {
@@ -675,6 +739,254 @@ mod system_tests {
         assert!(wf_list(&mut client).await.is_empty());
 
         cleanup();
+        terminate(handles)
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    #[serial_test::serial]
+    async fn system_test_orchestration_node_cordoning_functions_redis() -> anyhow::Result<()> {
+        // let _ = env_logger::try_init();
+
+        // Skip the test if there is no local Redis listening on default port.
+        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true, None) {
+            Ok(redis_proxy) => redis_proxy,
+            Err(_) => {
+                println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
+                return Ok(());
+            }
+        };
+
+        // Create an EDGELESS system with a single domain and two nodes.
+        let num_nodes = 2;
+        let (handles, mut client) = setup(1, num_nodes, Some("redis://127.0.0.1:6379")).await;
+
+        // Wait for all the nodes to be visible.
+        for _ in 0..100 {
+            if nodes_in_domain("domain-0", &mut client).await == num_nodes {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(num_nodes, nodes_in_domain("domain-0", &mut client).await);
+
+        let node_ids = redis_proxy
+            .fetch_node_capabilities()
+            .keys()
+            .cloned()
+            .collect::<Vec<edgeless_api::function_instance::NodeId>>();
+        assert_eq!(2, node_ids.len(), "invalid number of nodes");
+        let node1 = node_ids[0];
+        let node2 = node_ids[1];
+
+        // Start 10 workflows: they balance between node1 and node2.
+        let workflows = create_single_function_workflows(&mut client, 10).await;
+        assert_eq!(10, workflows.len());
+
+        for _ in 0..100 {
+            if redis_proxy.fetch_instances_to_physical_ids().len() == 10 {
+                break;
+            } else {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+        }
+
+        let instances_by_node = redis_proxy.fetch_nodes_to_instances();
+        let inst_node1 = instances_by_node.get(&node1).cloned().unwrap_or_default().len();
+        let inst_node2 = instances_by_node.get(&node2).cloned().unwrap_or_default().len();
+        assert!(inst_node1 > 0);
+        assert!(inst_node2 > 0);
+
+        // Stop the workflows.
+        for workflow_id in workflows {
+            match client.stop(workflow_id).await {
+                Ok(_) => {}
+                Err(err) => panic!("could not stop the workflow: {}", err),
+            }
+        }
+        assert!(wf_list(&mut client).await.is_empty());
+
+        // Cordon node1.
+        redis_proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Cordon(node1)]);
+        tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+
+        // Start 10 workflows: all go to node2.
+        let workflows = create_single_function_workflows(&mut client, 10).await;
+        assert_eq!(10, workflows.len());
+
+        for _ in 0..100 {
+            if redis_proxy.fetch_instances_to_physical_ids().len() == 10 {
+                break;
+            } else {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+        }
+
+        let instances_by_node = redis_proxy.fetch_nodes_to_instances();
+        let inst_node1 = instances_by_node.get(&node1).cloned().unwrap_or_default().len();
+        let inst_node2 = instances_by_node.get(&node2).cloned().unwrap_or_default().len();
+        assert_eq!(0, inst_node1);
+        assert_eq!(10, inst_node2);
+
+        // Stop the workflows.
+        for workflow_id in workflows {
+            match client.stop(workflow_id).await {
+                Ok(_) => {}
+                Err(err) => panic!("could not stop the workflow: {}", err),
+            }
+        }
+        assert!(wf_list(&mut client).await.is_empty());
+
+        // Cordon node2.
+        redis_proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Cordon(node2)]);
+        tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+
+        // Start 10 workflows: all fail.
+        let workflows = create_single_function_workflows(&mut client, 10).await;
+        assert_eq!(0, workflows.len());
+        assert!(wf_list(&mut client).await.is_empty());
+
+        // Uncordon node1.
+        redis_proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Uncordon(node1)]);
+        tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+
+        // Start 10 workflows: all go to node1.
+        let workflows = create_single_function_workflows(&mut client, 10).await;
+        assert_eq!(10, workflows.len());
+
+        for _ in 0..100 {
+            if redis_proxy.fetch_instances_to_physical_ids().len() == 10 {
+                break;
+            } else {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+        }
+
+        let instances_by_node = redis_proxy.fetch_nodes_to_instances();
+        let inst_node1 = instances_by_node.get(&node1).cloned().unwrap_or_default().len();
+        let inst_node2 = instances_by_node.get(&node2).cloned().unwrap_or_default().len();
+        assert_eq!(10, inst_node1);
+        assert_eq!(0, inst_node2);
+
+        // Stop the workflows.
+        for workflow_id in workflows {
+            match client.stop(workflow_id).await {
+                Ok(_) => {}
+                Err(err) => panic!("could not stop the workflow: {}", err),
+            }
+        }
+        assert!(wf_list(&mut client).await.is_empty());
+
+        terminate(handles)
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    #[serial_test::serial]
+    async fn system_test_orchestration_node_cordoning_resources_redis() -> anyhow::Result<()> {
+        let _ = env_logger::try_init();
+
+        // Skip the test if there is no local Redis listening on default port.
+        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true, None) {
+            Ok(redis_proxy) => redis_proxy,
+            Err(_) => {
+                println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
+                return Ok(());
+            }
+        };
+
+        // Create an EDGELESS system with a single domain and two nodes.
+        let num_nodes = 2;
+        let (handles, mut client) = setup(1, num_nodes, Some("redis://127.0.0.1:6379")).await;
+
+        // Wait for all the nodes to be visible.
+        for _ in 0..100 {
+            if nodes_in_domain("domain-0", &mut client).await == num_nodes {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert_eq!(num_nodes, nodes_in_domain("domain-0", &mut client).await);
+
+        let node_resource = redis_proxy.fetch_resource_providers().values().next().unwrap().node_id;
+        let node_ids = redis_proxy
+            .fetch_node_capabilities()
+            .keys()
+            .cloned()
+            .collect::<Vec<edgeless_api::function_instance::NodeId>>();
+        assert_eq!(2, node_ids.len(), "invalid number of nodes");
+        let mut node1 = node_ids[0];
+        let mut node2 = node_ids[1];
+        if node1 != node_resource {
+            std::mem::swap(&mut node1, &mut node2);
+        }
+
+        // Start 10 workflows: all go to node1.
+        let workflows = create_single_resource_workflows(&mut client, 10).await;
+        assert_eq!(10, workflows.len());
+
+        for _ in 0..100 {
+            if redis_proxy.fetch_instances_to_physical_ids().len() == 10 {
+                break;
+            } else {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+        }
+
+        let instances_by_node = redis_proxy.fetch_nodes_to_instances();
+        let inst_node1 = instances_by_node.get(&node1).cloned().unwrap_or_default().len();
+        let inst_node2 = instances_by_node.get(&node2).cloned().unwrap_or_default().len();
+        assert_eq!(10, inst_node1);
+        assert_eq!(0, inst_node2);
+
+        // Stop the workflows.
+        for workflow_id in workflows {
+            match client.stop(workflow_id).await {
+                Ok(_) => {}
+                Err(err) => panic!("could not stop the workflow: {}", err),
+            }
+        }
+        assert!(wf_list(&mut client).await.is_empty());
+
+        // Cordon node1.
+        redis_proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Cordon(node1)]);
+        tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+
+        // Start 10 workflows: all fail.
+        let workflows = create_single_resource_workflows(&mut client, 10).await;
+        assert_eq!(0, workflows.len());
+        assert!(wf_list(&mut client).await.is_empty());
+
+        // Uncordon node1.
+        redis_proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Uncordon(node1)]);
+        tokio::time::sleep(std::time::Duration::from_millis(1100)).await;
+
+        // Start 10 workflows: all go to node1.
+        let workflows = create_single_resource_workflows(&mut client, 10).await;
+        assert_eq!(10, workflows.len());
+
+        for _ in 0..100 {
+            if redis_proxy.fetch_instances_to_physical_ids().len() == 10 {
+                break;
+            } else {
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+        }
+
+        let instances_by_node = redis_proxy.fetch_nodes_to_instances();
+        let inst_node1 = instances_by_node.get(&node1).cloned().unwrap_or_default().len();
+        let inst_node2 = instances_by_node.get(&node2).cloned().unwrap_or_default().len();
+        assert_eq!(10, inst_node1);
+        assert_eq!(0, inst_node2);
+
+        // Stop the workflows.
+        for workflow_id in workflows {
+            match client.stop(workflow_id).await {
+                Ok(_) => {}
+                Err(err) => panic!("could not stop the workflow: {}", err),
+            }
+        }
+        assert!(wf_list(&mut client).await.is_empty());
+
+        let _ = std::fs::remove_file("removeme.log");
         terminate(handles)
     }
 }

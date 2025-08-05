@@ -9,6 +9,12 @@ pub enum DeployIntent {
     /// The component with givel logical identifier should be migrated to
     /// the given target nodes, if possible.
     Migrate(edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::NodeId>),
+    /// The node becomes cordoned, i.e., the orchestrator will not assign new
+    /// resources or functions to it.
+    Cordon(edgeless_api::function_instance::NodeId),
+    /// The node is not cordoned anymore, i.e., the orchestrator can assign new
+    /// resources or functions to it.
+    Uncordon(edgeless_api::function_instance::NodeId),
 }
 
 impl DeployIntent {
@@ -30,6 +36,17 @@ impl DeployIntent {
                     }
                     Ok(DeployIntent::Migrate(component_id, targets))
                 }
+                "cordon" => {
+                    anyhow::ensure!(tokens.len() == 3);
+                    let node_id = uuid::Uuid::from_str(tokens[2])?;
+                    if value == "yes" {
+                        Ok(DeployIntent::Cordon(node_id))
+                    } else if value == "no" {
+                        Ok(DeployIntent::Uncordon(node_id))
+                    } else {
+                        anyhow::bail!("ill-formed cordon value for node '{}': {}", tokens[2], value)
+                    }
+                }
                 _ => anyhow::bail!("unknown intent type '{}'", tokens[1]),
             }
         } else {
@@ -40,12 +57,16 @@ impl DeployIntent {
     pub fn key(&self) -> String {
         match self {
             Self::Migrate(component, _) => format!("intent:migrate:{}", component),
+            Self::Cordon(node_id) => format!("intent:cordon:{}", node_id),
+            Self::Uncordon(node_id) => format!("intent:cordon:{}", node_id),
         }
     }
 
     pub fn value(&self) -> String {
         match self {
             Self::Migrate(_, targets) => targets.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
+            Self::Cordon(_) => "yes".to_string(),
+            Self::Uncordon(_) => "no".to_string(),
         }
     }
 }
@@ -59,6 +80,8 @@ impl std::fmt::Display for DeployIntent {
                 component,
                 target.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
             ),
+            DeployIntent::Cordon(node_id) => write!(f, "cordon node_id {}", node_id),
+            DeployIntent::Uncordon(node_id) => write!(f, "uncordon node_id {}", node_id),
         }
     }
 }
