@@ -26,12 +26,16 @@ pub enum CallRet {
     Err,
 }
 
+// messages are basic communication units between components; strings are used as content
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message {
     Cast(String),
+
+    // TODO: these map to the CallRet enum and duplicate it; redundant, but fine for now; could be realized with Result<Option<String>> instead
     Call(String),
     CallRet(String),
     CallNoRet,
+
     Err,
 }
 

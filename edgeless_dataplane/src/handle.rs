@@ -4,9 +4,7 @@
 // SPDX-License-Identifier: MIT
 use futures::{SinkExt, StreamExt};
 
-use crate::core::*;
-use crate::node_local::*;
-use crate::remote_node::*;
+use crate::{core::*, local::local_link::*, remote::remote_link::*};
 
 fn timestamp_utc() -> edgeless_api::function_instance::EventTimestamp {
     let now = chrono::Utc::now();
@@ -39,7 +37,8 @@ impl DataplaneHandle {
         }));
 
         let clone_overwrites = receiver_overwrites.clone();
-        // This task intercepts the messages received and routes responses towards temporary receivers while routing other events towards the main receiver used in `receive_next`.
+        // This task intercepts the messages received and routes responses to call or async call towards
+        // temporary receivers while routing other events towards the main receiver used in `receive_next`.
         tokio::spawn(async move {
             let mut receiver = receiver;
             let mut main_sender = main_sender;
@@ -188,6 +187,7 @@ impl DataplaneHandle {
                 return;
             }
         }
+        // TODO: add a message that there was no link for this message and that it got lost
         log::info!("Unprocessed Message: {:?}->{:?}", self.slf, target);
     }
 }

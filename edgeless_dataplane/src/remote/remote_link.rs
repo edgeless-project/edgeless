@@ -3,7 +3,9 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 use crate::core::*;
-use crate::node_local::NodeLocalRouter;
+use crate::local::local_router::*;
+use crate::remote::invocation_event_handler::InvocationEventHandler;
+use crate::remote::remote_router::*;
 use edgeless_api::function_instance::{ComponentId, NodeId};
 use edgeless_api::invocation::InvocationAPI;
 
@@ -45,49 +47,10 @@ impl DataPlaneLink for RemoteLink {
     }
 }
 
-pub struct RemoteRouter {
-    receivers: std::collections::HashMap<NodeId, Box<dyn edgeless_api::invocation::InvocationAPI>>,
-}
-
 pub struct RemoteLinkProvider {
     own_node_id: edgeless_api::function_instance::NodeId,
-    remotes: std::sync::Arc<tokio::sync::Mutex<RemoteRouter>>,
+    pub remotes: std::sync::Arc<tokio::sync::Mutex<RemoteRouter>>,
     locals: std::sync::Arc<tokio::sync::Mutex<NodeLocalRouter>>,
-}
-
-struct InvocationEventHandler {
-    node_id: edgeless_api::function_instance::NodeId,
-    locals: std::sync::Arc<tokio::sync::Mutex<NodeLocalRouter>>,
-}
-
-#[async_trait::async_trait]
-impl edgeless_api::invocation::InvocationAPI for InvocationEventHandler {
-    async fn handle(&mut self, event: edgeless_api::invocation::Event) -> edgeless_api::invocation::LinkProcessingResult {
-        if event.target.node_id == self.node_id {
-            self.locals.lock().await.handle(event).await
-        } else {
-            LinkProcessingResult::ERROR("Wrong Node ID".to_string())
-        }
-    }
-}
-
-#[async_trait::async_trait]
-impl edgeless_api::invocation::InvocationAPI for RemoteRouter {
-    async fn handle(&mut self, event: edgeless_api::invocation::Event) -> edgeless_api::invocation::LinkProcessingResult {
-        if let Some(node_client) = self.receivers.get_mut(&event.target.node_id) {
-            match node_client.handle(event).await {
-                LinkProcessingResult::FINAL => return LinkProcessingResult::FINAL,
-                LinkProcessingResult::IGNORED => return LinkProcessingResult::IGNORED,
-                LinkProcessingResult::ERROR(e) => {
-                    log::error!("Error while processing link: {:?}", e);
-                    return LinkProcessingResult::ERROR(e);
-                }
-            }
-        } else {
-            // we can not process this even, ignore it
-            edgeless_api::invocation::LinkProcessingResult::IGNORED
-        }
-    }
 }
 
 impl RemoteLinkProvider {
@@ -138,7 +101,7 @@ impl RemoteLinkProvider {
 mod test {
     use futures::SinkExt;
 
-    use crate::remote_node::*;
+    use crate::remote::remote_link::*;
 
     #[tokio::test]
     async fn incomming_message() {
@@ -172,17 +135,18 @@ mod test {
 
         assert!(receiver_1.try_next().is_err());
 
-        // assert!(api
-        //     .handle(edgeless_api::invocation::Event {
-        //         target: fid_wrong_node_id,
-        //         source: fid_source,
-        //         stream_id: 0,
-        //         data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
-        //         created: created.clone(),
-        //         metadata: edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00013u128, 0x42a42bdecaf00014u64),
-        //     })
-        //     .await
-        //     .is_err());
+        assert!(matches!(
+            api.handle(edgeless_api::invocation::Event {
+                target: fid_wrong_node_id,
+                source: fid_source,
+                stream_id: 0,
+                data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
+                created: created.clone(),
+                metadata: edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00013u128, 0x42a42bdecaf00014u64),
+            })
+            .await,
+            LinkProcessingResult::ERROR(_) // we don't care about the inside error message
+        ));
 
         assert!(receiver_1.try_next().is_err());
 
