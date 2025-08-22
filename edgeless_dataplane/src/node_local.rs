@@ -43,10 +43,9 @@ impl DataPlaneLink for NodeLocalLink {
                     created: *created,
                     metadata: metadata.clone(),
                 })
-                .await
-                .unwrap();
+                .await;
         } else {
-            return LinkProcessingResult::PASSED;
+            return LinkProcessingResult::IGNORED;
         }
     }
 }
@@ -58,7 +57,7 @@ pub struct NodeLocalRouter {
 // This is used by the remote node that is currently borrowing the `NodeLocalRouter`
 #[async_trait::async_trait]
 impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
-    async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
+    async fn handle(&mut self, event: edgeless_api::invocation::Event) -> edgeless_api::invocation::LinkProcessingResult {
         if let Some(sender) = self.receivers.get_mut(&event.target.function_id) {
             let msg = match event.data {
                 edgeless_api::invocation::EventData::Call(data) => Message::Call(data),
@@ -83,9 +82,9 @@ impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
                     self.receivers.remove(&event.target.function_id);
                 }
             }
-            return Ok(LinkProcessingResult::FINAL);
+            return LinkProcessingResult::FINAL;
         }
-        Ok(LinkProcessingResult::PASSED)
+        LinkProcessingResult::IGNORED
     }
 }
 
@@ -150,7 +149,7 @@ mod test {
             .as_mut()
             .await;
 
-        assert_eq!(ret_1, crate::core::LinkProcessingResult::PASSED);
+        assert_eq!(ret_1, crate::core::LinkProcessingResult::IGNORED);
         assert!(receiver_1.try_next().is_err());
         assert!(receiver_2.try_next().is_err());
 
