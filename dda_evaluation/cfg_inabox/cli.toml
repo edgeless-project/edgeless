@@ -1,6 +1,0 @@
-controller_url = "http://127.0.0.1:7001"
-
-[function_repository]
-url = ""
-basic_auth_user = ""
-basic_auth_pass = ""

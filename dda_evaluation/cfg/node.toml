@@ -20,6 +20,7 @@ enabled = false
 guest_api_host_url = "http://127.0.0.1:7100"
 
 [resources]
+prepend_hostname = false
 http_ingress_url = "http://0.0.0.0:7008"
 http_ingress_provider = "http-ingress-1"
 http_egress_provider = "http-egress-1"
