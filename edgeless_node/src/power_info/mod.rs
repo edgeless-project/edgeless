@@ -16,6 +16,11 @@ impl PowerInfo {
     /// power values for a single outlet..
     pub async fn new(socket_addr: &str, outlet_number: u16) -> anyhow::Result<Self> {
         let socket_addr = socket_addr.parse()?;
+        anyhow::ensure!(
+            outlet_number > 0 && outlet_number <= 128,
+            "invalid outlet number {}: must be in [1,128]",
+            outlet_number
+        );
         Ok(Self {
             context: None,
             socket_addr,
