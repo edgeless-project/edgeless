@@ -30,6 +30,10 @@ uninlined_format_args = "allow"
 name = "edgeless_node_d"
 path = "src/bin/edgeless_node_d.rs"
 
+[[bin]]
+name = "power_query"
+path = "src/bin/power_query.rs"
+
 [features]
 default = ["wasmtime"]
 
