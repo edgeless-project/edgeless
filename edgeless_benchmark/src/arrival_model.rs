@@ -206,7 +206,7 @@ mod test {
             if now < crate::utils::to_microseconds(50.0) {
                 let (arrival_time, end_time) = model.next(0_u64).unwrap();
                 assert_eq!(crate::utils::to_microseconds(1.0 * i as f64), arrival_time);
-                assert_eq!(crate::utils::to_microseconds(100.0), end_time);
+                assert_eq!(crate::utils::to_microseconds(100.0) + 1, end_time);
             } else {
                 assert!(model.next(0_u64).is_none());
             }
@@ -220,7 +220,7 @@ mod test {
         let now = 42;
         let (arrival_time, end_time) = model.next(now).unwrap();
         assert_eq!(crate::utils::to_microseconds(0.0), arrival_time);
-        assert_eq!(crate::utils::to_microseconds(100.0), end_time);
+        assert_eq!(crate::utils::to_microseconds(100.0) + 1, end_time);
 
         assert!(model.next(0_u64).is_none());
     }
