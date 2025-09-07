@@ -20,6 +20,7 @@ enum InterarrivalType {
 struct Conf {
     out_type: OutType,
     interarrival_type: InterarrivalType,
+    log: bool,
 }
 
 struct State {
@@ -115,19 +116,38 @@ impl InterarrivalType {
 ///   - c(T): constant interarrival with period equal to T ms
 ///   - u(A;B): uniformly distributed interarrival between A ms and B ms
 ///   - e(M): exponentially distributed interarrival with average M ms
+/// - log: Boolean flag, if out_type=counter and the flag is true, create
+///   telemetry_log events tbegin, or tend, when a message is generated, or
+///   received, respectively. It can be used to compute RTT delay by
+///   post-processing the timestamps of tbegin/tend events.
 ///
 struct Trigger;
 
 impl EdgeFunction for Trigger {
-    fn handle_cast(_src: InstanceId, _encoded_message: &[u8]) {
+    fn handle_cast(_src: InstanceId, msg: &[u8]) {
         let conf = CONF.get().unwrap();
-        let mut state = STATE.get().unwrap().lock().unwrap();
+        if msg.is_empty() {
+            // New message to be created.
 
-        // Create an event towards the next function instance.
-        cast("out", next_output(conf, &mut state));
+            let mut state = STATE.get().unwrap().lock().unwrap();
 
-        // Schedule the text event to be generated.
-        delayed_cast(conf.interarrival_type.next(&mut state.lcg) as u64, "self", &[]);
+            // Create an event towards the next function instance.
+            let cur_counter = state.cnt;
+            cast("out", next_output(conf, &mut state));
+
+            // Log the emission of a new message.
+            if conf.log {
+                telemetry_log(5, "tbegin", &cur_counter.to_string());
+            }
+
+            // Schedule the next event to be generated.
+            delayed_cast(conf.interarrival_type.next(&mut state.lcg) as u64, "self", &[]);
+        } else {
+            // Message received back.
+            if conf.log {
+                telemetry_log(5, "tend", core::str::from_utf8(msg).unwrap_or_default());
+            }
+        }
     }
 
     fn handle_call(_src: InstanceId, _encoded_message: &[u8]) -> CallRet {
@@ -188,7 +208,13 @@ impl EdgeFunction for Trigger {
             }
         };
 
-        let _ = CONF.set(Conf { out_type, interarrival_type });
+        let log = matches!(out_type, OutType::Counter) && arg_to_bool("log", &arguments);
+
+        let _ = CONF.set(Conf {
+            out_type,
+            interarrival_type,
+            log,
+        });
         let _ = STATE.set(std::sync::Mutex::new(State {
             cnt: 0,
             cnt_string: vec![],
