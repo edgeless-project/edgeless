@@ -147,7 +147,7 @@ impl ArrivalModel {
         let lifetime = match self.arrival_type {
             ArrivalType::Poisson => arrival_time + crate::utils::to_microseconds(self.lifetime_exp_rv.sample(&mut self.rng)),
             ArrivalType::Incremental => arrival_time + self.lifetime,
-            ArrivalType::IncrAndKeep | ArrivalType::Single => self.duration,
+            ArrivalType::IncrAndKeep | ArrivalType::Single => self.duration + 1,
             ArrivalType::Trace => self.trace[trace_ndx].1,
         };
         Some((arrival_time, lifetime))
