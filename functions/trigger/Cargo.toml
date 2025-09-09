@@ -14,13 +14,13 @@ codegen-units = 1
 strip = true
 
 [package]
-name = "single_trigger"
-version = "0.1.0"
+name = "trigger"
+version = "0.2.0"
 authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it>"]
 edition = "2021"
 
 [lib]
-name = "single_trigger"
+name = "trigger"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 
