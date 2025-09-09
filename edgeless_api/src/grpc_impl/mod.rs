@@ -8,4 +8,5 @@ pub mod api {
 }
 mod common;
 mod inner;
+// only the outer grpc_impl is exported; inner stays private to this crate; only use the outer traits in your code
 pub mod outer;

@@ -1647,6 +1647,7 @@ dependencies = [
  "tokio",
  "tonic 0.13.1",
  "tonic-build",
+ "tower 0.5.2",
  "uuid",
 ]
 
@@ -7078,6 +7079,7 @@ checksum = "d039ad9159c98b70ecfd540b2573b97f7f52c3e8d9f8ad57a24b916a536975f9"
 dependencies = [
  "futures-core",
  "futures-util",
+ "hdrhistogram",
  "indexmap 2.7.0",
  "pin-project-lite",
  "slab",

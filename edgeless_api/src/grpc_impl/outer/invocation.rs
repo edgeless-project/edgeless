@@ -1,8 +1,10 @@
+use std::time::Duration;
+
 // SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
-use crate::grpc_impl::common::CommonConverters;
+use crate::{grpc_impl::common::CommonConverters, invocation::LinkProcessingResult};
 
 struct InvocationConverters {}
 
@@ -10,6 +12,13 @@ const TYPE_CALL: i32 = crate::grpc_impl::api::EventType::Call as i32;
 const TYPE_CAST: i32 = crate::grpc_impl::api::EventType::Cast as i32;
 const TYPE_CALL_RET: i32 = crate::grpc_impl::api::EventType::CallRet as i32;
 const TYPE_CALL_NO_RET: i32 = crate::grpc_impl::api::EventType::CallNoRet as i32;
+
+const RECONNECT_TRIES: i32 = 5;
+const RECONNECT_TIMEOUT: u64 = 500;
+// time after which we consider the connection to invocation grpc server broken
+// and start the reconnection attempts
+const INVOCATION_TIMEOUT: u64 = 500;
+const INVOCATION_TCP_KEEPALIVE: u64 = 2000;
 
 impl InvocationConverters {
     fn parse_api_event(api_event: &crate::grpc_impl::api::Event) -> anyhow::Result<crate::invocation::Event> {
@@ -75,6 +84,7 @@ impl InvocationConverters {
 
 pub struct InvocationAPIClient {
     client: crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient<tonic::transport::Channel>,
+    server_addr: String,
 }
 
 impl InvocationAPIClient {
@@ -83,7 +93,10 @@ impl InvocationAPIClient {
             match crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient::connect(server_addr.to_string()).await {
                 Ok(client) => {
                     let client = client.max_decoding_message_size(usize::MAX);
-                    return Self { client };
+                    return Self {
+                        client,
+                        server_addr: server_addr.to_string(),
+                    };
                 }
                 Err(_) => {
                     log::debug!("Waiting for InvocationAPI");
@@ -92,16 +105,52 @@ impl InvocationAPIClient {
             }
         }
     }
+
+    async fn reconnect(&mut self) -> Result<(), anyhow::Error> {
+        let mut retries = RECONNECT_TRIES;
+        loop {
+            if retries == 0 {
+                log::error!("could not reconnect in reasonable time");
+                anyhow::bail!("could not reconnect in reasonable time");
+            }
+            match crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient::connect(self.server_addr.clone()).await {
+                Ok(client) => {
+                    self.client = client.max_decoding_message_size(usize::MAX);
+                    return Ok(());
+                }
+                Err(e) => {
+                    log::warn!("Waiting for InvocationAPI to reconnect: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_millis(RECONNECT_TIMEOUT)).await;
+                }
+            }
+            retries -= 1;
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl crate::invocation::InvocationAPI for InvocationAPIClient {
-    async fn handle(&mut self, event: crate::invocation::Event) -> crate::invocation::LinkProcessingResult {
-        let serialized_event = InvocationConverters::encode_crate_event(&event);
-        let res = self.client.handle(tonic::Request::new(serialized_event)).await;
-        match res {
-            Ok(_) => crate::invocation::LinkProcessingResult::FINAL,
-            Err(e) => crate::invocation::LinkProcessingResult::ERROR((e.message().to_string())),
+    async fn handle(&mut self, event: crate::invocation::Event) -> LinkProcessingResult {
+        // to handle cases where connectivity between nodes is mobile, we repeat the
+        loop {
+            let serialized_event = InvocationConverters::encode_crate_event(&event);
+            let res = tokio::time::timeout(
+                Duration::from_millis(INVOCATION_TIMEOUT),
+                self.client.handle(tonic::Request::new(serialized_event)),
+            )
+            .await;
+            if let Ok(_) = res {
+                return LinkProcessingResult::FINAL;
+            } else if let Err(elapsed) = res {
+                let res = self.reconnect().await;
+                if let Ok(_) = res {
+                    log::info!("reconnected successfully, retrying the request");
+                    continue;
+                } else {
+                    log::warn!("reconnect did not work");
+                    return LinkProcessingResult::ERROR(elapsed.to_string());
+                }
+            }
         }
     }
 }
@@ -144,6 +193,13 @@ impl InvocationAPIServer {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start InvocationAPI GRPC Server at {}", invocation_url);
                     match tonic::transport::Server::builder()
+                        .tcp_keepalive(Some(Duration::from_millis(INVOCATION_TCP_KEEPALIVE)))
+                        .http2_keepalive_timeout(Some(std::time::Duration::from_millis(200)))
+                        // if the handling of request takes too long on the
+                        // server side, drop this request
+                        .layer(tower::timeout::TimeoutLayer::new(std::time::Duration::from_millis(
+                            crate::grpc_impl::common::GRPC_SERVICE_TIMEOUT,
+                        )))
                         .add_service(
                             crate::grpc_impl::api::function_invocation_server::FunctionInvocationServer::new(function_api)
                                 .max_decoding_message_size(usize::MAX),

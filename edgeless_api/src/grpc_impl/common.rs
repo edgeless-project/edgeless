@@ -2,6 +2,50 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+use futures::future::{self, Ready};
+use tonic::{Request, Response, Status};
+use tower::retry::Policy;
+
+// timeout in miliseconds for all grpc request
+pub static GRPC_SERVICE_TIMEOUT: u64 = 2000;
+pub static GRPC_SERVICE_RETRIES: usize = 3;
+
+#[derive(Clone)]
+pub struct Attempts(pub usize);
+
+// rename for ease of use
+type GrpcRequest<T> = Request<T>;
+type GrpcResponse<T> = Response<T>;
+type GrpcError = Status;
+
+// inspects the GrpcError returned to the client and decides whether to retry (classifies if we should retry a request based on that response)
+impl<Req, Res> Policy<GrpcRequest<Req>, GrpcResponse<Res>, GrpcError> for Attempts
+where
+    Req: Clone,
+{
+    type Future = Ready<()>;
+
+    fn retry(&mut self, _req: &mut GrpcRequest<Req>, result: &mut Result<GrpcResponse<Res>, GrpcError>) -> Option<Self::Future> {
+        match result {
+            Ok(_) => None,
+            Err(err) => {
+                if self.0 > 0 {
+                    log::warn!("[gRPC] attempt nr {}, error: {}", self.0, err);
+                    self.0 -= 1;
+                    Some(future::ready(()))
+                } else {
+                    log::warn!("[gRPC] no attempts left");
+                    None
+                }
+            }
+        }
+    }
+
+    fn clone_request(&mut self, req: &GrpcRequest<Req>) -> Option<GrpcRequest<Req>> {
+        Some(GrpcRequest::new(req.get_ref().clone()))
+    }
+}
+
 pub struct CommonConverters {}
 
 pub trait ParseableId<IdType> {
