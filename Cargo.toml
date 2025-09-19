@@ -19,7 +19,9 @@ members = [
     "edgeless_orc",
     "edgeless_systemtests",
     "edgeless_telemetry",
+    "edgeless_cloud_offloading",
 ]
 
 [workspace.dependencies]
 opentelemetry = { version = "0.30.0", default-features = false, features = ["trace"] }
+
