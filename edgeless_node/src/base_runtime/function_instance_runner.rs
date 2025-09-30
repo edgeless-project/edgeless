@@ -51,7 +51,6 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         let mut state_handle = state_handle;
 
         let alias_mapping = super::alias_mapping::AliasMapping::new();
-        // alias_mapping.update(spawn_req.output_mapping).await;
         let (poison_pill_sender, poison_pill_receiver) = tokio::sync::broadcast::channel::<()>(1);
         let serialized_state = state_handle.get().await;
 
