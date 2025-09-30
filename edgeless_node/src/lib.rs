@@ -44,6 +44,15 @@ pub struct EdgelessNodeTelemetrySettings {
     pub performance_samples: bool,
 }
 
+impl Default for EdgelessNodeTelemetrySettings {
+    fn default() -> Self {
+        Self {
+            metrics_url: String::from("http://127.0.0.1:7007"),
+            performance_samples: false,
+        }
+    }
+}
+
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessNodeWasmRuntimeSettings {
     /// True if WASM is enabled.
@@ -91,6 +100,22 @@ pub struct EdgelessNodeGeneralSettings {
     pub node_register_url: String,
     /// The interval at which the node refreshes subscription, s.
     pub subscription_refresh_interval_sec: u64,
+}
+
+impl Default for EdgelessNodeGeneralSettings {
+    fn default() -> Self {
+        Self {
+            node_id: uuid::Uuid::new_v4(),
+            agent_url: String::from("http://127.0.0.1:7005"),
+            agent_url_announced: String::from("http://127.0.0.1:7005"),
+            invocation_url: String::from("http://127.0.0.1:7006"),
+            invocation_url_announced: String::from("http://127.0.0.1:7006"),
+            invocation_url_coap: None,
+            invocation_url_announced_coap: None,
+            node_register_url: String::from("http://127.0.0.1:7004"),
+            subscription_refresh_interval_sec: 2,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, serde::Deserialize, serde::Serialize)]
@@ -779,21 +804,8 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
 
 pub fn edgeless_node_default_conf() -> String {
     let node_conf = EdgelessNodeSettings {
-        general: EdgelessNodeGeneralSettings {
-            node_id: uuid::Uuid::new_v4(),
-            agent_url: String::from("http://127.0.0.1:7005"),
-            agent_url_announced: String::from("http://127.0.0.1:7005"),
-            invocation_url: String::from("http://127.0.0.1:7006"),
-            invocation_url_announced: String::from("http://127.0.0.1:7006"),
-            invocation_url_coap: None,
-            invocation_url_announced_coap: None,
-            node_register_url: String::from("http://127.0.0.1:7004"),
-            subscription_refresh_interval_sec: 2,
-        },
-        telemetry: EdgelessNodeTelemetrySettings {
-            metrics_url: String::from("http://127.0.0.1:7007"),
-            performance_samples: false,
-        },
+        general: EdgelessNodeGeneralSettings::default(),
+        telemetry: EdgelessNodeTelemetrySettings::default(),
         wasm_runtime: Some(EdgelessNodeWasmRuntimeSettings { enabled: true }),
         container_runtime: Some(EdgelessNodeContainerRuntimeSettings::default()),
         resources: Some(EdgelessNodeResourceSettings {

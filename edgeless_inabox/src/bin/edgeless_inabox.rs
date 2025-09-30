@@ -10,7 +10,6 @@ use edgeless_node::{
     EdgelessNodeTelemetrySettings, OllamaProviderSettings, ServerlessProviderSettings,
 };
 use std::fs;
-use uuid::Uuid;
 
 #[derive(Debug, clap::Parser)]
 #[command(long_about = None)]
@@ -88,12 +87,6 @@ fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16
 
     let controller_url = format!("http://{}:{}", ip, reserved_controller_port);
     let domain_register_url = format!("http://{}:{}", ip, reserved_domain_register_port);
-
-    // Balancer
-    let bal_conf = edgeless_bal::EdgelessBalSettings {
-        balancer_id: Uuid::new_v4(),
-        invocation_url: next_url(false),
-    };
 
     // Orchestrator
     let orchestrator_url = next_url(true);
@@ -208,13 +201,6 @@ fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16
         log::warn!("File {:#?} exists and will not be overwritten", con_file);
     } else {
         std::fs::write(con_file, toml::to_string(&con_conf).expect("Wrong"))?;
-    }
-
-    let bal_file = Path::new(&config_path).join("balancer.toml");
-    if bal_file.exists() {
-        log::warn!("File {:#?} exists and will not be overwritten", bal_file);
-    } else {
-        std::fs::write(bal_file, toml::to_string(&bal_conf).expect("Wrong"))?;
     }
 
     let single_node = node_confs.len() == 1;
