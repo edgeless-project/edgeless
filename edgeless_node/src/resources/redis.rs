@@ -16,8 +16,8 @@ impl super::resource_provider_specs::ResourceProviderSpecs for RedisResourceSpec
     fn description(&self) -> String {
         r"Perform SET and GET operations on a Redis server -- https://redis.io/
 
-A SET operation is performed with a cast() on the key specified in the 'key' configuration parameter of the resource.
-A GET operation is performed with a call(), with the key specified in the message body."
+        A SET operation is performed with a cast() on the key specified in the 'key' configuration parameter of the resource.
+        A GET operation is performed with a call(), with the key specified in the message body."
             .to_string()
     }
 
@@ -139,7 +139,24 @@ impl RedisResource {
                         }
                     };
                 } else {
-                    // SET
+                    // Try to decode the message_data as a string with "key:value"
+                    if let Some(colon_pos) = message_data.find(':') {
+                        let (k_str, v_str) = message_data.split_at(colon_pos);
+                        let v_str = &v_str[1..]; // skip the colon
+                        let redis_key = format!("{}{}", workflow_id_header, k_str);
+                        if let Err(err) = connection.set::<&str, &str, std::string::String>(&redis_key, v_str) {
+                            log::error!(
+                                "Could not set key '{}' to value '{}' via redis resource: {}",
+                                redis_key,
+                                v_str,
+                                err
+                            );
+                        }
+                        // skip legacy set
+                        continue;
+                    }
+                    // SET like legacy
+                    // TODO: should be refactored like DDA
                     if let Some(redis_key) = &redis_key {
                         if let Err(err) = connection.set::<&str, &str, std::string::String>(redis_key, &message_data) {
                             log::error!(

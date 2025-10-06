@@ -7,6 +7,7 @@
 pub fn edgeless_inabox_main(async_runtime: &tokio::runtime::Runtime, async_tasks: &mut Vec<tokio::task::JoinHandle<()>>) -> anyhow::Result<()> {
     let mut node_confs: Vec<edgeless_node::EdgelessNodeSettings> = Vec::new();
     for entry in std::fs::read_dir(std::env::current_dir().expect("Cannot read CWD"))? {
+        log::info!("Current working directory: {:?}", std::env::current_dir().expect("Cannot read CWD"));
         let path = entry?.path();
         if !path.is_file() {
             continue;
@@ -35,7 +36,7 @@ pub fn edgeless_inabox_main(async_runtime: &tokio::runtime::Runtime, async_tasks
         None
     };
 
-    log::info!("Starting EDGELESS-in-a-box");
+    log::info!("Starting EDGELESS-in-a-box with");
 
     if let Some(bal_conf) = bal_conf {
         async_tasks.push(async_runtime.spawn(edgeless_bal::edgeless_bal_main(bal_conf)));
