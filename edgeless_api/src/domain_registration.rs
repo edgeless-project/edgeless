@@ -53,6 +53,17 @@ impl std::fmt::Display for DomainCapabilities {
     }
 }
 
+impl DomainCapabilities {
+    /// Return all the portal domains advertised.
+    pub fn portal_domains(&self) -> std::collections::HashSet<String> {
+        self.labels
+            .iter()
+            .filter(|x| x.starts_with("portal-domain="))
+            .map(|x| x.replace("portal-domain=", ""))
+            .collect()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct UpdateDomainRequest {
     // Domain name.

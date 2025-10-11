@@ -24,7 +24,7 @@ pub struct EdgelessBalGeneralSettings {
 impl Default for EdgelessBalGeneralSettings {
     fn default() -> Self {
         Self {
-            domain: String::from("domain:7000"),
+            domain: String::from("domain-7000"),
         }
     }
 }
@@ -100,10 +100,12 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
         telemetry_performance_target.clone(),
     )
     .await;
+    let mut capabilities = edgeless_api::node_registration::NodeCapabilities::default();
+    capabilities.labels.push(format!("portal-domain={}", settings.general.domain));
     let (_portal_subscriber, portal_subscriber_task, portal_refresh_task) = edgeless_node::node_subscriber::NodeSubscriber::new(
         settings.portal,
         portal_resource_provider_specifications.clone(),
-        edgeless_api::node_registration::NodeCapabilities::default(),
+        capabilities,
         None,
         telemetry_performance_target,
     )
