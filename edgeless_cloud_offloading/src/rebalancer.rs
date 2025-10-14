@@ -31,13 +31,9 @@ impl NodeDesc {
     }
 
     pub fn cpu_usage_percent(&self) -> Option<f64> {
-<<<<<<< HEAD
-        self.health_status.as_ref().map(|health| health.proc_cpu_usage as f64)
-=======
         self.health_status
             .as_ref()
             .map(|health| health.proc_cpu_usage as f64)
->>>>>>> feature/anomaly-detection
     }
 }
 
@@ -71,12 +67,8 @@ impl Rebalancer {
 
         let node_capabilities = self.proxy.fetch_node_capabilities();
         let health_data = self.proxy.fetch_node_health();
-<<<<<<< HEAD
-        let active_node_ids: HashSet<String> = node_capabilities.keys().map(|id| id.to_string()).collect();
-=======
         let active_node_ids: HashSet<String> =
             node_capabilities.keys().map(|id| id.to_string()).collect();
->>>>>>> feature/anomaly-detection
 
         for (node_id, capabilities) in node_capabilities {
             self.nodes.insert(
@@ -123,14 +115,10 @@ impl Rebalancer {
         let mut instances = self.proxy.fetch_function_instance_requests();
         for (lid, req) in &mut instances {
             let runtime = req.code.function_class_type.clone();
-<<<<<<< HEAD
-            let deployment_requirements = edgeless_orc::deployment_requirements::DeploymentRequirements::from_annotations(&req.annotations);
-=======
             let deployment_requirements =
                 edgeless_orc::deployment_requirements::DeploymentRequirements::from_annotations(
                     &req.annotations,
                 );
->>>>>>> feature/anomaly-detection
 
             let feasible_nodes: Vec<_> = self
                 .nodes
@@ -173,15 +161,11 @@ impl Rebalancer {
     }
 
     pub fn rebalance_cluster(&mut self) -> usize {
-<<<<<<< HEAD
-        let mut credits: HashMap<_, _> = self.nodes.iter().map(|(id, desc)| (*id, desc.credit())).collect();
-=======
         let mut credits: HashMap<_, _> = self
             .nodes
             .iter()
             .map(|(id, desc)| (*id, desc.credit()))
             .collect();
->>>>>>> feature/anomaly-detection
         let mut migrations = vec![];
 
         for (node_id, node_desc) in &self.nodes {
@@ -202,14 +186,10 @@ impl Rebalancer {
                             &target_node_desc.resource_providers,
                         )
                     {
-<<<<<<< HEAD
-                        migrations.push(edgeless_orc::deploy_intent::DeployIntent::Migrate(*lid, vec![*target_node_id]));
-=======
                         migrations.push(edgeless_orc::deploy_intent::DeployIntent::Migrate(
                             *lid,
                             vec![*target_node_id],
                         ));
->>>>>>> feature/anomaly-detection
                         *credits.get_mut(node_id).unwrap() -= 1.0;
                         *credits.get_mut(target_node_id).unwrap() += 1.0;
                         break;
@@ -221,23 +201,14 @@ impl Rebalancer {
         let num_migrations = migrations.len();
         if num_migrations > 0 {
             self.proxy.add_deploy_intents(migrations);
-<<<<<<< HEAD
-            log::info!("Rebalancing cluster: triggered {} migrations.", num_migrations);
-=======
             log::info!(
                 "Rebalancing cluster: triggered {} migrations.",
                 num_migrations
             );
->>>>>>> feature/anomaly-detection
         }
         num_migrations
     }
 
-<<<<<<< HEAD
-    pub fn should_create_node(&self, credit_threshold: f64, cpu_threshold: f64, mem_threshold: f64) -> bool {
-        // Option 1: Relative overload across the cluster
-        let total_overload: f64 = self.nodes.values().map(|n| n.credit()).filter(|c| *c > 0.0).sum();
-=======
     pub fn should_create_node(
         &self,
         credit_threshold: f64,
@@ -251,7 +222,6 @@ impl Rebalancer {
             .map(|n| n.credit())
             .filter(|c| *c > 0.0)
             .sum();
->>>>>>> feature/anomaly-detection
         if total_overload > credit_threshold {
             log::warn!(
                 "SCALE-UP decision: Relative overload detected (credit sum {} > {})",
@@ -294,28 +264,20 @@ impl Rebalancer {
         let node_id_uuid = if let Ok(uuid) = Uuid::parse_str(node_to_empty_id) {
             uuid
         } else {
-<<<<<<< HEAD
-            log::warn!("Invalid UUID format for node_to_empty_id: {}", node_to_empty_id);
-=======
             log::warn!(
                 "Invalid UUID format for node_to_empty_id: {}",
                 node_to_empty_id
             );
->>>>>>> feature/anomaly-detection
             return 0;
         };
 
         let node_to_empty = if let Some(node) = self.nodes.get(&node_id_uuid) {
             node
         } else {
-<<<<<<< HEAD
-            log::warn!("Cannot empty node {}: not found in current state.", node_to_empty_id);
-=======
             log::warn!(
                 "Cannot empty node {}: not found in current state.",
                 node_to_empty_id
             );
->>>>>>> feature/anomaly-detection
             return 0;
         };
 
@@ -332,14 +294,10 @@ impl Rebalancer {
                         &target_node_desc.resource_providers,
                     )
                 {
-<<<<<<< HEAD
-                    migrations.push(edgeless_orc::deploy_intent::DeployIntent::Migrate(*lid, vec![*target_node_id]));
-=======
                     migrations.push(edgeless_orc::deploy_intent::DeployIntent::Migrate(
                         *lid,
                         vec![*target_node_id],
                     ));
->>>>>>> feature/anomaly-detection
                     break;
                 }
             }
@@ -348,15 +306,11 @@ impl Rebalancer {
         let num_migrations = migrations.len();
         if num_migrations > 0 {
             self.proxy.add_deploy_intents(migrations);
-<<<<<<< HEAD
-            log::info!("Attempting to empty node {}: triggered {} migrations.", node_to_empty_id, num_migrations);
-=======
             log::info!(
                 "Attempting to empty node {}: triggered {} migrations.",
                 node_to_empty_id,
                 num_migrations
             );
->>>>>>> feature/anomaly-detection
         }
         num_migrations
     }
@@ -365,14 +319,10 @@ impl Rebalancer {
         let node_id_uuid = if let Ok(uuid) = Uuid::parse_str(node_to_cordon_id) {
             uuid
         } else {
-<<<<<<< HEAD
-            log::warn!("Invalid UUID format for node_to_cordon_id: {}", node_to_cordon_id);
-=======
             log::warn!(
                 "Invalid UUID format for node_to_cordon_id: {}",
                 node_to_cordon_id
             );
->>>>>>> feature/anomaly-detection
             return false;
         };
 
@@ -381,28 +331,20 @@ impl Rebalancer {
         };
 
         self.proxy
-<<<<<<< HEAD
-            .add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Cordon(node_id_uuid)]);
-=======
             .add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Cordon(
                 node_id_uuid,
             )]);
->>>>>>> feature/anomaly-detection
         log::info!("Attempting to cordon node {}", node_to_cordon_id);
 
         true
     }
 
-<<<<<<< HEAD
-    pub fn find_node_to_delete(&self, cloud_node_ids: &HashSet<String>, cpu_threshold: f64, mem_threshold: f64) -> Option<String> {
-=======
     pub fn find_node_to_delete(
         &self,
         cloud_node_ids: &HashSet<String>,
         cpu_threshold: f64,
         mem_threshold: f64,
     ) -> Option<String> {
->>>>>>> feature/anomaly-detection
         for (node_id, node_desc) in &self.nodes {
             let node_id_str = node_id.to_string();
 
@@ -410,17 +352,12 @@ impl Rebalancer {
                 continue;
             }
 
-<<<<<<< HEAD
-            let is_cpu_low = node_desc.cpu_usage_percent().map_or(false, |cpu| cpu < cpu_threshold);
-            let is_mem_low = node_desc.memory_usage_percent().map_or(false, |mem| mem < mem_threshold);
-=======
             let is_cpu_low = node_desc
                 .cpu_usage_percent()
                 .map_or(false, |cpu| cpu < cpu_threshold);
             let is_mem_low = node_desc
                 .memory_usage_percent()
                 .map_or(false, |mem| mem < mem_threshold);
->>>>>>> feature/anomaly-detection
 
             if is_cpu_low && is_mem_low {
                 log::warn!(
@@ -438,13 +375,9 @@ impl Rebalancer {
 
     pub fn is_node_empty(&self, node_id: &str) -> bool {
         if let Ok(uuid) = Uuid::parse_str(node_id) {
-<<<<<<< HEAD
-            self.nodes.get(&uuid).map_or(true, |node| node.function_instances.is_empty())
-=======
             self.nodes
                 .get(&uuid)
                 .map_or(true, |node| node.function_instances.is_empty())
->>>>>>> feature/anomaly-detection
         } else {
             true
         }

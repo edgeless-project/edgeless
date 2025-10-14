@@ -61,13 +61,9 @@ impl Default for Config {
 
 impl Default for GeneralConfig {
     fn default() -> Self {
-<<<<<<< HEAD
-        Self { check_interval_seconds: 15 }
-=======
         Self {
             check_interval_seconds: 15,
         }
->>>>>>> feature/anomaly-detection
     }
 }
 
@@ -83,13 +79,9 @@ impl Default for ClusterConfig {
 
 impl Default for CloudProviderConfig {
     fn default() -> Self {
-<<<<<<< HEAD
-        Self { aws: AwsConfig::default() }
-=======
         Self {
             aws: AwsConfig::default(),
         }
->>>>>>> feature/anomaly-detection
     }
 }
 
