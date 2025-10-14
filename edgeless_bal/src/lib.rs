@@ -1,7 +1,7 @@
-// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
-// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
-// SPDX-FileCopyrightText: © 2023 Siemens AG
+// SPDX-FileCopyrightText: © 2025 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
+
+pub mod portal;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct EdgelessBalSettings {
@@ -66,10 +66,54 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
     };
 
     // Create the resources.
-    let local_resource_provider_specifications = vec![];
-    let local_resources = std::collections::HashMap::new();
-    let portal_resource_provider_specifications = vec![];
-    let portal_resources = std::collections::HashMap::new();
+    let class_type = "portal";
+    let provider_id = format!("portal-{}", settings.general.domain);
+    let local_resource_provider_specifications = vec![edgeless_api::node_registration::ResourceProviderSpecification {
+        provider_id: provider_id.clone(),
+        class_type: class_type.to_string(),
+        outputs: vec!["out".to_string()],
+    }];
+    let local_resources = std::collections::HashMap::from([(
+        provider_id.clone(),
+        edgeless_node::agent::ResourceDesc {
+            class_type: class_type.to_string(),
+            client: Box::new(
+                portal::PortalResourceProvider::new(
+                    local_data_plane.clone(),
+                    Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                        ("RESOURCE_CLASS_TYPE".to_string(), class_type.to_string()),
+                        ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                        ("NODE_ID".to_string(), settings.local.node_id.to_string()),
+                    ]))),
+                    edgeless_api::function_instance::InstanceId::new(settings.local.node_id),
+                )
+                .await,
+            ),
+        },
+    )]);
+    let portal_resource_provider_specifications = vec![edgeless_api::node_registration::ResourceProviderSpecification {
+        provider_id: provider_id.clone(),
+        class_type: class_type.to_string(),
+        outputs: vec!["out".to_string()],
+    }];
+    let portal_resources = std::collections::HashMap::from([(
+        provider_id.clone(),
+        edgeless_node::agent::ResourceDesc {
+            class_type: class_type.to_string(),
+            client: Box::new(
+                portal::PortalResourceProvider::new(
+                    portal_data_plane.clone(),
+                    Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                        ("RESOURCE_CLASS_TYPE".to_string(), class_type.to_string()),
+                        ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                        ("NODE_ID".to_string(), settings.portal.node_id.to_string()),
+                    ]))),
+                    edgeless_api::function_instance::InstanceId::new(settings.portal.node_id),
+                )
+                .await,
+            ),
+        },
+    )]);
 
     // Create the local and portal agent.
     let (mut local_agent, local_agent_task) = edgeless_node::agent::Agent::new(
