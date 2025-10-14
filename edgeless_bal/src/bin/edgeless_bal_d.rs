@@ -1,7 +1,6 @@
-// SPDX-FileCopyrightText: © 2023 Technical University of Munich, Chair of Connected Mobility
-// SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
-// SPDX-FileCopyrightText: © 2023 Siemens AG
+// SPDX-FileCopyrightText: © 2025 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
+
 use clap::Parser;
 
 #[derive(Debug, clap::Parser)]

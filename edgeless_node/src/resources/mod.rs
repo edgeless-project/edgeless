@@ -13,7 +13,7 @@ pub mod resource_provider_specs;
 pub mod serverless;
 pub mod sqlx;
 
-fn observe_transfer(
+pub fn observe_transfer(
     created: edgeless_api::function_instance::EventTimestamp,
     telemetry_handle: &mut Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
 ) -> chrono::DateTime<chrono::Utc> {
@@ -27,7 +27,7 @@ fn observe_transfer(
     now
 }
 
-fn observe_execution(
+pub fn observe_execution(
     started: chrono::DateTime<chrono::Utc>,
     telemetry_handle: &mut Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     need_reply: bool,
