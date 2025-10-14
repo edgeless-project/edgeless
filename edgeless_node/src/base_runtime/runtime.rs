@@ -15,7 +15,10 @@ pub trait GuestAPIHostRegister {
         guest_api_host: crate::base_runtime::guest_api::GuestAPIHost,
     );
 
-    fn deregister_guest_api_host(&mut self, instance_id: &edgeless_api::function_instance::InstanceId);
+    fn deregister_guest_api_host(
+        &mut self,
+        instance_id: &edgeless_api::function_instance::InstanceId,
+    );
 
     fn guest_api_host(
         &mut self,
@@ -35,9 +38,13 @@ pub struct RuntimeTask<FunctionInstanceType: super::FunctionInstance> {
     data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     state_manager: Box<dyn crate::state_management::StateManagerAPI>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
+    guest_api_host_register:
+        std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
     slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
-    functions: std::collections::HashMap<uuid::Uuid, super::function_instance_runner::FunctionInstanceRunner<FunctionInstanceType>>,
+    functions: std::collections::HashMap<
+        uuid::Uuid,
+        super::function_instance_runner::FunctionInstanceRunner<FunctionInstanceType>,
+    >,
 }
 
 pub enum RuntimeRequest {
@@ -47,7 +54,10 @@ pub enum RuntimeRequest {
     ),
     Stop(edgeless_api::function_instance::InstanceId),
     Patch(edgeless_api::common::PatchRequest),
-    FunctionExit(edgeless_api::function_instance::InstanceId, Result<(), super::FunctionInstanceError>),
+    FunctionExit(
+        edgeless_api::function_instance::InstanceId,
+        Result<(), super::FunctionInstanceError>,
+    ),
 }
 
 /// Entrypoint for all runtimes based on the base_runtime.
@@ -55,7 +65,9 @@ pub fn create<FunctionInstanceType: super::FunctionInstance>(
     data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
     state_manager: Box<dyn crate::state_management::StateManagerAPI>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
+    guest_api_host_register: std::sync::Arc<
+        tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>,
+    >,
 ) -> (RuntimeClient, RuntimeTask<FunctionInstanceType>) {
     let (sender, receiver) = futures::channel::mpsc::unbounded();
     let task: RuntimeTask<FunctionInstanceType> = RuntimeTask::new(
@@ -78,7 +90,9 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         data_plane_provider: edgeless_dataplane::handle::DataplaneProvider,
         state_manager: Box<dyn crate::state_management::StateManagerAPI>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-        guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>>,
+        guest_api_host_register: std::sync::Arc<
+            tokio::sync::Mutex<Box<dyn GuestAPIHostRegister + Send>>,
+        >,
         slf_channel: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
     ) -> Self {
         Self {
@@ -126,12 +140,16 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
             data_plane,
             self.slf_channel.clone(),
             self.state_manager
-                .get_handle(spawn_request.state_specification.state_policy, spawn_request.state_specification.state_id)
+                .get_handle(
+                    spawn_request.state_specification.state_policy,
+                    spawn_request.state_specification.state_id,
+                )
                 .await,
-            self.telemetry_handle.fork(std::collections::BTreeMap::from([(
-                "FUNCTION_ID".to_string(),
-                instance_id.function_id.to_string(),
-            )])),
+            self.telemetry_handle
+                .fork(std::collections::BTreeMap::from([(
+                    "FUNCTION_ID".to_string(),
+                    instance_id.function_id.to_string(),
+                )])),
             self.guest_api_host_register.clone(),
         )
         .await;
@@ -152,14 +170,20 @@ impl<FunctionInstanceType: super::FunctionInstance> RuntimeTask<FunctionInstance
         }
     }
 
-    async fn function_exit(&mut self, instance_id: edgeless_api::function_instance::InstanceId, status: Result<(), super::FunctionInstanceError>) {
+    async fn function_exit(
+        &mut self,
+        instance_id: edgeless_api::function_instance::InstanceId,
+        status: Result<(), super::FunctionInstanceError>,
+    ) {
         log::info!("Function Exit Event: {:?} {:?}", instance_id, status);
         self.functions.remove(&instance_id.function_id);
     }
 }
 
 impl RuntimeClient {
-    pub fn new(runtime_request_sender: futures::channel::mpsc::UnboundedSender<RuntimeRequest>) -> Self {
+    pub fn new(
+        runtime_request_sender: futures::channel::mpsc::UnboundedSender<RuntimeRequest>,
+    ) -> Self {
         RuntimeClient {
             sender: runtime_request_sender,
         }
@@ -173,13 +197,20 @@ impl super::RuntimeAPI for RuntimeClient {
         instance_id: edgeless_api::function_instance::InstanceId,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<()> {
-        match self.sender.send(RuntimeRequest::Start(instance_id, request)).await {
+        match self
+            .sender
+            .send(RuntimeRequest::Start(instance_id, request))
+            .await
+        {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),
         }
     }
 
-    async fn stop(&mut self, instance_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+    async fn stop(
+        &mut self,
+        instance_id: edgeless_api::function_instance::InstanceId,
+    ) -> anyhow::Result<()> {
         match self.sender.send(RuntimeRequest::Stop(instance_id)).await {
             Ok(_) => Ok(()),
             Err(_) => Err(anyhow::anyhow!("Runner Channel Error")),

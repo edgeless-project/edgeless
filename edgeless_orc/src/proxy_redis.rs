@@ -31,7 +31,8 @@ pub struct ProxyRedis {
     last_update_timestamps: std::collections::HashMap<crate::proxy::Category, String>,
 
     // copy of data structures dumped to files
-    mapping_to_instance_id: std::collections::HashMap<uuid::Uuid, Vec<edgeless_api::function_instance::InstanceId>>,
+    mapping_to_instance_id:
+        std::collections::HashMap<uuid::Uuid, Vec<edgeless_api::function_instance::InstanceId>>,
     node_capabilities: std::collections::HashMap<uuid::Uuid, String>,
     node_health_status: std::collections::HashMap<uuid::Uuid, String>,
 
@@ -52,11 +53,19 @@ impl ProxyRedis {
     /// - `flushdb`: if true, then the Redis database is flushed upon creation.
     /// - `dataset_settings`: the settings to save samples to output files.
     ///
-    pub fn new(redis_url: &str, flushdb: bool, dataset_settings: Option<crate::EdgelessOrcProxyDatasetSettings>) -> anyhow::Result<Self> {
+    pub fn new(
+        redis_url: &str,
+        flushdb: bool,
+        dataset_settings: Option<crate::EdgelessOrcProxyDatasetSettings>,
+    ) -> anyhow::Result<Self> {
         log::info!(
             "creating Redis orchestrator proxy at URL {} ({})",
             redis_url,
-            if flushdb { "flush DB" } else { "do not flush DB" }
+            if flushdb {
+                "flush DB"
+            } else {
+                "do not flush DB"
+            }
         );
 
         // Create the connection with the Redis server
@@ -73,16 +82,24 @@ impl ProxyRedis {
             None => "".to_string(),
         };
 
-        let (health_status_file, capabilities_file, mapping_to_instance_id_file, performance_samples_file) =
-            if let Some(dataset_settings) = dataset_settings {
-                if !dataset_settings.dataset_path.is_empty() {
-                    ProxyRedis::open_files(dataset_settings.dataset_path, dataset_settings.append, dataset_settings.additional_header)
-                } else {
-                    (None, None, None, None)
-                }
+        let (
+            health_status_file,
+            capabilities_file,
+            mapping_to_instance_id_file,
+            performance_samples_file,
+        ) = if let Some(dataset_settings) = dataset_settings {
+            if !dataset_settings.dataset_path.is_empty() {
+                ProxyRedis::open_files(
+                    dataset_settings.dataset_path,
+                    dataset_settings.append,
+                    dataset_settings.additional_header,
+                )
             } else {
                 (None, None, None, None)
-            };
+            }
+        } else {
+            (None, None, None, None)
+        };
 
         Ok(Self {
             connection,
@@ -106,13 +123,29 @@ impl ProxyRedis {
         dataset_path: String,
         append: bool,
         additional_header: String,
-    ) -> (Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>) {
-        let filenames = ["performance_samples", "mapping_to_instance_id", "capabilities", "health_status"];
+    ) -> (
+        Option<std::fs::File>,
+        Option<std::fs::File>,
+        Option<std::fs::File>,
+        Option<std::fs::File>,
+    ) {
+        let filenames = [
+            "performance_samples",
+            "mapping_to_instance_id",
+            "capabilities",
+            "health_status",
+        ];
         let headers = [
             "identifier,metric,timestamp,value".to_string(),
             "timestamp,logical_id,workflow_id,node_id,physical_id".to_string(),
-            format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeCapabilities::csv_header()),
-            format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeHealthStatus::csv_header()),
+            format!(
+                "timestamp,node_id,{}",
+                edgeless_api::node_registration::NodeCapabilities::csv_header()
+            ),
+            format!(
+                "timestamp,node_id,{}",
+                edgeless_api::node_registration::NodeHealthStatus::csv_header()
+            ),
         ];
 
         let mut outfiles = vec![];
@@ -125,7 +158,11 @@ impl ProxyRedis {
             ancestors.next();
             let base_dir = ancestors.next().unwrap();
             let res = if let Err(err) = std::fs::create_dir_all(base_dir) {
-                log::warn!("could not create the directory where to dump the dataset '{}': {}", filename, err);
+                log::warn!(
+                    "could not create the directory where to dump the dataset '{}': {}",
+                    filename,
+                    err
+                );
                 None
             } else {
                 match ProxyRedis::open_file(filename.as_str(), append, header, &additional_header) {
@@ -148,7 +185,12 @@ impl ProxyRedis {
         )
     }
 
-    fn open_file(filename: &str, append: bool, header: &str, additional_header: &str) -> anyhow::Result<std::fs::File> {
+    fn open_file(
+        filename: &str,
+        append: bool,
+        header: &str,
+        additional_header: &str,
+    ) -> anyhow::Result<std::fs::File> {
         let write_header = !append
             || match std::fs::metadata(filename) {
                 Ok(metadata) => metadata.len() == 0,
@@ -174,11 +216,17 @@ impl ProxyRedis {
 pub enum ActiveInstanceClone {
     // 0: request
     // 1: [ (node_id, lid) ]
-    Function(edgeless_api::function_instance::SpawnFunctionRequest, Vec<String>),
+    Function(
+        edgeless_api::function_instance::SpawnFunctionRequest,
+        Vec<String>,
+    ),
 
     // 0: request
     // 1: (node_id, lid)
-    Resource(edgeless_api::resource_configuration::ResourceInstanceSpecification, String),
+    Resource(
+        edgeless_api::resource_configuration::ResourceInstanceSpecification,
+        String,
+    ),
 }
 
 fn string_to_instance_id(val: &str) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
@@ -195,7 +243,10 @@ fn string_to_instance_id(val: &str) -> anyhow::Result<edgeless_api::function_ins
         Ok(val) => val,
         Err(err) => anyhow::bail!("invalid function_id in InstanceId: {}", err),
     };
-    Ok(edgeless_api::function_instance::InstanceId { node_id, function_id })
+    Ok(edgeless_api::function_instance::InstanceId {
+        node_id,
+        function_id,
+    })
 }
 
 impl ProxyRedis {
@@ -204,20 +255,33 @@ impl ProxyRedis {
         now.timestamp() as f64 + now.timestamp_subsec_nanos() as f64 / 1e9
     }
 
-    fn fetch_instances(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, crate::active_instance::ActiveInstance> {
+    fn fetch_instances(
+        &mut self,
+    ) -> std::collections::HashMap<
+        edgeless_api::function_instance::ComponentId,
+        crate::active_instance::ActiveInstance,
+    > {
         self.local_timestamp_update(&crate::proxy::Category::ActiveInstances);
         let mut instance_ids = vec![];
-        for instance_key in self.connection.keys::<&str, Vec<String>>("instance:*").unwrap_or(vec![]) {
+        for instance_key in self
+            .connection
+            .keys::<&str, Vec<String>>("instance:*")
+            .unwrap_or(vec![])
+        {
             let tokens: Vec<&str> = instance_key.split(':').collect();
             if tokens.len() == 2 {
-                if let Ok(uuid) = edgeless_api::function_instance::ComponentId::parse_str(tokens[1]) {
+                if let Ok(uuid) = edgeless_api::function_instance::ComponentId::parse_str(tokens[1])
+                {
                     instance_ids.push(uuid);
                 }
             }
         }
         let mut instances = std::collections::HashMap::new();
         for instance_id in instance_ids {
-            if let Ok(val) = self.connection.get::<String, String>(format!("instance:{}", instance_id)) {
+            if let Ok(val) = self
+                .connection
+                .get::<String, String>(format!("instance:{}", instance_id))
+            {
                 if let Ok(val) = serde_json::from_str::<ActiveInstanceClone>(&val) {
                     instances.insert(
                         instance_id,
@@ -225,19 +289,26 @@ impl ProxyRedis {
                             ActiveInstanceClone::Function(spawn_req, instance_ids_str) => {
                                 let mut instance_ids = vec![];
                                 for instance_id_str in instance_ids_str {
-                                    if let Ok(instance_id) = string_to_instance_id(&instance_id_str) {
+                                    if let Ok(instance_id) = string_to_instance_id(&instance_id_str)
+                                    {
                                         instance_ids.push(instance_id);
                                     }
                                 }
                                 if !instance_ids.is_empty() {
-                                    crate::active_instance::ActiveInstance::Function(spawn_req, instance_ids)
+                                    crate::active_instance::ActiveInstance::Function(
+                                        spawn_req,
+                                        instance_ids,
+                                    )
                                 } else {
                                     continue;
                                 }
                             }
                             ActiveInstanceClone::Resource(spawn_req, instance_id_str) => {
                                 if let Ok(instance_id) = string_to_instance_id(&instance_id_str) {
-                                    crate::active_instance::ActiveInstance::Resource(spawn_req, instance_id)
+                                    crate::active_instance::ActiveInstance::Resource(
+                                        spawn_req,
+                                        instance_id,
+                                    )
                                 } else {
                                     continue;
                                 }
@@ -264,23 +335,30 @@ impl ProxyRedis {
 
     fn local_timestamp_update(&mut self, category: &crate::proxy::Category) {
         let redis_timestamp = self.get_last_update(category);
-        self.last_update_timestamps.insert(category.clone(), redis_timestamp);
+        self.last_update_timestamps
+            .insert(category.clone(), redis_timestamp);
     }
 }
 
 impl super::proxy::Proxy for ProxyRedis {
-    fn update_nodes(&mut self, nodes: &std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>) {
+    fn update_nodes(
+        &mut self,
+        nodes: &std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>,
+    ) {
         let timestamp = ProxyRedis::timestamp_now();
 
         // update the timestamp when the nodes were updated
-        let _ = redis::Cmd::set(String::from("node:capabilities:last_update"), timestamp).exec(&mut self.connection);
+        let _ = redis::Cmd::set(String::from("node:capabilities:last_update"), timestamp)
+            .exec(&mut self.connection);
 
         // serialize the nodes' capabilities and health status to Redis
         let mut new_node_capabilities = std::collections::HashMap::new();
         for (uuid, client_desc) in nodes {
             let _ = redis::Cmd::set(
                 format!("node:capabilities:{}", uuid).as_str(),
-                serde_json::to_string(&client_desc.capabilities).unwrap_or_default().as_str(),
+                serde_json::to_string(&client_desc.capabilities)
+                    .unwrap_or_default()
+                    .as_str(),
             )
             .exec(&mut self.connection);
             let new_caps = client_desc.capabilities.to_csv();
@@ -291,7 +369,11 @@ impl super::proxy::Proxy for ProxyRedis {
                     true
                 };
                 if write {
-                    let _ = writeln!(outfile, "{},{},{},{}", self.additional_fields, timestamp, uuid, new_caps);
+                    let _ = writeln!(
+                        outfile,
+                        "{},{},{},{}",
+                        self.additional_fields, timestamp, uuid, new_caps
+                    );
                 }
             }
             new_node_capabilities.insert(*uuid, new_caps);
@@ -299,53 +381,86 @@ impl super::proxy::Proxy for ProxyRedis {
         let _ = std::mem::replace(&mut self.node_capabilities, new_node_capabilities);
 
         // remove nodes that are not anymore in the orchestration domain
-        let new_active_instance_uuids = nodes.keys().cloned().collect::<std::collections::HashSet<uuid::Uuid>>();
-        self.active_instance_uuids.difference(&new_active_instance_uuids).for_each(|uuid| {
-            let _ = redis::pipe()
-                .del(format!("node:capabilities:{}", uuid).as_str())
-                .ignore()
-                .del(format!("node:health:{}", uuid).as_str())
-                .exec(&mut self.connection);
-        });
+        let new_active_instance_uuids = nodes
+            .keys()
+            .cloned()
+            .collect::<std::collections::HashSet<uuid::Uuid>>();
+        self.active_instance_uuids
+            .difference(&new_active_instance_uuids)
+            .for_each(|uuid| {
+                let _ = redis::pipe()
+                    .del(format!("node:capabilities:{}", uuid).as_str())
+                    .ignore()
+                    .del(format!("node:health:{}", uuid).as_str())
+                    .exec(&mut self.connection);
+            });
 
         // update the list of node UUIDs
         self.active_instance_uuids = new_active_instance_uuids;
     }
 
-    fn update_resource_providers(&mut self, resource_providers: &std::collections::HashMap<String, crate::resource_provider::ResourceProvider>) {
+    fn update_resource_providers(
+        &mut self,
+        resource_providers: &std::collections::HashMap<
+            String,
+            crate::resource_provider::ResourceProvider,
+        >,
+    ) {
         // update the timestamp when the resource providers were updated
-        let _ = redis::Cmd::set(String::from("provider:last_update"), ProxyRedis::timestamp_now()).exec(&mut self.connection);
+        let _ = redis::Cmd::set(
+            String::from("provider:last_update"),
+            ProxyRedis::timestamp_now(),
+        )
+        .exec(&mut self.connection);
 
         // serialize the resource providers
         for (provider_id, resource_provider) in resource_providers {
             let _ = self.connection.set::<&str, &str, usize>(
                 format!("provider:{}", provider_id).as_str(),
-                serde_json::to_string(&resource_provider).unwrap_or_default().as_str(),
+                serde_json::to_string(&resource_provider)
+                    .unwrap_or_default()
+                    .as_str(),
             );
         }
 
         // remove resource providers that are not anymore present
-        let new_resource_provider_ids = resource_providers.keys().cloned().collect::<std::collections::HashSet<String>>();
-        self.resource_provider_ids.difference(&new_resource_provider_ids).for_each(|provider_id| {
-            let _ = self.connection.del::<&str, usize>(format!("provider:{}", provider_id).as_str());
-        });
+        let new_resource_provider_ids = resource_providers
+            .keys()
+            .cloned()
+            .collect::<std::collections::HashSet<String>>();
+        self.resource_provider_ids
+            .difference(&new_resource_provider_ids)
+            .for_each(|provider_id| {
+                let _ = self
+                    .connection
+                    .del::<&str, usize>(format!("provider:{}", provider_id).as_str());
+            });
 
         // update the list of the resource provider identifiers
         self.resource_provider_ids = new_resource_provider_ids;
     }
 
-    fn update_active_instances(&mut self, active_instances: &std::collections::HashMap<uuid::Uuid, crate::active_instance::ActiveInstance>) {
+    fn update_active_instances(
+        &mut self,
+        active_instances: &std::collections::HashMap<
+            uuid::Uuid,
+            crate::active_instance::ActiveInstance,
+        >,
+    ) {
         let timestamp = ProxyRedis::timestamp_now();
 
         // update the timestamp when the active instances were updated
-        let _ = redis::Cmd::set(String::from("instance:last_update"), timestamp).exec(&mut self.connection);
+        let _ = redis::Cmd::set(String::from("instance:last_update"), timestamp)
+            .exec(&mut self.connection);
 
         // serialize the active instances
         let mut new_mapping_to_instance_id = std::collections::HashMap::new();
         for (lid, active_instance) in active_instances {
             let _ = self.connection.set::<&str, &str, usize>(
                 format!("instance:{}", lid).as_str(),
-                serde_json::to_string(&active_instance.strip()).unwrap_or_default().as_str(),
+                serde_json::to_string(&active_instance.strip())
+                    .unwrap_or_default()
+                    .as_str(),
             );
             let new_instance_ids = active_instance.instance_ids();
             if let Some(outfile) = &mut self.mapping_to_instance_id_file {
@@ -375,46 +490,77 @@ impl super::proxy::Proxy for ProxyRedis {
         let _ = std::mem::replace(&mut self.mapping_to_instance_id, new_mapping_to_instance_id);
 
         // remove instances that are not active anymore
-        let new_node_uuids = active_instances.keys().cloned().collect::<std::collections::HashSet<uuid::Uuid>>();
+        let new_node_uuids = active_instances
+            .keys()
+            .cloned()
+            .collect::<std::collections::HashSet<uuid::Uuid>>();
         self.node_uuids.difference(&new_node_uuids).for_each(|lid| {
-            let _ = self.connection.del::<&str, usize>(format!("instance:{}", lid).as_str());
+            let _ = self
+                .connection
+                .del::<&str, usize>(format!("instance:{}", lid).as_str());
         });
 
         // update the list of active instance ext fids
         self.node_uuids = new_node_uuids;
     }
 
-    fn update_dependency_graph(&mut self, dependency_graph: &std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>) {
+    fn update_dependency_graph(
+        &mut self,
+        dependency_graph: &std::collections::HashMap<
+            uuid::Uuid,
+            std::collections::HashMap<String, uuid::Uuid>,
+        >,
+    ) {
         // update the timestamp when the dependency graph was updated
-        let _ = redis::Cmd::set(String::from("dependency:last_update"), ProxyRedis::timestamp_now()).exec(&mut self.connection);
+        let _ = redis::Cmd::set(
+            String::from("dependency:last_update"),
+            ProxyRedis::timestamp_now(),
+        )
+        .exec(&mut self.connection);
 
         // serialize the dependency graph
         for (lid, dependencies) in dependency_graph {
-            let _ =
-                redis::Cmd::set(format!("dependency:{}", lid), serde_json::to_string(&dependencies).unwrap_or_default()).exec(&mut self.connection);
+            let _ = redis::Cmd::set(
+                format!("dependency:{}", lid),
+                serde_json::to_string(&dependencies).unwrap_or_default(),
+            )
+            .exec(&mut self.connection);
         }
 
         // remove dependencies that do not exist anymore
-        let new_dependency_uuids = dependency_graph.keys().cloned().collect::<std::collections::HashSet<uuid::Uuid>>();
-        self.dependency_uuids.difference(&new_dependency_uuids).for_each(|lid| {
-            let _ = redis::Cmd::del(format!("dependency:{}", lid)).exec(&mut self.connection);
-        });
+        let new_dependency_uuids = dependency_graph
+            .keys()
+            .cloned()
+            .collect::<std::collections::HashSet<uuid::Uuid>>();
+        self.dependency_uuids
+            .difference(&new_dependency_uuids)
+            .for_each(|lid| {
+                let _ = redis::Cmd::del(format!("dependency:{}", lid)).exec(&mut self.connection);
+            });
 
         // update the list of active instance ext fids
         self.dependency_uuids = new_dependency_uuids;
     }
 
     fn update_domain_info(&mut self, domain_info: &crate::domain_info::DomainInfo) {
-        let _ = self.connection.set::<&str, &str, usize>("domain_info:domain_id", &domain_info.domain_id);
+        let _ = self
+            .connection
+            .set::<&str, &str, usize>("domain_info:domain_id", &domain_info.domain_id);
     }
 
-    fn push_node_health(&mut self, node_id: &uuid::Uuid, node_health: edgeless_api::node_registration::NodeHealthStatus) {
+    fn push_node_health(
+        &mut self,
+        node_id: &uuid::Uuid,
+        node_health: edgeless_api::node_registration::NodeHealthStatus,
+    ) {
         let timestamp = ProxyRedis::timestamp_now();
 
         // Save to Redis.
         let _ = redis::Cmd::zadd(
             format!("node:health:{}", node_id).as_str(),
-            serde_json::to_string(&node_health).unwrap_or_default().as_str(),
+            serde_json::to_string(&node_health)
+                .unwrap_or_default()
+                .as_str(),
             timestamp,
         )
         .exec(&mut self.connection);
@@ -428,22 +574,37 @@ impl super::proxy::Proxy for ProxyRedis {
                 true
             };
             if write {
-                let _ = writeln!(outfile, "{},{},{},{}", self.additional_fields, timestamp, node_id, new_health_status);
+                let _ = writeln!(
+                    outfile,
+                    "{},{},{},{}",
+                    self.additional_fields, timestamp, node_id, new_health_status
+                );
             }
         }
     }
 
-    fn push_performance_samples(&mut self, _node_id: &uuid::Uuid, performance_samples: edgeless_api::node_registration::NodePerformanceSamples) {
+    fn push_performance_samples(
+        &mut self,
+        _node_id: &uuid::Uuid,
+        performance_samples: edgeless_api::node_registration::NodePerformanceSamples,
+    ) {
         let all_sample_series = vec![
-            ("function_execution_time", &performance_samples.function_execution_times),
-            ("function_transfer_time", &performance_samples.function_transfer_times),
+            (
+                "function_execution_time",
+                &performance_samples.function_execution_times,
+            ),
+            (
+                "function_transfer_time",
+                &performance_samples.function_transfer_times,
+            ),
         ];
         for (name, series) in all_sample_series {
             for (function_id, values) in series {
                 let key = format!("performance:{}:{}", function_id, name);
                 for value in values {
                     // Save to Redis.
-                    let _ = redis::Cmd::zadd(&key, value.to_string(), value.score()).exec(&mut self.connection);
+                    let _ = redis::Cmd::zadd(&key, value.to_string(), value.score())
+                        .exec(&mut self.connection);
 
                     // Save to dataset output.
                     if let Some(outfile) = &mut self.performance_samples_file {
@@ -465,7 +626,8 @@ impl super::proxy::Proxy for ProxyRedis {
                 let key = format!("performance:{}:{}", function_id, log_entry.target);
 
                 // Save to Redis.
-                let _ = redis::Cmd::zadd(&key, log_entry.to_string(), log_entry.score()).exec(&mut self.connection);
+                let _ = redis::Cmd::zadd(&key, log_entry.to_string(), log_entry.score())
+                    .exec(&mut self.connection);
 
                 // Save to dataset output.
                 if let Some(outfile) = &mut self.performance_samples_file {
@@ -484,15 +646,21 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn add_deploy_intents(&mut self, intents: Vec<crate::deploy_intent::DeployIntent>) {
         for intent in intents {
-            let _ = self.connection.set::<&str, &str, usize>(&intent.key(), &intent.value());
-            let _ = self.connection.rpush::<&str, &str, String>("intents", &intent.key());
+            let _ = self
+                .connection
+                .set::<&str, &str, usize>(&intent.key(), &intent.value());
+            let _ = self
+                .connection
+                .rpush::<&str, &str, String>("intents", &intent.key());
         }
     }
 
     fn retrieve_deploy_intents(&mut self) -> Vec<crate::deploy_intent::DeployIntent> {
         let mut intents = vec![];
         loop {
-            let lpop_res = self.connection.lpop::<&str, Option<String>>("intents", None);
+            let lpop_res = self
+                .connection
+                .lpop::<&str, Option<String>>("intents", None);
 
             match lpop_res {
                 Ok(intent_key) => {
@@ -501,13 +669,24 @@ impl super::proxy::Proxy for ProxyRedis {
                         let _ = self.connection.del::<&str, usize>(&intent_key);
                         match get_res {
                             Ok(intent_value) => match intent_value {
-                                Some(intent_value) => match crate::deploy_intent::DeployIntent::new(&intent_key, &intent_value) {
-                                    Ok(intent) => intents.push(intent),
-                                    Err(err) => log::warn!("invalid intent value '{}': {}", intent_value, err),
-                                },
+                                Some(intent_value) => {
+                                    match crate::deploy_intent::DeployIntent::new(
+                                        &intent_key,
+                                        &intent_value,
+                                    ) {
+                                        Ok(intent) => intents.push(intent),
+                                        Err(err) => log::warn!(
+                                            "invalid intent value '{}': {}",
+                                            intent_value,
+                                            err
+                                        ),
+                                    }
+                                }
                                 None => log::warn!("empty intent key '{}'", intent_key),
                             },
-                            Err(err) => log::warn!("could not read intent '{}': {}", intent_key, err),
+                            Err(err) => {
+                                log::warn!("could not read intent '{}': {}", intent_key, err)
+                            }
                         }
                     } else {
                         break;
@@ -529,15 +708,25 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_node_capabilities(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeCapabilities> {
+    ) -> std::collections::HashMap<
+        edgeless_api::function_instance::NodeId,
+        edgeless_api::node_registration::NodeCapabilities,
+    > {
         self.local_timestamp_update(&crate::proxy::Category::NodeCapabilities);
         let mut capabilities = std::collections::HashMap::new();
-        for node_key in self.connection.keys::<&str, Vec<String>>("node:capabilities:*").unwrap_or(vec![]) {
+        for node_key in self
+            .connection
+            .keys::<&str, Vec<String>>("node:capabilities:*")
+            .unwrap_or(vec![])
+        {
             let tokens: Vec<&str> = node_key.split(':').collect();
             assert_eq!(tokens.len(), 3);
             if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2]) {
                 if let Ok(val) = self.connection.get::<&str, String>(&node_key) {
-                    if let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeCapabilities>(&val) {
+                    if let Ok(val) = serde_json::from_str::<
+                        edgeless_api::node_registration::NodeCapabilities,
+                    >(&val)
+                    {
                         capabilities.insert(node_id, val);
                     }
                 }
@@ -546,14 +735,22 @@ impl super::proxy::Proxy for ProxyRedis {
         capabilities
     }
 
-    fn fetch_resource_providers(&mut self) -> std::collections::HashMap<String, crate::resource_provider::ResourceProvider> {
+    fn fetch_resource_providers(
+        &mut self,
+    ) -> std::collections::HashMap<String, crate::resource_provider::ResourceProvider> {
         self.local_timestamp_update(&crate::proxy::Category::ResourceProviders);
         let mut resource_providers = std::collections::HashMap::new();
-        for node_key in self.connection.keys::<&str, Vec<String>>("provider:*").unwrap_or(vec![]) {
+        for node_key in self
+            .connection
+            .keys::<&str, Vec<String>>("provider:*")
+            .unwrap_or(vec![])
+        {
             if let Some((provider, provider_id)) = node_key.split_once(':') {
                 assert_eq!("provider", provider);
                 if let Ok(val) = self.connection.get::<&str, String>(&node_key) {
-                    if let Ok(val) = serde_json::from_str::<crate::resource_provider::ResourceProvider>(&val) {
+                    if let Ok(val) =
+                        serde_json::from_str::<crate::resource_provider::ResourceProvider>(&val)
+                    {
                         resource_providers.insert(provider_id.to_string(), val);
                     }
                 }
@@ -566,21 +763,34 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_node_health(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, edgeless_api::node_registration::NodeHealthStatus> {
+    ) -> std::collections::HashMap<
+        edgeless_api::function_instance::NodeId,
+        edgeless_api::node_registration::NodeHealthStatus,
+    > {
         let mut health = std::collections::HashMap::new();
-        for node_key in self.connection.keys::<&str, Vec<String>>("node:health:*").unwrap_or(vec![]) {
+        for node_key in self
+            .connection
+            .keys::<&str, Vec<String>>("node:health:*")
+            .unwrap_or(vec![])
+        {
             let tokens: Vec<&str> = node_key.split(':').collect();
             assert_eq!(tokens.len(), 3);
             assert_eq!("node", tokens[0]);
             assert_eq!("health", tokens[1]);
             if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2]) {
-                if let Ok(values) = self.connection.zrange::<&str, Vec<String>>(&node_key, -1, -1) {
+                if let Ok(values) = self
+                    .connection
+                    .zrange::<&str, Vec<String>>(&node_key, -1, -1)
+                {
                     assert!(
                         values.len() <= 1,
                         "Invalid number of elements for ZRANGE command that should return 0 or 1 elements"
                     );
                     if let Some(value) = values.first() {
-                        if let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(value) {
+                        if let Ok(val) = serde_json::from_str::<
+                            edgeless_api::node_registration::NodeHealthStatus,
+                        >(value)
+                        {
                             health.insert(node_id, val);
                         }
                     }
@@ -592,20 +802,34 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_node_healths(&mut self) -> crate::proxy::NodeHealthStatuses {
         let mut healths = std::collections::HashMap::new();
-        for node_key in self.connection.keys::<&str, Vec<String>>("node:health:*").unwrap_or(vec![]) {
+        for node_key in self
+            .connection
+            .keys::<&str, Vec<String>>("node:health:*")
+            .unwrap_or(vec![])
+        {
             let tokens: Vec<&str> = node_key.split(':').collect();
             assert_eq!(tokens.len(), 3);
             assert_eq!("node", tokens[0]);
             assert_eq!("health", tokens[1]);
             let mut health_history = vec![];
             if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2]) {
-                if let Ok(values) =
-                    self.connection
-                        .zrangebyscore_withscores::<&str, f64, f64, Vec<(String, f64)>>(&node_key, f64::NEG_INFINITY, f64::INFINITY)
+                if let Ok(values) = self
+                    .connection
+                    .zrangebyscore_withscores::<&str, f64, f64, Vec<(String, f64)>>(
+                        &node_key,
+                        f64::NEG_INFINITY,
+                        f64::INFINITY,
+                    )
                 {
                     for (value, timestamp) in values {
-                        if let Some(timestamp) = chrono::DateTime::from_timestamp(timestamp as i64, (timestamp.fract() * 1e9) as u32) {
-                            if let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(&value) {
+                        if let Some(timestamp) = chrono::DateTime::from_timestamp(
+                            timestamp as i64,
+                            (timestamp.fract() * 1e9) as u32,
+                        ) {
+                            if let Ok(val) = serde_json::from_str::<
+                                edgeless_api::node_registration::NodeHealthStatus,
+                            >(&value)
+                            {
                                 health_history.push((timestamp, val));
                             }
                         }
@@ -617,9 +841,15 @@ impl super::proxy::Proxy for ProxyRedis {
         healths
     }
 
-    fn fetch_performance_samples(&mut self) -> std::collections::HashMap<String, crate::proxy::PerformanceSamples> {
+    fn fetch_performance_samples(
+        &mut self,
+    ) -> std::collections::HashMap<String, crate::proxy::PerformanceSamples> {
         let mut samples = std::collections::HashMap::new();
-        for perf_key in self.connection.keys::<&str, Vec<String>>("performance:*").unwrap_or(vec![]) {
+        for perf_key in self
+            .connection
+            .keys::<&str, Vec<String>>("performance:*")
+            .unwrap_or(vec![])
+        {
             let tokens: Vec<&str> = perf_key.split(':').collect();
             if tokens.len() != 3 {
                 continue;
@@ -627,12 +857,18 @@ impl super::proxy::Proxy for ProxyRedis {
             assert_eq!(tokens.len(), 3);
             assert_eq!("performance", tokens[0]);
 
-            let entry = samples.entry(tokens[1].to_string()).or_insert(std::collections::HashMap::new());
+            let entry = samples
+                .entry(tokens[1].to_string())
+                .or_insert(std::collections::HashMap::new());
             let sub_entry = entry.entry(tokens[2].to_string()).or_insert(vec![]);
 
             if let Ok(values) = self
                 .connection
-                .zrangebyscore::<&str, f64, f64, Vec<String>>(&perf_key, f64::NEG_INFINITY, f64::INFINITY)
+                .zrangebyscore::<&str, f64, f64, Vec<String>>(
+                    &perf_key,
+                    f64::NEG_INFINITY,
+                    f64::INFINITY,
+                )
             {
                 for value in values {
                     let tokens: Vec<&str> = value.split(":").collect();
@@ -654,10 +890,17 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_function_instance_requests(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::SpawnFunctionRequest> {
+    ) -> std::collections::HashMap<
+        edgeless_api::function_instance::ComponentId,
+        edgeless_api::function_instance::SpawnFunctionRequest,
+    > {
         let mut instances = std::collections::HashMap::new();
         for (logical_id, instance) in self.fetch_instances() {
-            if let crate::active_instance::ActiveInstance::Function(spawn_function_req, _instance_ids) = instance {
+            if let crate::active_instance::ActiveInstance::Function(
+                spawn_function_req,
+                _instance_ids,
+            ) = instance
+            {
                 instances.insert(logical_id, spawn_function_req);
             }
         }
@@ -666,11 +909,17 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_resource_instance_configurations(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::resource_configuration::ResourceInstanceSpecification>
-    {
+    ) -> std::collections::HashMap<
+        edgeless_api::function_instance::ComponentId,
+        edgeless_api::resource_configuration::ResourceInstanceSpecification,
+    > {
         let mut instances = std::collections::HashMap::new();
         for (logical_id, instance) in self.fetch_instances() {
-            if let crate::active_instance::ActiveInstance::Resource(resource_specification, _instance_id) = instance {
+            if let crate::active_instance::ActiveInstance::Resource(
+                resource_specification,
+                _instance_id,
+            ) = instance
+            {
                 instances.insert(logical_id, resource_specification);
             }
         }
@@ -679,7 +928,10 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_function_instances_to_nodes(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::NodeId>> {
+    ) -> std::collections::HashMap<
+        edgeless_api::function_instance::ComponentId,
+        Vec<edgeless_api::function_instance::NodeId>,
+    > {
         let mut instances = std::collections::HashMap::new();
         for (logical_id, instance) in self.fetch_instances() {
             if let crate::active_instance::ActiveInstance::Function(_, instance_ids) = instance {
@@ -691,12 +943,18 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_instances_to_physical_ids(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::ComponentId>> {
+    ) -> std::collections::HashMap<
+        edgeless_api::function_instance::ComponentId,
+        Vec<edgeless_api::function_instance::ComponentId>,
+    > {
         let mut instances = std::collections::HashMap::new();
         for (logical_id, instance) in self.fetch_instances() {
             match instance {
                 crate::active_instance::ActiveInstance::Function(_, instance_ids) => {
-                    instances.insert(logical_id, instance_ids.iter().map(|x| x.function_id).collect());
+                    instances.insert(
+                        logical_id,
+                        instance_ids.iter().map(|x| x.function_id).collect(),
+                    );
                 }
                 crate::active_instance::ActiveInstance::Resource(_, instance_id) => {
                     instances.insert(logical_id, vec![instance_id.function_id]);
@@ -708,7 +966,10 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_resource_instances_to_nodes(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::NodeId> {
+    ) -> std::collections::HashMap<
+        edgeless_api::function_instance::ComponentId,
+        edgeless_api::function_instance::NodeId,
+    > {
         let mut instances = std::collections::HashMap::new();
         for (logical_id, instance) in self.fetch_instances() {
             if let crate::active_instance::ActiveInstance::Resource(_, instance_id) = instance {
@@ -718,7 +979,12 @@ impl super::proxy::Proxy for ProxyRedis {
         instances
     }
 
-    fn fetch_nodes_to_instances(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::NodeId, Vec<crate::proxy::Instance>> {
+    fn fetch_nodes_to_instances(
+        &mut self,
+    ) -> std::collections::HashMap<
+        edgeless_api::function_instance::NodeId,
+        Vec<crate::proxy::Instance>,
+    > {
         let mut nodes_mapping = std::collections::HashMap::new();
         for (logical_id, instance) in self.fetch_instances() {
             match instance {
@@ -737,16 +1003,24 @@ impl super::proxy::Proxy for ProxyRedis {
         nodes_mapping
     }
 
-    fn fetch_dependency_graph(&mut self) -> std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>> {
+    fn fetch_dependency_graph(
+        &mut self,
+    ) -> std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>> {
         self.local_timestamp_update(&crate::proxy::Category::DependencyGraph);
         let mut dependency_graph = std::collections::HashMap::new();
-        for node_key in self.connection.keys::<&str, Vec<String>>("dependency:*").unwrap_or(vec![]) {
+        for node_key in self
+            .connection
+            .keys::<&str, Vec<String>>("dependency:*")
+            .unwrap_or(vec![])
+        {
             let tokens: Vec<&str> = node_key.split(':').collect();
             assert_eq!(tokens.len(), 2);
             assert_eq!("dependency", tokens[0]);
             if let Ok(lid) = uuid::Uuid::parse_str(tokens[1]) {
                 if let Ok(val) = self.connection.get::<&str, String>(&node_key) {
-                    if let Ok(val) = serde_json::from_str::<std::collections::HashMap<String, uuid::Uuid>>(&val) {
+                    if let Ok(val) =
+                        serde_json::from_str::<std::collections::HashMap<String, uuid::Uuid>>(&val)
+                    {
                         dependency_graph.insert(lid, val);
                     }
                 }
@@ -755,7 +1029,9 @@ impl super::proxy::Proxy for ProxyRedis {
         dependency_graph
     }
 
-    fn fetch_logical_id_to_workflow_id(&mut self) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, String> {
+    fn fetch_logical_id_to_workflow_id(
+        &mut self,
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, String> {
         self.fetch_instances()
             .iter()
             .map(|(logical_id, instance)| (*logical_id, instance.workflow_id()))
@@ -770,14 +1046,24 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn garbage_collection(&mut self, period: tokio::time::Duration) {
         let remove_timestamp = chrono::Utc::now() - period;
-        let remove_timestamp = remove_timestamp.timestamp() as f64 + remove_timestamp.timestamp_subsec_nanos() as f64 / 1e9;
-        log::debug!("proxy garbage collection: removing data until {}", remove_timestamp);
+        let remove_timestamp = remove_timestamp.timestamp() as f64
+            + remove_timestamp.timestamp_subsec_nanos() as f64 / 1e9;
+        log::debug!(
+            "proxy garbage collection: removing data until {}",
+            remove_timestamp
+        );
         let key_patterns = vec!["performance:*", "node:health:*"];
         for key_pattern in key_patterns {
-            for key in self.connection.keys::<&str, Vec<String>>(key_pattern).unwrap_or(vec![]) {
-                let _ = self
-                    .connection
-                    .zrembyscore::<&str, f64, f64, ()>(&key, f64::NEG_INFINITY, remove_timestamp);
+            for key in self
+                .connection
+                .keys::<&str, Vec<String>>(key_pattern)
+                .unwrap_or(vec![])
+            {
+                let _ = self.connection.zrembyscore::<&str, f64, f64, ()>(
+                    &key,
+                    f64::NEG_INFINITY,
+                    remove_timestamp,
+                );
             }
         }
     }
@@ -818,7 +1104,9 @@ mod test {
         assert!(redis_proxy.fetch_node_health().is_empty());
         assert!(redis_proxy.fetch_nodes_to_instances().is_empty());
         assert!(redis_proxy.fetch_performance_samples().is_empty());
-        assert!(redis_proxy.fetch_resource_instance_configurations().is_empty());
+        assert!(redis_proxy
+            .fetch_resource_instance_configurations()
+            .is_empty());
         assert!(redis_proxy.fetch_resource_instances_to_nodes().is_empty());
         assert!(redis_proxy.fetch_resource_providers().is_empty());
 
@@ -899,7 +1187,10 @@ mod test {
                 function_requests_expected.insert(*lid, req.clone());
             }
         }
-        assert_eq!(function_requests_expected, redis_proxy.fetch_function_instance_requests());
+        assert_eq!(
+            function_requests_expected,
+            redis_proxy.fetch_function_instance_requests()
+        );
         assert!(!redis_proxy.updated(crate::proxy::Category::ActiveInstances));
 
         let mut resource_configurations_expected = std::collections::HashMap::new();
@@ -908,7 +1199,10 @@ mod test {
                 resource_configurations_expected.insert(*lid, spec.clone());
             }
         }
-        assert_eq!(resource_configurations_expected, redis_proxy.fetch_resource_instance_configurations());
+        assert_eq!(
+            resource_configurations_expected,
+            redis_proxy.fetch_resource_instance_configurations()
+        );
 
         let function_instances = redis_proxy.fetch_function_instances_to_nodes();
         assert_eq!(function_instances.len(), 10);
@@ -940,7 +1234,10 @@ mod test {
             assert_eq!(1, mapping.1.len());
             let physical = mapping.1.first().unwrap();
 
-            let elem = logical_physical_ids.iter().find(|x| x.0 == logical).unwrap();
+            let elem = logical_physical_ids
+                .iter()
+                .find(|x| x.0 == logical)
+                .unwrap();
             assert_eq!(logical, elem.0);
             assert_eq!(*physical, elem.1);
         }
@@ -1001,12 +1298,16 @@ mod test {
         };
         let samples_1_values: Vec<f64> = vec![100.0, 101.0, 102.0, 103.0];
         let samples_2_values: Vec<f64> = vec![200.0, 201.0];
-        let samples_1: Vec<edgeless_api::node_registration::Sample> = samples_1_values.iter().map(|x| new_sample(*x)).collect();
-        let samples_2: Vec<edgeless_api::node_registration::Sample> = samples_2_values.iter().map(|x| new_sample(*x)).collect();
+        let samples_1: Vec<edgeless_api::node_registration::Sample> =
+            samples_1_values.iter().map(|x| new_sample(*x)).collect();
+        let samples_2: Vec<edgeless_api::node_registration::Sample> =
+            samples_2_values.iter().map(|x| new_sample(*x)).collect();
         let log_1_values: Vec<f64> = vec![100.0, 101.0, 102.0, 103.0];
         let log_2_values: Vec<f64> = vec![200.0, 201.0];
-        let log_1: Vec<edgeless_api::node_registration::FunctionLogEntry> = log_1_values.iter().map(|x| new_log(*x)).collect();
-        let log_2: Vec<edgeless_api::node_registration::FunctionLogEntry> = log_2_values.iter().map(|x| new_log(*x)).collect();
+        let log_1: Vec<edgeless_api::node_registration::FunctionLogEntry> =
+            log_1_values.iter().map(|x| new_log(*x)).collect();
+        let log_2: Vec<edgeless_api::node_registration::FunctionLogEntry> =
+            log_2_values.iter().map(|x| new_log(*x)).collect();
         let node_id_perf = uuid::Uuid::new_v4();
         let fid_perf_1 = uuid::Uuid::new_v4();
         let fid_perf_2 = uuid::Uuid::new_v4();
@@ -1020,15 +1321,27 @@ mod test {
         redis_proxy.push_performance_samples(
             &node_id_perf,
             edgeless_api::node_registration::NodePerformanceSamples {
-                function_execution_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
-                function_transfer_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
-                function_log_entries: std::collections::HashMap::from([(fid_perf_1, log_1.clone()), (fid_perf_2, log_2.clone())]),
+                function_execution_times: std::collections::HashMap::from([
+                    (fid_perf_1, samples_1.clone()),
+                    (fid_perf_2, samples_2.clone()),
+                ]),
+                function_transfer_times: std::collections::HashMap::from([
+                    (fid_perf_1, samples_1.clone()),
+                    (fid_perf_2, samples_2.clone()),
+                ]),
+                function_log_entries: std::collections::HashMap::from([
+                    (fid_perf_1, log_1.clone()),
+                    (fid_perf_2, log_2.clone()),
+                ]),
             },
         );
 
         // Node's last health.
         let node_health_res = redis_proxy.fetch_node_health();
-        assert_eq!(std::collections::HashMap::from([(node_id_perf, health_status.clone())]), node_health_res);
+        assert_eq!(
+            std::collections::HashMap::from([(node_id_perf, health_status.clone())]),
+            node_health_res
+        );
 
         // Node's health history.
         let node_healths_res = redis_proxy.fetch_node_healths();
@@ -1050,36 +1363,72 @@ mod test {
         assert_eq!(3, entry.len());
         let actual_values = entry.get("function_execution_time").unwrap();
         assert_eq!(
-            samples_1_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
-            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+            samples_1_values
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            actual_values
+                .iter()
+                .map(|x| x.1.clone())
+                .collect::<Vec<String>>()
         );
         let actual_values = entry.get("function_transfer_time").unwrap();
         assert_eq!(
-            samples_1_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
-            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+            samples_1_values
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            actual_values
+                .iter()
+                .map(|x| x.1.clone())
+                .collect::<Vec<String>>()
         );
         let actual_values = entry.get("target").unwrap();
         assert_eq!(
-            log_1_values.iter().map(|x| format!("value={}", x)).collect::<Vec<String>>(),
-            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+            log_1_values
+                .iter()
+                .map(|x| format!("value={}", x))
+                .collect::<Vec<String>>(),
+            actual_values
+                .iter()
+                .map(|x| x.1.clone())
+                .collect::<Vec<String>>()
         );
 
         let entry = samples.get(&fid_perf_2.to_string()).unwrap();
         assert_eq!(3, entry.len());
         let actual_values = entry.get("function_execution_time").unwrap();
         assert_eq!(
-            samples_2_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
-            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+            samples_2_values
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            actual_values
+                .iter()
+                .map(|x| x.1.clone())
+                .collect::<Vec<String>>()
         );
         let actual_values = entry.get("function_transfer_time").unwrap();
         assert_eq!(
-            samples_2_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
-            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+            samples_2_values
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>(),
+            actual_values
+                .iter()
+                .map(|x| x.1.clone())
+                .collect::<Vec<String>>()
         );
         let actual_values = entry.get("target").unwrap();
         assert_eq!(
-            log_2_values.iter().map(|x| format!("value={}", x)).collect::<Vec<String>>(),
-            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+            log_2_values
+                .iter()
+                .map(|x| format!("value={}", x))
+                .collect::<Vec<String>>(),
+            actual_values
+                .iter()
+                .map(|x| x.1.clone())
+                .collect::<Vec<String>>()
         );
 
         // Purge the proxy.
@@ -1126,7 +1475,8 @@ mod test {
 
         let node_id = uuid::Uuid::new_v4();
         let mut nodes = std::collections::HashMap::new();
-        let (mock_node_sender, _mock_node_receiver) = futures::channel::mpsc::unbounded::<crate::orchestrator::test::MockAgentEvent>();
+        let (mock_node_sender, _mock_node_receiver) =
+            futures::channel::mpsc::unbounded::<crate::orchestrator::test::MockAgentEvent>();
         nodes.insert(
             node_id.clone(),
             crate::client_desc::ClientDesc {
@@ -1145,7 +1495,10 @@ mod test {
         assert!(redis_proxy.updated(crate::proxy::Category::NodeCapabilities));
 
         let mut nodes_expected = std::collections::HashMap::new();
-        nodes_expected.insert(node_id.clone(), edgeless_api::node_registration::NodeCapabilities::minimum());
+        nodes_expected.insert(
+            node_id.clone(),
+            edgeless_api::node_registration::NodeCapabilities::minimum(),
+        );
 
         assert_eq!(nodes_expected, redis_proxy.fetch_node_capabilities());
         assert!(!redis_proxy.updated(crate::proxy::Category::NodeCapabilities));

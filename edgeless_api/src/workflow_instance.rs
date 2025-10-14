@@ -98,15 +98,23 @@ pub struct MigrateWorkflowRequest {
 
 #[async_trait::async_trait]
 pub trait WorkflowInstanceAPI: WorkflowInstanceAPIClone + Send + Sync {
-    async fn start(&mut self, request: SpawnWorkflowRequest) -> anyhow::Result<SpawnWorkflowResponse>;
+    async fn start(
+        &mut self,
+        request: SpawnWorkflowRequest,
+    ) -> anyhow::Result<SpawnWorkflowResponse>;
     async fn stop(&mut self, id: WorkflowId) -> anyhow::Result<()>;
     async fn list(&mut self) -> anyhow::Result<Vec<WorkflowId>>;
     async fn inspect(&mut self, id: WorkflowId) -> anyhow::Result<WorkflowInfo>;
     async fn domains(
         &mut self,
         domain_id: String,
-    ) -> anyhow::Result<std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>>;
-    async fn migrate(&mut self, request: MigrateWorkflowRequest) -> anyhow::Result<SpawnWorkflowResponse>;
+    ) -> anyhow::Result<
+        std::collections::HashMap<String, crate::domain_registration::DomainCapabilities>,
+    >;
+    async fn migrate(
+        &mut self,
+        request: MigrateWorkflowRequest,
+    ) -> anyhow::Result<SpawnWorkflowResponse>;
 }
 
 // https://stackoverflow.com/a/30353928

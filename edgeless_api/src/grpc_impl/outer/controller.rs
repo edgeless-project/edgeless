@@ -9,7 +9,12 @@ pub struct ControllerAPIClient {
 impl ControllerAPIClient {
     pub async fn new(api_addr: &str) -> Self {
         Self {
-            workflow_instance_client: Box::new(crate::grpc_impl::inner::workflow_instance::WorkflowInstanceAPIClient::new(api_addr).await),
+            workflow_instance_client: Box::new(
+                crate::grpc_impl::inner::workflow_instance::WorkflowInstanceAPIClient::new(
+                    api_addr,
+                )
+                .await,
+            ),
         }
     }
 }

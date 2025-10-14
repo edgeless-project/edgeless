@@ -10,15 +10,26 @@ pub struct ClientDesc {
 }
 
 impl ClientDesc {
-    pub async fn from(request: &edgeless_api::node_registration::UpdateNodeRequest) -> anyhow::Result<Self> {
+    pub async fn from(
+        request: &edgeless_api::node_registration::UpdateNodeRequest,
+    ) -> anyhow::Result<Self> {
         // Return immediately if the node has an invalid agent or invocation URL.
-        let urls_to_validate = vec![("agent", &request.agent_url), ("invocation", &request.invocation_url)];
+        let urls_to_validate = vec![
+            ("agent", &request.agent_url),
+            ("invocation", &request.invocation_url),
+        ];
         let mut proto_host_ports = vec![];
         for (label, url) in urls_to_validate {
             let (proto, host, port) = match edgeless_api::util::parse_http_host(url) {
                 Ok((proto, host, url)) => (proto, host, url),
                 Err(err) => {
-                    anyhow::bail!("Invalid {} URL '{}' for node '{}': {}", label, request.agent_url, request.node_id, err);
+                    anyhow::bail!(
+                        "Invalid {} URL '{}' for node '{}': {}",
+                        label,
+                        request.agent_url,
+                        request.node_id,
+                        err
+                    );
                 }
             };
             anyhow::ensure!(!host.is_empty(), "invalid empty host in {} URL", label);
@@ -35,9 +46,9 @@ impl ClientDesc {
                     let addr = std::net::SocketAddrV4::new(host.parse().unwrap(), *port);
                     Box::new(edgeless_api::coap_impl::CoapClient::new(addr).await)
                 }
-                edgeless_api::util::Proto::HTTP | edgeless_api::util::Proto::HTTPS => {
-                    Box::new(edgeless_api::grpc_impl::outer::agent::AgentAPIClient::new(&request.agent_url))
-                }
+                edgeless_api::util::Proto::HTTP | edgeless_api::util::Proto::HTTPS => Box::new(
+                    edgeless_api::grpc_impl::outer::agent::AgentAPIClient::new(&request.agent_url),
+                ),
             },
             capabilities: request.capabilities.clone(),
             cordoned: false,
@@ -45,6 +56,9 @@ impl ClientDesc {
     }
 
     pub fn to_string_short(&self) -> String {
-        format!("agent_url {} invocation_url {}", self.agent_url, self.invocation_url)
+        format!(
+            "agent_url {} invocation_url {}",
+            self.agent_url, self.invocation_url
+        )
     }
 }

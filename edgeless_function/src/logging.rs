@@ -12,9 +12,15 @@ impl log::Log for Logger {
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
             match record.args().as_str() {
-                Some(data) => telemetry_log(rust_to_api(record.level()) as usize, record.target(), data),
+                Some(data) => {
+                    telemetry_log(rust_to_api(record.level()) as usize, record.target(), data)
+                }
                 _ => {
-                    telemetry_log(rust_to_api(record.level()) as usize, record.target(), "Unsupported Message Arguments");
+                    telemetry_log(
+                        rust_to_api(record.level()) as usize,
+                        record.target(),
+                        "Unsupported Message Arguments",
+                    );
                 }
             }
         }
@@ -22,7 +28,11 @@ impl log::Log for Logger {
     #[cfg(feature = "std")]
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
-            super::telemetry_log(rust_to_api(record.level()) as usize, record.target(), &record.args().to_string());
+            super::telemetry_log(
+                rust_to_api(record.level()) as usize,
+                record.target(),
+                &record.args().to_string(),
+            );
         }
     }
 
@@ -32,7 +42,9 @@ impl log::Log for Logger {
 static LOGGER: Logger = Logger;
 
 pub fn init_logger() {
-    log::set_logger(&LOGGER).map(|()| log::set_max_level(log::LevelFilter::Debug)).unwrap();
+    log::set_logger(&LOGGER)
+        .map(|()| log::set_max_level(log::LevelFilter::Debug))
+        .unwrap();
 }
 
 pub fn rust_to_api(lvl: log::Level) -> u32 {

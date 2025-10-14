@@ -11,21 +11,37 @@ pub trait SerializeableId {
     fn serialize(id: &Self) -> crate::grpc_impl::api::InstanceIdVariant;
 }
 
-impl ParseableId<edgeless_api_core::instance_id::InstanceId> for crate::grpc_impl::api::InstanceIdVariant {
+impl ParseableId<edgeless_api_core::instance_id::InstanceId>
+    for crate::grpc_impl::api::InstanceIdVariant
+{
     fn parse(api_id_variant: &Self) -> anyhow::Result<crate::function_instance::InstanceId> {
-        match api_id_variant.clone().instance_id_type.ok_or(anyhow::anyhow!("Missing Id"))? {
-            crate::grpc_impl::api::instance_id_variant::InstanceIdType::InstanceId(instance_id) => CommonConverters::parse_instance_id(&instance_id),
+        match api_id_variant
+            .clone()
+            .instance_id_type
+            .ok_or(anyhow::anyhow!("Missing Id"))?
+        {
+            crate::grpc_impl::api::instance_id_variant::InstanceIdType::InstanceId(instance_id) => {
+                CommonConverters::parse_instance_id(&instance_id)
+            }
             _ => Err(anyhow::anyhow!("Wrong Type")),
         }
     }
 }
 
-impl ParseableId<crate::function_instance::DomainManagedInstanceId> for crate::grpc_impl::api::InstanceIdVariant {
-    fn parse(api_id_variant: &Self) -> anyhow::Result<crate::function_instance::DomainManagedInstanceId> {
-        match api_id_variant.clone().instance_id_type.ok_or(anyhow::anyhow!("Missing Id"))? {
-            crate::grpc_impl::api::instance_id_variant::InstanceIdType::DomainManagedInstanceId(instance_id) => {
-                CommonConverters::parse_domain_managed_instance_id(&instance_id)
-            }
+impl ParseableId<crate::function_instance::DomainManagedInstanceId>
+    for crate::grpc_impl::api::InstanceIdVariant
+{
+    fn parse(
+        api_id_variant: &Self,
+    ) -> anyhow::Result<crate::function_instance::DomainManagedInstanceId> {
+        match api_id_variant
+            .clone()
+            .instance_id_type
+            .ok_or(anyhow::anyhow!("Missing Id"))?
+        {
+            crate::grpc_impl::api::instance_id_variant::InstanceIdType::DomainManagedInstanceId(
+                instance_id,
+            ) => CommonConverters::parse_domain_managed_instance_id(&instance_id),
             _ => Err(anyhow::anyhow!("Wrong Type")),
         }
     }
@@ -34,9 +50,11 @@ impl ParseableId<crate::function_instance::DomainManagedInstanceId> for crate::g
 impl SerializeableId for edgeless_api_core::instance_id::InstanceId {
     fn serialize(id: &Self) -> crate::grpc_impl::api::InstanceIdVariant {
         crate::grpc_impl::api::InstanceIdVariant {
-            instance_id_type: Some(crate::grpc_impl::api::instance_id_variant::InstanceIdType::InstanceId(
-                CommonConverters::serialize_instance_id(id),
-            )),
+            instance_id_type: Some(
+                crate::grpc_impl::api::instance_id_variant::InstanceIdType::InstanceId(
+                    CommonConverters::serialize_instance_id(id),
+                ),
+            ),
         }
     }
 }
@@ -44,29 +62,37 @@ impl SerializeableId for edgeless_api_core::instance_id::InstanceId {
 impl SerializeableId for crate::function_instance::DomainManagedInstanceId {
     fn serialize(id: &Self) -> crate::grpc_impl::api::InstanceIdVariant {
         crate::grpc_impl::api::InstanceIdVariant {
-            instance_id_type: Some(crate::grpc_impl::api::instance_id_variant::InstanceIdType::DomainManagedInstanceId(
-                CommonConverters::serialize_domain_managed_instance_id(id),
-            )),
+            instance_id_type: Some(
+                crate::grpc_impl::api::instance_id_variant::InstanceIdType::DomainManagedInstanceId(
+                    CommonConverters::serialize_domain_managed_instance_id(id),
+                ),
+            ),
         }
     }
 }
 
 impl CommonConverters {
-    pub fn parse_response_error(api_request: &crate::grpc_impl::api::ResponseError) -> anyhow::Result<crate::common::ResponseError> {
+    pub fn parse_response_error(
+        api_request: &crate::grpc_impl::api::ResponseError,
+    ) -> anyhow::Result<crate::common::ResponseError> {
         Ok(crate::common::ResponseError {
             summary: api_request.summary.to_string(),
             detail: api_request.detail.clone(),
         })
     }
 
-    pub fn parse_instance_id(api_id: &crate::grpc_impl::api::InstanceId) -> anyhow::Result<crate::function_instance::InstanceId> {
+    pub fn parse_instance_id(
+        api_id: &crate::grpc_impl::api::InstanceId,
+    ) -> anyhow::Result<crate::function_instance::InstanceId> {
         Ok(crate::function_instance::InstanceId {
             node_id: uuid::Uuid::parse_str(&api_id.node_id)?,
             function_id: uuid::Uuid::parse_str(&api_id.function_id)?,
         })
     }
 
-    pub fn parse_event_timestamp(api_ts: &crate::grpc_impl::api::EventTimestamp) -> anyhow::Result<crate::function_instance::EventTimestamp> {
+    pub fn parse_event_timestamp(
+        api_ts: &crate::grpc_impl::api::EventTimestamp,
+    ) -> anyhow::Result<crate::function_instance::EventTimestamp> {
         Ok(crate::function_instance::EventTimestamp {
             secs: api_ts.secs,
             nsecs: api_ts.nsecs,
@@ -102,35 +128,45 @@ impl CommonConverters {
         }
     }
 
-    pub fn parse_patch_request(api_update: &crate::grpc_impl::api::PatchRequest) -> anyhow::Result<crate::common::PatchRequest> {
+    pub fn parse_patch_request(
+        api_update: &crate::grpc_impl::api::PatchRequest,
+    ) -> anyhow::Result<crate::common::PatchRequest> {
         Ok(crate::common::PatchRequest {
             function_id: uuid::Uuid::parse_str(&api_update.function_id)?,
             output_mapping: api_update
                 .output_mapping
                 .iter()
-                .filter_map(|(key, value)| match CommonConverters::parse_instance_id(value) {
-                    Ok(val) => Some((key.clone(), val)),
-                    Err(_) => None,
-                })
+                .filter_map(
+                    |(key, value)| match CommonConverters::parse_instance_id(value) {
+                        Ok(val) => Some((key.clone(), val)),
+                        Err(_) => None,
+                    },
+                )
                 .collect(),
         })
     }
 
-    pub fn serialize_response_error(crate_function: &crate::common::ResponseError) -> crate::grpc_impl::api::ResponseError {
+    pub fn serialize_response_error(
+        crate_function: &crate::common::ResponseError,
+    ) -> crate::grpc_impl::api::ResponseError {
         crate::grpc_impl::api::ResponseError {
             summary: crate_function.summary.clone(),
             detail: crate_function.detail.clone(),
         }
     }
 
-    pub fn serialize_instance_id(instance_id: &crate::function_instance::InstanceId) -> crate::grpc_impl::api::InstanceId {
+    pub fn serialize_instance_id(
+        instance_id: &crate::function_instance::InstanceId,
+    ) -> crate::grpc_impl::api::InstanceId {
         crate::grpc_impl::api::InstanceId {
             node_id: instance_id.node_id.to_string(),
             function_id: instance_id.function_id.to_string(),
         }
     }
 
-    pub fn serialize_event_timestamp(ts: &crate::function_instance::EventTimestamp) -> crate::grpc_impl::api::EventTimestamp {
+    pub fn serialize_event_timestamp(
+        ts: &crate::function_instance::EventTimestamp,
+    ) -> crate::grpc_impl::api::EventTimestamp {
         crate::grpc_impl::api::EventTimestamp {
             secs: ts.secs,
             nsecs: ts.nsecs,
@@ -149,18 +185,24 @@ impl CommonConverters {
         req: &crate::common::StartComponentResponse<ComponentIdType>,
     ) -> crate::grpc_impl::api::StartComponentResponse {
         match req {
-            crate::common::StartComponentResponse::ResponseError(err) => crate::grpc_impl::api::StartComponentResponse {
-                response_error: Some(CommonConverters::serialize_response_error(err)),
-                instance_id: None,
-            },
-            crate::common::StartComponentResponse::InstanceId(id) => crate::grpc_impl::api::StartComponentResponse {
-                response_error: None,
-                instance_id: Some(SerializeableId::serialize(id)),
-            },
+            crate::common::StartComponentResponse::ResponseError(err) => {
+                crate::grpc_impl::api::StartComponentResponse {
+                    response_error: Some(CommonConverters::serialize_response_error(err)),
+                    instance_id: None,
+                }
+            }
+            crate::common::StartComponentResponse::InstanceId(id) => {
+                crate::grpc_impl::api::StartComponentResponse {
+                    response_error: None,
+                    instance_id: Some(SerializeableId::serialize(id)),
+                }
+            }
         }
     }
 
-    pub fn serialize_patch_request(crate_update: &crate::common::PatchRequest) -> crate::grpc_impl::api::PatchRequest {
+    pub fn serialize_patch_request(
+        crate_update: &crate::common::PatchRequest,
+    ) -> crate::grpc_impl::api::PatchRequest {
         crate::grpc_impl::api::PatchRequest {
             function_id: crate_update.function_id.to_string(),
             output_mapping: crate_update
@@ -172,7 +214,9 @@ impl CommonConverters {
     }
 }
 
-impl From<&edgeless_api_core::event_metadata::EventMetadata> for crate::grpc_impl::api::EventSerializedMetadata {
+impl From<&edgeless_api_core::event_metadata::EventMetadata>
+    for crate::grpc_impl::api::EventSerializedMetadata
+{
     fn from(value: &edgeless_api_core::event_metadata::EventMetadata) -> Self {
         let _words = value.trace_id().to_bytes();
         Self {
@@ -182,12 +226,24 @@ impl From<&edgeless_api_core::event_metadata::EventMetadata> for crate::grpc_imp
     }
 }
 
-impl TryFrom<&crate::grpc_impl::api::EventSerializedMetadata> for edgeless_api_core::event_metadata::EventMetadata {
+impl TryFrom<&crate::grpc_impl::api::EventSerializedMetadata>
+    for edgeless_api_core::event_metadata::EventMetadata
+{
     type Error = anyhow::Error;
 
-    fn try_from(value: &crate::grpc_impl::api::EventSerializedMetadata) -> Result<Self, Self::Error> {
-        let trace_id: [u8; 16] = value.clone().trace_id.try_into().map_err(|_| anyhow::anyhow!("Mismatched length"))?;
-        let span_id: [u8; 8] = value.clone().span_id.try_into().map_err(|_| anyhow::anyhow!("Mismatched length"))?;
+    fn try_from(
+        value: &crate::grpc_impl::api::EventSerializedMetadata,
+    ) -> Result<Self, Self::Error> {
+        let trace_id: [u8; 16] = value
+            .clone()
+            .trace_id
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Mismatched length"))?;
+        let span_id: [u8; 8] = value
+            .clone()
+            .span_id
+            .try_into()
+            .map_err(|_| anyhow::anyhow!("Mismatched length"))?;
         Ok(Self::from_bytes(trace_id, span_id))
     }
 }
@@ -244,7 +300,9 @@ mod tests {
             },
         ];
         for msg in messages {
-            match CommonConverters::parse_patch_request(&CommonConverters::serialize_patch_request(&msg)) {
+            match CommonConverters::parse_patch_request(&CommonConverters::serialize_patch_request(
+                &msg,
+            )) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }

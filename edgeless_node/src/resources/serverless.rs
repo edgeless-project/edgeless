@@ -23,7 +23,8 @@ impl super::resource_provider_specs::ResourceProviderSpecs for ServerlessResourc
     }
 
     fn description(&self) -> String {
-        r"Call an external OpenFaaS-compatible function at an URL -- see https://www.openfaas.com/".to_string()
+        r"Call an external OpenFaaS-compatible function at an URL -- see https://www.openfaas.com/"
+            .to_string()
     }
 
     fn outputs(&self) -> Vec<String> {
@@ -48,21 +49,30 @@ pub struct ServerlessResourceProvider {
 struct CallCommand {
     msg: String,
     resource_id: edgeless_api::function_instance::ComponentId,
-    reply_sender: tokio::sync::oneshot::Sender<anyhow::Result<(Option<edgeless_api::function_instance::InstanceId>, String)>>,
+    reply_sender: tokio::sync::oneshot::Sender<
+        anyhow::Result<(Option<edgeless_api::function_instance::InstanceId>, String)>,
+    >,
 }
 
 enum ServerlessCommand {
     Call(CallCommand),
     // resource_id, target
-    PatchOut(edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::InstanceId),
-    PatchErr(edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::InstanceId),
+    PatchOut(
+        edgeless_api::function_instance::ComponentId,
+        edgeless_api::function_instance::InstanceId,
+    ),
+    PatchErr(
+        edgeless_api::function_instance::ComponentId,
+        edgeless_api::function_instance::InstanceId,
+    ),
 }
 
 pub struct ServerlessResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    instances: std::collections::HashMap<edgeless_api::function_instance::ComponentId, ServerlessResource>,
+    instances:
+        std::collections::HashMap<edgeless_api::function_instance::ComponentId, ServerlessResource>,
     sender: futures::channel::mpsc::UnboundedSender<ServerlessCommand>,
     _handle: tokio::task::JoinHandle<()>,
 }
@@ -113,8 +123,9 @@ impl ServerlessResource {
                     }
                 };
 
-                let (reply_sender, reply_receiver) =
-                    tokio::sync::oneshot::channel::<anyhow::Result<(Option<edgeless_api::function_instance::InstanceId>, String)>>();
+                let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
+                    anyhow::Result<(Option<edgeless_api::function_instance::InstanceId>, String)>,
+                >();
                 let _ = sender
                     .send(ServerlessCommand::Call(CallCommand {
                         msg,
@@ -135,7 +146,10 @@ impl ServerlessResource {
                         }
                     },
                     Err(err) => {
-                        log::warn!("Communication error with serverless resource provider: {}", err)
+                        log::warn!(
+                            "Communication error with serverless resource provider: {}",
+                            err
+                        )
                     }
                 }
 
@@ -143,7 +157,9 @@ impl ServerlessResource {
             }
         });
 
-        Ok(Self { join_handle: handle })
+        Ok(Self {
+            join_handle: handle,
+        })
     }
 }
 
@@ -177,7 +193,9 @@ impl ServerlessResourceProvider {
                     ServerlessCommand::Call(cmd) => {
                         let target_out = targets_out.get(&cmd.resource_id).cloned();
                         let target_err = targets_err.get(&cmd.resource_id).cloned();
-                        let client = client.request(reqwest::Method::POST, function_url.clone()).body(cmd.msg);
+                        let client = client
+                            .request(reqwest::Method::POST, function_url.clone())
+                            .body(cmd.msg);
                         let response = match client.send().await {
                             Ok(ret) => {
                                 if ret.status() == reqwest::StatusCode::OK {
@@ -237,23 +255,41 @@ impl ServerlessResourceProvider {
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for ServerlessResourceProvider {
+impl
+    edgeless_api::resource_configuration::ResourceConfigurationAPI<
+        edgeless_api::function_instance::InstanceId,
+    > for ServerlessResourceProvider
+{
     async fn start(
         &mut self,
         _instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
+    ) -> anyhow::Result<
+        edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>,
+    > {
         let mut lck = self.inner.lock().await;
-        let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
+        let new_id =
+            edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
         let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
-        let telemetry_handle = lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
-            "FUNCTION_ID".to_string(),
-            new_id.function_id.to_string(),
-        )]));
+        let telemetry_handle = lck
+            .telemetry_handle
+            .fork(std::collections::BTreeMap::from([(
+                "FUNCTION_ID".to_string(),
+                new_id.function_id.to_string(),
+            )]));
 
-        match ServerlessResource::new(dataplane_handle, telemetry_handle, new_id, lck.sender.clone()).await {
+        match ServerlessResource::new(
+            dataplane_handle,
+            telemetry_handle,
+            new_id,
+            lck.sender.clone(),
+        )
+        .await
+        {
             Ok(resource) => {
                 lck.instances.insert(new_id.function_id, resource);
-                return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
+                return Ok(edgeless_api::common::StartComponentResponse::InstanceId(
+                    new_id,
+                ));
             }
             Err(err) => {
                 return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
@@ -266,8 +302,15 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         }
     }
 
-    async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-        self.inner.lock().await.instances.remove(&resource_id.function_id);
+    async fn stop(
+        &mut self,
+        resource_id: edgeless_api::function_instance::InstanceId,
+    ) -> anyhow::Result<()> {
+        self.inner
+            .lock()
+            .await
+            .instances
+            .remove(&resource_id.function_id);
         Ok(())
     }
 
@@ -285,10 +328,16 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         //
         // Other mappings are silently ignored.
         if let Some(target) = update.output_mapping.get("out") {
-            let _ = lck.sender.send(ServerlessCommand::PatchOut(update.function_id, *target)).await;
+            let _ = lck
+                .sender
+                .send(ServerlessCommand::PatchOut(update.function_id, *target))
+                .await;
         }
         if let Some(target) = update.output_mapping.get("err") {
-            let _ = lck.sender.send(ServerlessCommand::PatchErr(update.function_id, *target)).await;
+            let _ = lck
+                .sender
+                .send(ServerlessCommand::PatchErr(update.function_id, *target))
+                .await;
         }
 
         Ok(())

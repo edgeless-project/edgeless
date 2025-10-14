@@ -51,8 +51,14 @@ pub struct SyncData {
 pub trait GuestAPIHost: GuestAPIHostClone + Sync + Send {
     async fn cast(&mut self, event: OutputEventData) -> anyhow::Result<()>;
     async fn cast_raw(&mut self, event: OutputEventDataRaw) -> anyhow::Result<()>;
-    async fn call(&mut self, event: OutputEventData) -> anyhow::Result<crate::guest_api_function::CallReturn>;
-    async fn call_raw(&mut self, event: OutputEventDataRaw) -> anyhow::Result<crate::guest_api_function::CallReturn>;
+    async fn call(
+        &mut self,
+        event: OutputEventData,
+    ) -> anyhow::Result<crate::guest_api_function::CallReturn>;
+    async fn call_raw(
+        &mut self,
+        event: OutputEventDataRaw,
+    ) -> anyhow::Result<crate::guest_api_function::CallReturn>;
     async fn telemetry_log(&mut self, event: TelemetryLogEvent) -> anyhow::Result<()>;
     async fn slf(&mut self) -> anyhow::Result<edgeless_api_core::instance_id::InstanceId>;
     async fn delayed_cast(&mut self, event: DelayedEventData) -> anyhow::Result<()>;

@@ -26,7 +26,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for FileLogResourceSp
                 String::from("add-source-id"),
                 String::from("If specified adds the InstanceId of the source component"),
             ),
-            (String::from("add-timestamp"), String::from("If specified adds a timestamp")),
+            (
+                String::from("add-timestamp"),
+                String::from("If specified adds a timestamp"),
+            ),
         ])
     }
 
@@ -44,7 +47,8 @@ struct FileLogResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, FileLogResource>,
+    instances:
+        std::collections::HashMap<edgeless_api::function_instance::InstanceId, FileLogResource>,
 }
 
 pub struct FileLogResource {
@@ -68,7 +72,10 @@ impl FileLogResource {
         let mut dataplane_handle = dataplane_handle;
         let mut telemetry_handle = telemetry_handle;
 
-        let mut outfile = std::fs::OpenOptions::new().create(true).append(true).open(filename)?;
+        let mut outfile = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(filename)?;
 
         log::info!("FileLogResource created, writing to file: {}", filename);
 
@@ -114,7 +121,12 @@ impl FileLogResource {
                 // Reply to the caller if the resource instance was called.
                 if need_reply {
                     dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()), &metadata)
+                        .reply(
+                            source_id,
+                            channel_id,
+                            edgeless_dataplane::core::CallRet::Reply("".to_string()),
+                            &metadata,
+                        )
                         .await;
                 }
 
@@ -122,7 +134,9 @@ impl FileLogResource {
             }
         });
 
-        Ok(Self { join_handle: handle })
+        Ok(Self {
+            join_handle: handle,
+        })
     }
 }
 
@@ -137,39 +151,56 @@ impl FileLogResourceProvider {
                 resource_provider_id,
                 dataplane_provider,
                 telemetry_handle,
-                instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, FileLogResource>::new(),
+                instances: std::collections::HashMap::<
+                    edgeless_api::function_instance::InstanceId,
+                    FileLogResource,
+                >::new(),
             })),
         }
     }
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for FileLogResourceProvider {
+impl
+    edgeless_api::resource_configuration::ResourceConfigurationAPI<
+        edgeless_api::function_instance::InstanceId,
+    > for FileLogResourceProvider
+{
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
+    ) -> anyhow::Result<
+        edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>,
+    > {
         if let Some(filename) = instance_specification.configuration.get("filename") {
             let mut lck = self.inner.lock().await;
 
-            let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
+            let new_id =
+                edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
 
             match FileLogResource::new(
                 dataplane_handle,
-                lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
-                    "FUNCTION_ID".to_string(),
-                    new_id.function_id.to_string(),
-                )])),
+                lck.telemetry_handle
+                    .fork(std::collections::BTreeMap::from([(
+                        "FUNCTION_ID".to_string(),
+                        new_id.function_id.to_string(),
+                    )])),
                 filename,
-                instance_specification.configuration.contains_key("add-source-id"),
-                instance_specification.configuration.contains_key("add-timestamp"),
+                instance_specification
+                    .configuration
+                    .contains_key("add-source-id"),
+                instance_specification
+                    .configuration
+                    .contains_key("add-timestamp"),
             )
             .await
             {
                 Ok(resource) => {
                     lck.instances.insert(new_id, resource);
-                    return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
+                    return Ok(edgeless_api::common::StartComponentResponse::InstanceId(
+                        new_id,
+                    ));
                 }
                 Err(err) => {
                     return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
@@ -189,7 +220,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         ))
     }
 
-    async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+    async fn stop(
+        &mut self,
+        resource_id: edgeless_api::function_instance::InstanceId,
+    ) -> anyhow::Result<()> {
         self.inner.lock().await.instances.remove(&resource_id);
         Ok(())
     }

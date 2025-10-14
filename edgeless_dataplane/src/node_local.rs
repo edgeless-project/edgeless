@@ -36,7 +36,9 @@ impl DataPlaneLink for NodeLocalLink {
                     data: match msg {
                         Message::Call(data) => edgeless_api::invocation::EventData::Call(data),
                         Message::Cast(data) => edgeless_api::invocation::EventData::Cast(data),
-                        Message::CallRet(data) => edgeless_api::invocation::EventData::CallRet(data),
+                        Message::CallRet(data) => {
+                            edgeless_api::invocation::EventData::CallRet(data)
+                        }
                         Message::CallNoRet => edgeless_api::invocation::EventData::CallNoRet,
                         Message::Err => edgeless_api::invocation::EventData::Err,
                     },
@@ -52,13 +54,19 @@ impl DataPlaneLink for NodeLocalLink {
 }
 
 pub struct NodeLocalRouter {
-    pub receivers: std::collections::HashMap<uuid::Uuid, futures::channel::mpsc::UnboundedSender<DataplaneEvent>>,
+    pub receivers: std::collections::HashMap<
+        uuid::Uuid,
+        futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
+    >,
 }
 
 // This is used by the remote node that is currently borrowing the `NodeLocalRouter`
 #[async_trait::async_trait]
 impl edgeless_api::invocation::InvocationAPI for NodeLocalRouter {
-    async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
+    async fn handle(
+        &mut self,
+        event: edgeless_api::invocation::Event,
+    ) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
         if let Some(sender) = self.receivers.get_mut(&event.target.function_id) {
             let msg = match event.data {
                 edgeless_api::invocation::EventData::Call(data) => Message::Call(data),
@@ -103,7 +111,10 @@ impl NodeLocalLinkProvider {
     pub fn new() -> Self {
         Self {
             router: std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalRouter {
-                receivers: std::collections::HashMap::<uuid::Uuid, futures::channel::mpsc::UnboundedSender<DataplaneEvent>>::new(),
+                receivers: std::collections::HashMap::<
+                    uuid::Uuid,
+                    futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
+                >::new(),
             })),
         }
     }
@@ -113,7 +124,11 @@ impl NodeLocalLinkProvider {
         target: edgeless_api::function_instance::InstanceId,
         sender: futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
     ) -> Box<dyn DataPlaneLink> {
-        self.router.lock().await.receivers.insert(target.function_id, sender);
+        self.router
+            .lock()
+            .await
+            .receivers
+            .insert(target.function_id, sender);
         Box::new(NodeLocalLink {
             node_id: target.node_id,
             router: self.router.clone(),
@@ -132,21 +147,33 @@ mod test {
         let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id);
         let fid_3 = edgeless_api::function_instance::InstanceId::new(node_id);
         let ts = edgeless_api::function_instance::EventTimestamp::default();
-        let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00017u128, 0x42a42bdecaf00018u64);
+        let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(
+            0x42a42bdecaf00017u128,
+            0x42a42bdecaf00018u64,
+        );
 
         let provider = NodeLocalLinkProvider::new();
 
-        let (sender_1, mut receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
+        let (sender_1, mut receiver_1) =
+            futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
         let mut handle_1 = provider.new_link(fid_1, sender_1).await;
 
-        let (sender_2, mut receiver_2) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
+        let (sender_2, mut receiver_2) =
+            futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
         let _handle_2 = provider.new_link(fid_2, sender_2).await;
 
         assert!(receiver_1.try_next().is_err());
         assert!(receiver_2.try_next().is_err());
 
         let ret_1 = handle_1
-            .handle_send(&fid_3, crate::core::Message::Cast("".to_string()), &fid_1, &ts, 0, &metad_1)
+            .handle_send(
+                &fid_3,
+                crate::core::Message::Cast("".to_string()),
+                &fid_1,
+                &ts,
+                0,
+                &metad_1,
+            )
             .as_mut()
             .await;
 
@@ -155,7 +182,14 @@ mod test {
         assert!(receiver_2.try_next().is_err());
 
         let ret_2 = handle_1
-            .handle_send(&fid_2, crate::core::Message::Cast("".to_string()), &fid_1, &ts, 0, &metad_1)
+            .handle_send(
+                &fid_2,
+                crate::core::Message::Cast("".to_string()),
+                &fid_1,
+                &ts,
+                0,
+                &metad_1,
+            )
             .as_mut()
             .await;
 

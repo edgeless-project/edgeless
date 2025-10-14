@@ -16,7 +16,10 @@ impl Docker {
         } else {
             match rs_docker::Docker::connect(format!("unix://{}", path).as_str()) {
                 Ok(docker) => Ok(docker),
-                Err(err) => Err(anyhow::anyhow!("could not connect to Docker, bailing out: {}", err)),
+                Err(err) => Err(anyhow::anyhow!(
+                    "could not connect to Docker, bailing out: {}",
+                    err
+                )),
             }
         }
     }
@@ -25,7 +28,10 @@ impl Docker {
     /// The name is automatically selected as a random UUID; the ID is returned.
     /// It is assumed that a TCP port bound to 0.0.0.0 is published, the
     /// public port number is returned, too.
-    pub fn start(docker: &mut rs_docker::Docker, image_name: String) -> anyhow::Result<(String, u64)> {
+    pub fn start(
+        docker: &mut rs_docker::Docker,
+        image_name: String,
+    ) -> anyhow::Result<(String, u64)> {
         let name: String = uuid::Uuid::new_v4().to_string();
 
         let mut devices = vec![];
@@ -65,7 +71,11 @@ impl Docker {
         };
 
         if let Err(err) = docker.start_container(&name.to_string()) {
-            return Err(anyhow::anyhow!("could not start the container with image {}: {}", image_name, err));
+            return Err(anyhow::anyhow!(
+                "could not start the container with image {}: {}",
+                image_name,
+                err
+            ));
         }
 
         let containers = match docker.get_containers(false) {
@@ -75,7 +85,12 @@ impl Docker {
 
         let container = match containers.iter().find(|x| id == x.Id) {
             Some(container) => container,
-            None => return Err(anyhow::anyhow!("could not find the newly-created container with ID {}", id)),
+            None => {
+                return Err(anyhow::anyhow!(
+                    "could not find the newly-created container with ID {}",
+                    id
+                ))
+            }
         };
         let public_port = match container.Ports.iter().find(|x| {
             if let Some(ip) = &x.IP {
@@ -109,11 +124,19 @@ impl Docker {
     /// Stop and delete the container with a given ID.
     pub fn stop(docker: &mut rs_docker::Docker, id: String) -> anyhow::Result<()> {
         if let Err(err) = docker.stop_container(&id) {
-            return Err(anyhow::anyhow!("could not stop container with ID {}: {}", id, err));
+            return Err(anyhow::anyhow!(
+                "could not stop container with ID {}: {}",
+                id,
+                err
+            ));
         }
 
         if let Err(err) = docker.delete_container(&id) {
-            return Err(anyhow::anyhow!("could not delete container with ID {}: {}", id, err));
+            return Err(anyhow::anyhow!(
+                "could not delete container with ID {}: {}",
+                id,
+                err
+            ));
         }
 
         Ok(())

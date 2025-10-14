@@ -37,7 +37,8 @@ struct EgressResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    egress_instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, EgressResource>,
+    egress_instances:
+        std::collections::HashMap<edgeless_api::function_instance::InstanceId, EgressResource>,
 }
 
 pub struct EgressResource {
@@ -79,7 +80,12 @@ impl EgressResource {
                     Ok(val) => val,
                     Err(_) => {
                         dataplane_handle
-                            .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err, &metadata)
+                            .reply(
+                                source_id,
+                                channel_id,
+                                edgeless_dataplane::core::CallRet::Err,
+                                &metadata,
+                            )
                             .await;
                         continue;
                     }
@@ -100,7 +106,12 @@ impl EgressResource {
                         }
                         Err(_) => {
                             cloned_dataplane
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err, &metadata)
+                                .reply(
+                                    source_id,
+                                    channel_id,
+                                    edgeless_dataplane::core::CallRet::Err,
+                                    &metadata,
+                                )
                                 .await;
                         }
                     }
@@ -109,11 +120,17 @@ impl EgressResource {
             }
         });
 
-        Self { join_handle: handle }
+        Self {
+            join_handle: handle,
+        }
     }
 
-    async fn perform_request(req: edgeless_http::EdgelessHTTPRequest) -> anyhow::Result<edgeless_http::EdgelessHTTPResponse> {
-        let method = reqwest::Method::from_bytes(edgeless_http::edgeless_method_to_string(req.method).as_bytes())?;
+    async fn perform_request(
+        req: edgeless_http::EdgelessHTTPRequest,
+    ) -> anyhow::Result<edgeless_http::EdgelessHTTPResponse> {
+        let method = reqwest::Method::from_bytes(
+            edgeless_http::edgeless_method_to_string(req.method).as_bytes(),
+        )?;
 
         let protocol_string = match req.protocol {
             edgeless_http::EdgelessHTTPProtocol::HTTPS => "HTTPS",
@@ -170,35 +187,58 @@ impl EgressResourceProvider {
                 resource_provider_id,
                 dataplane_provider,
                 telemetry_handle,
-                egress_instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, EgressResource>::new(),
+                egress_instances: std::collections::HashMap::<
+                    edgeless_api::function_instance::InstanceId,
+                    EgressResource,
+                >::new(),
             })),
         }
     }
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for EgressResourceProvider {
+impl
+    edgeless_api::resource_configuration::ResourceConfigurationAPI<
+        edgeless_api::function_instance::InstanceId,
+    > for EgressResourceProvider
+{
     async fn start(
         &mut self,
         _instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
+    ) -> anyhow::Result<
+        edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>,
+    > {
         let mut lck = self.inner.lock().await;
 
-        let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
+        let new_id =
+            edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
         let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
 
-        let telemetry_handle = lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
-            "FUNCTION_ID".to_string(),
-            new_id.function_id.to_string(),
-        )]));
-        lck.egress_instances
-            .insert(new_id, EgressResource::new(dataplane_handle, telemetry_handle).await);
+        let telemetry_handle = lck
+            .telemetry_handle
+            .fork(std::collections::BTreeMap::from([(
+                "FUNCTION_ID".to_string(),
+                new_id.function_id.to_string(),
+            )]));
+        lck.egress_instances.insert(
+            new_id,
+            EgressResource::new(dataplane_handle, telemetry_handle).await,
+        );
 
-        Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
+        Ok(edgeless_api::common::StartComponentResponse::InstanceId(
+            new_id,
+        ))
     }
 
-    async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-        self.inner.lock().await.egress_instances.remove(&resource_id);
+    async fn stop(
+        &mut self,
+        resource_id: edgeless_api::function_instance::InstanceId,
+    ) -> anyhow::Result<()> {
+        self.inner
+            .lock()
+            .await
+            .egress_instances
+            .remove(&resource_id);
         Ok(())
     }
 

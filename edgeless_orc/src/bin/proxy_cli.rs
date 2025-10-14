@@ -104,11 +104,19 @@ fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
 
-    anyhow::ensure!(args.proxy_type.to_lowercase() == "redis", "unknown proxy type: {}", args.proxy_type);
+    anyhow::ensure!(
+        args.proxy_type.to_lowercase() == "redis",
+        "unknown proxy type: {}",
+        args.proxy_type
+    );
 
     let mut proxy = match edgeless_orc::proxy_redis::ProxyRedis::new(&args.redis_url, false, None) {
         Ok(proxy) => proxy,
-        Err(err) => anyhow::bail!("could not connect to a Redis at {}: {}", args.redis_url, err),
+        Err(err) => anyhow::bail!(
+            "could not connect to a Redis at {}: {}",
+            args.redis_url,
+            err
+        ),
     };
 
     let node_print_format = NodePrintFormat::from(&args.node_print_format)?;
@@ -116,65 +124,118 @@ fn main() -> anyhow::Result<()> {
     if matches!(node_print_format, NodePrintFormat::Labels) {
         for (node_id, caps) in proxy.fetch_node_capabilities() {
             let labels = caps.labels.join(",");
-            let name = if labels.is_empty() { node_id.to_string() } else { labels };
+            let name = if labels.is_empty() {
+                node_id.to_string()
+            } else {
+                labels
+            };
             node_to_names.insert(node_id, name);
         }
     }
-    let map_node = |node_id: &uuid::Uuid| node_to_names.get(node_id).unwrap_or(&node_id.to_string()).to_string();
+    let map_node = |node_id: &uuid::Uuid| {
+        node_to_names
+            .get(node_id)
+            .unwrap_or(&node_id.to_string())
+            .to_string()
+    };
 
     match args.command {
         Commands::Show { show_command } => match show_command {
             ShowCommands::Functions {} => {
-                for (function, nodes) in proxy.fetch_function_instances_to_nodes().iter().sorted_by_key(|x| x.0.to_string()) {
+                for (function, nodes) in proxy
+                    .fetch_function_instances_to_nodes()
+                    .iter()
+                    .sorted_by_key(|x| x.0.to_string())
+                {
                     println!(
                         "{} -> {}",
                         function,
-                        nodes.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                        nodes
+                            .iter()
+                            .map(|x| x.to_string())
+                            .collect::<Vec<String>>()
+                            .join(",")
                     );
                 }
             }
             ShowCommands::Resources {} => {
-                for (resource, node) in proxy.fetch_resource_instances_to_nodes().iter().sorted_by_key(|x| x.0.to_string()) {
+                for (resource, node) in proxy
+                    .fetch_resource_instances_to_nodes()
+                    .iter()
+                    .sorted_by_key(|x| x.0.to_string())
+                {
                     println!("{} -> {}", resource, map_node(node));
                 }
             }
             ShowCommands::LogicalToPhysical {} => {
-                for (logical, physical) in proxy.fetch_instances_to_physical_ids().iter().sorted_by_key(|x| x.0.to_string()) {
+                for (logical, physical) in proxy
+                    .fetch_instances_to_physical_ids()
+                    .iter()
+                    .sorted_by_key(|x| x.0.to_string())
+                {
                     println!(
                         "{} -> {}",
                         logical,
-                        physical.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                        physical
+                            .iter()
+                            .map(|x| x.to_string())
+                            .collect::<Vec<String>>()
+                            .join(",")
                     );
                 }
             }
             ShowCommands::LogicalToWorkflow {} => {
-                for (logical, workflow_id) in proxy.fetch_logical_id_to_workflow_id().iter().sorted_by_key(|x| x.0.to_string()) {
+                for (logical, workflow_id) in proxy
+                    .fetch_logical_id_to_workflow_id()
+                    .iter()
+                    .sorted_by_key(|x| x.0.to_string())
+                {
                     println!("{} -> {}", logical, workflow_id);
                 }
             }
             ShowCommands::Node { node_command } => match node_command {
                 NodeCommands::Capabilities {} => {
-                    for (node, capabilities) in proxy.fetch_node_capabilities().iter().sorted_by_key(|x| x.0.to_string()) {
+                    for (node, capabilities) in proxy
+                        .fetch_node_capabilities()
+                        .iter()
+                        .sorted_by_key(|x| x.0.to_string())
+                    {
                         println!("{} -> {}", map_node(node), capabilities);
                     }
                 }
                 NodeCommands::ResourceProviders {} => {
-                    for (provider_id, resource_providers) in proxy.fetch_resource_providers().iter().sorted_by_key(|x| x.0.to_string()) {
+                    for (provider_id, resource_providers) in proxy
+                        .fetch_resource_providers()
+                        .iter()
+                        .sorted_by_key(|x| x.0.to_string())
+                    {
                         println!("{} -> {}", provider_id, resource_providers);
                     }
                 }
                 NodeCommands::Health {} => {
-                    for (node, health) in proxy.fetch_node_health().iter().sorted_by_key(|x| x.0.to_string()) {
+                    for (node, health) in proxy
+                        .fetch_node_health()
+                        .iter()
+                        .sorted_by_key(|x| x.0.to_string())
+                    {
                         println!("{} -> {}", map_node(node), health);
                     }
                 }
                 NodeCommands::Instances {} => {
-                    for (node, instances) in proxy.fetch_nodes_to_instances().iter().sorted_by_key(|x| x.0.to_string()) {
+                    for (node, instances) in proxy
+                        .fetch_nodes_to_instances()
+                        .iter()
+                        .sorted_by_key(|x| x.0.to_string())
+                    {
                         println!("{}", map_node(node));
                         for instance in instances {
                             match instance {
-                                edgeless_orc::proxy::Instance::Function(id) => println!("[F] {}", id),
-                                edgeless_orc::proxy::Instance::Resource(id) => println!("[R] {}", id),
+                                edgeless_orc::proxy::Instance::Function(id) => {
+                                    println!("[F] {}", id)
+                                }
+                                edgeless_orc::proxy::Instance::Resource(id) => {
+                                    println!("[R] {}", id)
+                                }
                             }
                         }
                     }
@@ -191,21 +252,28 @@ fn main() -> anyhow::Result<()> {
                     Ok(node_id) => node_id,
                     Err(err) => anyhow::bail!("invalid node id {}: {}", node_id, err),
                 };
-                proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Migrate(instance_id, vec![node_id])]);
+                proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Migrate(
+                    instance_id,
+                    vec![node_id],
+                )]);
             }
             IntentCommands::Cordon { node_id } => {
                 let node_id = match uuid::Uuid::from_str(&node_id) {
                     Ok(node_id) => node_id,
                     Err(err) => anyhow::bail!("invalid node id {}: {}", node_id, err),
                 };
-                proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Cordon(node_id)]);
+                proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Cordon(
+                    node_id,
+                )]);
             }
             IntentCommands::Uncordon { node_id } => {
                 let node_id = match uuid::Uuid::from_str(&node_id) {
                     Ok(node_id) => node_id,
                     Err(err) => anyhow::bail!("invalid node id {}: {}", node_id, err),
                 };
-                proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Uncordon(node_id)]);
+                proxy.add_deploy_intents(vec![
+                    edgeless_orc::deploy_intent::DeployIntent::Uncordon(node_id),
+                ]);
             }
         },
         Commands::Dump { dump_command } => match dump_command {
@@ -217,7 +285,9 @@ fn main() -> anyhow::Result<()> {
                         for value in values {
                             outfile
                                 .write_all(format!("{},{}\n", value.0, value.1).as_bytes())
-                                .unwrap_or_else(|_| panic!("could not write to file '{}'", filename));
+                                .unwrap_or_else(|_| {
+                                    panic!("could not write to file '{}'", filename)
+                                });
                         }
                     }
                 }
@@ -226,12 +296,14 @@ fn main() -> anyhow::Result<()> {
                 for (lid, spec) in proxy.fetch_function_instance_requests() {
                     let filename = format!("fun-{}.json", lid);
                     let outfile = open_file(&filename)?;
-                    serde_json::to_writer_pretty(outfile, &spec).unwrap_or_else(|_| panic!("could not write to file '{}'", filename));
+                    serde_json::to_writer_pretty(outfile, &spec)
+                        .unwrap_or_else(|_| panic!("could not write to file '{}'", filename));
                 }
                 for (lid, spec) in proxy.fetch_resource_instance_configurations() {
                     let filename = format!("res-{}.json", lid);
                     let outfile = open_file(&filename)?;
-                    serde_json::to_writer_pretty(outfile, &spec).unwrap_or_else(|_| panic!("could not write to file '{}'", filename));
+                    serde_json::to_writer_pretty(outfile, &spec)
+                        .unwrap_or_else(|_| panic!("could not write to file '{}'", filename));
                 }
             }
         },

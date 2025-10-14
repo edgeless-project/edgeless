@@ -18,7 +18,10 @@ struct FileStateProvider {
 
 impl FileStateProvider {
     fn new() -> Self {
-        std::fs::DirBuilder::new().recursive(true).create("./function_state/").unwrap();
+        std::fs::DirBuilder::new()
+            .recursive(true)
+            .create("./function_state/")
+            .unwrap();
         Self {
             base_path: std::path::PathBuf::from("./function_state/"),
         }
@@ -46,7 +49,11 @@ struct StateProviders {
 
 #[async_trait::async_trait]
 pub trait StateManagerAPI: Send {
-    async fn get_handle(&mut self, state_policy: edgeless_api::function_instance::StatePolicy, state_id: uuid::Uuid) -> Box<dyn StateHandleAPI>;
+    async fn get_handle(
+        &mut self,
+        state_policy: edgeless_api::function_instance::StatePolicy,
+        state_id: uuid::Uuid,
+    ) -> Box<dyn StateHandleAPI>;
 }
 
 impl StateManager {
@@ -62,7 +69,11 @@ impl StateManager {
 
 #[async_trait::async_trait]
 impl StateManagerAPI for StateManager {
-    async fn get_handle(&mut self, state_policy: edgeless_api::function_instance::StatePolicy, state_id: uuid::Uuid) -> Box<dyn StateHandleAPI> {
+    async fn get_handle(
+        &mut self,
+        state_policy: edgeless_api::function_instance::StatePolicy,
+        state_id: uuid::Uuid,
+    ) -> Box<dyn StateHandleAPI> {
         Box::new(StateHandle {
             state_policy,
             state_id,

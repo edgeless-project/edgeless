@@ -63,7 +63,10 @@ struct InvocationEventHandler {
 
 #[async_trait::async_trait]
 impl edgeless_api::invocation::InvocationAPI for InvocationEventHandler {
-    async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
+    async fn handle(
+        &mut self,
+        event: edgeless_api::invocation::Event,
+    ) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
         if event.target.node_id == self.node_id {
             self.locals.lock().await.handle(event).await
         } else {
@@ -74,7 +77,10 @@ impl edgeless_api::invocation::InvocationAPI for InvocationEventHandler {
 
 #[async_trait::async_trait]
 impl edgeless_api::invocation::InvocationAPI for RemoteRouter {
-    async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
+    async fn handle(
+        &mut self,
+        event: edgeless_api::invocation::Event,
+    ) -> anyhow::Result<edgeless_api::invocation::LinkProcessingResult> {
         if let Some(node_client) = self.receivers.get_mut(&event.target.node_id) {
             if let Err(err) = node_client.handle(event).await {
                 log::warn!("Error in handling event: {}", err);
@@ -89,7 +95,10 @@ impl edgeless_api::invocation::InvocationAPI for RemoteRouter {
 impl RemoteLinkProvider {
     pub async fn new(own_node_id: edgeless_api::function_instance::NodeId) -> Self {
         let locals = std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalRouter {
-            receivers: std::collections::HashMap::<ComponentId, futures::channel::mpsc::UnboundedSender<DataplaneEvent>>::new(),
+            receivers: std::collections::HashMap::<
+                ComponentId,
+                futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
+            >::new(),
         }));
 
         let remotes = std::sync::Arc::new(tokio::sync::Mutex::new(RemoteRouter {
@@ -108,7 +117,11 @@ impl RemoteLinkProvider {
         target: edgeless_api::function_instance::InstanceId,
         sender: futures::channel::mpsc::UnboundedSender<DataplaneEvent>,
     ) -> Box<dyn DataPlaneLink> {
-        self.locals.lock().await.receivers.insert(target.function_id, sender);
+        self.locals
+            .lock()
+            .await
+            .receivers
+            .insert(target.function_id, sender);
         Box::new(RemoteLink {
             remotes: self.remotes.clone(),
         })
@@ -121,8 +134,16 @@ impl RemoteLinkProvider {
         })
     }
 
-    pub async fn add_peer(&mut self, peer_id: NodeId, peer_api: Box<dyn edgeless_api::invocation::InvocationAPI>) {
-        self.remotes.lock().await.receivers.insert(peer_id, peer_api);
+    pub async fn add_peer(
+        &mut self,
+        peer_id: NodeId,
+        peer_api: Box<dyn edgeless_api::invocation::InvocationAPI>,
+    ) {
+        self.remotes
+            .lock()
+            .await
+            .receivers
+            .insert(peer_id, peer_api);
     }
 
     pub async fn del_peer(&mut self, peer_id: NodeId) {
@@ -153,7 +174,8 @@ mod test {
         let mut provider = RemoteLinkProvider::new(node_id).await;
         let mut api = provider.incomming_api().await;
 
-        let (sender_1, mut receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
+        let (sender_1, mut receiver_1) =
+            futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
         provider.new_link(fid_target, sender_1).await;
 
         api.handle(edgeless_api::invocation::Event {
@@ -162,7 +184,10 @@ mod test {
             stream_id: 0,
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
             created: created.clone(),
-            metadata: edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00015u128, 0x42a42bdecaf00016u64),
+            metadata: edgeless_api::function_instance::EventMetadata::from_uints(
+                0x42a42bdecaf00015u128,
+                0x42a42bdecaf00016u64,
+            ),
         })
         .await
         .unwrap();
@@ -176,14 +201,20 @@ mod test {
                 stream_id: 0,
                 data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
                 created: created.clone(),
-                metadata: edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00013u128, 0x42a42bdecaf00014u64),
+                metadata: edgeless_api::function_instance::EventMetadata::from_uints(
+                    0x42a42bdecaf00013u128,
+                    0x42a42bdecaf00014u64
+                ),
             })
             .await
             .is_err());
 
         assert!(receiver_1.try_next().is_err());
 
-        let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00011u128, 0x42a42bdecaf00012u64);
+        let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(
+            0x42a42bdecaf00011u128,
+            0x42a42bdecaf00012u64,
+        );
         api.handle(edgeless_api::invocation::Event {
             target: fid_target,
             source: fid_source,
@@ -208,7 +239,10 @@ mod test {
 
     #[async_trait::async_trait]
     impl edgeless_api::invocation::InvocationAPI for MockInvocationAPI {
-        async fn handle(&mut self, event: edgeless_api::invocation::Event) -> anyhow::Result<LinkProcessingResult> {
+        async fn handle(
+            &mut self,
+            event: edgeless_api::invocation::Event,
+        ) -> anyhow::Result<LinkProcessingResult> {
             self.events.send(event.clone()).await.unwrap();
             if event.target.node_id == self.own_node_id {
                 Ok(LinkProcessingResult::FINAL)
@@ -225,7 +259,10 @@ mod test {
         let node_id_2 = uuid::Uuid::new_v4();
         let node_id_3 = uuid::Uuid::new_v4();
         let fid_source = edgeless_api::function_instance::InstanceId::new(node_id);
-        let metad_source = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf0000fu128, 0x42a42bdecaf00010u64);
+        let metad_source = edgeless_api::function_instance::EventMetadata::from_uints(
+            0x42a42bdecaf0000fu128,
+            0x42a42bdecaf00010u64,
+        );
 
         let fid_target = edgeless_api::function_instance::InstanceId::new(node_id_2);
         let fid_wrong_component_id = edgeless_api::function_instance::InstanceId::new(node_id_2);
@@ -234,21 +271,31 @@ mod test {
             function_id: fid_target.function_id,
         };
 
-        let (api_sender_node_2, mut api_receiver_node_2) = futures::channel::mpsc::unbounded::<edgeless_api::invocation::Event>();
-        let node_2_api: Box<dyn edgeless_api::invocation::InvocationAPI> = Box::new(MockInvocationAPI {
-            own_node_id: node_id_2,
-            events: api_sender_node_2,
-        });
+        let (api_sender_node_2, mut api_receiver_node_2) =
+            futures::channel::mpsc::unbounded::<edgeless_api::invocation::Event>();
+        let node_2_api: Box<dyn edgeless_api::invocation::InvocationAPI> =
+            Box::new(MockInvocationAPI {
+                own_node_id: node_id_2,
+                events: api_sender_node_2,
+            });
         let mut provider = RemoteLinkProvider::new(node_id).await;
         provider.add_peer(node_id_2, node_2_api).await;
         // let mut api = provider.incomming_api().await;
         let created = edgeless_api::function_instance::EventTimestamp::default();
 
-        let (sender_1, _receiver_1) = futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
+        let (sender_1, _receiver_1) =
+            futures::channel::mpsc::unbounded::<crate::core::DataplaneEvent>();
         let mut link = provider.new_link(fid_source, sender_1).await;
 
         let res = link
-            .handle_send(&fid_target, Message::Cast("Test".to_string()), &fid_source, &created, 0, &metad_source)
+            .handle_send(
+                &fid_target,
+                Message::Cast("Test".to_string()),
+                &fid_source,
+                &created,
+                0,
+                &metad_source,
+            )
             .await;
         assert_eq!(res, LinkProcessingResult::FINAL);
         assert!(api_receiver_node_2.try_next().unwrap().is_some());
@@ -280,7 +327,14 @@ mod test {
         assert!(api_receiver_node_2.try_next().is_err());
 
         let res = link
-            .handle_send(&fid_target, Message::Cast("Test".to_string()), &fid_source, &created, 0, &metad_source)
+            .handle_send(
+                &fid_target,
+                Message::Cast("Test".to_string()),
+                &fid_source,
+                &created,
+                0,
+                &metad_source,
+            )
             .await;
         assert_eq!(res, LinkProcessingResult::FINAL);
         assert!(api_receiver_node_2.try_next().unwrap().is_some());

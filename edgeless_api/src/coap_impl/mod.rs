@@ -24,7 +24,8 @@ struct CoapClientInner {
     endpoint: std::net::SocketAddrV4,
     next_token: u8,
     #[allow(clippy::type_complexity)]
-    active_requests: std::collections::HashMap<u8, tokio::sync::oneshot::Sender<Result<Vec<u8>, Vec<u8>>>>,
+    active_requests:
+        std::collections::HashMap<u8, tokio::sync::oneshot::Sender<Result<Vec<u8>, Vec<u8>>>>,
 }
 
 impl CoapClient {
@@ -104,7 +105,11 @@ impl CoapClient {
 
     async fn call_with_reply(
         &mut self,
-        encode_request: impl Fn(u8, std::net::SocketAddrV4, &mut [u8]) -> ((&mut [u8], std::net::SocketAddrV4), &mut [u8]),
+        encode_request: impl Fn(
+            u8,
+            std::net::SocketAddrV4,
+            &mut [u8],
+        ) -> ((&mut [u8], std::net::SocketAddrV4), &mut [u8]),
     ) -> Result<Vec<u8>, Vec<u8>> {
         let (token, endpoint, mut receiver) = {
             let mut lck = self.inner.lock().await;
@@ -124,7 +129,8 @@ impl CoapClient {
                 log::warn!("Sender could not send on iteration {}", i);
             }
 
-            let res = tokio::time::timeout(core::time::Duration::from_millis(500), &mut receiver).await;
+            let res =
+                tokio::time::timeout(core::time::Duration::from_millis(500), &mut receiver).await;
             match res {
                 Ok(reply) => {
                     if let Ok(val) = reply {

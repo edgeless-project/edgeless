@@ -19,7 +19,9 @@ impl DomainRegisterClient {
 }
 
 impl edgeless_api::outer::domain_register::DomainRegisterAPI for DomainRegisterClient {
-    fn domain_registration_api(&mut self) -> Box<dyn edgeless_api::domain_registration::DomainRegistrationAPI> {
+    fn domain_registration_api(
+        &mut self,
+    ) -> Box<dyn edgeless_api::domain_registration::DomainRegistrationAPI> {
         self.domain_register_client.clone()
     }
 }
@@ -35,11 +37,15 @@ impl edgeless_api::domain_registration::DomainRegistrationAPI for DomainRegister
         &mut self,
         request: edgeless_api::domain_registration::UpdateDomainRequest,
     ) -> anyhow::Result<edgeless_api::domain_registration::UpdateDomainResponse> {
-        let (reply_sender, reply_receiver) =
-            tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::domain_registration::UpdateDomainResponse>>();
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
+            anyhow::Result<edgeless_api::domain_registration::UpdateDomainResponse>,
+        >();
         match self
             .sender
-            .send(super::DomainRegisterRequest::Update(request.clone(), reply_sender))
+            .send(super::DomainRegisterRequest::Update(
+                request.clone(),
+                reply_sender,
+            ))
             .await
         {
             Ok(_) => {}

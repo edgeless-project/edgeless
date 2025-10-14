@@ -21,12 +21,16 @@ pub(crate) enum ControllerRequest {
     Start(
         edgeless_api::workflow_instance::SpawnWorkflowRequest,
         // Reply Channel
-        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>,
+        tokio::sync::oneshot::Sender<
+            anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>,
+        >,
     ),
     Stop(edgeless_api::workflow_instance::WorkflowId),
     List(
         // Reply Channel
-        tokio::sync::oneshot::Sender<anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowId>>>,
+        tokio::sync::oneshot::Sender<
+            anyhow::Result<Vec<edgeless_api::workflow_instance::WorkflowId>>,
+        >,
     ),
     Inspect(
         edgeless_api::workflow_instance::WorkflowId,
@@ -36,12 +40,21 @@ pub(crate) enum ControllerRequest {
     Domains(
         String,
         // Reply Channel
-        tokio::sync::oneshot::Sender<anyhow::Result<std::collections::HashMap<String, edgeless_api::domain_registration::DomainCapabilities>>>,
+        tokio::sync::oneshot::Sender<
+            anyhow::Result<
+                std::collections::HashMap<
+                    String,
+                    edgeless_api::domain_registration::DomainCapabilities,
+                >,
+            >,
+        >,
     ),
     Migrate(
         edgeless_api::workflow_instance::MigrateWorkflowRequest,
         // Reply Channel
-        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>>,
+        tokio::sync::oneshot::Sender<
+            anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>,
+        >,
     ),
 }
 
@@ -49,7 +62,9 @@ pub(crate) enum DomainRegisterRequest {
     Update(
         edgeless_api::domain_registration::UpdateDomainRequest,
         // Reply Channel
-        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::domain_registration::UpdateDomainResponse>>,
+        tokio::sync::oneshot::Sender<
+            anyhow::Result<edgeless_api::domain_registration::UpdateDomainResponse>,
+        >,
     ),
 }
 
@@ -70,8 +85,10 @@ type Task = std::pin::Pin<Box<dyn futures::Future<Output = ()> + Send>>;
 
 impl Controller {
     pub fn new(persistence_filename: String) -> (Self, Task, Task) {
-        let (workflow_instance_sender, workflow_instance_receiver) = futures::channel::mpsc::unbounded();
-        let (domain_register_sender, domain_register_receiver) = futures::channel::mpsc::unbounded();
+        let (workflow_instance_sender, workflow_instance_receiver) =
+            futures::channel::mpsc::unbounded();
+        let (domain_register_sender, domain_register_receiver) =
+            futures::channel::mpsc::unbounded();
         let (internal_sender, internal_receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
@@ -104,11 +121,15 @@ impl Controller {
         )
     }
 
-    pub fn get_workflow_instance_client(&mut self) -> Box<dyn edgeless_api::outer::controller::ControllerAPI + Send> {
+    pub fn get_workflow_instance_client(
+        &mut self,
+    ) -> Box<dyn edgeless_api::outer::controller::ControllerAPI + Send> {
         client::ControllerClient::new(self.workflow_instance_sender.clone())
     }
 
-    pub fn get_domain_register_client(&mut self) -> Box<dyn edgeless_api::outer::domain_register::DomainRegisterAPI + Send> {
+    pub fn get_domain_register_client(
+        &mut self,
+    ) -> Box<dyn edgeless_api::outer::domain_register::DomainRegisterAPI + Send> {
         domain_register_client::DomainRegisterClient::new(self.domain_register_sender.clone())
     }
 }

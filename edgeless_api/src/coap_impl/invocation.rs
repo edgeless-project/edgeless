@@ -22,12 +22,14 @@ impl CoapInvocationServer {
 
             let mut buffer = vec![0_u8; 5000];
 
-            let mut received_tokens: std::collections::HashMap<std::net::IpAddr, u8> = std::collections::HashMap::new();
+            let mut received_tokens: std::collections::HashMap<std::net::IpAddr, u8> =
+                std::collections::HashMap::new();
 
             loop {
                 let (size, sender) = slf.sock.recv_from(&mut buffer[..]).await.unwrap();
 
-                let (pack, token) = edgeless_api_core::coap_mapping::CoapDecoder::decode(&buffer[..size]).unwrap();
+                let (pack, token) =
+                    edgeless_api_core::coap_mapping::CoapDecoder::decode(&buffer[..size]).unwrap();
                 match pack {
                     edgeless_api_core::coap_mapping::CoapMessage::Invocation(invocation_event) => {
                         let event = crate::invocation::Event {
@@ -36,16 +38,26 @@ impl CoapInvocationServer {
                             stream_id: invocation_event.stream_id,
                             data: match invocation_event.data {
                                 edgeless_api_core::invocation::EventData::Cast(val) => {
-                                    crate::invocation::EventData::Cast(String::from_utf8(val.to_vec()).unwrap())
+                                    crate::invocation::EventData::Cast(
+                                        String::from_utf8(val.to_vec()).unwrap(),
+                                    )
                                 }
                                 edgeless_api_core::invocation::EventData::Call(val) => {
-                                    crate::invocation::EventData::Call(String::from_utf8(val.to_vec()).unwrap())
+                                    crate::invocation::EventData::Call(
+                                        String::from_utf8(val.to_vec()).unwrap(),
+                                    )
                                 }
                                 edgeless_api_core::invocation::EventData::CallRet(val) => {
-                                    crate::invocation::EventData::CallRet(String::from_utf8(val.to_vec()).unwrap())
+                                    crate::invocation::EventData::CallRet(
+                                        String::from_utf8(val.to_vec()).unwrap(),
+                                    )
                                 }
-                                edgeless_api_core::invocation::EventData::CallNoRet => crate::invocation::EventData::CallNoRet,
-                                edgeless_api_core::invocation::EventData::Err => crate::invocation::EventData::Err,
+                                edgeless_api_core::invocation::EventData::CallNoRet => {
+                                    crate::invocation::EventData::CallNoRet
+                                }
+                                edgeless_api_core::invocation::EventData::Err => {
+                                    crate::invocation::EventData::Err
+                                }
                             },
                             created: invocation_event.created,
                             metadata: invocation_event.metadata,
@@ -79,16 +91,27 @@ impl CoapInvocationServer {
 
 #[async_trait::async_trait]
 impl crate::invocation::InvocationAPI for super::CoapClient {
-    async fn handle(&mut self, event: crate::invocation::Event) -> anyhow::Result<crate::invocation::LinkProcessingResult> {
+    async fn handle(
+        &mut self,
+        event: crate::invocation::Event,
+    ) -> anyhow::Result<crate::invocation::LinkProcessingResult> {
         let encoded_event = edgeless_api_core::invocation::Event::<&[u8]> {
             target: event.target,
             source: event.source,
             stream_id: event.stream_id,
             data: match &event.data {
-                crate::invocation::EventData::Cast(val) => edgeless_api_core::invocation::EventData::Cast(val.as_bytes()),
-                crate::invocation::EventData::Call(val) => edgeless_api_core::invocation::EventData::Call(val.as_bytes()),
-                crate::invocation::EventData::CallRet(val) => edgeless_api_core::invocation::EventData::CallRet(val.as_bytes()),
-                crate::invocation::EventData::CallNoRet => edgeless_api_core::invocation::EventData::CallNoRet,
+                crate::invocation::EventData::Cast(val) => {
+                    edgeless_api_core::invocation::EventData::Cast(val.as_bytes())
+                }
+                crate::invocation::EventData::Call(val) => {
+                    edgeless_api_core::invocation::EventData::Call(val.as_bytes())
+                }
+                crate::invocation::EventData::CallRet(val) => {
+                    edgeless_api_core::invocation::EventData::CallRet(val.as_bytes())
+                }
+                crate::invocation::EventData::CallNoRet => {
+                    edgeless_api_core::invocation::EventData::CallNoRet
+                }
                 crate::invocation::EventData::Err => edgeless_api_core::invocation::EventData::Err,
             },
             created: event.created,
@@ -100,10 +123,19 @@ impl crate::invocation::InvocationAPI for super::CoapClient {
         let mut buffer = vec![0_u8; 2000];
 
         let token = lck.next_token;
-        lck.next_token = if lck.next_token == u8::MAX { 0 } else { lck.next_token + 1 };
+        lck.next_token = if lck.next_token == u8::MAX {
+            0
+        } else {
+            lck.next_token + 1
+        };
 
         let ((packet, _addr), _tail) =
-            edgeless_api_core::coap_mapping::COAPEncoder::encode_invocation_event(lck.endpoint, encoded_event, token, &mut buffer[..]);
+            edgeless_api_core::coap_mapping::COAPEncoder::encode_invocation_event(
+                lck.endpoint,
+                encoded_event,
+                token,
+                &mut buffer[..],
+            );
         self.outgoing_sender.send(Vec::from(packet)).unwrap();
         Ok(crate::invocation::LinkProcessingResult::FINAL)
     }

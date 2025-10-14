@@ -12,7 +12,8 @@ pub(crate) fn copy_to_vm(
     let data_ptr = alloc
         .call(ctx.borrow_mut(), data.len() as i32)
         .map_err(|_| wasmi::core::Trap::new("alloc error"))?;
-    memory.data_mut(ctx.borrow_mut())[data_ptr as usize..(data_ptr as usize) + data.len()].copy_from_slice(data);
+    memory.data_mut(ctx.borrow_mut())[data_ptr as usize..(data_ptr as usize) + data.len()]
+        .copy_from_slice(data);
     Ok(data_ptr)
 }
 
@@ -23,7 +24,8 @@ pub(crate) fn copy_to_vm_ptr(
     target_ptr: i32,
     data: &[u8],
 ) -> Result<(), wasmi::core::Trap> {
-    memory.data_mut(ctx.borrow_mut())[target_ptr as usize..(target_ptr as usize) + data.len()].copy_from_slice(data);
+    memory.data_mut(ctx.borrow_mut())[target_ptr as usize..(target_ptr as usize) + data.len()]
+        .copy_from_slice(data);
     Ok(())
 }
 
@@ -33,8 +35,10 @@ pub(crate) fn load_string_from_vm(
     data_ptr: i32,
     data_len: i32,
 ) -> Result<String, wasmi::core::Trap> {
-    String::from_utf8(memory.data_mut(ctx)[data_ptr as usize..(data_ptr as usize) + data_len as usize].to_vec())
-        .map_err(|_| wasmi::core::Trap::new("string error"))
+    String::from_utf8(
+        memory.data_mut(ctx)[data_ptr as usize..(data_ptr as usize) + data_len as usize].to_vec(),
+    )
+    .map_err(|_| wasmi::core::Trap::new("string error"))
 }
 
 pub(crate) fn level_from_i32(lvl: i32) -> edgeless_telemetry::telemetry_events::TelemetryLogLevel {

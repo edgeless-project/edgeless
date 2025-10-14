@@ -21,6 +21,12 @@ Below you will find instructions to create different flavors of your working env
 
 ## Ubuntu 22.04/24.04
 
+Start by installing Rust (follow the interactive instructions):
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
 Install the dependencies:
 
 ```bash
@@ -30,11 +36,6 @@ rustup target add wasm32-unknown-unknown
 cargo install wasm-opt
 ```
 
-Install Rust (follow the interactive instructions):
-
-```bash
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
 
 If using Ubuntu 24.04 or newer, you can install protobuf with apt:
 
@@ -42,8 +43,9 @@ If using Ubuntu 24.04 or newer, you can install protobuf with apt:
 sudo apt update && sudo apt install protobuf-compiler libprotobuf-dev -y
 ```
 
-Otherwise, with Ubuntu 22.04 or older, you must to install a modern release of the Protocol Buffers binaries
-(v31.1 is the latest stable release as of 16/06/2025).
+Otherwise if using Ubuntu 22.04 LTS or older versions, you might need to install a modern release of the Protocol Buffers binaries
+(v31.1 is the latest stable release as of 16/06/2025)
+
 The available binaries in the default Ubuntu 22.04 repositories have proven to be too old for some EDGELESS crates.
 
 ```bash

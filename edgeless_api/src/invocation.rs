@@ -39,7 +39,12 @@ impl std::fmt::Display for Event {
         write!(
             f,
             "target node {} component {}, source node {} component {}, stream_id {}, {}",
-            self.target.node_id, self.target.function_id, self.source.node_id, self.source.function_id, self.stream_id, self.data
+            self.target.node_id,
+            self.target.function_id,
+            self.source.node_id,
+            self.source.function_id,
+            self.stream_id,
+            self.data
         )
     }
 }

@@ -1,0 +1,15 @@
+{
+  "min_transaction_interval_ms": 2000,
+  "max_transaction_interval_ms": 2000,
+  "min_input_size": 70,
+  "max_input_size": 70,
+  "min_num_stages": 2,
+  "max_num_stages": 2,
+  "min_fan_out": 2,
+  "max_fan_out": 2,
+  "min_fibonacci": 10000,
+  "max_fibonacci": 10000,
+  "min_memory_bytes": 0,
+  "max_memory_bytes": 0,
+  "functions_path": "/root/edgeless/functions/"
+}

@@ -28,6 +28,7 @@ pub struct CloudNodeData {
 }
 
 fn generate_instance_name() -> String {
+<<<<<<< HEAD
     let random_string: String = thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
     format!("EDGELESS-Node-{}", random_string)
 }
@@ -35,6 +36,24 @@ fn generate_instance_name() -> String {
 pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNodeData, Box<dyn std::error::Error>> {
     // Config for AWS SDK
     let config = aws_config::from_env().region(Region::new(input_data.aws_region.clone())).load().await;
+=======
+    let random_string: String = thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(8)
+        .map(char::from)
+        .collect();
+    format!("EDGELESS-Node-{}", random_string)
+}
+
+pub async fn create_cloud_node(
+    input_data: CloudNodeInputData,
+) -> Result<CloudNodeData, Box<dyn std::error::Error>> {
+    // Config for AWS SDK
+    let config = aws_config::from_env()
+        .region(Region::new(input_data.aws_region.clone()))
+        .load()
+        .await;
+>>>>>>> feature/anomaly-detection
     let client = aws_sdk_ec2::Client::new(&config);
 
     // Define a node id
@@ -43,7 +62,14 @@ pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNo
     // Get the user data script from the file and convert it to to Base64
     const SCRIPT_CONTENT: &str = include_str!("ec2-user-data.sh");
     let script_content_modified = SCRIPT_CONTENT
+<<<<<<< HEAD
         .replace("__ORCHESTRATOR_URL_PLACEHOLDER__", &input_data.orchestrator_url)
+=======
+        .replace(
+            "__ORCHESTRATOR_URL_PLACEHOLDER__",
+            &input_data.orchestrator_url,
+        )
+>>>>>>> feature/anomaly-detection
         .replace("__NODE_ID_PLACEHOLDER__", &node_id);
     let script_content_as_string = script_content_modified.to_string();
     let encoded_user_data = STANDARD.encode(script_content_as_string);
@@ -90,16 +116,37 @@ pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNo
     Ok(cloud_node)
 }
 
+<<<<<<< HEAD
 pub async fn delete_cloud_node(cloud_node: CloudNodeData) -> Result<String, Box<dyn std::error::Error>> {
+=======
+pub async fn delete_cloud_node(
+    cloud_node: CloudNodeData,
+) -> Result<String, Box<dyn std::error::Error>> {
+>>>>>>> feature/anomaly-detection
     let instance_id: &str = &cloud_node.instance_id;
     let instance_name: &str = &cloud_node.instance_name;
 
     // Config for AWS SDK
+<<<<<<< HEAD
     let config = aws_config::from_env().region(Region::new(cloud_node.aws_region)).load().await;
     let client = aws_sdk_ec2::Client::new(&config);
 
     // Terminate the EC2 instance
     client.terminate_instances().instance_ids(instance_id).send().await?;
+=======
+    let config = aws_config::from_env()
+        .region(Region::new(cloud_node.aws_region))
+        .load()
+        .await;
+    let client = aws_sdk_ec2::Client::new(&config);
+
+    // Terminate the EC2 instance
+    client
+        .terminate_instances()
+        .instance_ids(instance_id)
+        .send()
+        .await?;
+>>>>>>> feature/anomaly-detection
 
     log::info!("EDGELESS Node deployed on AWS Instance: {instance_id}, with name: {instance_name} has been deleted.");
 

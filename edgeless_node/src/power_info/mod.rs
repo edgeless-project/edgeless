@@ -27,11 +27,16 @@ impl PowerInfo {
     /// A negative value means that something went wrong.
     pub async fn active_power(&mut self) -> f32 {
         if self.context.is_none() {
-            self.context = tokio_modbus::client::tcp::connect(self.socket_addr).await.ok();
+            self.context = tokio_modbus::client::tcp::connect(self.socket_addr)
+                .await
+                .ok();
         }
 
         if let Some(context) = &mut self.context {
-            match context.read_holding_registers(PowerInfo::active_power_addr(self.outlet_number), 2).await {
+            match context
+                .read_holding_registers(PowerInfo::active_power_addr(self.outlet_number), 2)
+                .await
+            {
                 Ok(res) => match res {
                     Ok(data) => return PowerInfo::parse_f32(&data),
                     Err(_err) => self.context = None,
@@ -71,10 +76,16 @@ mod tests {
 
         println!("Connecting to {}", socket_addr);
 
-        let mut ctx = tokio_modbus::client::tcp::connect(socket_addr).await.unwrap();
+        let mut ctx = tokio_modbus::client::tcp::connect(socket_addr)
+            .await
+            .unwrap();
 
         println!("Fetching the value of the float register from a Raritan PDU");
-        let data = ctx.read_holding_registers(0x8012, 2).await.unwrap().unwrap();
+        let data = ctx
+            .read_holding_registers(0x8012, 2)
+            .await
+            .unwrap()
+            .unwrap();
 
         let bytes: Vec<u8> = data.iter().fold(vec![], |mut x, elem| {
             x.push((elem >> 8) as u8);
@@ -91,7 +102,9 @@ mod tests {
         // Query 8 active power values with PowerInfo
         println!("With PowerInfo");
         for outlet_number in 1..=8 {
-            let mut power_info = PowerInfo::new("127.0.0.1:5502", outlet_number).await.unwrap();
+            let mut power_info = PowerInfo::new("127.0.0.1:5502", outlet_number)
+                .await
+                .unwrap();
             println!("#{} {} W", outlet_number, power_info.active_power().await);
         }
     }

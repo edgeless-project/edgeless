@@ -7,12 +7,18 @@ use crate::grpc_impl::common::CommonConverters;
 
 #[derive(Clone)]
 pub struct FunctionInstanceAPIClient<FunctionIdType> {
-    client: Option<crate::grpc_impl::api::function_instance_client::FunctionInstanceClient<tonic::transport::Channel>>,
+    client: Option<
+        crate::grpc_impl::api::function_instance_client::FunctionInstanceClient<
+            tonic::transport::Channel,
+        >,
+    >,
     server_addr: String,
     _phantom: std::marker::PhantomData<FunctionIdType>,
 }
 
-impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + Sync + 'static> FunctionInstanceAPIClient<FunctionIdType> {
+impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + Sync + 'static>
+    FunctionInstanceAPIClient<FunctionIdType>
+{
     pub fn new(server_addr: String) -> Self {
         Self {
             client: None,
@@ -46,7 +52,8 @@ impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + 
 
 #[async_trait::async_trait]
 impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + Sync + 'static>
-    crate::function_instance::FunctionInstanceAPI<FunctionIdType> for FunctionInstanceAPIClient<FunctionIdType>
+    crate::function_instance::FunctionInstanceAPI<FunctionIdType>
+    for FunctionInstanceAPIClient<FunctionIdType>
 where
     // TODO: refactor
     grpc_stubs::InstanceIdVariant: crate::grpc_impl::common::ParseableId<FunctionIdType>,
@@ -58,8 +65,17 @@ where
         match self.try_connect().await {
             Ok(_) => {
                 if let Some(client) = &mut self.client {
-                    match client.start(tonic::Request::new(serialize_spawn_function_request(&request))).await {
-                        Ok(res) => CommonConverters::parse_start_component_response::<FunctionIdType>(&res.into_inner()),
+                    match client
+                        .start(tonic::Request::new(serialize_spawn_function_request(
+                            &request,
+                        )))
+                        .await
+                    {
+                        Ok(res) => {
+                            CommonConverters::parse_start_component_response::<FunctionIdType>(
+                                &res.into_inner(),
+                            )
+                        }
                         Err(err) => {
                             self.disconnect();
                             Err(anyhow::anyhow!(
@@ -84,7 +100,9 @@ where
             Ok(_) => {
                 if let Some(client) = &mut self.client {
                     match client
-                        .stop(tonic::Request::new(crate::grpc_impl::common::SerializeableId::serialize(&id)))
+                        .stop(tonic::Request::new(
+                            crate::grpc_impl::common::SerializeableId::serialize(&id),
+                        ))
                         .await
                     {
                         Ok(_) => Ok(()),
@@ -112,7 +130,9 @@ where
             Ok(_) => {
                 if let Some(client) = &mut self.client {
                     match client
-                        .patch(tonic::Request::new(CommonConverters::serialize_patch_request(&update)))
+                        .patch(tonic::Request::new(
+                            CommonConverters::serialize_patch_request(&update),
+                        ))
                         .await
                     {
                         Ok(_) => Ok(()),
@@ -136,12 +156,14 @@ where
     }
 }
 pub struct FunctionInstanceAPIServer<FunctionIdType> {
-    pub root_api: tokio::sync::Mutex<Box<dyn crate::function_instance::FunctionInstanceAPI<FunctionIdType>>>,
+    pub root_api:
+        tokio::sync::Mutex<Box<dyn crate::function_instance::FunctionInstanceAPI<FunctionIdType>>>,
 }
 
 #[async_trait::async_trait]
 impl<FunctionIdType: crate::grpc_impl::common::SerializeableId + Clone + Send + 'static>
-    crate::grpc_impl::api::function_instance_server::FunctionInstance for FunctionInstanceAPIServer<FunctionIdType>
+    crate::grpc_impl::api::function_instance_server::FunctionInstance
+    for FunctionInstanceAPIServer<FunctionIdType>
 where
     crate::grpc_impl::api::InstanceIdVariant: crate::grpc_impl::common::ParseableId<FunctionIdType>,
 {
@@ -153,31 +175,42 @@ where
         let parsed_request = match parse_spawn_function_request(&inner_request) {
             Ok(val) => val,
             Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
-                    response_error: Some(crate::grpc_impl::api::ResponseError {
-                        summary: "Invalid function instance creation request".to_string(),
-                        detail: Some(err.to_string()),
-                    }),
-                    instance_id: None,
-                }))
+                return Ok(tonic::Response::new(
+                    crate::grpc_impl::api::StartComponentResponse {
+                        response_error: Some(crate::grpc_impl::api::ResponseError {
+                            summary: "Invalid function instance creation request".to_string(),
+                            detail: Some(err.to_string()),
+                        }),
+                        instance_id: None,
+                    },
+                ))
             }
         };
         match self.root_api.lock().await.start(parsed_request).await {
-            Ok(response) => Ok(tonic::Response::new(CommonConverters::serialize_start_component_response(&response))),
+            Ok(response) => Ok(tonic::Response::new(
+                CommonConverters::serialize_start_component_response(&response),
+            )),
             Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
-                    response_error: Some(crate::grpc_impl::api::ResponseError {
-                        summary: "Function instance creation request rejected".to_string(),
-                        detail: Some(err.to_string()),
-                    }),
-                    instance_id: None,
-                }))
+                return Ok(tonic::Response::new(
+                    crate::grpc_impl::api::StartComponentResponse {
+                        response_error: Some(crate::grpc_impl::api::ResponseError {
+                            summary: "Function instance creation request rejected".to_string(),
+                            detail: Some(err.to_string()),
+                        }),
+                        instance_id: None,
+                    },
+                ))
             }
         }
     }
 
-    async fn stop(&self, request: tonic::Request<grpc_stubs::InstanceIdVariant>) -> Result<tonic::Response<()>, tonic::Status> {
-        let stop_function_id = match crate::grpc_impl::common::ParseableId::<FunctionIdType>::parse(&request.into_inner()) {
+    async fn stop(
+        &self,
+        request: tonic::Request<grpc_stubs::InstanceIdVariant>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
+        let stop_function_id = match crate::grpc_impl::common::ParseableId::<FunctionIdType>::parse(
+            &request.into_inner(),
+        ) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
                 log::error!("Error when stopping a function instance: {}", err);
@@ -189,11 +222,17 @@ where
         };
         match self.root_api.lock().await.stop(stop_function_id).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Function instance stopping error: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!(
+                "Function instance stopping error: {}",
+                err
+            ))),
         }
     }
 
-    async fn patch(&self, update: tonic::Request<crate::grpc_impl::api::PatchRequest>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn patch(
+        &self,
+        update: tonic::Request<crate::grpc_impl::api::PatchRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_update = match CommonConverters::parse_patch_request(&update.into_inner()) {
             Ok(parsed_update) => parsed_update,
             Err(err) => {
@@ -272,7 +311,9 @@ pub fn serialize_function_class_specification(
     }
 }
 
-pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFunctionRequest) -> crate::grpc_impl::api::SpawnFunctionRequest {
+pub fn serialize_spawn_function_request(
+    req: &crate::function_instance::SpawnFunctionRequest,
+) -> crate::grpc_impl::api::SpawnFunctionRequest {
     crate::grpc_impl::api::SpawnFunctionRequest {
         code: Some(serialize_function_class_specification(&req.code)),
         annotations: req.annotations.clone(),
@@ -281,13 +322,21 @@ pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFun
     }
 }
 
-pub fn serialize_state_specification(crate_spec: &crate::function_instance::StateSpecification) -> crate::grpc_impl::api::StateSpecification {
+pub fn serialize_state_specification(
+    crate_spec: &crate::function_instance::StateSpecification,
+) -> crate::grpc_impl::api::StateSpecification {
     crate::grpc_impl::api::StateSpecification {
         state_id: crate_spec.state_id.to_string(),
         policy: match crate_spec.state_policy {
-            crate::function_instance::StatePolicy::Transient => crate::grpc_impl::api::StatePolicy::Transient as i32,
-            crate::function_instance::StatePolicy::Global => crate::grpc_impl::api::StatePolicy::Global as i32,
-            crate::function_instance::StatePolicy::NodeLocal => crate::grpc_impl::api::StatePolicy::NodeLocal as i32,
+            crate::function_instance::StatePolicy::Transient => {
+                crate::grpc_impl::api::StatePolicy::Transient as i32
+            }
+            crate::function_instance::StatePolicy::Global => {
+                crate::grpc_impl::api::StatePolicy::Global as i32
+            }
+            crate::function_instance::StatePolicy::NodeLocal => {
+                crate::grpc_impl::api::StatePolicy::NodeLocal as i32
+            }
         },
     }
 }
@@ -312,7 +361,10 @@ mod tests {
                 function_class_code: "binary-code".as_bytes().to_vec(),
                 function_class_outputs: vec!["out".to_string(), "err".to_string()],
             },
-            annotations: std::collections::HashMap::from([("key1".to_string(), "value1".to_string())]),
+            annotations: std::collections::HashMap::from([(
+                "key1".to_string(),
+                "value1".to_string(),
+            )]),
             state_specification: StateSpecification {
                 state_id: uuid::Uuid::new_v4(),
                 state_policy: StatePolicy::NodeLocal,
@@ -340,7 +392,9 @@ mod tests {
             }),
         ];
         for msg in messages {
-            match CommonConverters::parse_start_component_response(&CommonConverters::serialize_start_component_response(&msg)) {
+            match CommonConverters::parse_start_component_response(
+                &CommonConverters::serialize_start_component_response(&msg),
+            ) {
                 Ok(val) => assert_eq!(msg, val),
                 Err(err) => panic!("{}", err),
             }

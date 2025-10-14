@@ -61,7 +61,10 @@ impl ArrivalModel {
         let arrival_type = match arrival_type.to_ascii_lowercase().as_str() {
             "poisson" => {
                 anyhow::ensure!(lifetime > 0.0, "the average lifetime cannot be negative");
-                anyhow::ensure!(interarrival > 0.0, "the average interarrival cannot be negative");
+                anyhow::ensure!(
+                    interarrival > 0.0,
+                    "the average interarrival cannot be negative"
+                );
                 ArrivalType::Poisson
             }
             "incremental" => ArrivalType::Incremental,
@@ -75,11 +78,30 @@ impl ArrivalModel {
 
                 let mut last_arrival_time = 0;
                 for (line_no, line) in reader.lines().enumerate() {
-                    let tokens = line?.split(',').filter_map(|x| x.parse::<f64>().ok()).collect::<Vec<f64>>();
-                    anyhow::ensure!(tokens.len() == 2, "invalid input in workload trace at line {}", line_no);
-                    anyhow::ensure!(tokens[0] >= 0.0, "invalid negative arrival time at line {}", line_no);
-                    anyhow::ensure!(tokens[1] >= 0.0, "invalid negative end time at line {}", line_no);
-                    anyhow::ensure!(tokens[1] > tokens[0], "invalid end time is before arrival time at line {}", line_no);
+                    let tokens = line?
+                        .split(',')
+                        .filter_map(|x| x.parse::<f64>().ok())
+                        .collect::<Vec<f64>>();
+                    anyhow::ensure!(
+                        tokens.len() == 2,
+                        "invalid input in workload trace at line {}",
+                        line_no
+                    );
+                    anyhow::ensure!(
+                        tokens[0] >= 0.0,
+                        "invalid negative arrival time at line {}",
+                        line_no
+                    );
+                    anyhow::ensure!(
+                        tokens[1] >= 0.0,
+                        "invalid negative end time at line {}",
+                        line_no
+                    );
+                    anyhow::ensure!(
+                        tokens[1] > tokens[0],
+                        "invalid end time is before arrival time at line {}",
+                        line_no
+                    );
                     let arrival_time = crate::utils::to_microseconds(tokens[0]);
                     anyhow::ensure!(
                         arrival_time >= last_arrival_time,
@@ -120,7 +142,9 @@ impl ArrivalModel {
         let next_periodic = self.interarrival * (self.counter - 1);
         let trace_ndx = (self.counter - 1) as usize;
         let arrival_time = match self.arrival_type {
-            ArrivalType::Poisson => now + crate::utils::to_microseconds(self.interarrival_exp_rv.sample(&mut self.rng)),
+            ArrivalType::Poisson => {
+                now + crate::utils::to_microseconds(self.interarrival_exp_rv.sample(&mut self.rng))
+            }
             ArrivalType::Incremental => next_periodic,
             ArrivalType::IncrAndKeep => {
                 if next_periodic < self.warmup {
@@ -145,7 +169,10 @@ impl ArrivalModel {
             }
         };
         let lifetime = match self.arrival_type {
-            ArrivalType::Poisson => arrival_time + crate::utils::to_microseconds(self.lifetime_exp_rv.sample(&mut self.rng)),
+            ArrivalType::Poisson => {
+                arrival_time
+                    + crate::utils::to_microseconds(self.lifetime_exp_rv.sample(&mut self.rng))
+            }
             ArrivalType::Incremental => arrival_time + self.lifetime,
             ArrivalType::IncrAndKeep | ArrivalType::Single => self.duration,
             ArrivalType::Trace => self.trace[trace_ndx].1,
@@ -182,8 +209,14 @@ mod test {
             interarrival_sum += (arrival_time - now) as f64;
             lifetime_sum += (end_time - arrival_time) as f64;
         }
-        assert_eq!(1, crate::utils::to_seconds((interarrival_sum / 10000 as f64) as u64).round() as u64);
-        assert_eq!(10, crate::utils::to_seconds((lifetime_sum / 10000 as f64) as u64).round() as u64);
+        assert_eq!(
+            1,
+            crate::utils::to_seconds((interarrival_sum / 10000 as f64) as u64).round() as u64
+        );
+        assert_eq!(
+            10,
+            crate::utils::to_seconds((lifetime_sum / 10000 as f64) as u64).round() as u64
+        );
     }
 
     #[test]
@@ -193,7 +226,10 @@ mod test {
         for i in 0..10 {
             let (arrival_time, end_time) = model.next(0_u64).unwrap();
             assert_eq!(crate::utils::to_microseconds(1.0 * i as f64), arrival_time);
-            assert_eq!(crate::utils::to_microseconds(1.0 * i as f64 + 10.0), end_time);
+            assert_eq!(
+                crate::utils::to_microseconds(1.0 * i as f64 + 10.0),
+                end_time
+            );
         }
     }
 
@@ -229,7 +265,12 @@ mod test {
     fn test_arrival_model_trace() {
         let tmpfile = "test_arrival_model_trace_removeme.csv";
         {
-            let mut outfile = std::fs::OpenOptions::new().create(true).write(true).truncate(true).open(tmpfile).unwrap();
+            let mut outfile = std::fs::OpenOptions::new()
+                .create(true)
+                .write(true)
+                .truncate(true)
+                .open(tmpfile)
+                .unwrap();
             for i in 0..10 {
                 let _ = writeln!(outfile, "{},{}", i as f64, i as f64 + 10.0);
             }

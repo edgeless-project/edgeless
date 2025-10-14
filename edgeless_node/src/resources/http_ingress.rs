@@ -27,7 +27,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for HttpIngressResour
                 String::from("host"),
                 String::from("Hostname that is used to match incoming HTTP commands"),
             ),
-            (String::from("method"), String::from("Comma-separated list of HTTP methods allowed")),
+            (
+                String::from("method"),
+                String::from("Comma-separated list of HTTP methods allowed"),
+            ),
         ])
     }
 
@@ -58,7 +61,9 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
 
     type Error = anyhow::Error;
 
-    type Future = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Future = std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Self::Response, Self::Error>> + Send>,
+    >;
 
     fn call(&self, req: hyper::Request<hyper::body::Incoming>) -> Self::Future {
         let cloned = self.interests.clone();
@@ -103,14 +108,20 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                 let serialized_msg = serde_json::to_string(&msg)?;
                 let res = lck
                     .dataplane
-                    .call(target, serialized_msg, &edgeless_api::function_instance::EventMetadata::empty_new_root())
+                    .call(
+                        target,
+                        serialized_msg,
+                        &edgeless_api::function_instance::EventMetadata::empty_new_root(),
+                    )
                     .await;
                 if let edgeless_dataplane::core::CallRet::Reply(data) = res {
-                    let processor_response: edgeless_http::EdgelessHTTPResponse = serde_json::from_str(&data)?;
-                    let mut response_builder = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from(
-                        processor_response.body.unwrap_or_default(),
-                    )));
-                    *response_builder.status_mut() = hyper::StatusCode::from_u16(processor_response.status)?;
+                    let processor_response: edgeless_http::EdgelessHTTPResponse =
+                        serde_json::from_str(&data)?;
+                    let mut response_builder = hyper::Response::new(http_body_util::Full::new(
+                        hyper::body::Bytes::from(processor_response.body.unwrap_or_default()),
+                    ));
+                    *response_builder.status_mut() =
+                        hyper::StatusCode::from_u16(processor_response.status)?;
                     {
                         let headers = response_builder.headers_mut();
                         for (header_key, header_val) in processor_response.headers {
@@ -126,7 +137,9 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                 }
             }
 
-            let mut not_found = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from("Not Found")));
+            let mut not_found = hyper::Response::new(http_body_util::Full::new(
+                hyper::body::Bytes::from("Not Found"),
+            ));
             *not_found.status_mut() = hyper::StatusCode::NOT_FOUND;
             Ok(not_found)
         })
@@ -137,7 +150,11 @@ pub async fn ingress_task(
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     ingress_id: edgeless_api::function_instance::InstanceId,
     ingress_url: String,
-) -> Box<dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId>> {
+) -> Box<
+    dyn edgeless_api::resource_configuration::ResourceConfigurationAPI<
+        edgeless_api::function_instance::InstanceId,
+    >,
+> {
     let mut provider = dataplane_provider;
     let (_, host, port) = edgeless_api::util::parse_http_host(&ingress_url).unwrap();
     let addr = std::net::SocketAddr::from((std::net::IpAddr::from_str(&host).unwrap(), port));
@@ -196,11 +213,17 @@ struct IngressResource {
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for IngressResource {
+impl
+    edgeless_api::resource_configuration::ResourceConfigurationAPI<
+        edgeless_api::function_instance::InstanceId,
+    > for IngressResource
+{
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
+    ) -> anyhow::Result<
+        edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>,
+    > {
         let mut lck = self.configuration_state.lock().await;
         if let (Some(host), Some(methods)) = (
             instance_specification.configuration.get("host"),
@@ -214,17 +237,21 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                     host: host.clone(),
                     allow: methods
                         .split(",")
-                        .filter_map(|str_method| match edgeless_http::string_method_to_edgeless(str_method) {
-                            Ok(val) => Some(val),
-                            Err(_) => {
-                                log::warn!("Bad HTTP Method");
-                                None
+                        .filter_map(|str_method| {
+                            match edgeless_http::string_method_to_edgeless(str_method) {
+                                Ok(val) => Some(val),
+                                Err(_) => {
+                                    log::warn!("Bad HTTP Method");
+                                    None
+                                }
                             }
                         })
                         .collect(),
                 },
             );
-            Ok(edgeless_api::common::StartComponentResponse::InstanceId(resource_id))
+            Ok(edgeless_api::common::StartComponentResponse::InstanceId(
+                resource_id,
+            ))
         } else {
             Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                 edgeless_api::common::ResponseError {
@@ -234,7 +261,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             ))
         }
     }
-    async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+    async fn stop(
+        &mut self,
+        resource_id: edgeless_api::function_instance::InstanceId,
+    ) -> anyhow::Result<()> {
         let mut lck = self.configuration_state.lock().await;
         lck.interests.retain(|item| item.resource_id != resource_id);
         Ok(())
@@ -251,7 +281,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         let (host, allow) = match lck.active_resources.get(&update.function_id) {
             Some(val) => (val.host.clone(), val.allow.clone()),
             None => {
-                return Err(anyhow::anyhow!("Patching a non-existing resource: {}", update.function_id));
+                return Err(anyhow::anyhow!(
+                    "Patching a non-existing resource: {}",
+                    update.function_id
+                ));
             }
         };
         lck.interests.push(HTTPIngressInterest {

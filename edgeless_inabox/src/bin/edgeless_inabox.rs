@@ -6,8 +6,9 @@ use std::path::Path;
 
 use clap::Parser;
 use edgeless_node::{
-    EdgelessNodeContainerRuntimeSettings, EdgelessNodeGeneralSettings, EdgelessNodeResourceSettings, EdgelessNodeSettings,
-    EdgelessNodeTelemetrySettings, OllamaProviderSettings, ServerlessProviderSettings,
+    EdgelessNodeContainerRuntimeSettings, EdgelessNodeGeneralSettings,
+    EdgelessNodeResourceSettings, EdgelessNodeSettings, EdgelessNodeTelemetrySettings,
+    OllamaProviderSettings, ServerlessProviderSettings,
 };
 use std::fs;
 use uuid::Uuid;
@@ -37,12 +38,20 @@ fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     if args.templates {
-        let last_port = generate_configs(args.config_path, args.num_of_nodes, args.initial_port, args.bind_to_nonloopback)?;
+        let last_port = generate_configs(
+            args.config_path,
+            args.num_of_nodes,
+            args.initial_port,
+            args.bind_to_nonloopback,
+        )?;
         log::info!("Templates written, last port used: {}", last_port);
         return Ok(());
     }
 
-    let async_runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(8).enable_all().build()?;
+    let async_runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(8)
+        .enable_all()
+        .build()?;
     let mut async_tasks = vec![];
 
     edgeless_inabox::edgeless_inabox_main(&async_runtime, &mut async_tasks)?;
@@ -54,8 +63,16 @@ fn main() -> anyhow::Result<()> {
 /// Generates configs for a minimal in-a-box edgeless cluster with
 /// number_of_nodes nodes in the directory. If directory is non-empty, it
 /// fails.
-fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16, bind_to_nonloopback: bool) -> anyhow::Result<u16> {
-    log::info!("Generating configuration files for EDGELESS in-a-box with {} nodes", number_of_nodes);
+fn generate_configs(
+    config_path: String,
+    number_of_nodes: u32,
+    initial_port: u16,
+    bind_to_nonloopback: bool,
+) -> anyhow::Result<u16> {
+    log::info!(
+        "Generating configuration files for EDGELESS in-a-box with {} nodes",
+        number_of_nodes
+    );
 
     let reserved_controller_port = 7001;
     let reserved_domain_register_port = 7002;

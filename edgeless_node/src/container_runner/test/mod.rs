@@ -15,7 +15,10 @@ fn test_docker_basic() {
     let mut docker = match rs_docker::Docker::connect(format!("unix://{}", path).as_str()) {
         Ok(docker) => docker,
         Err(e) => {
-            println!("could not connect to Docker, bailing out of the test: {}", e);
+            println!(
+                "could not connect to Docker, bailing out of the test: {}",
+                e
+            );
             return;
         }
     };
@@ -78,7 +81,10 @@ fn test_docker_basic() {
     match docker.start_container(&name.to_string()) {
         Ok(val) => println!("{}", val),
         Err(e) => {
-            println!("error when starting the container, this likely means Docker is misconfigured: {}", e);
+            println!(
+                "error when starting the container, this likely means Docker is misconfigured: {}",
+                e
+            );
             return;
         }
     };
@@ -148,13 +154,15 @@ fn test_docker_basic_with_utils() {
 
     let image_name = "edgeless_function".to_string();
 
-    let (id, port) = match crate::container_runner::docker_utils::Docker::start(&mut docker, image_name) {
-        Ok((id, port)) => (id, port),
-        Err(err) => {
-            println!("could not create container, which may be fine: {}", err);
-            return;
-        }
-    };
+    let (id, port) =
+        match crate::container_runner::docker_utils::Docker::start(&mut docker, image_name) {
+            Ok((id, port)) => (id, port),
+            Err(err) => {
+                println!("could not create container, which may be fine: {}", err);
+                return;
+            }
+        };
     println!("container ID: {}, port: {}", id, port);
-    crate::container_runner::docker_utils::Docker::stop(&mut docker, id).expect("we should be able to stop a container that started flawlessly");
+    crate::container_runner::docker_utils::Docker::stop(&mut docker, id)
+        .expect("we should be able to stop a container that started flawlessly");
 }

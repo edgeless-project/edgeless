@@ -100,10 +100,16 @@ pub enum OrchestrationStrategy {
     RoundRobin,
 }
 
-pub fn make_proxy(settings: EdgelessOrcProxySettings) -> std::sync::Arc<tokio::sync::Mutex<dyn proxy::Proxy>> {
+pub fn make_proxy(
+    settings: EdgelessOrcProxySettings,
+) -> std::sync::Arc<tokio::sync::Mutex<dyn proxy::Proxy>> {
     match settings.proxy_type.to_lowercase().as_str() {
         "none" => {}
-        "redis" => match proxy_redis::ProxyRedis::new(&settings.redis_url.unwrap_or_default(), true, settings.dataset_settings) {
+        "redis" => match proxy_redis::ProxyRedis::new(
+            &settings.redis_url.unwrap_or_default(),
+            true,
+            settings.dataset_settings,
+        ) {
             Ok(proxy_redis) => return std::sync::Arc::new(tokio::sync::Mutex::new(proxy_redis)),
             Err(err) => log::error!("error when connecting to Redis: {}", err),
         },
@@ -118,58 +124,78 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
 
     // Create the component that subscribes to the domain register to
     // notify domain updates (periodically refreshed).
-    let (mut subscriber, subscriber_task, subscriber_refresh_task) = domain_subscriber::DomainSubscriber::new(
-        settings.general.domain_id.clone(),
-        match edgeless_api::util::get_announced(&settings.general.orchestrator_url, &settings.general.orchestrator_url_announced) {
-            Ok(url) => url,
-            Err(err) => {
-                log::error!(
-                    "invalid URL '{}' (announced: '{}'): {}",
-                    settings.general.orchestrator_url,
-                    settings.general.orchestrator_url_announced,
-                    err
-                );
-                String::default()
-            }
-        },
-        settings.general.domain_register_url,
-        settings.general.subscription_refresh_interval_sec,
-    )
-    .await;
+    let (mut subscriber, subscriber_task, subscriber_refresh_task) =
+        domain_subscriber::DomainSubscriber::new(
+            settings.general.domain_id.clone(),
+            match edgeless_api::util::get_announced(
+                &settings.general.orchestrator_url,
+                &settings.general.orchestrator_url_announced,
+            ) {
+                Ok(url) => url,
+                Err(err) => {
+                    log::error!(
+                        "invalid URL '{}' (announced: '{}'): {}",
+                        settings.general.orchestrator_url,
+                        settings.general.orchestrator_url_announced,
+                        err
+                    );
+                    String::default()
+                }
+            },
+            settings.general.domain_register_url,
+            settings.general.subscription_refresh_interval_sec,
+        )
+        .await;
 
     // Create the proxy.
     let proxy_gc_period = tokio::time::Duration::from_secs(settings.proxy.proxy_gc_period_seconds);
     let proxy = make_proxy(settings.proxy);
-    proxy.lock().await.update_domain_info(&crate::domain_info::DomainInfo {
-        domain_id: settings.general.domain_id.to_string(),
-    });
+    proxy
+        .lock()
+        .await
+        .update_domain_info(&crate::domain_info::DomainInfo {
+            domain_id: settings.general.domain_id.to_string(),
+        });
 
     // Create the orchestrator.
     let (mut orchestrator, orchestrator_task, orchestrator_refresh_task) =
-        orchestrator::Orchestrator::new(settings.baseline.clone(), proxy.clone(), subscriber.get_subscriber_sender()).await;
+        orchestrator::Orchestrator::new(
+            settings.baseline.clone(),
+            proxy.clone(),
+            subscriber.get_subscriber_sender(),
+        )
+        .await;
 
-    let orchestrator_server =
-        edgeless_api::grpc_impl::outer::orc::OrchestratorAPIServer::run(orchestrator.get_api_client(), settings.general.orchestrator_url);
+    let orchestrator_server = edgeless_api::grpc_impl::outer::orc::OrchestratorAPIServer::run(
+        orchestrator.get_api_client(),
+        settings.general.orchestrator_url,
+    );
 
     // Create the node register.
     let (mut node_register, node_register_task, node_register_refresh_task) =
         node_register::NodeRegister::new(proxy, proxy_gc_period, orchestrator.get_sender()).await;
 
-    let node_register_server = edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIServer::run(
-        node_register.get_node_registration_client(),
-        settings.general.node_register_url,
-    );
+    let node_register_server =
+        edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIServer::run(
+            node_register.get_node_registration_client(),
+            settings.general.node_register_url,
+        );
 
     let node_register_coap_server = if let Some(url) = settings.general.node_register_coap_url {
         if let Ok((proto, address, port)) = edgeless_api::util::parse_http_host(&url) {
             if proto != edgeless_api::util::Proto::COAP {
-                log::warn!("Wrong protocol for the CoAP node register ({}): assuming coap://", url);
+                log::warn!(
+                    "Wrong protocol for the CoAP node register ({}): assuming coap://",
+                    url
+                );
             }
             if address != "0.0.0.0" {
                 log::warn!("CoAP node register requested to be bound at {}: ignored, using 0.0.0.0 instead", address);
             }
             edgeless_api::coap_impl::node_register::CoapNodeRegisterServer::run(
-                node_register.get_node_registration_client().node_registration_api(),
+                node_register
+                    .get_node_registration_client()
+                    .node_registration_api(),
                 std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
             )
         } else {

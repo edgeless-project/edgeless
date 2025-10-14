@@ -14,7 +14,12 @@ pub struct MockSensorConfiguration {
 }
 
 pub struct MockSensor {
-    pub inner: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
+    pub inner: &'static core::cell::RefCell<
+        embassy_sync::mutex::Mutex<
+            embassy_sync::blocking_mutex::raw::NoopRawMutex,
+            MockSensorInner,
+        >,
+    >,
 }
 
 impl MockSensor {
@@ -60,7 +65,12 @@ impl MockSensor {
     #[allow(clippy::new_ret_no_self)]
     pub async fn new() -> &'static mut dyn crate::resource::ResourceDyn {
         static SENSOR_STATE_RAW: static_cell::StaticCell<
-            core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
+            core::cell::RefCell<
+                embassy_sync::mutex::Mutex<
+                    embassy_sync::blocking_mutex::raw::NoopRawMutex,
+                    MockSensorInner,
+                >,
+            >,
         > = static_cell::StaticCell::new();
         let mock_sensor_state = SENSOR_STATE_RAW.init_with(|| {
             core::cell::RefCell::new(embassy_sync::mutex::Mutex::new(MockSensorInner {
@@ -70,7 +80,9 @@ impl MockSensor {
             }))
         });
         static SLF_RAW: static_cell::StaticCell<MockSensor> = static_cell::StaticCell::new();
-        SLF_RAW.init_with(|| MockSensor { inner: mock_sensor_state })
+        SLF_RAW.init_with(|| MockSensor {
+            inner: mock_sensor_state,
+        })
     }
 }
 
@@ -95,15 +107,26 @@ impl crate::resource::Resource for MockSensor {
         lck.instance_id == Some(*instance_id)
     }
 
-    async fn launch(&mut self, spawner: embassy_executor::Spawner, dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {
-        spawner.spawn(mock_sensor_task(self.inner, dataplane_handle)).unwrap();
+    async fn launch(
+        &mut self,
+        spawner: embassy_executor::Spawner,
+        dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
+    ) {
+        spawner
+            .spawn(mock_sensor_task(self.inner, dataplane_handle))
+            .unwrap();
     }
 }
 
 #[embassy_executor::task]
 #[allow(clippy::await_holding_refcell_ref)]
 pub async fn mock_sensor_task(
-    state: &'static core::cell::RefCell<embassy_sync::mutex::Mutex<embassy_sync::blocking_mutex::raw::NoopRawMutex, MockSensorInner>>,
+    state: &'static core::cell::RefCell<
+        embassy_sync::mutex::Mutex<
+            embassy_sync::blocking_mutex::raw::NoopRawMutex,
+            MockSensorInner,
+        >,
+    >,
     dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
 ) {
     let mut dataplane_handle = dataplane_handle;
@@ -121,7 +144,10 @@ pub async fn mock_sensor_task(
                     instance_id,
                     data_out_id,
                     "800.12345;50.12345;20.12345",
-                    &edgeless_api_core::event_metadata::EventMetadata::from_uints(0x42a42bdecaf0000bu128, 0x42a42bdecaf0000cu64),
+                    &edgeless_api_core::event_metadata::EventMetadata::from_uints(
+                        0x42a42bdecaf0000bu128,
+                        0x42a42bdecaf0000cu64,
+                    ),
                 )
                 .await;
         }
@@ -145,7 +171,8 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse>
+    {
         log::info!("Mock Sensor Start");
         let instance_specification = Self::parse_configuration(instance_specification).await?;
         log::info!("Post Config Start");
@@ -170,7 +197,10 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockSensor {
         Ok(instance_id)
     }
 
-    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+    async fn stop(
+        &mut self,
+        resource_id: edgeless_api_core::instance_id::InstanceId,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         log::info!("Mock Sensor Stop");
         let tmp = self.inner.borrow_mut();
         let mut lck = tmp.lock().await;

@@ -6,7 +6,11 @@
 /// Shared between a function instance's host and guest.
 #[derive(Clone)]
 pub struct AliasMapping {
-    mapping: std::sync::Arc<tokio::sync::Mutex<std::collections::HashMap<String, edgeless_api::function_instance::InstanceId>>>,
+    mapping: std::sync::Arc<
+        tokio::sync::Mutex<
+            std::collections::HashMap<String, edgeless_api::function_instance::InstanceId>,
+        >,
+    >,
 }
 
 impl Default for AliasMapping {
@@ -22,11 +26,17 @@ impl AliasMapping {
         }
     }
 
-    pub async fn get_mapping(&self, alias: &str) -> Option<edgeless_api::function_instance::InstanceId> {
+    pub async fn get_mapping(
+        &self,
+        alias: &str,
+    ) -> Option<edgeless_api::function_instance::InstanceId> {
         self.mapping.lock().await.get(alias).copied()
     }
 
-    pub async fn update(&mut self, new_mapping: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId>) {
+    pub async fn update(
+        &mut self,
+        new_mapping: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId>,
+    ) {
         *self.mapping.lock().await = new_mapping;
     }
 }

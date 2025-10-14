@@ -3,11 +3,17 @@
 // SPDX-License-Identifier: MIT
 
 #[async_trait::async_trait]
-impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::instance_id::InstanceId> for super::CoapClient {
+impl
+    crate::resource_configuration::ResourceConfigurationAPI<
+        edgeless_api_core::instance_id::InstanceId,
+    > for super::CoapClient
+{
     async fn start(
         &mut self,
         instance_specification: crate::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<crate::common::StartComponentResponse<edgeless_api_core::instance_id::InstanceId>> {
+    ) -> anyhow::Result<
+        crate::common::StartComponentResponse<edgeless_api_core::instance_id::InstanceId>,
+    > {
         let mut configuration = heapless::Vec::<(&str, &str), 16>::new();
         for (key, val) in &instance_specification.configuration {
             configuration
@@ -15,14 +21,20 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
                 .map_err(|_| anyhow::anyhow!("Too many configuration options"))?;
         }
 
-        let encoded_resource_spec = edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification {
-            class_type: &instance_specification.class_type,
-            configuration,
-        };
+        let encoded_resource_spec =
+            edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification {
+                class_type: &instance_specification.class_type,
+                configuration,
+            };
 
         let res = self
             .call_with_reply(|token, addr, buffer| {
-                edgeless_api_core::coap_mapping::COAPEncoder::encode_start_resource(addr, encoded_resource_spec.clone(), token, &mut buffer[..])
+                edgeless_api_core::coap_mapping::COAPEncoder::encode_start_resource(
+                    addr,
+                    encoded_resource_spec.clone(),
+                    token,
+                    &mut buffer[..],
+                )
             })
             .await;
 
@@ -30,27 +42,40 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
             Ok(data) => Ok(crate::common::StartComponentResponse::InstanceId(
                 edgeless_api_core::coap_mapping::CoapDecoder::decode_instance_id(&data).unwrap(),
             )),
-            Err(data) => Ok(crate::common::StartComponentResponse::ResponseError(crate::common::ResponseError {
-                summary: minicbor::decode::<&str>(&data).unwrap().to_string(),
-                detail: None,
-            })),
+            Err(data) => Ok(crate::common::StartComponentResponse::ResponseError(
+                crate::common::ResponseError {
+                    summary: minicbor::decode::<&str>(&data).unwrap().to_string(),
+                    detail: None,
+                },
+            )),
         }
     }
 
-    async fn stop(&mut self, resource_id: crate::function_instance::InstanceId) -> anyhow::Result<()> {
+    async fn stop(
+        &mut self,
+        resource_id: crate::function_instance::InstanceId,
+    ) -> anyhow::Result<()> {
         let res = self
             .call_with_reply(|token, addr, buffer| {
-                edgeless_api_core::coap_mapping::COAPEncoder::encode_stop_resource(addr, resource_id, token, &mut buffer[..])
+                edgeless_api_core::coap_mapping::COAPEncoder::encode_stop_resource(
+                    addr,
+                    resource_id,
+                    token,
+                    &mut buffer[..],
+                )
             })
             .await;
         match res {
             Ok(_) => Ok(()),
-            Err(data) => Err(anyhow::anyhow!(core::str::from_utf8(&data).unwrap().to_string())),
+            Err(data) => Err(anyhow::anyhow!(core::str::from_utf8(&data)
+                .unwrap()
+                .to_string())),
         }
     }
 
     async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()> {
-        let mut outputs: [Option<(&str, edgeless_api_core::instance_id::InstanceId)>; 16] = [None; 16];
+        let mut outputs: [Option<(&str, edgeless_api_core::instance_id::InstanceId)>; 16] =
+            [None; 16];
 
         for (outputs_i, (key, val)) in update.output_mapping.iter().enumerate() {
             outputs[outputs_i] = Some((key, *val));
@@ -66,12 +91,19 @@ impl crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::
 
         let res = self
             .call_with_reply(|token, addr, buffer| {
-                edgeless_api_core::coap_mapping::COAPEncoder::encode_patch_request(addr, encoded_patch_req.clone(), token, &mut buffer[..])
+                edgeless_api_core::coap_mapping::COAPEncoder::encode_patch_request(
+                    addr,
+                    encoded_patch_req.clone(),
+                    token,
+                    &mut buffer[..],
+                )
             })
             .await;
         match res {
             Ok(_) => Ok(()),
-            Err(data) => Err(anyhow::anyhow!(core::str::from_utf8(&data).unwrap().to_string())),
+            Err(data) => Err(anyhow::anyhow!(core::str::from_utf8(&data)
+                .unwrap()
+                .to_string())),
         }
     }
 }

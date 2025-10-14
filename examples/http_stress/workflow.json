@@ -1,0 +1,46 @@
+{
+    "functions": [
+        {
+            "name": "endpoint",
+            "class_specification": {
+                "id": "http_stress_endpoint",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/http_stress_endpoint/http_stress_endpoint.wasm",
+                "outputs": [
+                    "parameters"
+                ]
+            },
+            "output_mapping": {
+                "parameters": "processor"
+            },
+            "annotations": {}
+        },
+        {
+            "name": "processor",
+            "class_specification": {
+                "id": "http_stress_processor",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/http_stress_processor/http_stress_processor.wasm",
+                "outputs": []
+            },
+            "output_mapping": {},
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "resource-http-ingress",
+            "class_type": "http-ingress",
+            "output_mapping": {
+                "new_request": "endpoint"
+            },
+            "configurations": {
+                "host": "stress.edgeless-project.eu",
+                "methods": "POST"
+            }
+        }
+    ],
+    "annotations": {}
+}

@@ -59,7 +59,10 @@ impl DeploymentRequirements {
 
         let mut node_id_match_any = vec![];
         if let Some(val) = annotations.get("node_id_match_any") {
-            node_id_match_any = val.split(",").filter_map(|x| uuid::Uuid::parse_str(x).ok()).collect();
+            node_id_match_any = val
+                .split(",")
+                .filter_map(|x| uuid::Uuid::parse_str(x).ok())
+                .collect();
         }
 
         let mut label_match_all = vec![];

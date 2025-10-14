@@ -88,13 +88,20 @@ pub fn arg_to_bool(key: &str, arguments: &std::collections::HashMap<&str, &str>)
 }
 
 #[cfg(feature = "std")]
-pub fn arg_to_vec<T>(key: &str, pat: &str, arguments: &std::collections::HashMap<&str, &str>) -> Vec<T>
+pub fn arg_to_vec<T>(
+    key: &str,
+    pat: &str,
+    arguments: &std::collections::HashMap<&str, &str>,
+) -> Vec<T>
 where
     T: std::str::FromStr,
 {
     let value = arguments.get(key).unwrap_or(&"");
     let tokens = value.split(pat);
-    tokens.into_iter().filter_map(|x| x.parse::<T>().ok()).collect::<Vec<T>>()
+    tokens
+        .into_iter()
+        .filter_map(|x| x.parse::<T>().ok())
+        .collect::<Vec<T>>()
 }
 
 #[cfg(test)]
@@ -153,14 +160,29 @@ mod test {
             ("vec5", "1:two:3:four:5"),
         ]);
 
-        assert_eq!(vec![1, 2, 3, 4, 5], arg_to_vec::<usize>("vec1", ":", &arguments));
+        assert_eq!(
+            vec![1, 2, 3, 4, 5],
+            arg_to_vec::<usize>("vec1", ":", &arguments)
+        );
         assert!(arg_to_vec::<usize>("vec1", "@", &arguments).is_empty());
-        assert_eq!(vec![1, 2, 3, 4, 5], arg_to_vec::<u32>("vec1", ":", &arguments));
-        assert_eq!(vec![1, 2, 3, 4, 5], arg_to_vec::<i32>("vec1", ":", &arguments));
-        assert_eq!(vec![1, 2, 3, 4, 5], arg_to_vec::<usize>("vec2", "@", &arguments));
+        assert_eq!(
+            vec![1, 2, 3, 4, 5],
+            arg_to_vec::<u32>("vec1", ":", &arguments)
+        );
+        assert_eq!(
+            vec![1, 2, 3, 4, 5],
+            arg_to_vec::<i32>("vec1", ":", &arguments)
+        );
+        assert_eq!(
+            vec![1, 2, 3, 4, 5],
+            arg_to_vec::<usize>("vec2", "@", &arguments)
+        );
         assert_eq!(vec![3.4, 6.8], arg_to_vec::<f32>("vec3", ":", &arguments));
         assert_eq!(vec![1, 3, 5], arg_to_vec::<usize>("vec4", ":", &arguments));
-        assert_eq!(vec![1, -2, 3, -4, 5], arg_to_vec::<i32>("vec4", ":", &arguments));
+        assert_eq!(
+            vec![1, -2, 3, -4, 5],
+            arg_to_vec::<i32>("vec4", ":", &arguments)
+        );
         assert_eq!(vec![1, 3, 5], arg_to_vec::<usize>("vec5", ":", &arguments));
         assert!(arg_to_vec::<usize>("non-existing", "@", &arguments).is_empty());
     }

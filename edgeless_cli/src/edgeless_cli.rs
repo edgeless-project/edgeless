@@ -111,7 +111,9 @@ pub fn edgeless_cli_default_conf() -> String {
     toml::to_string(&cli_conf).expect("Wrong")
 }
 
-async fn wf_client(config_file: &str) -> anyhow::Result<Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>> {
+async fn wf_client(
+    config_file: &str,
+) -> anyhow::Result<Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>> {
     anyhow::ensure!(
         std::fs::metadata(config_file).is_ok(),
         "configuration file does not exist or cannot be accessed: {}",
@@ -119,12 +121,21 @@ async fn wf_client(config_file: &str) -> anyhow::Result<Box<dyn edgeless_api::wo
     );
 
     let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(config_file).unwrap()).unwrap();
-    let mut con_client = edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(&conf.controller_url).await;
+    let mut con_client =
+        edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(&conf.controller_url)
+            .await;
     Ok(con_client.workflow_instance_api())
 }
 
-async fn workflow_stop(wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>, id: &str) -> anyhow::Result<()> {
-    anyhow::ensure!(workflow_info_or_none(wf_client, id).await.is_some(), "unknown or invalid workflow {}", id);
+async fn workflow_stop(
+    wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>,
+    id: &str,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        workflow_info_or_none(wf_client, id).await.is_some(),
+        "unknown or invalid workflow {}",
+        id
+    );
     wf_client
         .stop(edgeless_api::workflow_instance::WorkflowId {
             workflow_id: uuid::Uuid::parse_str(id)?,
@@ -138,11 +149,21 @@ async fn workflow_info_or_none(
     wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>,
     id: &str,
 ) -> Option<edgeless_api::workflow_instance::WorkflowInfo> {
-    let workflow_id = if let Ok(id) = uuid::Uuid::parse_str(id) { id } else { return None };
-    wf_client.inspect(edgeless_api::workflow_instance::WorkflowId { workflow_id }).await.ok()
+    let workflow_id = if let Ok(id) = uuid::Uuid::parse_str(id) {
+        id
+    } else {
+        return None;
+    };
+    wf_client
+        .inspect(edgeless_api::workflow_instance::WorkflowId { workflow_id })
+        .await
+        .ok()
 }
 
-async fn workflow_inspect(wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>, id: &str) -> anyhow::Result<()> {
+async fn workflow_inspect(
+    wf_client: &mut Box<dyn edgeless_api::workflow_instance::WorkflowInstanceAPI>,
+    id: &str,
+) -> anyhow::Result<()> {
     let info = workflow_info_or_none(wf_client, id).await;
     anyhow::ensure!(info.is_some(), "unknown or invalid workflow {}", id);
     let info = info.unwrap();
@@ -172,7 +193,10 @@ async fn workflow_inspect(wf_client: &mut Box<dyn edgeless_api::workflow_instanc
         println!("W_ANN {} -> {}", name, annotation);
     }
     for mapping in info.status.domain_mapping {
-        println!("MAP {} -> {} [logical ID {}]", mapping.name, mapping.domain_id, mapping.function_id);
+        println!(
+            "MAP {} -> {} [logical ID {}]",
+            mapping.name, mapping.domain_id, mapping.function_id
+        );
     }
     Ok(())
 }
@@ -197,11 +221,15 @@ async fn main() -> anyhow::Result<()> {
                         log::debug!("Start Workflow");
 
                         let workflow_spec: edgeless_cli::workflow_spec::WorkflowSpec =
-                            serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
+                            serde_json::from_str(
+                                &std::fs::read_to_string(spec_file.clone()).unwrap(),
+                            )
+                            .unwrap();
                         let parent_path = std::path::Path::new(&spec_file)
                             .parent()
                             .expect("cannot find the workflow spec's parent path");
-                        let workflow = edgeless_cli::workflow_spec_to_request(workflow_spec, parent_path)?;
+                        let workflow =
+                            edgeless_cli::workflow_spec_to_request(workflow_spec, parent_path)?;
                         let res = wf_client.start(workflow).await;
                         match res {
                             Ok(response) => {
@@ -221,7 +249,8 @@ async fn main() -> anyhow::Result<()> {
                     WorkflowCommands::Stop { id } => {
                         if id.to_lowercase() == "all" {
                             for wf_id in wf_client.list().await? {
-                                workflow_stop(&mut wf_client, &wf_id.workflow_id.to_string()).await?
+                                workflow_stop(&mut wf_client, &wf_id.workflow_id.to_string())
+                                    .await?
                             }
                         } else {
                             workflow_stop(&mut wf_client, &id).await?
@@ -242,7 +271,9 @@ async fn main() -> anyhow::Result<()> {
                                 response_error.summary,
                                 response_error.detail.unwrap_or_default()
                             ),
-                            SpawnWorkflowResponse::WorkflowInstance(_workflow_instance) => println!("migration of {} to {} successful", id, domain),
+                            SpawnWorkflowResponse::WorkflowInstance(_workflow_instance) => {
+                                println!("migration of {} to {} successful", id, domain)
+                            }
                         }
                     }
                     WorkflowCommands::List {} => {
@@ -254,7 +285,8 @@ async fn main() -> anyhow::Result<()> {
                         if id.to_lowercase() == "all" {
                             for wf_id in wf_client.list().await? {
                                 println!("** workflow {}", wf_id);
-                                workflow_inspect(&mut wf_client, &wf_id.workflow_id.to_string()).await?
+                                workflow_inspect(&mut wf_client, &wf_id.workflow_id.to_string())
+                                    .await?
                             }
                         } else {
                             workflow_inspect(&mut wf_client, &id).await?
@@ -264,14 +296,21 @@ async fn main() -> anyhow::Result<()> {
             }
             Commands::Function { function_command } => match function_command {
                 FunctionCommands::Build { spec_file } => {
-                    let spec_file_path = std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
+                    let spec_file_path =
+                        std::fs::canonicalize(std::path::PathBuf::from(spec_file.clone()))?;
                     let cargo_project_path = spec_file_path.parent().unwrap().to_path_buf();
                     let cargo_manifest = cargo_project_path.join("Cargo.toml");
 
-                    let function_spec: workflow_spec::WorkflowSpecFunctionClass = serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
-                    let build_dir = std::env::temp_dir().join(format!("edgeless-{}-{}", function_spec.id, uuid::Uuid::new_v4()));
+                    let function_spec: workflow_spec::WorkflowSpecFunctionClass =
+                        serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
+                    let build_dir = std::env::temp_dir().join(format!(
+                        "edgeless-{}-{}",
+                        function_spec.id,
+                        uuid::Uuid::new_v4()
+                    ));
 
-                    let context = GlobalContext::default().expect("Could not construct a global context for the workspace");
+                    let context = GlobalContext::default()
+                        .expect("Could not construct a global context for the workspace");
                     let mut ws = cargo::core::Workspace::new(&cargo_manifest, &context)?;
                     ws.set_target_dir(cargo::util::Filesystem::new(build_dir.clone()));
 
@@ -289,8 +328,12 @@ async fn main() -> anyhow::Result<()> {
                     };
 
                     // standard files - could be extended to look for more
-                    let triggering_files = ["Cargo.toml", "Cargo.lock", "function.json", "src/lib.rs"];
-                    let full_paths: Vec<std::path::PathBuf> = triggering_files.iter().map(|&f| cargo_project_path.join(f)).collect();
+                    let triggering_files =
+                        ["Cargo.toml", "Cargo.lock", "function.json", "src/lib.rs"];
+                    let full_paths: Vec<std::path::PathBuf> = triggering_files
+                        .iter()
+                        .map(|&f| cargo_project_path.join(f))
+                        .collect();
                     let mod_timestamps: Vec<SystemTime> = full_paths
                         .iter()
                         .filter_map(|p| fs::metadata(p).ok())
@@ -320,7 +363,9 @@ async fn main() -> anyhow::Result<()> {
                         let lib_name = match pack.library() {
                             Some(val) => val.name(),
                             None => {
-                                return Err(anyhow::anyhow!("Cargo package does not contain library."));
+                                return Err(anyhow::anyhow!(
+                                    "Cargo package does not contain library."
+                                ));
                             }
                         };
 
@@ -331,7 +376,8 @@ async fn main() -> anyhow::Result<()> {
                             &["wasm32-unknown-unknown".to_string()],
                             cargo::core::compiler::CompileMode::Build,
                         )?;
-                        build_config.requested_profile = cargo::util::interning::InternedString::new("release");
+                        build_config.requested_profile =
+                            cargo::util::interning::InternedString::new("release");
 
                         let compile_options = cargo::ops::CompileOptions {
                             build_config,
@@ -370,8 +416,18 @@ async fn main() -> anyhow::Result<()> {
                     function_id,
                     payload,
                 } => {
-                    log::info!("invoking function: {} {} {} {}", event_type, node_id, function_id, payload);
-                    let mut client = edgeless_api::grpc_impl::outer::invocation::InvocationAPIClient::new(&invocation_url).await;
+                    log::info!(
+                        "invoking function: {} {} {} {}",
+                        event_type,
+                        node_id,
+                        function_id,
+                        payload
+                    );
+                    let mut client =
+                        edgeless_api::grpc_impl::outer::invocation::InvocationAPIClient::new(
+                            &invocation_url,
+                        )
+                        .await;
                     let event = edgeless_api::invocation::Event {
                         target: edgeless_api::function_instance::InstanceId {
                             node_id: uuid::Uuid::parse_str(&node_id)?,
@@ -386,9 +442,12 @@ async fn main() -> anyhow::Result<()> {
                         created: edgeless_api::function_instance::EventTimestamp::default(),
                         metadata: edgeless_api::function_instance::EventMetadata::empty_new_root(),
                     };
-                    match edgeless_api::invocation::InvocationAPI::handle(&mut client, event).await {
+                    match edgeless_api::invocation::InvocationAPI::handle(&mut client, event).await
+                    {
                         Ok(_) => println!("event casted"),
-                        Err(err) => return Err(anyhow::anyhow!("error casting the event: {}", err)),
+                        Err(err) => {
+                            return Err(anyhow::anyhow!("error casting the event: {}", err))
+                        }
                     }
                 }
 
@@ -400,7 +459,9 @@ async fn main() -> anyhow::Result<()> {
                         ));
                     }
                     log::debug!("Got Config");
-                    let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
+                    let conf: CLiConfig =
+                        toml::from_str(&std::fs::read_to_string(args.config_file).unwrap())
+                            .unwrap();
                     let function_repository_conf = match conf.function_repository {
                         Some(conf) => conf,
                         None => anyhow::bail!("function repository configuration section missing"),
@@ -408,9 +469,17 @@ async fn main() -> anyhow::Result<()> {
 
                     let client = Client::new();
                     let response = client
-                        .get(function_repository_conf.url.to_string() + "/function/" + function_name.as_str())
+                        .get(
+                            function_repository_conf.url.to_string()
+                                + "/function/"
+                                + function_name.as_str(),
+                        )
                         .header(ACCEPT, "application/json")
-                        .header("Authorization", "ApiKey_".to_owned() + function_repository_conf.api_key.clone().as_str())
+                        .header(
+                            "Authorization",
+                            "ApiKey_".to_owned()
+                                + function_repository_conf.api_key.clone().as_str(),
+                        )
                         .send()
                         .await
                         .expect("failed to get response")
@@ -429,7 +498,9 @@ async fn main() -> anyhow::Result<()> {
                         ));
                     }
                     log::debug!("Got Config");
-                    let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(args.config_file).unwrap()).unwrap();
+                    let conf: CLiConfig =
+                        toml::from_str(&std::fs::read_to_string(args.config_file).unwrap())
+                            .unwrap();
                     let function_repository_conf = match conf.function_repository {
                         Some(conf) => conf,
                         None => anyhow::bail!("function repository configuration section missing"),
@@ -437,9 +508,17 @@ async fn main() -> anyhow::Result<()> {
 
                     let client = Client::new();
                     let response = client
-                        .get(function_repository_conf.url.to_string() + "/function/download/" + code_file_id.as_str())
+                        .get(
+                            function_repository_conf.url.to_string()
+                                + "/function/download/"
+                                + code_file_id.as_str(),
+                        )
                         .header(ACCEPT, "*/*")
-                        .header("Authorization", "ApiKey_".to_owned() + function_repository_conf.api_key.clone().as_str())
+                        .header(
+                            "Authorization",
+                            "ApiKey_".to_owned()
+                                + function_repository_conf.api_key.clone().as_str(),
+                        )
                         .send()
                         .await
                         .expect("failed to get header");
@@ -447,7 +526,8 @@ async fn main() -> anyhow::Result<()> {
                     println!("status code {}", status);
                     let header = response.headers().get("content-disposition").unwrap();
 
-                    let header_str = format!("{}{}", "Content-Disposition: ", header.to_str().unwrap());
+                    let header_str =
+                        format!("{}{}", "Content-Disposition: ", header.to_str().unwrap());
                     let (parsed, _) = parse_header(header_str.as_bytes()).unwrap();
                     let dis = parse_content_disposition(&parsed.get_value());
 
@@ -464,7 +544,10 @@ async fn main() -> anyhow::Result<()> {
                     println!("File downloaded successfully.");
                 }
 
-                FunctionCommands::Push { binary_name, function_json } => {
+                FunctionCommands::Push {
+                    binary_name,
+                    function_json,
+                } => {
                     if std::fs::metadata(&args.config_file).is_err() {
                         return Err(anyhow::anyhow!(
                             "configuration file does not exist or cannot be accessed: {}",
@@ -472,7 +555,9 @@ async fn main() -> anyhow::Result<()> {
                         ));
                     }
                     log::debug!("Got Config");
-                    let conf: CLiConfig = toml::from_str(&std::fs::read_to_string(&args.config_file).unwrap()).unwrap();
+                    let conf: CLiConfig =
+                        toml::from_str(&std::fs::read_to_string(&args.config_file).unwrap())
+                            .unwrap();
                     let function_repository_conf = match conf.function_repository {
                         Some(conf) => conf,
                         None => anyhow::bail!("function repository configuration section missing"),
@@ -480,10 +565,12 @@ async fn main() -> anyhow::Result<()> {
 
                     let client = Client::new();
                     let file = File::open(&binary_name).await?;
-                    let config_file = fs::read_to_string(&function_json).expect("Failed to read function JSON file");
+                    let config_file = fs::read_to_string(&function_json)
+                        .expect("Failed to read function JSON file");
 
                     // parse the JSON file
-                    let config_json: serde_json::Value = serde_json::from_str(&config_file).expect("JSON was not well-formatted");
+                    let config_json: serde_json::Value =
+                        serde_json::from_str(&config_file).expect("JSON was not well-formatted");
 
                     // read file body stream
                     let stream = FramedRead::new(file, BytesCodec::new());
@@ -498,7 +585,11 @@ async fn main() -> anyhow::Result<()> {
                     let response = client
                         .post(function_repository_conf.url.to_string() + "/function/upload")
                         .header(ACCEPT, "application/json")
-                        .header("Authorization", "ApiKey_".to_owned() + function_repository_conf.api_key.clone().as_str())
+                        .header(
+                            "Authorization",
+                            "ApiKey_".to_owned()
+                                + function_repository_conf.api_key.clone().as_str(),
+                        )
                         .multipart(form)
                         .send()
                         .await
@@ -525,7 +616,11 @@ async fn main() -> anyhow::Result<()> {
                     let post_response = client
                         .post(function_repository_conf.url.to_string() + "/function")
                         .header(ACCEPT, "application/json")
-                        .header("Authorization", "ApiKey_".to_owned() + function_repository_conf.api_key.clone().as_str())
+                        .header(
+                            "Authorization",
+                            "ApiKey_".to_owned()
+                                + function_repository_conf.api_key.clone().as_str(),
+                        )
                         .json(&r)
                         .send()
                         .await
@@ -534,10 +629,14 @@ async fn main() -> anyhow::Result<()> {
                         .await
                         .expect("failed to get body");
 
-                    let post_response_json: serde_json::Value = serde_json::from_str(&post_response)?;
+                    let post_response_json: serde_json::Value =
+                        serde_json::from_str(&post_response)?;
                     match post_response_json.get("id").and_then(|v| v.as_str()) {
                         None => {
-                            let error_msg = post_response_json.get("message").and_then(|v| v.as_str()).unwrap_or("Fatal error");
+                            let error_msg = post_response_json
+                                .get("message")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("Fatal error");
                             eprintln!("Error: function not saved correctly. {}", error_msg);
                         }
                         Some(id) => println!("Function saved with id: {}", id),

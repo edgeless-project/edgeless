@@ -16,7 +16,12 @@ pub struct EPaperDisplay {
     pub instance_id: Option<edgeless_api_core::instance_id::InstanceId>,
     pub header: Option<[u8; 128]>,
     // pub display: &'static mut dyn EPaper,
-    msg_sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>,
+    msg_sender: embassy_sync::channel::Sender<
+        'static,
+        embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+        heapless::String<1500>,
+        2,
+    >,
 }
 
 impl EPaperDisplay {
@@ -41,7 +46,9 @@ impl EPaperDisplay {
                 }
             }
 
-            Ok(EPaperDisplayInstanceConfiguration { header_text: config })
+            Ok(EPaperDisplayInstanceConfiguration {
+                header_text: config,
+            })
         } else {
             Err(edgeless_api_core::common::ErrorResponse {
                 summary: "Wrong Resource ProviderId",
@@ -71,12 +78,22 @@ impl crate::resource::Resource for EPaperDisplay {
         false
     }
 
-    async fn launch(&mut self, _spawner: embassy_executor::Spawner, _dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {}
+    async fn launch(
+        &mut self,
+        _spawner: embassy_executor::Spawner,
+        _dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
+    ) {
+    }
 }
 
 #[embassy_executor::task]
 pub async fn display_writer(
-    message_receiver: embassy_sync::channel::Receiver<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>,
+    message_receiver: embassy_sync::channel::Receiver<
+        'static,
+        embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+        heapless::String<1500>,
+        2,
+    >,
     display: &'static mut dyn EPaper,
 ) {
     display.set_text("Edgeless\nInitialized");
@@ -89,7 +106,12 @@ pub async fn display_writer(
 impl EPaperDisplay {
     #[allow(clippy::new_ret_no_self)]
     pub async fn new(
-        sender: embassy_sync::channel::Sender<'static, embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex, heapless::String<1500>, 2>,
+        sender: embassy_sync::channel::Sender<
+            'static,
+            embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex,
+            heapless::String<1500>,
+            2,
+        >,
     ) -> &'static mut dyn crate::resource::ResourceDyn {
         static SLF_RAW: static_cell::StaticCell<EPaperDisplay> = static_cell::StaticCell::new();
         SLF_RAW.init_with(|| EPaperDisplay {
@@ -107,7 +129,9 @@ impl crate::invocation::InvocationAPI for EPaperDisplay {
     ) -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()> {
         if let edgeless_api_core::invocation::EventData::Cast(message) = event.data {
             if let Ok(message) = core::str::from_utf8(message) {
-                self.msg_sender.send(heapless::String::<1500>::from_str(message).unwrap()).await;
+                self.msg_sender
+                    .send(heapless::String::<1500>::from_str(message).unwrap())
+                    .await;
             }
         }
 
@@ -116,13 +140,18 @@ impl crate::invocation::InvocationAPI for EPaperDisplay {
 }
 
 impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
-    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+    async fn stop(
+        &mut self,
+        resource_id: edgeless_api_core::instance_id::InstanceId,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         log::info!("EPaper Display Stop");
 
         if Some(resource_id) == self.instance_id {
             self.instance_id = None;
             // self.display.set_text("Display\nStopped");
-            self.msg_sender.send(heapless::String::<1500>::from_str("Display Stop").unwrap()).await;
+            self.msg_sender
+                .send(heapless::String::<1500>::from_str("Display Stop").unwrap())
+                .await;
             Ok(())
         } else {
             Err(edgeless_api_core::common::ErrorResponse {
@@ -136,7 +165,8 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse>
+    {
         log::info!("Epaper Display Start");
 
         let instance_specification = Self::parse_configuration(instance_specification).await?;
@@ -148,13 +178,17 @@ impl crate::resource_configuration::ResourceConfigurationAPI for EPaperDisplay {
             });
         }
 
-        self.instance_id = Some(edgeless_api_core::instance_id::InstanceId::new(crate::NODE_ID));
+        self.instance_id = Some(edgeless_api_core::instance_id::InstanceId::new(
+            crate::NODE_ID,
+        ));
 
         self.header = instance_specification.header_text;
 
         if let Some(t) = self.header {
             self.msg_sender
-                .send(heapless::String::<1500>::from_str(core::str::from_utf8(&t).unwrap()).unwrap())
+                .send(
+                    heapless::String::<1500>::from_str(core::str::from_utf8(&t).unwrap()).unwrap(),
+                )
                 .await;
         } else {
             self.msg_sender

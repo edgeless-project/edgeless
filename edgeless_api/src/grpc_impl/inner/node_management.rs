@@ -7,7 +7,11 @@ use std::str::FromStr;
 
 #[derive(Clone)]
 pub struct NodeManagementClient {
-    client: Option<crate::grpc_impl::api::node_management_client::NodeManagementClient<tonic::transport::Channel>>,
+    client: Option<
+        crate::grpc_impl::api::node_management_client::NodeManagementClient<
+            tonic::transport::Channel,
+        >,
+    >,
     server_addr: String,
 }
 
@@ -17,7 +21,10 @@ pub struct NodeManagementAPIService {
 
 impl NodeManagementClient {
     pub fn new(server_addr: String) -> Self {
-        Self { client: None, server_addr }
+        Self {
+            client: None,
+            server_addr,
+        }
     }
 
     /// Try connecting, if not already connected.
@@ -26,10 +33,15 @@ impl NodeManagementClient {
     /// Otherwise, the client is set to some value (connected).
     async fn try_connect(&mut self) -> anyhow::Result<()> {
         if self.client.is_none() {
-            self.client = match crate::grpc_impl::api::node_management_client::NodeManagementClient::connect(self.server_addr.clone()).await {
-                Ok(client) => Some(client.max_decoding_message_size(usize::MAX)),
-                Err(err) => anyhow::bail!(err),
-            }
+            self.client =
+                match crate::grpc_impl::api::node_management_client::NodeManagementClient::connect(
+                    self.server_addr.clone(),
+                )
+                .await
+                {
+                    Ok(client) => Some(client.max_decoding_message_size(usize::MAX)),
+                    Err(err) => anyhow::bail!(err),
+                }
         }
         Ok(())
     }
@@ -42,13 +54,25 @@ impl NodeManagementClient {
 
 #[async_trait::async_trait]
 impl crate::node_management::NodeManagementAPI for NodeManagementClient {
-    async fn update_peers(&mut self, request: crate::node_management::UpdatePeersRequest) -> anyhow::Result<()> {
+    async fn update_peers(
+        &mut self,
+        request: crate::node_management::UpdatePeersRequest,
+    ) -> anyhow::Result<()> {
         match self.try_connect().await {
             Ok(_) => {
                 if let Some(client) = &mut self.client {
-                    if let Err(err) = client.update_peers(tonic::Request::new(serialize_update_peers_request(&request))).await {
+                    if let Err(err) = client
+                        .update_peers(tonic::Request::new(serialize_update_peers_request(
+                            &request,
+                        )))
+                        .await
+                    {
                         self.disconnect();
-                        anyhow::bail!("Error when updating peers at {}: {}", self.server_addr, err.to_string());
+                        anyhow::bail!(
+                            "Error when updating peers at {}: {}",
+                            self.server_addr,
+                            err.to_string()
+                        );
                     } else {
                         Ok(())
                     }
@@ -67,7 +91,11 @@ impl crate::node_management::NodeManagementAPI for NodeManagementClient {
                 if let Some(client) = &mut self.client {
                     if let Err(err) = client.reset(tonic::Request::new(())).await {
                         self.disconnect();
-                        anyhow::bail!("Error when resetting at {}: {}", self.server_addr, err.to_string());
+                        anyhow::bail!(
+                            "Error when resetting at {}: {}",
+                            self.server_addr,
+                            err.to_string()
+                        );
                     } else {
                         Ok(())
                     }
@@ -84,7 +112,10 @@ impl crate::node_management::NodeManagementAPI for NodeManagementClient {
 
 #[async_trait::async_trait]
 impl crate::grpc_impl::api::node_management_server::NodeManagement for NodeManagementAPIService {
-    async fn update_peers(&self, request: tonic::Request<crate::grpc_impl::api::UpdatePeersRequest>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn update_peers(
+        &self,
+        request: tonic::Request<crate::grpc_impl::api::UpdatePeersRequest>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         let parsed_request = match parse_update_peers_request(&request.into_inner()) {
             Ok(parsed_request) => parsed_request,
             Err(err) => {
@@ -95,15 +126,30 @@ impl crate::grpc_impl::api::node_management_server::NodeManagement for NodeManag
                 )));
             }
         };
-        match self.node_management_api.lock().await.update_peers(parsed_request).await {
+        match self
+            .node_management_api
+            .lock()
+            .await
+            .update_peers(parsed_request)
+            .await
+        {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when updating peers: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!(
+                "Error when updating peers: {}",
+                err
+            ))),
         }
     }
-    async fn reset(&self, _request: tonic::Request<()>) -> Result<tonic::Response<()>, tonic::Status> {
+    async fn reset(
+        &self,
+        _request: tonic::Request<()>,
+    ) -> Result<tonic::Response<()>, tonic::Status> {
         match self.node_management_api.lock().await.reset().await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when resetting: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!(
+                "Error when resetting: {}",
+                err
+            ))),
         }
     }
 }
@@ -113,11 +159,18 @@ fn parse_update_peers_request(
 ) -> anyhow::Result<crate::node_management::UpdatePeersRequest> {
     match api_instance.request_type {
         x if x == crate::grpc_impl::api::UpdatePeersRequestType::Add as i32 => {
-            if let (Some(node_id), Some(invocation_url)) = (&api_instance.node_id, &api_instance.invocation_url) {
+            if let (Some(node_id), Some(invocation_url)) =
+                (&api_instance.node_id, &api_instance.invocation_url)
+            {
                 let node_id = uuid::Uuid::from_str(node_id.as_str());
                 match node_id {
-                    Ok(node_id) => Ok(crate::node_management::UpdatePeersRequest::Add(node_id, invocation_url.clone())),
-                    Err(_) => Err(anyhow::anyhow!("Ill-formed UpdatePeersRequest: invalid UUID as node_id")),
+                    Ok(node_id) => Ok(crate::node_management::UpdatePeersRequest::Add(
+                        node_id,
+                        invocation_url.clone(),
+                    )),
+                    Err(_) => Err(anyhow::anyhow!(
+                        "Ill-formed UpdatePeersRequest: invalid UUID as node_id"
+                    )),
                 }
             } else {
                 Err(anyhow::anyhow!(
@@ -130,7 +183,9 @@ fn parse_update_peers_request(
                 let node_id = uuid::Uuid::from_str(node_id.as_str());
                 match node_id {
                     Ok(node_id) => Ok(crate::node_management::UpdatePeersRequest::Del(node_id)),
-                    Err(_) => Err(anyhow::anyhow!("Ill-formed UpdatePeersRequest: invalid UUID as node_id")),
+                    Err(_) => Err(anyhow::anyhow!(
+                        "Ill-formed UpdatePeersRequest: invalid UUID as node_id"
+                    )),
                 }
             } else {
                 Err(anyhow::anyhow!(
@@ -138,28 +193,41 @@ fn parse_update_peers_request(
                 ))
             }
         }
-        x if x == crate::grpc_impl::api::UpdatePeersRequestType::Clear as i32 => Ok(crate::node_management::UpdatePeersRequest::Clear),
-        x => Err(anyhow::anyhow!("Ill-formed UpdatePeersRequest message: unknown type {}", x)),
+        x if x == crate::grpc_impl::api::UpdatePeersRequestType::Clear as i32 => {
+            Ok(crate::node_management::UpdatePeersRequest::Clear)
+        }
+        x => Err(anyhow::anyhow!(
+            "Ill-formed UpdatePeersRequest message: unknown type {}",
+            x
+        )),
     }
 }
 
-fn serialize_update_peers_request(req: &crate::node_management::UpdatePeersRequest) -> crate::grpc_impl::api::UpdatePeersRequest {
+fn serialize_update_peers_request(
+    req: &crate::node_management::UpdatePeersRequest,
+) -> crate::grpc_impl::api::UpdatePeersRequest {
     match req {
-        crate::node_management::UpdatePeersRequest::Add(node_id, invocation_url) => crate::grpc_impl::api::UpdatePeersRequest {
-            request_type: crate::grpc_impl::api::UpdatePeersRequestType::Add as i32,
-            node_id: Some(node_id.to_string()),
-            invocation_url: Some(invocation_url.clone()),
-        },
-        crate::node_management::UpdatePeersRequest::Del(node_id) => crate::grpc_impl::api::UpdatePeersRequest {
-            request_type: crate::grpc_impl::api::UpdatePeersRequestType::Del as i32,
-            node_id: Some(node_id.to_string()),
-            invocation_url: None,
-        },
-        crate::node_management::UpdatePeersRequest::Clear => crate::grpc_impl::api::UpdatePeersRequest {
-            request_type: crate::grpc_impl::api::UpdatePeersRequestType::Clear as i32,
-            node_id: None,
-            invocation_url: None,
-        },
+        crate::node_management::UpdatePeersRequest::Add(node_id, invocation_url) => {
+            crate::grpc_impl::api::UpdatePeersRequest {
+                request_type: crate::grpc_impl::api::UpdatePeersRequestType::Add as i32,
+                node_id: Some(node_id.to_string()),
+                invocation_url: Some(invocation_url.clone()),
+            }
+        }
+        crate::node_management::UpdatePeersRequest::Del(node_id) => {
+            crate::grpc_impl::api::UpdatePeersRequest {
+                request_type: crate::grpc_impl::api::UpdatePeersRequestType::Del as i32,
+                node_id: Some(node_id.to_string()),
+                invocation_url: None,
+            }
+        }
+        crate::node_management::UpdatePeersRequest::Clear => {
+            crate::grpc_impl::api::UpdatePeersRequest {
+                request_type: crate::grpc_impl::api::UpdatePeersRequestType::Clear as i32,
+                node_id: None,
+                invocation_url: None,
+            }
+        }
     }
 }
 

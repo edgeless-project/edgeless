@@ -136,8 +136,13 @@ impl WorkflowType {
             return WorkflowType::Single(tokens[1].to_string(), tokens[2].to_string()).check();
         } else if !tokens.is_empty() && tokens[0] == "matrix-mul-chain" && tokens.len() == 2 {
             if tokens[1] == "template" {
-                println!("{}\n", serde_json::to_string_pretty(&MatrixMulChainData::default()).unwrap());
-                anyhow::bail!("enjoy your template file, which you can save by redirecting stdout to file");
+                println!(
+                    "{}\n",
+                    serde_json::to_string_pretty(&MatrixMulChainData::default()).unwrap()
+                );
+                anyhow::bail!(
+                    "enjoy your template file, which you can save by redirecting stdout to file"
+                );
             }
             let file = std::fs::File::open(tokens[1])?;
             let reader = std::io::BufReader::new(file);
@@ -145,8 +150,13 @@ impl WorkflowType {
             return WorkflowType::MatrixMulChain(data).check();
         } else if !tokens.is_empty() && tokens[0] == "vector-mul-chain" && tokens.len() == 2 {
             if tokens[1] == "template" {
-                println!("{}\n", serde_json::to_string_pretty(&VectorMulChainData::default()).unwrap());
-                anyhow::bail!("enjoy your template file, which you can save by redirecting stdout to file");
+                println!(
+                    "{}\n",
+                    serde_json::to_string_pretty(&VectorMulChainData::default()).unwrap()
+                );
+                anyhow::bail!(
+                    "enjoy your template file, which you can save by redirecting stdout to file"
+                );
             }
             let file = std::fs::File::open(tokens[1])?;
             let reader = std::io::BufReader::new(file);
@@ -154,8 +164,13 @@ impl WorkflowType {
             return WorkflowType::VectorMulChain(data).check();
         } else if !tokens.is_empty() && tokens[0] == "map-reduce" && tokens.len() == 2 {
             if tokens[1] == "template" {
-                println!("{}\n", serde_json::to_string_pretty(&MapReduceData::default()).unwrap());
-                anyhow::bail!("enjoy your template file, which you can save by redirecting stdout to file");
+                println!(
+                    "{}\n",
+                    serde_json::to_string_pretty(&MapReduceData::default()).unwrap()
+                );
+                anyhow::bail!(
+                    "enjoy your template file, which you can save by redirecting stdout to file"
+                );
             }
             let file = std::fs::File::open(tokens[1])?;
             let reader = std::io::BufReader::new(file);
@@ -170,7 +185,11 @@ impl WorkflowType {
                 .parent()
                 .expect("cannot find the workflow spec's parent path")
                 .into();
-            return WorkflowType::JsonSpec(JsonSpecData { spec_string, parent_path }).check();
+            return WorkflowType::JsonSpec(JsonSpecData {
+                spec_string,
+                parent_path,
+            })
+            .check();
         }
         Err(anyhow!("unknown workflow type: {}", wf_type))
     }
@@ -184,33 +203,63 @@ impl WorkflowType {
             }
             WorkflowType::VectorMulChain(data) => {
                 anyhow::ensure!(data.min_chain_length > 0, "vanishing min chain");
-                anyhow::ensure!(data.max_chain_length >= data.min_chain_length, "chain: min > max");
-                anyhow::ensure!(data.max_input_size >= data.min_input_size, "size: min > max");
+                anyhow::ensure!(
+                    data.max_chain_length >= data.min_chain_length,
+                    "chain: min > max"
+                );
+                anyhow::ensure!(
+                    data.max_input_size >= data.min_input_size,
+                    "size: min > max"
+                );
                 anyhow::ensure!(!data.function_wasm_path.is_empty(), "empty WASM file path");
             }
             WorkflowType::MatrixMulChain(data) => {
                 anyhow::ensure!(data.min_chain_length > 0, "vanishing min chain");
-                anyhow::ensure!(data.max_chain_length >= data.min_chain_length, "chain: min > max");
-                anyhow::ensure!(data.max_matrix_size >= data.min_matrix_size, "size: min > max");
+                anyhow::ensure!(
+                    data.max_chain_length >= data.min_chain_length,
+                    "chain: min > max"
+                );
+                anyhow::ensure!(
+                    data.max_matrix_size >= data.min_matrix_size,
+                    "size: min > max"
+                );
                 anyhow::ensure!(!data.function_wasm_path.is_empty(), "empty WASM file path");
             }
             WorkflowType::MapReduce(data) => {
-                anyhow::ensure!(data.min_transaction_interval_ms > 0, "vanishing min interval");
+                anyhow::ensure!(
+                    data.min_transaction_interval_ms > 0,
+                    "vanishing min interval"
+                );
                 anyhow::ensure!(
                     data.max_transaction_interval_ms >= data.min_transaction_interval_ms,
                     "interval: min > max"
                 );
-                anyhow::ensure!(data.max_input_size >= data.min_input_size, "rate: min > max");
+                anyhow::ensure!(
+                    data.max_input_size >= data.min_input_size,
+                    "rate: min > max"
+                );
                 anyhow::ensure!(data.min_num_stages > 0, "vanishing min stages");
-                anyhow::ensure!(data.max_num_stages >= data.min_num_stages, "rate: min > max");
+                anyhow::ensure!(
+                    data.max_num_stages >= data.min_num_stages,
+                    "rate: min > max"
+                );
                 anyhow::ensure!(data.min_fan_out > 0, "vanishing fan-out");
                 anyhow::ensure!(data.max_fan_out >= data.min_fan_out, "fan-out: min > max");
-                anyhow::ensure!(data.max_fibonacci >= data.min_fibonacci, "fibonacci: min > max");
-                anyhow::ensure!(data.max_memory_bytes >= data.min_memory_bytes, "allocation: min > max");
+                anyhow::ensure!(
+                    data.max_fibonacci >= data.min_fibonacci,
+                    "fibonacci: min > max"
+                );
+                anyhow::ensure!(
+                    data.max_memory_bytes >= data.min_memory_bytes,
+                    "allocation: min > max"
+                );
                 anyhow::ensure!(!data.functions_path.is_empty(), "empty library path");
             }
             WorkflowType::JsonSpec(data) => {
-                anyhow::ensure!(!data.spec_string.is_empty(), "empty workflow specification file");
+                anyhow::ensure!(
+                    !data.spec_string.is_empty(),
+                    "empty workflow specification file"
+                );
             }
         }
         Ok(self)

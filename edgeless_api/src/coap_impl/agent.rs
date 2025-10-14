@@ -2,7 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 impl crate::outer::agent::AgentAPI for super::CoapClient {
-    fn function_instance_api(&mut self) -> Box<dyn crate::function_instance::FunctionInstanceAPI<edgeless_api_core::instance_id::InstanceId>> {
+    fn function_instance_api(
+        &mut self,
+    ) -> Box<
+        dyn crate::function_instance::FunctionInstanceAPI<
+            edgeless_api_core::instance_id::InstanceId,
+        >,
+    > {
         crate::function_instance::FunctionInstanceAPIClone::clone_box(self)
     }
 
@@ -12,7 +18,11 @@ impl crate::outer::agent::AgentAPI for super::CoapClient {
 
     fn resource_configuration_api(
         &mut self,
-    ) -> Box<dyn crate::resource_configuration::ResourceConfigurationAPI<edgeless_api_core::instance_id::InstanceId>> {
+    ) -> Box<
+        dyn crate::resource_configuration::ResourceConfigurationAPI<
+            edgeless_api_core::instance_id::InstanceId,
+        >,
+    > {
         crate::resource_configuration::ResourceConfigurationAPIClone::clone_box(self)
     }
 }

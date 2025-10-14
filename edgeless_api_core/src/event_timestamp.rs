@@ -8,7 +8,11 @@ pub struct EventTimestamp {
 }
 
 impl<C> minicbor::Encode<C> for EventTimestamp {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
         let secs = self.secs.to_ne_bytes();
         let nsecs = self.nsecs.to_ne_bytes();
 
@@ -24,7 +28,10 @@ impl<C> minicbor::CborLen<C> for EventTimestamp {
 }
 
 impl<C> minicbor::Decode<'_, C> for EventTimestamp {
-    fn decode(d: &mut minicbor::Decoder<'_>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+    fn decode(
+        d: &mut minicbor::Decoder<'_>,
+        _ctx: &mut C,
+    ) -> Result<Self, minicbor::decode::Error> {
         let secs: [u8; 8] = (*d.bytes()?).try_into().unwrap();
         let nsecs: [u8; 4] = (*d.bytes()?).try_into().unwrap();
 
@@ -49,7 +56,10 @@ mod test {
     fn test_event_timestamp_encoding() {
         let mut buffer = [0_u8; 16];
 
-        let ts = EventTimestamp { secs: 42, nsecs: 999 };
+        let ts = EventTimestamp {
+            secs: 42,
+            nsecs: 999,
+        };
 
         minicbor::encode(ts, &mut buffer[..]).unwrap();
 

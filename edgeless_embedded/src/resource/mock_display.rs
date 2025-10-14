@@ -54,7 +54,12 @@ impl crate::resource::Resource for MockDisplay {
         false
     }
 
-    async fn launch(&mut self, _spawner: embassy_executor::Spawner, _dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle) {}
+    async fn launch(
+        &mut self,
+        _spawner: embassy_executor::Spawner,
+        _dataplane_handle: crate::dataplane::EmbeddedDataplaneHandle,
+    ) {
+    }
 }
 
 impl crate::invocation::InvocationAPI for MockDisplay {
@@ -73,7 +78,10 @@ impl crate::invocation::InvocationAPI for MockDisplay {
 }
 
 impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
-    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse> {
+    async fn stop(
+        &mut self,
+        resource_id: edgeless_api_core::instance_id::InstanceId,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse> {
         log::info!("Display Stop");
 
         if Some(resource_id) == self.instance_id {
@@ -91,7 +99,8 @@ impl crate::resource_configuration::ResourceConfigurationAPI for MockDisplay {
     async fn start<'a>(
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
-    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse> {
+    ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse>
+    {
         log::info!("Display Start");
 
         let _instance_specification = Self::parse_configuration(instance_specification).await?;

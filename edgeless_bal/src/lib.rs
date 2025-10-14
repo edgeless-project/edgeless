@@ -11,7 +11,12 @@ pub struct EdgelessBalSettings {
 pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
     log::info!("Starting Edgeless Balancer");
     log::debug!("Settings: {:?}", settings);
-    let _data_plane = edgeless_dataplane::handle::DataplaneProvider::new(settings.balancer_id, settings.invocation_url.clone(), None).await;
+    let _data_plane = edgeless_dataplane::handle::DataplaneProvider::new(
+        settings.balancer_id,
+        settings.invocation_url.clone(),
+        None,
+    )
+    .await;
 
     let _ = tokio::spawn(async move {
         let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));

@@ -27,7 +27,8 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
     function_instance: Option<Box<FunctionInstanceType>>,
     guest_api_host: Option<super::guest_api::GuestAPIHost>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
+    guest_api_host_register:
+        std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
     code: Vec<u8>,
     data_plane: edgeless_dataplane::handle::DataplaneHandle,
     serialized_state: Option<String>,
@@ -45,7 +46,9 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
         runtime_api: futures::channel::mpsc::UnboundedSender<super::runtime::RuntimeRequest>,
         state_handle: Box<dyn crate::state_management::StateHandleAPI>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-        guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
+        guest_api_host_register: std::sync::Arc<
+            tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>,
+        >,
     ) -> Self {
         let mut telemetry_handle = telemetry_handle;
         let mut state_handle = state_handle;
@@ -106,7 +109,9 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
     }
 
     pub async fn patch(&mut self, update_request: edgeless_api::common::PatchRequest) {
-        self.alias_mapping.update(update_request.output_mapping).await;
+        self.alias_mapping
+            .update(update_request.output_mapping)
+            .await;
     }
 }
 
@@ -115,7 +120,9 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
     pub async fn new(
         poison_pill_receiver: tokio::sync::broadcast::Receiver<()>,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-        guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
+        guest_api_host_register: std::sync::Arc<
+            tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>,
+        >,
         guest_api_host: super::guest_api::GuestAPIHost,
         code: Vec<u8>,
         data_plane: edgeless_dataplane::handle::DataplaneHandle,
@@ -152,7 +159,10 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         if res.is_ok() {
             res = self.processing_loop().await;
         }
-        self.guest_api_host_register.lock().await.deregister_guest_api_host(&self.instance_id);
+        self.guest_api_host_register
+            .lock()
+            .await
+            .deregister_guest_api_host(&self.instance_id);
         self.exit(res).await;
     }
 
@@ -164,16 +174,28 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             // Register this function instance, if needed by the runtime.
             let mut register = self.guest_api_host_register.lock().await;
             if register.needs_to_register() {
-                register.register_guest_api_host(&self.instance_id, self.guest_api_host.take().unwrap());
+                register.register_guest_api_host(
+                    &self.instance_id,
+                    self.guest_api_host.take().unwrap(),
+                );
             }
             runtime_configuration = register.configuration();
         }
 
-        self.function_instance =
-            Some(FunctionInstanceType::instantiate(&self.instance_id, runtime_configuration, &mut self.guest_api_host.take(), &self.code).await?);
+        self.function_instance = Some(
+            FunctionInstanceType::instantiate(
+                &self.instance_id,
+                runtime_configuration,
+                &mut self.guest_api_host.take(),
+                &self.code,
+            )
+            .await?,
+        );
 
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInstantiate(start.elapsed()),
+            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInstantiate(
+                start.elapsed(),
+            ),
             std::collections::BTreeMap::new(),
         );
 
@@ -186,7 +208,10 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         self.function_instance
             .as_mut()
             .ok_or(super::FunctionInstanceError::InternalError)?
-            .init(self.init_payload.as_deref(), self.serialized_state.as_deref())
+            .init(
+                self.init_payload.as_deref(),
+                self.serialized_state.as_deref(),
+            )
             .await?;
 
         self.telemetry_handle.observe(
@@ -228,16 +253,25 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         metadata: &edgeless_api::function_instance::EventMetadata,
     ) -> Result<(), super::FunctionInstanceError> {
         let now = chrono::Utc::now();
-        let created = chrono::DateTime::from_timestamp(created.secs, created.nsecs).unwrap_or(chrono::DateTime::UNIX_EPOCH);
-        let elapsed = (now - created).to_std().unwrap_or(std::time::Duration::ZERO);
+        let created = chrono::DateTime::from_timestamp(created.secs, created.nsecs)
+            .unwrap_or(chrono::DateTime::UNIX_EPOCH);
+        let elapsed = (now - created)
+            .to_std()
+            .unwrap_or(std::time::Duration::ZERO);
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionTransfer(elapsed),
             std::collections::BTreeMap::new(),
         );
 
         match message {
-            edgeless_dataplane::core::Message::Cast(payload) => self.process_cast_message(source_id, payload, metadata).await,
-            edgeless_dataplane::core::Message::Call(payload) => self.process_call_message(source_id, payload, channel_id, metadata).await,
+            edgeless_dataplane::core::Message::Cast(payload) => {
+                self.process_cast_message(source_id, payload, metadata)
+                    .await
+            }
+            edgeless_dataplane::core::Message::Call(payload) => {
+                self.process_call_message(source_id, payload, channel_id, metadata)
+                    .await
+            }
             _ => {
                 log::debug!("Unprocessed Message");
                 Ok(())
@@ -265,7 +299,9 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             .await?;
 
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(start.elapsed()),
+            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(
+                start.elapsed(),
+            ),
             std::collections::BTreeMap::from([("EVENT_TYPE".to_string(), "CAST".to_string())]),
         );
         Ok(())
@@ -293,7 +329,9 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             .await?;
 
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(start.elapsed()),
+            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(
+                start.elapsed(),
+            ),
             std::collections::BTreeMap::from([("EVENT_TYPE".to_string(), "CALL".to_string())]),
         );
 
@@ -321,7 +359,10 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
 
     async fn exit(&mut self, exit_status: Result<(), super::FunctionInstanceError>) {
         self.runtime_api
-            .send(super::runtime::RuntimeRequest::FunctionExit(self.instance_id, exit_status.clone()))
+            .send(super::runtime::RuntimeRequest::FunctionExit(
+                self.instance_id,
+                exit_status.clone(),
+            ))
             .await
             .unwrap_or_else(|_| log::error!("FunctionInstance outlived runner."));
 

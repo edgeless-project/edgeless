@@ -10,7 +10,12 @@ pub struct CsvDumper {
 }
 
 impl CsvDumper {
-    pub fn new(additional_fields: String, additional_header: String, filename: &str, append: bool) -> anyhow::Result<Self> {
+    pub fn new(
+        additional_fields: String,
+        additional_header: String,
+        filename: &str,
+        append: bool,
+    ) -> anyhow::Result<Self> {
         let header = !append
             || match std::fs::metadata(filename) {
                 Ok(metadata) => metadata.len() == 0,
@@ -32,15 +37,25 @@ impl CsvDumper {
         let mut additional_header = additional_header;
         let mut additional_fields = additional_fields;
         if !additional_header.is_empty() {
-            anyhow::ensure!(!additional_fields.is_empty(), "empty additional fields with non-empty additional header");
+            anyhow::ensure!(
+                !additional_fields.is_empty(),
+                "empty additional fields with non-empty additional header"
+            );
             additional_header += ",";
             additional_fields += ",";
         }
         if header {
-            writeln!(&mut outfile, "{}timestamp,metric,target,value", additional_header)?;
+            writeln!(
+                &mut outfile,
+                "{}timestamp,metric,target,value",
+                additional_header
+            )?;
         }
 
-        Ok(Self { additional_fields, outfile })
+        Ok(Self {
+            additional_fields,
+            outfile,
+        })
     }
 
     pub fn add(&mut self, metric: &str, target: &str, value: &str) {

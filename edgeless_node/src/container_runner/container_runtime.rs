@@ -4,7 +4,10 @@
 use futures::{Future, SinkExt, StreamExt};
 
 pub struct ContainerRuntime {
-    guest_api_hosts: std::collections::HashMap<edgeless_api::function_instance::InstanceId, crate::base_runtime::guest_api::GuestAPIHost>,
+    guest_api_hosts: std::collections::HashMap<
+        edgeless_api::function_instance::InstanceId,
+        crate::base_runtime::guest_api::GuestAPIHost,
+    >,
     configuration: std::collections::HashMap<String, String>,
 }
 
@@ -34,14 +37,27 @@ impl crate::base_runtime::runtime::GuestAPIHostRegister for ContainerRuntime {
         instance_id: &edgeless_api::function_instance::InstanceId,
         guest_api_host: crate::base_runtime::guest_api::GuestAPIHost,
     ) {
-        if self.guest_api_hosts.insert(*instance_id, guest_api_host).is_some() {
-            log::warn!("ContainerRuntime: overwrote container function: {}", instance_id);
+        if self
+            .guest_api_hosts
+            .insert(*instance_id, guest_api_host)
+            .is_some()
+        {
+            log::warn!(
+                "ContainerRuntime: overwrote container function: {}",
+                instance_id
+            );
         }
     }
 
-    fn deregister_guest_api_host(&mut self, instance_id: &edgeless_api::function_instance::InstanceId) {
+    fn deregister_guest_api_host(
+        &mut self,
+        instance_id: &edgeless_api::function_instance::InstanceId,
+    ) {
         if self.guest_api_hosts.remove(instance_id).is_none() {
-            log::warn!("ContainerRunTime: trying to deregister non-existing container function {}", instance_id);
+            log::warn!(
+                "ContainerRunTime: trying to deregister non-existing container function {}",
+                instance_id
+            );
         }
     }
 
@@ -62,18 +78,21 @@ impl ContainerRuntime {
     pub fn new(
         configuration: std::collections::HashMap<String, String>,
     ) -> (
-        std::sync::Arc<tokio::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>>,
+        std::sync::Arc<
+            tokio::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>,
+        >,
         std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
         Box<dyn edgeless_api::outer::container_runtime::ContainerRuntimeAPI + Send>,
     ) {
         log::debug!("new container runtime created");
         let (sender, receiver) = futures::channel::mpsc::unbounded();
 
-        let container_runtime: std::sync::Arc<tokio::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>> =
-            std::sync::Arc::new(tokio::sync::Mutex::new(Box::new(Self {
-                guest_api_hosts: std::collections::HashMap::new(),
-                configuration,
-            })));
+        let container_runtime: std::sync::Arc<
+            tokio::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>,
+        > = std::sync::Arc::new(tokio::sync::Mutex::new(Box::new(Self {
+            guest_api_hosts: std::collections::HashMap::new(),
+            configuration,
+        })));
 
         let container_runtime_clone = container_runtime.clone();
         let main_task = Box::pin(async move {
@@ -91,7 +110,9 @@ impl ContainerRuntime {
 
     async fn main_task(
         receiver: futures::channel::mpsc::UnboundedReceiver<ContainerRuntimeRequest>,
-        container_runtime: std::sync::Arc<tokio::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>>,
+        container_runtime: std::sync::Arc<
+            tokio::sync::Mutex<Box<dyn crate::base_runtime::runtime::GuestAPIHostRegister + Send>>,
+        >,
     ) {
         let mut receiver = receiver;
 
@@ -100,13 +121,23 @@ impl ContainerRuntime {
             match req {
                 ContainerRuntimeRequest::Cast(event) => {
                     log::debug!("cast, alias {}, msg {} bytes", event.alias, event.msg.len());
-                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&event.originator)
+                    {
                         if runtime
-                            .cast_alias(&event.alias, String::from_utf8(event.msg).unwrap().as_str())
+                            .cast_alias(
+                                &event.alias,
+                                String::from_utf8(event.msg).unwrap().as_str(),
+                            )
                             .await
                             .is_err()
                         {
-                            log::error!("error occurred when casting an event towards alias {}: dropped", event.alias);
+                            log::error!(
+                                "error occurred when casting an event towards alias {}: dropped",
+                                event.alias
+                            );
                         }
                     } else {
                         log::warn!(
@@ -118,9 +149,20 @@ impl ContainerRuntime {
                 }
                 ContainerRuntimeRequest::CastRaw(event) => {
                     log::debug!("cast-raw, dst {}, msg {} bytes", event.dst, event.msg.len());
-                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
-                        if runtime.cast_raw(event.dst, String::from_utf8(event.msg).unwrap().as_str()).await.is_err() {
-                            log::error!("error occurred when raw-casting an event towards {}", event.dst);
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&event.originator)
+                    {
+                        if runtime
+                            .cast_raw(event.dst, String::from_utf8(event.msg).unwrap().as_str())
+                            .await
+                            .is_err()
+                        {
+                            log::error!(
+                                "error occurred when raw-casting an event towards {}",
+                                event.dst
+                            );
                         }
                     } else {
                         log::warn!(
@@ -133,19 +175,38 @@ impl ContainerRuntime {
                 ContainerRuntimeRequest::Call(event, reply_sender) => {
                     log::debug!("call, alias {}, msg {} bytes", event.alias, event.msg.len());
                     let mut res = edgeless_api::guest_api_function::CallReturn::Err;
-                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
-                        match runtime.call_alias(&event.alias, String::from_utf8(event.msg).unwrap().as_str()).await {
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&event.originator)
+                    {
+                        match runtime
+                            .call_alias(
+                                &event.alias,
+                                String::from_utf8(event.msg).unwrap().as_str(),
+                            )
+                            .await
+                        {
                             Ok(ret) => {
                                 res = match ret {
-                                    edgeless_dataplane::core::CallRet::NoReply => edgeless_api::guest_api_function::CallReturn::NoRet,
-                                    edgeless_dataplane::core::CallRet::Reply(msg) => {
-                                        edgeless_api::guest_api_function::CallReturn::Reply(msg.as_bytes().to_vec())
+                                    edgeless_dataplane::core::CallRet::NoReply => {
+                                        edgeless_api::guest_api_function::CallReturn::NoRet
                                     }
-                                    edgeless_dataplane::core::CallRet::Err => edgeless_api::guest_api_function::CallReturn::Err,
+                                    edgeless_dataplane::core::CallRet::Reply(msg) => {
+                                        edgeless_api::guest_api_function::CallReturn::Reply(
+                                            msg.as_bytes().to_vec(),
+                                        )
+                                    }
+                                    edgeless_dataplane::core::CallRet::Err => {
+                                        edgeless_api::guest_api_function::CallReturn::Err
+                                    }
                                 }
                             }
                             Err(_) => {
-                                log::error!("error occurred when calling an event towards alias {}", event.alias)
+                                log::error!(
+                                    "error occurred when calling an event towards alias {}",
+                                    event.alias
+                                )
                             }
                         }
                     } else {
@@ -165,19 +226,35 @@ impl ContainerRuntime {
                 ContainerRuntimeRequest::CallRaw(event, reply_sender) => {
                     log::debug!("call-raw, dst {}, msg {} bytes", event.dst, event.msg.len());
                     let mut res = edgeless_api::guest_api_function::CallReturn::Err;
-                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
-                        match runtime.call_raw(event.dst, String::from_utf8(event.msg).unwrap().as_str()).await {
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&event.originator)
+                    {
+                        match runtime
+                            .call_raw(event.dst, String::from_utf8(event.msg).unwrap().as_str())
+                            .await
+                        {
                             Ok(ret) => {
                                 res = match ret {
-                                    edgeless_dataplane::core::CallRet::NoReply => edgeless_api::guest_api_function::CallReturn::NoRet,
-                                    edgeless_dataplane::core::CallRet::Reply(msg) => {
-                                        edgeless_api::guest_api_function::CallReturn::Reply(msg.as_bytes().to_vec())
+                                    edgeless_dataplane::core::CallRet::NoReply => {
+                                        edgeless_api::guest_api_function::CallReturn::NoRet
                                     }
-                                    edgeless_dataplane::core::CallRet::Err => edgeless_api::guest_api_function::CallReturn::Err,
+                                    edgeless_dataplane::core::CallRet::Reply(msg) => {
+                                        edgeless_api::guest_api_function::CallReturn::Reply(
+                                            msg.as_bytes().to_vec(),
+                                        )
+                                    }
+                                    edgeless_dataplane::core::CallRet::Err => {
+                                        edgeless_api::guest_api_function::CallReturn::Err
+                                    }
                                 }
                             }
                             Err(_) => {
-                                log::error!("error occurred when raw-calling an event towards {}", event.dst)
+                                log::error!(
+                                    "error occurred when raw-calling an event towards {}",
+                                    event.dst
+                                )
                             }
                         }
                     } else {
@@ -201,7 +278,11 @@ impl ContainerRuntime {
                         event.target,
                         event.msg
                     );
-                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&event.originator)
+                    {
                         runtime
                             .telemetry_log(
                                 match event.log_level {
@@ -239,7 +320,8 @@ impl ContainerRuntime {
                     // This method should never be called by a container
                     // function instance, since it is supposed to learn its
                     // Instance ID at boot.
-                    match reply_sender.send(Ok(edgeless_api::function_instance::InstanceId::none())) {
+                    match reply_sender.send(Ok(edgeless_api::function_instance::InstanceId::none()))
+                    {
                         Ok(_) => {}
                         Err(err) => {
                             log::error!("Unhandled: {:?}", err);
@@ -253,9 +335,17 @@ impl ContainerRuntime {
                         event.alias,
                         event.msg.len()
                     );
-                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&event.originator) {
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&event.originator)
+                    {
                         if runtime
-                            .delayed_cast(event.delay, &event.alias, String::from_utf8(event.msg).unwrap().as_str())
+                            .delayed_cast(
+                                event.delay,
+                                &event.alias,
+                                String::from_utf8(event.msg).unwrap().as_str(),
+                            )
                             .await
                             .is_err()
                         {
@@ -275,14 +365,28 @@ impl ContainerRuntime {
                     }
                 }
                 ContainerRuntimeRequest::Sync(sync_data) => {
-                    log::debug!("sync, serialized-data {} bytes", sync_data.serialized_data.len());
-                    if let Some(runtime) = container_runtime.lock().await.guest_api_host(&sync_data.originator) {
+                    log::debug!(
+                        "sync, serialized-data {} bytes",
+                        sync_data.serialized_data.len()
+                    );
+                    if let Some(runtime) = container_runtime
+                        .lock()
+                        .await
+                        .guest_api_host(&sync_data.originator)
+                    {
                         if runtime
-                            .sync(String::from_utf8(sync_data.serialized_data).unwrap().as_str())
+                            .sync(
+                                String::from_utf8(sync_data.serialized_data)
+                                    .unwrap()
+                                    .as_str(),
+                            )
                             .await
                             .is_err()
                         {
-                            log::error!("error occurred when synchronizing state of {}: ignored", sync_data.originator);
+                            log::error!(
+                                "error occurred when synchronizing state of {}: ignored",
+                                sync_data.originator
+                            );
                         }
                     } else {
                         log::warn!(
@@ -313,67 +417,166 @@ pub struct GuestAPIRuntimeClient {
 
 #[async_trait::async_trait]
 impl edgeless_api::guest_api_host::GuestAPIHost for GuestAPIRuntimeClient {
-    async fn cast(&mut self, event: edgeless_api::guest_api_host::OutputEventData) -> anyhow::Result<()> {
-        match self.sender.send(ContainerRuntimeRequest::Cast(event.clone())).await {
+    async fn cast(
+        &mut self,
+        event: edgeless_api::guest_api_host::OutputEventData,
+    ) -> anyhow::Result<()> {
+        match self
+            .sender
+            .send(ContainerRuntimeRequest::Cast(event.clone()))
+            .await
+        {
             Ok(_) => Ok(()),
-            Err(err) => return Err(anyhow::anyhow!("GuestAPIRuntime::cast channel error: {}", err)),
+            Err(err) => {
+                return Err(anyhow::anyhow!(
+                    "GuestAPIRuntime::cast channel error: {}",
+                    err
+                ))
+            }
         }
     }
-    async fn cast_raw(&mut self, event: edgeless_api::guest_api_host::OutputEventDataRaw) -> anyhow::Result<()> {
-        match self.sender.send(ContainerRuntimeRequest::CastRaw(event.clone())).await {
+    async fn cast_raw(
+        &mut self,
+        event: edgeless_api::guest_api_host::OutputEventDataRaw,
+    ) -> anyhow::Result<()> {
+        match self
+            .sender
+            .send(ContainerRuntimeRequest::CastRaw(event.clone()))
+            .await
+        {
             Ok(_) => Ok(()),
-            Err(err) => return Err(anyhow::anyhow!("GuestAPIRuntime::cast_raw channel error: {}", err)),
+            Err(err) => {
+                return Err(anyhow::anyhow!(
+                    "GuestAPIRuntime::cast_raw channel error: {}",
+                    err
+                ))
+            }
         }
     }
-    async fn call(&mut self, event: edgeless_api::guest_api_host::OutputEventData) -> anyhow::Result<edgeless_api::guest_api_function::CallReturn> {
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::guest_api_function::CallReturn>>();
-        match self.sender.send(ContainerRuntimeRequest::Call(event.clone(), reply_sender)).await {
+    async fn call(
+        &mut self,
+        event: edgeless_api::guest_api_host::OutputEventData,
+    ) -> anyhow::Result<edgeless_api::guest_api_function::CallReturn> {
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
+            anyhow::Result<edgeless_api::guest_api_function::CallReturn>,
+        >();
+        match self
+            .sender
+            .send(ContainerRuntimeRequest::Call(event.clone(), reply_sender))
+            .await
+        {
             Ok(_) => match reply_receiver.await {
                 Ok(ret) => ret,
                 Err(err) => Err(anyhow::anyhow!("GuestAPIFunction::call error: {}", err)),
             },
-            Err(err) => return Err(anyhow::anyhow!("GuestAPIFunction::call channel error: {}", err)),
+            Err(err) => {
+                return Err(anyhow::anyhow!(
+                    "GuestAPIFunction::call channel error: {}",
+                    err
+                ))
+            }
         }
     }
     async fn call_raw(
         &mut self,
         event: edgeless_api::guest_api_host::OutputEventDataRaw,
     ) -> anyhow::Result<edgeless_api::guest_api_function::CallReturn> {
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::guest_api_function::CallReturn>>();
-        match self.sender.send(ContainerRuntimeRequest::CallRaw(event.clone(), reply_sender)).await {
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
+            anyhow::Result<edgeless_api::guest_api_function::CallReturn>,
+        >();
+        match self
+            .sender
+            .send(ContainerRuntimeRequest::CallRaw(
+                event.clone(),
+                reply_sender,
+            ))
+            .await
+        {
             Ok(_) => match reply_receiver.await {
                 Ok(ret) => ret,
                 Err(err) => Err(anyhow::anyhow!("GuestAPIFunction::call_raw error: {}", err)),
             },
-            Err(err) => return Err(anyhow::anyhow!("GuestAPIFunction::call_raw channel error: {}", err)),
+            Err(err) => {
+                return Err(anyhow::anyhow!(
+                    "GuestAPIFunction::call_raw channel error: {}",
+                    err
+                ))
+            }
         }
     }
-    async fn telemetry_log(&mut self, event: edgeless_api::guest_api_host::TelemetryLogEvent) -> anyhow::Result<()> {
-        match self.sender.send(ContainerRuntimeRequest::TelemetryLog(event.clone())).await {
+    async fn telemetry_log(
+        &mut self,
+        event: edgeless_api::guest_api_host::TelemetryLogEvent,
+    ) -> anyhow::Result<()> {
+        match self
+            .sender
+            .send(ContainerRuntimeRequest::TelemetryLog(event.clone()))
+            .await
+        {
             Ok(_) => Ok(()),
-            Err(err) => return Err(anyhow::anyhow!("GuestAPIRuntime::telemetry_log channel error: {}", err)),
+            Err(err) => {
+                return Err(anyhow::anyhow!(
+                    "GuestAPIRuntime::telemetry_log channel error: {}",
+                    err
+                ))
+            }
         }
     }
     async fn slf(&mut self) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::function_instance::InstanceId>>();
-        match self.sender.send(ContainerRuntimeRequest::Slf(reply_sender)).await {
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
+            anyhow::Result<edgeless_api::function_instance::InstanceId>,
+        >();
+        match self
+            .sender
+            .send(ContainerRuntimeRequest::Slf(reply_sender))
+            .await
+        {
             Ok(_) => match reply_receiver.await {
                 Ok(ret) => ret,
                 Err(err) => Err(anyhow::anyhow!("GuestAPIFunction::slf error: {}", err)),
             },
-            Err(err) => return Err(anyhow::anyhow!("GuestAPIFunction::slf channel error: {}", err)),
+            Err(err) => {
+                return Err(anyhow::anyhow!(
+                    "GuestAPIFunction::slf channel error: {}",
+                    err
+                ))
+            }
         }
     }
-    async fn delayed_cast(&mut self, event: edgeless_api::guest_api_host::DelayedEventData) -> anyhow::Result<()> {
-        match self.sender.send(ContainerRuntimeRequest::DelayedCast(event.clone())).await {
+    async fn delayed_cast(
+        &mut self,
+        event: edgeless_api::guest_api_host::DelayedEventData,
+    ) -> anyhow::Result<()> {
+        match self
+            .sender
+            .send(ContainerRuntimeRequest::DelayedCast(event.clone()))
+            .await
+        {
             Ok(_) => Ok(()),
-            Err(err) => return Err(anyhow::anyhow!("GuestAPIRuntime::delayed_cast channel error: {}", err)),
+            Err(err) => {
+                return Err(anyhow::anyhow!(
+                    "GuestAPIRuntime::delayed_cast channel error: {}",
+                    err
+                ))
+            }
         }
     }
-    async fn sync(&mut self, sync_data: edgeless_api::guest_api_host::SyncData) -> anyhow::Result<()> {
-        match self.sender.send(ContainerRuntimeRequest::Sync(sync_data.clone())).await {
+    async fn sync(
+        &mut self,
+        sync_data: edgeless_api::guest_api_host::SyncData,
+    ) -> anyhow::Result<()> {
+        match self
+            .sender
+            .send(ContainerRuntimeRequest::Sync(sync_data.clone()))
+            .await
+        {
             Ok(_) => Ok(()),
-            Err(err) => return Err(anyhow::anyhow!("GuestAPIRuntime::sync channel error: {}", err)),
+            Err(err) => {
+                return Err(anyhow::anyhow!(
+                    "GuestAPIRuntime::sync channel error: {}",
+                    err
+                ))
+            }
         }
     }
 }

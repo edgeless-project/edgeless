@@ -16,7 +16,10 @@ pub trait RuntimeAPI {
         instance_id: edgeless_api::function_instance::InstanceId,
         request: edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<()>;
-    async fn stop(&mut self, instance_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()>;
+    async fn stop(
+        &mut self,
+        instance_id: edgeless_api::function_instance::InstanceId,
+    ) -> anyhow::Result<()>;
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()>;
 }
 
@@ -30,8 +33,16 @@ pub trait FunctionInstance: Send + 'static {
         guest_api_host: &mut Option<crate::base_runtime::guest_api::GuestAPIHost>,
         code: &[u8],
     ) -> Result<Box<Self>, FunctionInstanceError>;
-    async fn init(&mut self, init_payload: Option<&str>, serialized_state: Option<&str>) -> Result<(), FunctionInstanceError>;
-    async fn cast(&mut self, src: &edgeless_api::function_instance::InstanceId, msg: &str) -> Result<(), FunctionInstanceError>;
+    async fn init(
+        &mut self,
+        init_payload: Option<&str>,
+        serialized_state: Option<&str>,
+    ) -> Result<(), FunctionInstanceError>;
+    async fn cast(
+        &mut self,
+        src: &edgeless_api::function_instance::InstanceId,
+        msg: &str,
+    ) -> Result<(), FunctionInstanceError>;
     async fn call(
         &mut self,
         src: &edgeless_api::function_instance::InstanceId,

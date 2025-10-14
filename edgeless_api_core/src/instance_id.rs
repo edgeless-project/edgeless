@@ -18,7 +18,11 @@ pub struct InstanceId {
 }
 
 impl<C> minicbor::Encode<C> for InstanceId {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
         let n_id = *self.node_id.as_bytes();
         let f_id = *self.function_id.as_bytes();
 
@@ -34,7 +38,10 @@ impl<C> minicbor::CborLen<C> for InstanceId {
 }
 
 impl<C> minicbor::Decode<'_, C> for InstanceId {
-    fn decode(d: &mut minicbor::Decoder<'_>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+    fn decode(
+        d: &mut minicbor::Decoder<'_>,
+        _ctx: &mut C,
+    ) -> Result<Self, minicbor::decode::Error> {
         // let data: [[u8; 16];2]  = d.decode::<[[u8;16]; 2]>().unwrap();
         let n_id: [u8; 16] = (*d.bytes()?).try_into().unwrap();
         let f_id: [u8; 16] = (*d.bytes()?).try_into().unwrap();
@@ -48,7 +55,11 @@ impl<C> minicbor::Decode<'_, C> for InstanceId {
 
 impl core::fmt::Display for InstanceId {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        write!(f, "InstanceId(node_id: {}, function_id: {})", self.node_id, self.function_id)
+        write!(
+            f,
+            "InstanceId(node_id: {}, function_id: {})",
+            self.node_id, self.function_id
+        )
     }
 }
 

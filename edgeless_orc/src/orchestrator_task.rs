@@ -32,9 +32,11 @@ pub(crate) struct OrchestratorTask {
     nodes: std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>,
     // known resources providers as advertised by the nodes upon registration
     // key: provider_id
-    resource_providers: std::collections::HashMap<String, crate::resource_provider::ResourceProvider>,
+    resource_providers:
+        std::collections::HashMap<String, crate::resource_provider::ResourceProvider>,
     proxy: std::sync::Arc<tokio::sync::Mutex<dyn super::proxy::Proxy>>,
-    subscriber_sender: futures::channel::mpsc::UnboundedSender<super::domain_subscriber::DomainSubscriberRequest>,
+    subscriber_sender:
+        futures::channel::mpsc::UnboundedSender<super::domain_subscriber::DomainSubscriberRequest>,
     orchestration_logic: crate::orchestration_logic::OrchestrationLogic,
     rng: rand::rngs::StdRng,
     // instances that the orchestrator promises to keep active
@@ -46,16 +48,21 @@ pub(crate) struct OrchestratorTask {
     // value: map of:
     //        key:   channel output name
     //        value: lid (target function)
-    dependency_graph: std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
+    dependency_graph:
+        std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
     dependency_graph_changed: bool,
 }
 
 impl OrchestratorTask {
     pub async fn new(
-        receiver: futures::channel::mpsc::UnboundedReceiver<crate::orchestrator::OrchestratorRequest>,
+        receiver: futures::channel::mpsc::UnboundedReceiver<
+            crate::orchestrator::OrchestratorRequest,
+        >,
         orchestrator_settings: crate::EdgelessOrcBaselineSettings,
         proxy: std::sync::Arc<tokio::sync::Mutex<dyn super::proxy::Proxy>>,
-        subscriber_sender: futures::channel::mpsc::UnboundedSender<super::domain_subscriber::DomainSubscriberRequest>,
+        subscriber_sender: futures::channel::mpsc::UnboundedSender<
+            super::domain_subscriber::DomainSubscriberRequest,
+        >,
     ) -> Self {
         Self {
             receiver,
@@ -63,7 +70,9 @@ impl OrchestratorTask {
             resource_providers: std::collections::HashMap::new(),
             proxy,
             subscriber_sender,
-            orchestration_logic: crate::orchestration_logic::OrchestrationLogic::new(orchestrator_settings.orchestration_strategy),
+            orchestration_logic: crate::orchestration_logic::OrchestrationLogic::new(
+                orchestrator_settings.orchestration_strategy,
+            ),
             rng: rand::rngs::StdRng::from_entropy(),
             active_instances: std::collections::HashMap::new(),
             active_instances_changed: false,
@@ -77,8 +86,14 @@ impl OrchestratorTask {
         self.update_domain().await;
         while let Some(req) = self.receiver.next().await {
             match req {
-                crate::orchestrator::OrchestratorRequest::StartFunction(spawn_req, reply_channel) => {
-                    log::debug!("Orchestrator StartFunction {}", spawn_req.code.to_short_string());
+                crate::orchestrator::OrchestratorRequest::StartFunction(
+                    spawn_req,
+                    reply_channel,
+                ) => {
+                    log::debug!(
+                        "Orchestrator StartFunction {}",
+                        spawn_req.code.to_short_string()
+                    );
                     let res = self.start_function(&spawn_req).await;
                     if let Err(err) = reply_channel.send(res) {
                         log::error!("Orchestrator channel error in SPAWN: {:?}", err);
@@ -88,9 +103,14 @@ impl OrchestratorTask {
                     log::debug!("Orchestrator StopFunction {:?}", lid);
                     self.stop_function_lid(lid).await;
                 }
-                crate::orchestrator::OrchestratorRequest::StartResource(start_req, reply_channel) => {
+                crate::orchestrator::OrchestratorRequest::StartResource(
+                    start_req,
+                    reply_channel,
+                ) => {
                     log::debug!("Orchestrator StartResource {:?}", &start_req);
-                    let res = self.start_resource(start_req.clone(), uuid::Uuid::new_v4()).await;
+                    let res = self
+                        .start_resource(start_req.clone(), uuid::Uuid::new_v4())
+                        .await;
                     if let Err(err) = reply_channel.send(res) {
                         log::error!("Orchestrator channel error in STARTRESOURCE: {:?}", err);
                     }
@@ -103,10 +123,15 @@ impl OrchestratorTask {
                     log::debug!("Orchestrator Patch {:?}", update);
                     self.patch(update).await;
                 }
-                crate::orchestrator::OrchestratorRequest::AddNode(node_id, mut client_desc, resource_providers) => {
+                crate::orchestrator::OrchestratorRequest::AddNode(
+                    node_id,
+                    mut client_desc,
+                    resource_providers,
+                ) => {
                     log::debug!("Orchestrator AddNode {}", client_desc.to_string_short());
                     let _ = client_desc.api.node_management_api().reset().await;
-                    self.add_node(node_id, client_desc, resource_providers).await;
+                    self.add_node(node_id, client_desc, resource_providers)
+                        .await;
                     self.update_domain().await;
                     self.refresh().await;
                 }
@@ -179,10 +204,15 @@ impl OrchestratorTask {
                 crate::active_instance::ActiveInstance::Function(spawn_req, origin_instances) => {
                     (Some(spawn_req.clone()), None, origin_instances.clone())
                 }
-                crate::active_instance::ActiveInstance::Resource(resource_spec, origin_lid) => (None, Some(resource_spec.clone()), vec![*origin_lid]),
+                crate::active_instance::ActiveInstance::Resource(resource_spec, origin_lid) => {
+                    (None, Some(resource_spec.clone()), vec![*origin_lid])
+                }
             },
             None => {
-                anyhow::bail!("Intent to migrate component LID {} that is not active: ignored", lid);
+                anyhow::bail!(
+                    "Intent to migrate component LID {} that is not active: ignored",
+                    lid
+                );
             }
         };
 
@@ -190,10 +220,14 @@ impl OrchestratorTask {
 
         // Return immediately if the migration is requested to precisely the
         // set of nodes to which the instance is already assigned.
-        let target_node_ids: std::collections::HashSet<&uuid::Uuid> = std::collections::HashSet::from_iter(targets.iter());
+        let target_node_ids: std::collections::HashSet<&uuid::Uuid> =
+            std::collections::HashSet::from_iter(targets.iter());
         let origin_node_ids: std::collections::HashSet<&uuid::Uuid> =
             std::collections::HashSet::from_iter(origin_instances.iter().map(|x| &x.node_id));
-        anyhow::ensure!(target_node_ids != origin_node_ids, "instance already running on the migration target(s)");
+        anyhow::ensure!(
+            target_node_ids != origin_node_ids,
+            "instance already running on the migration target(s)"
+        );
 
         // Do the migration of the function of resource.
         if let Some(spawn_req) = spawn_req {
@@ -212,7 +246,10 @@ impl OrchestratorTask {
                 }
                 to_be_started.push((spawn_req.clone(), *target));
             } else {
-                anyhow::bail!("No (valid) target found for the migration of function LID {}", lid);
+                anyhow::bail!(
+                    "No (valid) target found for the migration of function LID {}",
+                    lid
+                );
             }
 
             // Stop all the function instances associated with this LID.
@@ -223,7 +260,11 @@ impl OrchestratorTask {
             // Remove the association of the component with origin instances.
             // If the start below fails, then the function instance will remain
             // associated with no instances.
-            if let Some(crate::active_instance::ActiveInstance::Function(_spawn_req, origin_instances)) = self.active_instances.get_mut(lid) {
+            if let Some(crate::active_instance::ActiveInstance::Function(
+                _spawn_req,
+                origin_instances,
+            )) = self.active_instances.get_mut(lid)
+            {
                 origin_instances.clear();
             }
             self.active_instances_changed = true;
@@ -231,14 +272,22 @@ impl OrchestratorTask {
             // Start the new function instances.
             assert_eq!(1, to_be_started.len());
             for (spawn_request, node_id) in to_be_started {
-                if let Err(err) = self.start_function_in_node(&spawn_request, lid, &node_id).await {
+                if let Err(err) = self
+                    .start_function_in_node(&spawn_request, lid, &node_id)
+                    .await
+                {
                     // TODO: if migration to multiple instances is supported,
                     // then we should choose how to consider the case of a
                     // function start failing while others succeed:
                     // - if this is considered a failure, then the function
                     // instances already started should be stopped (rollback)
                     // - otherwise, an Ok must be returned instead of an Err
-                    anyhow::bail!("Error when migrating function LID {} to node_id {}: {}", lid, node_id, err);
+                    anyhow::bail!(
+                        "Error when migrating function LID {} to node_id {}: {}",
+                        lid,
+                        node_id,
+                        err
+                    );
                 }
             }
             Ok(*target.expect("impossible: the target node must have a value"))
@@ -256,14 +305,25 @@ impl OrchestratorTask {
                     // Remove the association of the component with origin instances.
                     // If the start below fails, then the function instance will remain
                     // associated with no instances.
-                    if let Some(crate::active_instance::ActiveInstance::Resource(_resource_req, origin_instance)) = self.active_instances.get_mut(lid)
+                    if let Some(crate::active_instance::ActiveInstance::Resource(
+                        _resource_req,
+                        origin_instance,
+                    )) = self.active_instances.get_mut(lid)
                     {
                         *origin_instance = edgeless_api::function_instance::InstanceId::none();
                     }
                     self.active_instances_changed = true;
 
-                    if let Err(err) = self.start_resource_in_node(resource_req, lid, target_node_id).await {
-                        anyhow::bail!("Error when migrating resource LID {} to node_id {}: {}", lid, target_node_id, err);
+                    if let Err(err) = self
+                        .start_resource_in_node(resource_req, lid, target_node_id)
+                        .await
+                    {
+                        anyhow::bail!(
+                            "Error when migrating resource LID {} to node_id {}: {}",
+                            lid,
+                            target_node_id,
+                            err
+                        );
                     } else {
                         Ok(*target_node_id)
                     }
@@ -286,7 +346,10 @@ impl OrchestratorTask {
     ///
     /// * `origin_lids` - The logical resource identifiers for which patches
     ///   must be applied.
-    async fn apply_patches(&mut self, origin_lids: Vec<edgeless_api::function_instance::ComponentId>) {
+    async fn apply_patches(
+        &mut self,
+        origin_lids: Vec<edgeless_api::function_instance::ComponentId>,
+    ) {
         for origin_lid in origin_lids.iter() {
             let logical_output_mapping = match self.dependency_graph.get(origin_lid) {
                 Some(x) => x,
@@ -321,7 +384,11 @@ impl OrchestratorTask {
                             .await
                         {
                             Ok(_) => {
-                                log::info!("Patched node_id {} pid {}", instance_id.node_id, instance_id.function_id);
+                                log::info!(
+                                    "Patched node_id {} pid {}",
+                                    instance_id.node_id,
+                                    instance_id.function_id
+                                );
                             }
                             Err(err) => {
                                 log::error!(
@@ -347,7 +414,11 @@ impl OrchestratorTask {
                             .await
                         {
                             Ok(_) => {
-                                log::info!("Patched provider node_id {} pid {}", instance_id.node_id, instance_id.function_id);
+                                log::info!(
+                                    "Patched provider node_id {} pid {}",
+                                    instance_id.node_id,
+                                    instance_id.function_id
+                                );
                             }
                             Err(err) => {
                                 log::error!(
@@ -359,7 +430,10 @@ impl OrchestratorTask {
                             }
                         },
                         None => {
-                            log::error!("Cannot patch unknown provider node_id {}", instance_id.node_id);
+                            log::error!(
+                                "Cannot patch unknown provider node_id {}",
+                                instance_id.node_id
+                            );
                         }
                     },
                 };
@@ -388,7 +462,8 @@ impl OrchestratorTask {
             Some(provider_id) => {
                 let resource_provider = self.resource_providers.get(provider_id).unwrap();
                 let node_id = resource_provider.node_id;
-                self.start_resource_in_node(resource_req, &lid, &node_id).await
+                self.start_resource_in_node(resource_req, &lid, &node_id)
+                    .await
             }
             None => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                 edgeless_api::common::ResponseError {
@@ -401,7 +476,10 @@ impl OrchestratorTask {
 
     /// Return the list of resource providers that are feasible for the given
     /// resource specification.
-    fn feasible_providers(&self, resource_req: &edgeless_api::resource_configuration::ResourceInstanceSpecification) -> Vec<String> {
+    fn feasible_providers(
+        &self,
+        resource_req: &edgeless_api::resource_configuration::ResourceInstanceSpecification,
+    ) -> Vec<String> {
         let cordoned_nodes = self
             .nodes
             .iter()
@@ -410,7 +488,9 @@ impl OrchestratorTask {
         self.resource_providers
             .iter()
             .filter_map(|(provider_id, provider)| {
-                if provider.class_type == resource_req.class_type && !cordoned_nodes.contains(&provider.node_id) {
+                if provider.class_type == resource_req.class_type
+                    && !cordoned_nodes.contains(&provider.node_id)
+                {
                     Some(provider_id.clone())
                 } else {
                     None
@@ -473,7 +553,10 @@ impl OrchestratorTask {
             }
             Err(err) => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                 edgeless_api::common::ResponseError {
-                    summary: format!("Could not start function {}", spawn_req.code.to_short_string()),
+                    summary: format!(
+                        "Could not start function {}",
+                        spawn_req.code.to_short_string()
+                    ),
                     detail: Some(err.to_string()),
                 },
             )),
@@ -564,7 +647,11 @@ impl OrchestratorTask {
         match fn_client.start(spawn_req.clone()).await {
             Ok(res) => match res {
                 edgeless_api::common::StartComponentResponse::ResponseError(err) => {
-                    Err(anyhow::anyhow!("Could not start a function instance for lid {}: {}", lid, err))
+                    Err(anyhow::anyhow!(
+                        "Could not start a function instance for lid {}: {}",
+                        lid,
+                        err
+                    ))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                     assert!(*node_id == id.node_id);
@@ -579,14 +666,25 @@ impl OrchestratorTask {
                         ),
                     );
                     self.active_instances_changed = true;
-                    log::info!("Spawned at node_id {}, LID {}, pid {}", node_id, &lid, id.function_id);
+                    log::info!(
+                        "Spawned at node_id {}, LID {}, pid {}",
+                        node_id,
+                        &lid,
+                        id.function_id
+                    );
 
-                    Ok(edgeless_api::common::StartComponentResponse::InstanceId(*lid))
+                    Ok(edgeless_api::common::StartComponentResponse::InstanceId(
+                        *lid,
+                    ))
                 }
             },
             Err(err) => {
                 log::error!("Unhandled: {}", err);
-                Err(anyhow::anyhow!("Could not start a function instance for LID {}: {}", lid, err))
+                Err(anyhow::anyhow!(
+                    "Could not start a function instance for LID {}: {}",
+                    lid,
+                    err
+                ))
             }
         }
     }
@@ -608,7 +706,12 @@ impl OrchestratorTask {
     ) -> Result<edgeless_api::common::StartComponentResponse<uuid::Uuid>, anyhow::Error> {
         let class_type = resource_req.class_type.clone();
         match self.nodes.get_mut(node_id) {
-            Some(client) => match client.api.resource_configuration_api().start(resource_req.clone()).await {
+            Some(client) => match client
+                .api
+                .resource_configuration_api()
+                .start(resource_req.clone())
+                .await
+            {
                 Ok(start_response) => match start_response {
                     edgeless_api::common::StartComponentResponse::InstanceId(instance_id) => {
                         self.active_instances.insert(
@@ -629,20 +732,28 @@ impl OrchestratorTask {
                             &lid,
                             instance_id.function_id
                         );
-                        Ok(edgeless_api::common::StartComponentResponse::InstanceId(*lid))
+                        Ok(edgeless_api::common::StartComponentResponse::InstanceId(
+                            *lid,
+                        ))
                     }
-                    edgeless_api::common::StartComponentResponse::ResponseError(err) => {
-                        Ok(edgeless_api::common::StartComponentResponse::ResponseError(err))
-                    }
+                    edgeless_api::common::StartComponentResponse::ResponseError(err) => Ok(
+                        edgeless_api::common::StartComponentResponse::ResponseError(err),
+                    ),
                 },
                 Err(err) => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                     edgeless_api::common::ResponseError {
                         summary: "could not start resource".to_string(),
-                        detail: Some(format!("resource type {}, node_id {}, lid {}: {}", class_type, node_id, &lid, err)),
+                        detail: Some(format!(
+                            "resource type {}, node_id {}, lid {}: {}",
+                            class_type, node_id, &lid, err
+                        )),
                     },
                 )),
             },
-            None => Err(anyhow::anyhow!("Resource client missing for node_id {}", node_id)),
+            None => Err(anyhow::anyhow!(
+                "Resource client missing for node_id {}",
+                node_id
+            )),
         }
     }
 
@@ -651,12 +762,21 @@ impl OrchestratorTask {
     /// * `instance_id` - The function instance to be stopped.
     async fn stop_function(&mut self, instance_id: &edgeless_api::function_instance::InstanceId) {
         match self.nodes.get_mut(&instance_id.node_id) {
-            Some(client_desc) => match client_desc.api.function_instance_api().stop(*instance_id).await {
+            Some(client_desc) => match client_desc
+                .api
+                .function_instance_api()
+                .stop(*instance_id)
+                .await
+            {
                 Ok(_) => {
                     log::info!("Stopped function instance_id {}", instance_id)
                 }
                 Err(err) => {
-                    log::error!("Unhandled stop function instance_id {}: {}", instance_id, err)
+                    log::error!(
+                        "Unhandled stop function instance_id {}: {}",
+                        instance_id,
+                        err
+                    )
                 }
             },
             None => log::error!(
@@ -696,12 +816,21 @@ impl OrchestratorTask {
     /// * `instance_id` - The resource instance to be stopped.
     async fn stop_resource(&mut self, instance_id: &edgeless_api::function_instance::InstanceId) {
         match self.nodes.get_mut(&instance_id.node_id) {
-            Some(node_client) => match node_client.api.resource_configuration_api().stop(*instance_id).await {
+            Some(node_client) => match node_client
+                .api
+                .resource_configuration_api()
+                .stop(*instance_id)
+                .await
+            {
                 Ok(_) => {
                     log::info!("Stopped resource instance_id {}", instance_id)
                 }
                 Err(err) => {
-                    log::error!("Unhandled stop resource instance_id {}: {}", instance_id, err)
+                    log::error!(
+                        "Unhandled stop resource instance_id {}: {}",
+                        instance_id,
+                        err
+                    )
                 }
             },
             None => log::error!(
@@ -800,7 +929,10 @@ impl OrchestratorTask {
             if client
                 .api
                 .node_management_api()
-                .update_peers(edgeless_api::node_management::UpdatePeersRequest::Add(node_id, invocation_url.clone()))
+                .update_peers(edgeless_api::node_management::UpdatePeersRequest::Add(
+                    node_id,
+                    invocation_url.clone(),
+                ))
                 .await
                 .is_err()
             {
@@ -857,7 +989,9 @@ impl OrchestratorTask {
             if let Err(err) = client_desc
                 .api
                 .node_management_api()
-                .update_peers(edgeless_api::node_management::UpdatePeersRequest::Del(node_id))
+                .update_peers(edgeless_api::node_management::UpdatePeersRequest::Del(
+                    node_id,
+                ))
                 .await
             {
                 log::error!("Unhandled: {}", err);
@@ -884,13 +1018,14 @@ impl OrchestratorTask {
         let new_domain_capabilities = self.domain_capabilities();
         let _ = self
             .subscriber_sender
-            .send(super::domain_subscriber::DomainSubscriberRequest::Update(Box::new(
-                new_domain_capabilities,
-            )))
+            .send(super::domain_subscriber::DomainSubscriberRequest::Update(
+                Box::new(new_domain_capabilities),
+            ))
             .await;
 
         // Update the orchestration logic.
-        self.orchestration_logic.update_nodes(&self.nodes, &self.resource_providers);
+        self.orchestration_logic
+            .update_nodes(&self.nodes, &self.resource_providers);
 
         // Update the proxy.
         let mut proxy = self.proxy.lock().await;
@@ -936,7 +1071,10 @@ impl OrchestratorTask {
         for (origin_lid, instance) in self.active_instances.iter() {
             match instance {
                 crate::active_instance::ActiveInstance::Function(start_req, instances) => {
-                    let num_disconnected = instances.iter().filter(|x| !self.nodes.contains_key(&x.node_id)).count();
+                    let num_disconnected = instances
+                        .iter()
+                        .filter(|x| !self.nodes.contains_key(&x.node_id))
+                        .count();
                     assert!(num_disconnected <= instances.len());
                     if instances.is_empty() || num_disconnected > 0 {
                         to_be_repatched.push(*origin_lid);
@@ -984,7 +1122,9 @@ impl OrchestratorTask {
             match self.active_instances.get_mut(lid) {
                 None => panic!("lid {} just disappeared", lid),
                 Some(active_instance) => match active_instance {
-                    crate::active_instance::ActiveInstance::Resource(_, _) => panic!("expecting a function, found a resource for lid {}", lid),
+                    crate::active_instance::ActiveInstance::Resource(_, _) => {
+                        panic!("expecting a function, found a resource for lid {}", lid)
+                    }
                     crate::active_instance::ActiveInstance::Function(_, instances) => {
                         instances.retain(|x| self.nodes.contains_key(&x.node_id));
                         self.active_instances_changed = true;
@@ -1001,7 +1141,10 @@ impl OrchestratorTask {
             let res = match self.select_node(&spawn_req) {
                 Ok(node_id) => {
                     // Start the function instance.
-                    match self.start_function_in_node(&spawn_req, &lid, &node_id).await {
+                    match self
+                        .start_function_in_node(&spawn_req, &lid, &node_id)
+                        .await
+                    {
                         Ok(_) => Ok(()),
                         Err(err) => Err(err),
                     }
@@ -1009,14 +1152,21 @@ impl OrchestratorTask {
                 Err(err) => Err(err),
             };
             if let Err(err) = res {
-                log::error!("Error when creating a new function assigned with lid {}: {}", lid, err);
+                log::error!(
+                    "Error when creating a new function assigned with lid {}: {}",
+                    lid,
+                    err
+                );
                 match self.active_instances.get_mut(&lid).unwrap() {
                     crate::active_instance::ActiveInstance::Function(_spawn_req, instances) => {
                         instances.clear();
                         self.active_instances_changed = true;
                     }
                     crate::active_instance::ActiveInstance::Resource(_, _) => {
-                        panic!("Expecting a function to be associated with LID {}, found a resource", lid)
+                        panic!(
+                            "Expecting a function to be associated with LID {}, found a resource",
+                            lid
+                        )
                     }
                 }
             }
@@ -1028,10 +1178,17 @@ impl OrchestratorTask {
         // assigned an invalid function instance.
         for (lid, start_req) in res_to_be_created.into_iter() {
             if let Err(err) = self.start_resource(start_req, lid).await {
-                log::error!("Error when creating a new resource assigned with lid {}: {}", lid, err);
+                log::error!(
+                    "Error when creating a new resource assigned with lid {}: {}",
+                    lid,
+                    err
+                );
                 match self.active_instances.get_mut(&lid).unwrap() {
                     crate::active_instance::ActiveInstance::Function(_, _) => {
-                        panic!("expecting a resource to be associated with LID {}, found a function", lid)
+                        panic!(
+                            "expecting a resource to be associated with LID {}, found a function",
+                            lid
+                        )
                     }
                     crate::active_instance::ActiveInstance::Resource(_start_req, instance_id) => {
                         *instance_id = edgeless_api::function_instance::InstanceId::none();
@@ -1051,7 +1208,11 @@ impl OrchestratorTask {
                         Err(err) => log::warn!("Request to migrate '{}' declined: {}", lid, err),
                         Ok(target_node_id) => {
                             // Migration was successful.
-                            log::info!("Request to migrate '{}' accepted, now running in '{}'", lid, target_node_id);
+                            log::info!(
+                                "Request to migrate '{}' accepted, now running in '{}'",
+                                lid,
+                                target_node_id
+                            );
 
                             // Repatch the component migrated.
                             to_be_repatched.push(lid);
@@ -1084,7 +1245,8 @@ impl OrchestratorTask {
             }
         }
         if cordoned_uncordoned_nodes {
-            self.orchestration_logic.update_nodes(&self.nodes, &self.resource_providers);
+            self.orchestration_logic
+                .update_nodes(&self.nodes, &self.resource_providers);
         }
 
         // Repatch everything that needs to be repatched.

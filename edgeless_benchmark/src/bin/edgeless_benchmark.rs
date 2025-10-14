@@ -133,8 +133,16 @@ async fn main() -> anyhow::Result<()> {
     )?;
 
     // Check that the additional fields, if present, have a consistent header.
-    let mut additional_fields = args.additional_fields.split(',').filter(|x| !x.is_empty()).collect::<Vec<&str>>();
-    let mut additional_header = args.additional_header.split(',').filter(|x| !x.is_empty()).collect::<Vec<&str>>();
+    let mut additional_fields = args
+        .additional_fields
+        .split(',')
+        .filter(|x| !x.is_empty())
+        .collect::<Vec<&str>>();
+    let mut additional_header = args
+        .additional_header
+        .split(',')
+        .filter(|x| !x.is_empty())
+        .collect::<Vec<&str>>();
     if additional_fields.len() != additional_header.len() {
         return Err(anyhow::anyhow!(
             "mismatching number of additional fields ({}) vs header ({})",
@@ -147,8 +155,12 @@ async fn main() -> anyhow::Result<()> {
     additional_header.push("seed");
 
     // Create the CSV dumper.
-    let csv_dumper =
-        edgeless_benchmark::csv_dumper::CsvDumper::new(additional_fields.join(","), additional_header.join(","), &args.output, args.append)?;
+    let csv_dumper = edgeless_benchmark::csv_dumper::CsvDumper::new(
+        additional_fields.join(","),
+        additional_header.join(","),
+        &args.output,
+        args.append,
+    )?;
 
     // Create the engine for the creation/termination of workflows.
     let mut engine = Engine::new(&args.controller_url, wf_type, args.seed + 1000, csv_dumper).await;
@@ -162,7 +174,9 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // add the end-of-experiment event
-    events.push(Event::WfExperimentEnd(utils::to_microseconds(args.duration)));
+    events.push(Event::WfExperimentEnd(utils::to_microseconds(
+        args.duration,
+    )));
 
     // main experiment loop
     let mut wf_started = 0;

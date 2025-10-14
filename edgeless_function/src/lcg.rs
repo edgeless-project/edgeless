@@ -14,7 +14,9 @@ pub struct Lcg {
 
 impl Lcg {
     pub fn new(seed: u32) -> Self {
-        Self { seed: Wrapping(seed) }
+        Self {
+            seed: Wrapping(seed),
+        }
     }
 
     pub fn rand(&mut self) -> f32 {

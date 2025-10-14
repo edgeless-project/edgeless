@@ -18,12 +18,19 @@ fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
     if !args.template.is_empty() {
-        edgeless_api::util::create_template(&args.template, edgeless_bal::edgeless_bal_default_conf().as_str())?;
+        edgeless_api::util::create_template(
+            &args.template,
+            edgeless_bal::edgeless_bal_default_conf().as_str(),
+        )?;
         return Ok(());
     }
-    let conf: edgeless_bal::EdgelessBalSettings = toml::from_str(&std::fs::read_to_string(args.config_file)?)?;
+    let conf: edgeless_bal::EdgelessBalSettings =
+        toml::from_str(&std::fs::read_to_string(args.config_file)?)?;
 
-    let async_runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(8).enable_all().build()?;
+    let async_runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(8)
+        .enable_all()
+        .build()?;
     let async_tasks = vec![async_runtime.spawn(edgeless_bal::edgeless_bal_main(conf.clone()))];
 
     async_runtime.block_on(async { futures::future::join_all(async_tasks).await });

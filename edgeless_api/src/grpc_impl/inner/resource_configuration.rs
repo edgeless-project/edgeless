@@ -7,7 +7,11 @@ use crate::grpc_impl::common::{CommonConverters, ParseableId, SerializeableId};
 
 #[derive(Clone)]
 pub struct ResourceConfigurationClient<ResourceIdType> {
-    client: Option<crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient<tonic::transport::Channel>>,
+    client: Option<
+        crate::grpc_impl::api::resource_configuration_client::ResourceConfigurationClient<
+            tonic::transport::Channel,
+        >,
+    >,
     server_addr: String,
     _phantom: std::marker::PhantomData<ResourceIdType>,
 }
@@ -46,7 +50,8 @@ impl<ResourceIdType> ResourceConfigurationClient<ResourceIdType> {
 }
 
 #[async_trait::async_trait]
-impl<ResourceIdType: SerializeableId + Clone + Send + Sync + 'static> crate::resource_configuration::ResourceConfigurationAPI<ResourceIdType>
+impl<ResourceIdType: SerializeableId + Clone + Send + Sync + 'static>
+    crate::resource_configuration::ResourceConfigurationAPI<ResourceIdType>
     for ResourceConfigurationClient<ResourceIdType>
 where
     grpc_stubs::InstanceIdVariant: ParseableId<ResourceIdType>,
@@ -59,10 +64,14 @@ where
             Ok(_) => {
                 if let Some(client) = &mut self.client {
                     match client
-                        .start(tonic::Request::new(serialize_resource_instance_specification(&instance_specification)))
+                        .start(tonic::Request::new(
+                            serialize_resource_instance_specification(&instance_specification),
+                        ))
                         .await
                     {
-                        Ok(res) => CommonConverters::parse_start_component_response(&res.into_inner()),
+                        Ok(res) => {
+                            CommonConverters::parse_start_component_response(&res.into_inner())
+                        }
                         Err(err) => {
                             self.disconnect();
                             Err(anyhow::anyhow!(
@@ -111,7 +120,10 @@ where
         match self.try_connect().await {
             Ok(_) => {
                 if let Some(client) = &mut self.client {
-                    match client.patch(CommonConverters::serialize_patch_request(&update)).await {
+                    match client
+                        .patch(CommonConverters::serialize_patch_request(&update))
+                        .await
+                    {
                         Ok(_) => Ok(()),
                         Err(err) => {
                             self.disconnect();
@@ -134,11 +146,14 @@ where
 }
 
 pub struct ResourceConfigurationServerHandler<ResourceIdType> {
-    pub root_api: tokio::sync::Mutex<Box<dyn crate::resource_configuration::ResourceConfigurationAPI<ResourceIdType>>>,
+    pub root_api: tokio::sync::Mutex<
+        Box<dyn crate::resource_configuration::ResourceConfigurationAPI<ResourceIdType>>,
+    >,
 }
 
 #[async_trait::async_trait]
-impl<ResourceIdType: Clone + Send + 'static> crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
+impl<ResourceIdType: Clone + Send + 'static>
+    crate::grpc_impl::api::resource_configuration_server::ResourceConfiguration
     for ResourceConfigurationServerHandler<ResourceIdType>
 where
     crate::grpc_impl::api::InstanceIdVariant: crate::grpc_impl::common::ParseableId<ResourceIdType>,
@@ -149,57 +164,83 @@ where
         request: tonic::Request<crate::grpc_impl::api::ResourceInstanceSpecification>,
     ) -> tonic::Result<tonic::Response<crate::grpc_impl::api::StartComponentResponse>> {
         let inner = request.into_inner();
-        let parsed_spec = match super::resource_configuration::parse_resource_instance_specification(&inner) {
-            Ok(val) => val,
-            Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
-                    response_error: Some(crate::grpc_impl::api::ResponseError {
-                        summary: "Invalid resource specification".to_string(),
-                        detail: Some(err.to_string()),
-                    }),
-                    instance_id: None,
-                }))
-            }
-        };
+        let parsed_spec =
+            match super::resource_configuration::parse_resource_instance_specification(&inner) {
+                Ok(val) => val,
+                Err(err) => {
+                    return Ok(tonic::Response::new(
+                        crate::grpc_impl::api::StartComponentResponse {
+                            response_error: Some(crate::grpc_impl::api::ResponseError {
+                                summary: "Invalid resource specification".to_string(),
+                                detail: Some(err.to_string()),
+                            }),
+                            instance_id: None,
+                        },
+                    ))
+                }
+            };
         match self.root_api.lock().await.start(parsed_spec).await {
-            Ok(response) => Ok(tonic::Response::new(CommonConverters::serialize_start_component_response(&response))),
+            Ok(response) => Ok(tonic::Response::new(
+                CommonConverters::serialize_start_component_response(&response),
+            )),
             Err(err) => {
-                return Ok(tonic::Response::new(crate::grpc_impl::api::StartComponentResponse {
-                    response_error: Some(crate::grpc_impl::api::ResponseError {
-                        summary: "Resource creation rejected".to_string(),
-                        detail: Some(err.to_string()),
-                    }),
-                    instance_id: None,
-                }))
+                return Ok(tonic::Response::new(
+                    crate::grpc_impl::api::StartComponentResponse {
+                        response_error: Some(crate::grpc_impl::api::ResponseError {
+                            summary: "Resource creation rejected".to_string(),
+                            detail: Some(err.to_string()),
+                        }),
+                        instance_id: None,
+                    },
+                ))
             }
         }
     }
 
-    async fn stop(&self, request: tonic::Request<crate::grpc_impl::api::InstanceIdVariant>) -> tonic::Result<tonic::Response<()>> {
+    async fn stop(
+        &self,
+        request: tonic::Request<crate::grpc_impl::api::InstanceIdVariant>,
+    ) -> tonic::Result<tonic::Response<()>> {
         let inner: grpc_stubs::InstanceIdVariant = request.into_inner();
-        let parsed_id = match crate::grpc_impl::common::ParseableId::<ResourceIdType>::parse(&inner) {
+        let parsed_id = match crate::grpc_impl::common::ParseableId::<ResourceIdType>::parse(&inner)
+        {
             Ok(val) => val,
             Err(err) => {
-                return Err(tonic::Status::invalid_argument(format!("Error when deleting a resource: {}", err)));
+                return Err(tonic::Status::invalid_argument(format!(
+                    "Error when deleting a resource: {}",
+                    err
+                )));
             }
         };
         match self.root_api.lock().await.stop(parsed_id).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when deleting a resource: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!(
+                "Error when deleting a resource: {}",
+                err
+            ))),
         }
     }
 
-    async fn patch(&self, update: tonic::Request<crate::grpc_impl::api::PatchRequest>) -> tonic::Result<tonic::Response<()>> {
+    async fn patch(
+        &self,
+        update: tonic::Request<crate::grpc_impl::api::PatchRequest>,
+    ) -> tonic::Result<tonic::Response<()>> {
         let inner = update.into_inner();
         let parsed_request = match CommonConverters::parse_patch_request(&inner) {
             Ok(val) => val,
             Err(err) => {
-                return Err(tonic::Status::invalid_argument(format!("Error when patching a resource: {}", err)));
+                return Err(tonic::Status::invalid_argument(format!(
+                    "Error when patching a resource: {}",
+                    err
+                )));
             }
         };
         match self.root_api.lock().await.patch(parsed_request).await {
             Ok(_) => Ok(tonic::Response::new(())),
-            Err(err) => Err(tonic::Status::internal(format!("Error when patching a resource: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!(
+                "Error when patching a resource: {}",
+                err
+            ))),
         }
     }
 }
@@ -207,11 +248,13 @@ where
 fn parse_resource_instance_specification(
     api_spec: &crate::grpc_impl::api::ResourceInstanceSpecification,
 ) -> anyhow::Result<crate::resource_configuration::ResourceInstanceSpecification> {
-    Ok(crate::resource_configuration::ResourceInstanceSpecification {
-        class_type: api_spec.resource_class_type.clone(),
-        configuration: api_spec.configuration.clone(),
-        workflow_id: api_spec.workflow_id.clone(),
-    })
+    Ok(
+        crate::resource_configuration::ResourceInstanceSpecification {
+            class_type: api_spec.resource_class_type.clone(),
+            configuration: api_spec.configuration.clone(),
+            workflow_id: api_spec.workflow_id.clone(),
+        },
+    )
 }
 
 fn serialize_resource_instance_specification(

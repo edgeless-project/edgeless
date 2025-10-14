@@ -53,9 +53,14 @@ impl NodeSubscriber {
         (Self { sender }, main_task, refresh_task)
     }
 
-    async fn refresh_task(sender: futures::channel::mpsc::UnboundedSender<NodeSubscriberRequest>, subscription_refresh_interval_sec: u64) {
+    async fn refresh_task(
+        sender: futures::channel::mpsc::UnboundedSender<NodeSubscriberRequest>,
+        subscription_refresh_interval_sec: u64,
+    ) {
         let mut sender = sender;
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(subscription_refresh_interval_sec));
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(
+            subscription_refresh_interval_sec,
+        ));
         loop {
             interval.tick().await;
             let _ = sender.send(NodeSubscriberRequest::Refresh()).await;
@@ -73,7 +78,10 @@ impl NodeSubscriber {
     ) {
         let node_register_url = settings.node_register_url;
         let node_id = settings.node_id;
-        let agent_url = match edgeless_api::util::get_announced(&settings.agent_url, &settings.agent_url_announced) {
+        let agent_url = match edgeless_api::util::get_announced(
+            &settings.agent_url,
+            &settings.agent_url_announced,
+        ) {
             Ok(url) => url,
             Err(err) => {
                 log::error!(
@@ -85,7 +93,10 @@ impl NodeSubscriber {
                 String::default()
             }
         };
-        let invocation_url = match edgeless_api::util::get_announced(&settings.invocation_url, &settings.invocation_url_announced) {
+        let invocation_url = match edgeless_api::util::get_announced(
+            &settings.invocation_url,
+            &settings.invocation_url_announced,
+        ) {
             Ok(url) => url,
             Err(err) => {
                 log::error!(
@@ -100,7 +111,10 @@ impl NodeSubscriber {
         let subscription_refresh_interval_sec = settings.subscription_refresh_interval_sec;
 
         let mut receiver = receiver;
-        let mut client = edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIClient::new(node_register_url).await;
+        let mut client = edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIClient::new(
+            node_register_url,
+        )
+        .await;
         let mut telemetry_performance_target = telemetry_performance_target;
 
         // Internal data structures to query system/process information.
@@ -138,14 +152,23 @@ impl NodeSubscriber {
                         agent_url: agent_url.clone(),
                         resource_providers: resource_providers.clone(),
                         capabilities: capabilities.clone(),
-                        refresh_deadline: std::time::SystemTime::now() + std::time::Duration::from_secs(subscription_refresh_interval_sec * 2),
+                        refresh_deadline: std::time::SystemTime::now()
+                            + std::time::Duration::from_secs(subscription_refresh_interval_sec * 2),
                         nonce,
-                        health_status: Self::get_health_status(&mut sys, &mut networks, &mut disks, own_pid, &mut power_info).await,
-                        performance_samples: edgeless_api::node_registration::NodePerformanceSamples {
-                            function_execution_times: metrics.function_execution_times,
-                            function_transfer_times: metrics.function_transfer_times,
-                            function_log_entries: metrics.function_log_entries,
-                        },
+                        health_status: Self::get_health_status(
+                            &mut sys,
+                            &mut networks,
+                            &mut disks,
+                            own_pid,
+                            &mut power_info,
+                        )
+                        .await,
+                        performance_samples:
+                            edgeless_api::node_registration::NodePerformanceSamples {
+                                function_execution_times: metrics.function_execution_times,
+                                function_transfer_times: metrics.function_transfer_times,
+                                function_log_entries: metrics.function_log_entries,
+                            },
                     };
                     match client.node_registration_api().update_node(update_node_request).await {
                         Ok(response) => {
@@ -232,7 +255,9 @@ impl NodeSubscriber {
         }
     }
 
-    pub fn get_subscriber_sender(&mut self) -> futures::channel::mpsc::UnboundedSender<NodeSubscriberRequest> {
+    pub fn get_subscriber_sender(
+        &mut self,
+    ) -> futures::channel::mpsc::UnboundedSender<NodeSubscriberRequest> {
         self.sender.clone()
     }
 }

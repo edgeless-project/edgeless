@@ -105,7 +105,10 @@ mod test {
 
         let announced = get_announced(url, "");
         assert!(announced.is_ok());
-        assert_eq!(format!("http://{}:1234", get_my_ip().unwrap()), announced.unwrap());
+        assert_eq!(
+            format!("http://{}:1234", get_my_ip().unwrap()),
+            announced.unwrap()
+        );
 
         let announced = get_announced(url, "http://1.2.3.4:1234");
         assert!(announced.is_ok());

@@ -1,0 +1,29 @@
+# SPDX-License-Identifier: MIT
+[workspace]
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+lto = true
+opt-level = "z"
+panic = "abort"
+codegen-units = 1
+strip = true
+
+[package]
+name = "http_stress_endpoint"
+version = "0.1.0"
+authors = ["Alvaro Curto Merino <alvaro.curtomerino@telefonica.com>"]
+edition = "2024"
+rust-version = "1.85"
+
+[lib]
+name = "http_stress_endpoint"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+edgeless_function = { path = "../../edgeless_function" }
+edgeless_http = { path = "../../edgeless_http" }
+log = "0.4"

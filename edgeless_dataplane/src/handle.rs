@@ -21,7 +21,9 @@ fn timestamp_utc() -> edgeless_api::function_instance::EventTimestamp {
 #[derive(Clone)]
 pub struct DataplaneHandle {
     slf: edgeless_api::function_instance::InstanceId,
-    receiver: std::sync::Arc<tokio::sync::Mutex<futures::channel::mpsc::UnboundedReceiver<DataplaneEvent>>>,
+    receiver: std::sync::Arc<
+        tokio::sync::Mutex<futures::channel::mpsc::UnboundedReceiver<DataplaneEvent>>,
+    >,
     output_chain: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn DataPlaneLink>>>>,
     receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
     next_id: u64,
@@ -34,9 +36,10 @@ impl DataplaneHandle {
         receiver: futures::channel::mpsc::UnboundedReceiver<DataplaneEvent>,
     ) -> Self {
         let (main_sender, main_receiver) = futures::channel::mpsc::unbounded::<DataplaneEvent>();
-        let receiver_overwrites = std::sync::Arc::new(tokio::sync::Mutex::new(TemporaryReceivers {
-            temporary_receivers: std::collections::HashMap::new(),
-        }));
+        let receiver_overwrites =
+            std::sync::Arc::new(tokio::sync::Mutex::new(TemporaryReceivers {
+                temporary_receivers: std::collections::HashMap::new(),
+            }));
 
         let clone_overwrites = receiver_overwrites.clone();
         // This task intercepts the messages received and routes responses towards temporary receivers while routing other events towards the main receiver used in `receive_next`.
@@ -52,7 +55,12 @@ impl DataplaneHandle {
                     metadata,
                 }) = receiver.next().await
                 {
-                    if let Some(sender) = clone_overwrites.lock().await.temporary_receivers.remove(&channel_id) {
+                    if let Some(sender) = clone_overwrites
+                        .lock()
+                        .await
+                        .temporary_receivers
+                        .remove(&channel_id)
+                    {
                         match sender.send((source_id, message.clone())) {
                             Ok(_) => {
                                 continue;
@@ -102,8 +110,10 @@ impl DataplaneHandle {
                 metadata,
             }) = self.receiver.lock().await.next().await
             {
-                if std::mem::discriminant(&message) == std::mem::discriminant(&Message::Cast("".to_string()))
-                    || std::mem::discriminant(&message) == std::mem::discriminant(&Message::Call("".to_string()))
+                if std::mem::discriminant(&message)
+                    == std::mem::discriminant(&Message::Cast("".to_string()))
+                    || std::mem::discriminant(&message)
+                        == std::mem::discriminant(&Message::Call("".to_string()))
                 {
                     return DataplaneEvent {
                         source_id,
@@ -125,7 +135,8 @@ impl DataplaneHandle {
         msg: String,
         metadata: &edgeless_api::function_instance::EventMetadata,
     ) {
-        self.send_inner(target, Message::Cast(msg), timestamp_utc(), 0, metadata).await;
+        self.send_inner(target, Message::Cast(msg), timestamp_utc(), 0, metadata)
+            .await;
     }
 
     // Send a `call` event and wait for the return event.
@@ -136,12 +147,26 @@ impl DataplaneHandle {
         msg: String,
         metadata: &edgeless_api::function_instance::EventMetadata,
     ) -> CallRet {
-        let (sender, receiver) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
+        let (sender, receiver) = futures::channel::oneshot::channel::<(
+            edgeless_api::function_instance::InstanceId,
+            Message,
+        )>();
         let channel_id = self.next_id;
         self.next_id += 1;
         // Potential Leak: This is only received if a message is received (or the handle is dropped)
-        self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
-        self.send_inner(target, Message::Call(msg), timestamp_utc(), channel_id, metadata).await;
+        self.receiver_overwrites
+            .lock()
+            .await
+            .temporary_receivers
+            .insert(channel_id, sender);
+        self.send_inner(
+            target,
+            Message::Call(msg),
+            timestamp_utc(),
+            channel_id,
+            metadata,
+        )
+        .await;
         match receiver.await {
             Ok((_src, msg)) => match msg {
                 Message::CallRet(ret) => CallRet::Reply(ret),
@@ -184,7 +209,18 @@ impl DataplaneHandle {
     ) {
         let mut lck = self.output_chain.lock().await;
         for link in &mut lck.iter_mut() {
-            if link.handle_send(&target, msg.clone(), &self.slf, &created, channel_id, &metadata).await == LinkProcessingResult::FINAL {
+            if link
+                .handle_send(
+                    &target,
+                    msg.clone(),
+                    &self.slf,
+                    &created,
+                    channel_id,
+                    &metadata,
+                )
+                .await
+                == LinkProcessingResult::FINAL
+            {
                 return;
             }
         }
@@ -193,7 +229,10 @@ impl DataplaneHandle {
 }
 
 struct TemporaryReceivers {
-    temporary_receivers: std::collections::HashMap<u64, futures::channel::oneshot::Sender<(edgeless_api::function_instance::InstanceId, Message)>>,
+    temporary_receivers: std::collections::HashMap<
+        u64,
+        futures::channel::oneshot::Sender<(edgeless_api::function_instance::InstanceId, Message)>,
+    >,
 }
 
 #[derive(Clone)]
@@ -203,38 +242,62 @@ pub struct DataplaneProvider {
 }
 
 impl DataplaneProvider {
-    pub async fn new(node_id: uuid::Uuid, invocation_url: String, invocation_url_coap: Option<String>) -> Self {
-        let remote_provider = std::sync::Arc::new(tokio::sync::Mutex::new(RemoteLinkProvider::new(node_id).await));
+    pub async fn new(
+        node_id: uuid::Uuid,
+        invocation_url: String,
+        invocation_url_coap: Option<String>,
+    ) -> Self {
+        let remote_provider = std::sync::Arc::new(tokio::sync::Mutex::new(
+            RemoteLinkProvider::new(node_id).await,
+        ));
 
         let (_, _, port) = edgeless_api::util::parse_http_host(&invocation_url.clone()).unwrap();
 
         let clone_provider = remote_provider.clone();
-        let _server = tokio::spawn(edgeless_api::grpc_impl::outer::invocation::InvocationAPIServer::run(
-            clone_provider.lock().await.incomming_api().await,
-            invocation_url,
-        ));
+        let _server = tokio::spawn(
+            edgeless_api::grpc_impl::outer::invocation::InvocationAPIServer::run(
+                clone_provider.lock().await.incomming_api().await,
+                invocation_url,
+            ),
+        );
 
         if let Some(invocation_url_coap) = invocation_url_coap {
-            let (_, coap_ip, coap_port) = edgeless_api::util::parse_http_host(&invocation_url_coap.clone()).unwrap();
+            let (_, coap_ip, coap_port) =
+                edgeless_api::util::parse_http_host(&invocation_url_coap.clone()).unwrap();
             log::info!("Start COAP Invocation Server {}:{}", coap_ip, port);
 
-            let _coap_server = tokio::spawn(edgeless_api::coap_impl::invocation::CoapInvocationServer::run(
-                clone_provider.lock().await.incomming_api().await,
-                std::net::SocketAddrV4::new(coap_ip.parse().unwrap(), coap_port),
-            ));
+            let _coap_server = tokio::spawn(
+                edgeless_api::coap_impl::invocation::CoapInvocationServer::run(
+                    clone_provider.lock().await.incomming_api().await,
+                    std::net::SocketAddrV4::new(coap_ip.parse().unwrap(), coap_port),
+                ),
+            );
         }
 
         Self {
-            local_provider: std::sync::Arc::new(tokio::sync::Mutex::new(NodeLocalLinkProvider::new())),
+            local_provider: std::sync::Arc::new(tokio::sync::Mutex::new(
+                NodeLocalLinkProvider::new(),
+            )),
             remote_provider,
         }
     }
 
-    pub async fn get_handle_for(&mut self, target: edgeless_api::function_instance::InstanceId) -> DataplaneHandle {
+    pub async fn get_handle_for(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+    ) -> DataplaneHandle {
         let (sender, receiver) = futures::channel::mpsc::unbounded::<DataplaneEvent>();
         let output_chain = vec![
-            self.local_provider.lock().await.new_link(target, sender.clone()).await,
-            self.remote_provider.lock().await.new_link(target, sender.clone()).await,
+            self.local_provider
+                .lock()
+                .await
+                .new_link(target, sender.clone())
+                .await,
+            self.remote_provider
+                .lock()
+                .await
+                .new_link(target, sender.clone())
+                .await,
         ];
         DataplaneHandle::new(target, output_chain, receiver).await
     }
@@ -253,13 +316,25 @@ impl DataplaneProvider {
         self.remote_provider.lock().await.del_peer(node_id).await;
     }
 
-    async fn connect_peer(target: &EdgelessDataplanePeerSettings) -> Box<dyn edgeless_api::invocation::InvocationAPI> {
-        let (proto, url, port) = edgeless_api::util::parse_http_host(&target.invocation_url).unwrap();
+    async fn connect_peer(
+        target: &EdgelessDataplanePeerSettings,
+    ) -> Box<dyn edgeless_api::invocation::InvocationAPI> {
+        let (proto, url, port) =
+            edgeless_api::util::parse_http_host(&target.invocation_url).unwrap();
         match proto {
-            edgeless_api::util::Proto::COAP => {
-                Box::new(edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(url.parse().unwrap(), port)).await)
-            }
-            _ => Box::new(edgeless_api::grpc_impl::outer::invocation::InvocationAPIClient::new(&target.invocation_url).await),
+            edgeless_api::util::Proto::COAP => Box::new(
+                edgeless_api::coap_impl::CoapClient::new(std::net::SocketAddrV4::new(
+                    url.parse().unwrap(),
+                    port,
+                ))
+                .await,
+            ),
+            _ => Box::new(
+                edgeless_api::grpc_impl::outer::invocation::InvocationAPIClient::new(
+                    &target.invocation_url,
+                )
+                .await,
+            ),
         }
     }
 }
@@ -273,9 +348,13 @@ mod test {
         let node_id = uuid::Uuid::new_v4();
         let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id);
         let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id);
-        let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00020u128, 0x42a42bdecaf00021u64);
+        let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(
+            0x42a42bdecaf00020u128,
+            0x42a42bdecaf00021u64,
+        );
 
-        let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7096".to_string(), None).await;
+        let mut provider =
+            DataplaneProvider::new(node_id, "http://127.0.0.1:7096".to_string(), None).await;
 
         let mut handle_1 = provider.get_handle_for(fid_1).await;
         let mut handle_2 = provider.get_handle_for(fid_2).await;
@@ -299,9 +378,13 @@ mod test {
         let node_id = uuid::Uuid::new_v4();
         let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id);
         let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id);
-        let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf0001du128, 0x42a42bdecaf0001eu64);
+        let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(
+            0x42a42bdecaf0001du128,
+            0x42a42bdecaf0001eu64,
+        );
 
-        let mut provider = DataplaneProvider::new(node_id, "http://127.0.0.1:7097".to_string(), None).await;
+        let mut provider =
+            DataplaneProvider::new(node_id, "http://127.0.0.1:7097".to_string(), None).await;
 
         let mut handle_1 = provider.get_handle_for(fid_1).await;
         let mut handle_2 = provider.get_handle_for(fid_2).await;
@@ -321,10 +404,20 @@ mod test {
             "Handle 2 must receive the same metadata given by its parent through handle 1"
         );
 
-        handle_2.reply(req.source_id, req.channel_id, CallRet::NoReply, &req.metadata).await;
+        handle_2
+            .reply(
+                req.source_id,
+                req.channel_id,
+                CallRet::NoReply,
+                &req.metadata,
+            )
+            .await;
 
         let repl = return_handle.await.unwrap();
-        assert_eq!(std::mem::discriminant(&CallRet::NoReply), std::mem::discriminant(&repl));
+        assert_eq!(
+            std::mem::discriminant(&CallRet::NoReply),
+            std::mem::discriminant(&repl)
+        );
     }
 
     #[tokio::test]
@@ -333,11 +426,18 @@ mod test {
         let node_id_2 = uuid::Uuid::new_v4();
         let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id);
         let fid_2 = edgeless_api::function_instance::InstanceId::new(node_id_2);
-        let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf0001bu128, 0x42a42bdecaf0001cu64);
-        let metad_2 = edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00019u128, 0x42a42bdecaf0001au64);
+        let metad_1 = edgeless_api::function_instance::EventMetadata::from_uints(
+            0x42a42bdecaf0001bu128,
+            0x42a42bdecaf0001cu64,
+        );
+        let metad_2 = edgeless_api::function_instance::EventMetadata::from_uints(
+            0x42a42bdecaf00019u128,
+            0x42a42bdecaf0001au64,
+        );
 
         let provider1_f = tokio::spawn(async move {
-            let mut dataplane = DataplaneProvider::new(node_id, "http://127.0.0.1:7099".to_string(), None).await;
+            let mut dataplane =
+                DataplaneProvider::new(node_id, "http://127.0.0.1:7099".to_string(), None).await;
             dataplane
                 .add_peer(EdgelessDataplanePeerSettings {
                     node_id: node_id_2,
@@ -348,7 +448,8 @@ mod test {
         });
 
         let provider2_f = tokio::spawn(async move {
-            let mut dataplane = DataplaneProvider::new(node_id_2, "http://127.0.0.1:7098".to_string(), None).await;
+            let mut dataplane =
+                DataplaneProvider::new(node_id_2, "http://127.0.0.1:7098".to_string(), None).await;
             dataplane
                 .add_peer(EdgelessDataplanePeerSettings {
                     node_id,
@@ -383,7 +484,11 @@ mod test {
 
         let return_handle = {
             let cloned_metad_2 = metad_2.clone();
-            tokio::spawn(async move { cloned_handle_2.call(cloned_id_1, "Test".to_string(), &cloned_metad_2).await })
+            tokio::spawn(async move {
+                cloned_handle_2
+                    .call(cloned_id_1, "Test".to_string(), &cloned_metad_2)
+                    .await
+            })
         };
 
         let call_req = handle_1.receive_next().await;
@@ -393,10 +498,18 @@ mod test {
         );
         assert_eq!(&call_req.metadata, &metad_2);
         handle_1
-            .reply(call_req.source_id, call_req.channel_id, CallRet::NoReply, &call_req.metadata)
+            .reply(
+                call_req.source_id,
+                call_req.channel_id,
+                CallRet::NoReply,
+                &call_req.metadata,
+            )
             .await;
 
         let repl = return_handle.await.unwrap();
-        assert_eq!(std::mem::discriminant(&CallRet::NoReply), std::mem::discriminant(&repl));
+        assert_eq!(
+            std::mem::discriminant(&CallRet::NoReply),
+            std::mem::discriminant(&repl)
+        );
     }
 }

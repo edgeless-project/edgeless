@@ -81,8 +81,14 @@ fn test_sysinfo() {
             tot_tx_pkts += network.total_transmitted();
             tot_tx_errs += network.total_errors_on_transmitted();
         }
-        println!("ALL:\tRX {} bytes {} pkts {} errs", tot_rx_bytes, tot_rx_pkts, tot_rx_errs);
-        println!("ALL:\tTX {} bytes {} pkts {} errs", tot_tx_bytes, tot_tx_pkts, tot_tx_errs);
+        println!(
+            "ALL:\tRX {} bytes {} pkts {} errs",
+            tot_rx_bytes, tot_rx_pkts, tot_rx_errs
+        );
+        println!(
+            "ALL:\tTX {} bytes {} pkts {} errs",
+            tot_tx_bytes, tot_tx_pkts, tot_tx_errs
+        );
 
         disks.refresh_list();
         disks.refresh();
@@ -101,9 +107,18 @@ fn test_sysinfo() {
             .iter()
             .map(|x| (x.name().to_str().unwrap_or_default(), x.total_space()))
             .collect::<std::collections::BTreeMap<&str, u64>>();
-        println!("available  disk space {} B", disks.iter().map(|x| x.available_space()).sum::<u64>());
-        println!("total      disk space {} B", disks.iter().map(|x| x.total_space()).sum::<u64>());
-        println!("total uniq disk space {} B", unique_total_space.values().sum::<u64>());
+        println!(
+            "available  disk space {} B",
+            disks.iter().map(|x| x.available_space()).sum::<u64>()
+        );
+        println!(
+            "total      disk space {} B",
+            disks.iter().map(|x| x.total_space()).sum::<u64>()
+        );
+        println!(
+            "total uniq disk space {} B",
+            unique_total_space.values().sum::<u64>()
+        );
 
         let mut tot_disk_reads = 0;
         let mut tot_disk_writes = 0;
@@ -115,6 +130,9 @@ fn test_sysinfo() {
         println!("total reads from disk {} B", tot_disk_reads);
         println!("total writes to disk {} B", tot_disk_writes);
 
-        std::thread::sleep(std::cmp::max(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL, std::time::Duration::from_secs(2)));
+        std::thread::sleep(std::cmp::max(
+            sysinfo::MINIMUM_CPU_UPDATE_INTERVAL,
+            std::time::Duration::from_secs(2),
+        ));
     }
 }

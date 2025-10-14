@@ -98,27 +98,39 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
+    ) -> anyhow::Result<
+        edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>,
+    > {
         // read the sidecar url from the instance specification configuration
-        if let (Some(dda_url), Some(dda_com_subscription_mapping), Some(dda_com_publication_mapping)) = (
+        if let (
+            Some(dda_url),
+            Some(dda_com_subscription_mapping),
+            Some(dda_com_publication_mapping),
+        ) = (
             instance_specification.configuration.get("dda_url"),
-            instance_specification.configuration.get("dda_com_subscription_mapping"),
-            instance_specification.configuration.get("dda_com_publication_mapping"),
+            instance_specification
+                .configuration
+                .get("dda_com_subscription_mapping"),
+            instance_specification
+                .configuration
+                .get("dda_com_publication_mapping"),
         ) {
             let mut lck = self.inner.lock().await;
             // creates a new id for the new DDA Instance with the node_id of the
             // resource provider as its component
-            let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
+            let new_id =
+                edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
 
             // create the resource
             let dda_res = match DDAResource::new(
                 self.clone(),
                 dataplane_handle,
-                lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
-                    "FUNCTION_ID".to_string(),
-                    new_id.function_id.to_string(),
-                )])),
+                lck.telemetry_handle
+                    .fork(std::collections::BTreeMap::from([(
+                        "FUNCTION_ID".to_string(),
+                        new_id.function_id.to_string(),
+                    )])),
                 dda_url.clone(),
                 dda_com_subscription_mapping.clone(),
                 dda_com_publication_mapping.clone(),
@@ -127,11 +139,18 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
             .await
             {
                 Ok(res) => res,
-                Err(e) => return Err(anyhow::anyhow!("Wrong configuration of DDA resource in workflow.json: {}", e)),
+                Err(e) => {
+                    return Err(anyhow::anyhow!(
+                        "Wrong configuration of DDA resource in workflow.json: {}",
+                        e
+                    ))
+                }
             };
             // save a reference to the dda instance for future reference
             lck.instances.insert(new_id.function_id, dda_res);
-            Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id))
+            Ok(edgeless_api::common::StartComponentResponse::InstanceId(
+                new_id,
+            ))
         } else {
             Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                 edgeless_api::common::ResponseError {
@@ -142,14 +161,20 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
         }
     }
 
-    async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+    async fn stop(
+        &mut self,
+        resource_id: edgeless_api::function_instance::InstanceId,
+    ) -> anyhow::Result<()> {
         let mut lck = self.inner.lock().await;
         match lck.instances.get_mut(&resource_id.function_id) {
             Some(instance) => {
                 instance.sub_tasks.iter().for_each(|i| i.abort());
             }
             None => {
-                return Err(anyhow::anyhow!("Stopping a non-existing resource instance: {}", resource_id.function_id));
+                return Err(anyhow::anyhow!(
+                    "Stopping a non-existing resource instance: {}",
+                    resource_id.function_id
+                ));
             }
         };
         // don't forget the mappings
@@ -162,7 +187,8 @@ impl ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for D
         let mut lck = self.inner.lock().await;
         // update the mappings
         log::info!("Patching request to dda provider {:?}", update);
-        lck.mappings.insert(update.function_id, update.output_mapping);
+        lck.mappings
+            .insert(update.function_id, update.output_mapping);
         Ok(())
     }
 }
@@ -226,14 +252,22 @@ impl DDAResource {
     ) -> anyhow::Result<Self> {
         let mut telemetry_handle = telemetry_handle;
         // Parse the configuration of action / event / query bindings to functions
-        let dcs: Result<Vec<DDAComSubscription>, Error> = serde_json::from_str(&dda_com_subscription_mapping);
-        let dps: Result<Vec<DDAComPublication>, Error> = serde_json::from_str(&dda_com_publication_mapping);
+        let dcs: Result<Vec<DDAComSubscription>, Error> =
+            serde_json::from_str(&dda_com_subscription_mapping);
+        let dps: Result<Vec<DDAComPublication>, Error> =
+            serde_json::from_str(&dda_com_publication_mapping);
 
         let dda_sub_array = match dcs {
             Ok(dda_array) => dda_array,
             Err(err) => {
-                log::error!("Error parsing input dda_com_subscription_mapping JSON: {}", err);
-                return Err(anyhow::anyhow!("Error parsing input dda_com_subscription_mapping JSON: {}", err));
+                log::error!(
+                    "Error parsing input dda_com_subscription_mapping JSON: {}",
+                    err
+                );
+                return Err(anyhow::anyhow!(
+                    "Error parsing input dda_com_subscription_mapping JSON: {}",
+                    err
+                ));
             }
         };
 
@@ -241,7 +275,11 @@ impl DDAResource {
         // max one (target, method) per whole mapping
         let mut seen: HashSet<(String, String, String)> = HashSet::new();
         for item in dda_sub_array.clone() {
-            let key = (item.topic.clone(), item.pattern.clone(), item.method.clone());
+            let key = (
+                item.topic.clone(),
+                item.pattern.clone(),
+                item.method.clone(),
+            );
             if !seen.insert(key) {
                 return Err(anyhow::anyhow!(
                     "Ambiguous mapping of (target, method) in sub: ({}, {}, {}) is mapped at least twice to two different targets",
@@ -255,8 +293,14 @@ impl DDAResource {
         let dda_pub_array = match dps {
             Ok(dda_array) => dda_array,
             Err(err) => {
-                log::error!("Error parsing input dda_com_publication_mapping JSON: {}", err);
-                return Err(anyhow::anyhow!("Error parsing input dda_com_publication_mapping JSON: {}", err));
+                log::error!(
+                    "Error parsing input dda_com_publication_mapping JSON: {}",
+                    err
+                );
+                return Err(anyhow::anyhow!(
+                    "Error parsing input dda_com_publication_mapping JSON: {}",
+                    err
+                ));
             }
         };
         // each alias must be present maximally once
@@ -270,28 +314,35 @@ impl DDAResource {
                 ));
             }
         }
-        let dda_pub_map: HashMap<String, DDAComPublication> = dda_pub_array.into_iter().map(|p| (p.alias.clone(), p)).collect();
+        let dda_pub_map: HashMap<String, DDAComPublication> = dda_pub_array
+            .into_iter()
+            .map(|p| (p.alias.clone(), p))
+            .collect();
 
         // always connect all clients to the sidecar, because the function can
         // use any of the subsystems
-        let mut dda_com_client = dda_com::com_service_client::ComServiceClient::connect(dda_url.clone())
-            .await
-            .expect("dda sidecar: com connection failed");
+        let mut dda_com_client =
+            dda_com::com_service_client::ComServiceClient::connect(dda_url.clone())
+                .await
+                .expect("dda sidecar: com connection failed");
 
-        let mut dda_state_client = dda_state::state_service_client::StateServiceClient::connect(dda_url.clone())
-            .await
-            .expect("dda sidecar: state connection failed");
+        let mut dda_state_client =
+            dda_state::state_service_client::StateServiceClient::connect(dda_url.clone())
+                .await
+                .expect("dda sidecar: state connection failed");
 
-        let mut dda_store_client = dda_store::store_service_client::StoreServiceClient::connect(dda_url.clone())
-            .await
-            .expect("dda sidecar: store connection failed");
+        let mut dda_store_client =
+            dda_store::store_service_client::StoreServiceClient::connect(dda_url.clone())
+                .await
+                .expect("dda sidecar: store connection failed");
 
         // subscribe to configured dda topics
         let mut sub_tasks: Vec<tokio::task::JoinHandle<()>> = vec![];
         // constructed here to get access to Self
         let mut dda_resource = Self { sub_tasks: vec![] };
 
-        let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<(dda::DDA, DDAComSubscription)>();
+        let (sender, receiver) =
+            tokio::sync::mpsc::unbounded_channel::<(dda::DDA, DDAComSubscription)>();
         let mut receiver = receiver;
         let mut handle = dataplane_handle.clone();
         let passer_task = tokio::spawn(async move {
@@ -319,7 +370,8 @@ impl DDAResource {
                                 .send(
                                     target_function_id,
                                     encoded_event,
-                                    &edgeless_api::function_instance::EventMetadata::empty_new_root(),
+                                    &edgeless_api::function_instance::EventMetadata::empty_new_root(
+                                    ),
                                 )
                                 .await;
                         }
@@ -332,7 +384,10 @@ impl DDAResource {
                         }
                     },
                     None => {
-                        log::warn!("Unknown target for incoming event that was subscribed {:?}", event);
+                        log::warn!(
+                            "Unknown target for incoming event that was subscribed {:?}",
+                            event
+                        );
                     }
                 }
             }
@@ -351,16 +406,25 @@ impl DDAResource {
                 "event" => {
                     let mut dda_com_client = dda_com_client.clone();
                     tokio::spawn(async move {
-                        let mut event_stream = match dda_com_client.subscribe_event(dda_subscription_filter).await {
+                        let mut event_stream = match dda_com_client
+                            .subscribe_event(dda_subscription_filter)
+                            .await
+                        {
                             Ok(dda_resp) => dda_resp.into_inner(),
                             Err(err) => {
-                                panic!("dda event subscription failed {:?} - {}", dda_sub.topic, err);
+                                panic!(
+                                    "dda event subscription failed {:?} - {}",
+                                    dda_sub.topic, err
+                                );
                             }
                         };
                         loop {
                             match event_stream.message().await {
                                 Ok(e) => {
-                                    let _ = sender.send((dda::DDA::ComSubscribeEvent(e.unwrap().data), dda_sub.clone()));
+                                    let _ = sender.send((
+                                        dda::DDA::ComSubscribeEvent(e.unwrap().data),
+                                        dda_sub.clone(),
+                                    ));
                                 }
                                 Err(_) => {
                                     log::error!("subscription event parser error");
@@ -372,10 +436,16 @@ impl DDAResource {
                 "action" => {
                     let mut dda_com_client = dda_com_client.clone();
                     tokio::spawn(async move {
-                        let mut action_stream = match dda_com_client.subscribe_action(dda_subscription_filter).await {
+                        let mut action_stream = match dda_com_client
+                            .subscribe_action(dda_subscription_filter)
+                            .await
+                        {
                             Ok(dda_resp) => dda_resp.into_inner(),
                             Err(err) => {
-                                panic!("dda action subscription failed {:?} - {}", dda_sub.topic, err);
+                                panic!(
+                                    "dda action subscription failed {:?} - {}",
+                                    dda_sub.topic, err
+                                );
                             }
                         };
                         loop {
@@ -383,7 +453,10 @@ impl DDAResource {
                                 Ok(e) => {
                                     let action_correlated = e.unwrap();
                                     let _ = sender.send((
-                                        dda::DDA::ComSubscribeAction(action_correlated.correlation_id, action_correlated.action.unwrap().params),
+                                        dda::DDA::ComSubscribeAction(
+                                            action_correlated.correlation_id,
+                                            action_correlated.action.unwrap().params,
+                                        ),
                                         dda_sub.clone(),
                                     ));
                                 }
@@ -397,10 +470,16 @@ impl DDAResource {
                 "query" => {
                     let mut dda_com_client = dda_com_client.clone();
                     tokio::spawn(async move {
-                        let mut query_stream = match dda_com_client.subscribe_query(dda_subscription_filter).await {
+                        let mut query_stream = match dda_com_client
+                            .subscribe_query(dda_subscription_filter)
+                            .await
+                        {
                             Ok(dda_resp) => dda_resp.into_inner(),
                             Err(err) => {
-                                panic!("dda query subscription failed {:?} - {}", dda_sub.topic, err);
+                                panic!(
+                                    "dda query subscription failed {:?} - {}",
+                                    dda_sub.topic, err
+                                );
                             }
                         };
                         loop {
@@ -408,7 +487,10 @@ impl DDAResource {
                                 Ok(e) => {
                                     let query_correlated = e.unwrap();
                                     let _ = sender.send((
-                                        dda::DDA::ComSubscribeQuery(query_correlated.correlation_id, query_correlated.query.unwrap().data),
+                                        dda::DDA::ComSubscribeQuery(
+                                            query_correlated.correlation_id,
+                                            query_correlated.query.unwrap().data,
+                                        ),
                                         dda_sub.clone(),
                                     ));
                                 }
@@ -423,12 +505,16 @@ impl DDAResource {
                     let mut dda_state_client = dda_state_client.clone();
                     tokio::spawn(async move {
                         let params = ObserveStateChangeParams::default();
-                        let mut state_input_stream = match dda_state_client.observe_state_change(params).await {
-                            Ok(state_input) => state_input.into_inner(),
-                            Err(err) => {
-                                panic!("dda input subscription failed {:?} - {}", dda_sub.topic, err);
-                            }
-                        };
+                        let mut state_input_stream =
+                            match dda_state_client.observe_state_change(params).await {
+                                Ok(state_input) => state_input.into_inner(),
+                                Err(err) => {
+                                    panic!(
+                                        "dda input subscription failed {:?} - {}",
+                                        dda_sub.topic, err
+                                    );
+                                }
+                            };
                         loop {
                             match state_input_stream.message().await {
                                 Ok(e) => {
@@ -456,17 +542,24 @@ impl DDAResource {
                     let mut dda_state_client = dda_state_client.clone();
                     tokio::spawn(async move {
                         let params = ObserveMembershipChangeParams::default();
-                        let mut membership_change_stream = match dda_state_client.observe_membership_change(params).await {
-                            Ok(memb_change) => memb_change.into_inner(),
-                            Err(err) => {
-                                panic!("dda membership subscription failed {:?} - {}", dda_sub.topic, err);
-                            }
-                        };
+                        let mut membership_change_stream =
+                            match dda_state_client.observe_membership_change(params).await {
+                                Ok(memb_change) => memb_change.into_inner(),
+                                Err(err) => {
+                                    panic!(
+                                        "dda membership subscription failed {:?} - {}",
+                                        dda_sub.topic, err
+                                    );
+                                }
+                            };
                         loop {
                             match membership_change_stream.message().await {
                                 Ok(m) => {
                                     let m = m.unwrap();
-                                    let _ = sender.send((dda::DDA::StateSubscribeMembershipChange(m.id, m.joined), dda_sub.clone()));
+                                    let _ = sender.send((
+                                        dda::DDA::StateSubscribeMembershipChange(m.id, m.joined),
+                                        dda_sub.clone(),
+                                    ));
                                 }
                                 Err(_) => {
                                     log::error!("subscription membership error");
@@ -507,7 +600,8 @@ impl DDAResource {
                     edgeless_dataplane::core::Message::Call(data) => {
                         // all calls to DDA resource must be Calls with
                         // DataplaneDDA as serialized data
-                        serde_json::from_str::<dda::DDA>(&data).expect("wrong incoming dataplane event from a function")
+                        serde_json::from_str::<dda::DDA>(&data)
+                            .expect("wrong incoming dataplane event from a function")
                     }
                     _ => {
                         // disregard anything but Calls
@@ -576,13 +670,17 @@ impl DDAResource {
                                 let mut stream = res.into_inner();
                                 match stream.message().await {
                                     Ok(response) => {
-                                        let action_result = response.expect("expected an action result!").data;
+                                        let action_result =
+                                            response.expect("expected an action result!").data;
                                         let res = dda::DDA::ComSubscribeActionResult(action_result);
                                         let r = serde_json::to_string(&res).expect("wrong");
                                         respond(edgeless_dataplane::core::CallRet::Reply(r)).await;
                                     }
                                     Err(status) => {
-                                        log::error!("could not retrieve an action result {:?}", status);
+                                        log::error!(
+                                            "could not retrieve an action result {:?}",
+                                            status
+                                        );
                                         respond(edgeless_dataplane::core::CallRet::Err).await;
                                     }
                                 }
@@ -604,7 +702,11 @@ impl DDAResource {
                             }
                         };
                         if p.pattern != "query" {
-                            log::warn!("can not publish a query using alias={:?}. Mapping specifies: {:?}", alias, p.pattern);
+                            log::warn!(
+                                "can not publish a query using alias={:?}. Mapping specifies: {:?}",
+                                alias,
+                                p.pattern
+                            );
                             respond(edgeless_dataplane::core::CallRet::Err).await;
                             continue;
                         }
@@ -624,13 +726,18 @@ impl DDAResource {
                                 let mut stream = res.into_inner();
                                 match stream.message().await {
                                     Ok(response) => {
-                                        let query_result = response.expect("expected a query result!").data;
+                                        let query_result =
+                                            response.expect("expected a query result!").data;
                                         let res = dda::DDA::ComSubscribeQueryResult(query_result);
-                                        let r = serde_json::to_string(&res).expect("should never happen");
+                                        let r = serde_json::to_string(&res)
+                                            .expect("should never happen");
                                         respond(edgeless_dataplane::core::CallRet::Reply(r)).await;
                                     }
                                     Err(status) => {
-                                        log::error!("could not get any result for a query{:?}", status);
+                                        log::error!(
+                                            "could not get any result for a query{:?}",
+                                            status
+                                        );
                                         respond(edgeless_dataplane::core::CallRet::Err).await;
                                     }
                                 }
@@ -651,8 +758,14 @@ impl DDAResource {
                             result: Some(action_result),
                             correlation_id,
                         };
-                        match dda_com_client.publish_action_result(action_result_correlated).await {
-                            Ok(_) => respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await,
+                        match dda_com_client
+                            .publish_action_result(action_result_correlated)
+                            .await
+                        {
+                            Ok(_) => {
+                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                                    .await
+                            }
                             Err(status) => {
                                 log::error!("publishing action result failed: {:?}", status);
                                 respond(edgeless_dataplane::core::CallRet::Err).await;
@@ -669,10 +782,19 @@ impl DDAResource {
                             result: Some(query_result),
                             correlation_id,
                         };
-                        match dda_com_client.publish_query_result(query_result_correlated).await {
-                            Ok(_) => respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await,
+                        match dda_com_client
+                            .publish_query_result(query_result_correlated)
+                            .await
+                        {
+                            Ok(_) => {
+                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                                    .await
+                            }
                             Err(status) => {
-                                log::error!("publishing query result failed: {:?}", status.message());
+                                log::error!(
+                                    "publishing query result failed: {:?}",
+                                    status.message()
+                                );
                                 respond(edgeless_dataplane::core::CallRet::Err).await;
                             }
                         }
@@ -685,7 +807,8 @@ impl DDAResource {
                         };
                         match dda_state_client.propose_input(set_input).await {
                             Ok(_) => {
-                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await;
+                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                                    .await;
                             }
                             Err(e) => {
                                 log::error!("DDA: StatePublishSet: {:?}", e.message());
@@ -701,7 +824,8 @@ impl DDAResource {
                         };
                         match dda_state_client.propose_input(delete_input).await {
                             Ok(_) => {
-                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await;
+                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                                    .await;
                             }
                             Err(e) => {
                                 log::error!("DDA: StatePublishDelete: {:?}", e.message());
@@ -714,11 +838,16 @@ impl DDAResource {
                         match dda_store_client.get(get).await {
                             Ok(val) => match val.into_inner().value {
                                 Some(v) => {
-                                    let v_as_str = String::from_utf8(v).expect("should never happen");
-                                    respond(edgeless_dataplane::core::CallRet::Reply(v_as_str)).await;
+                                    let v_as_str =
+                                        String::from_utf8(v).expect("should never happen");
+                                    respond(edgeless_dataplane::core::CallRet::Reply(v_as_str))
+                                        .await;
                                 }
                                 None => {
-                                    respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await;
+                                    respond(edgeless_dataplane::core::CallRet::Reply(
+                                        "".to_string(),
+                                    ))
+                                    .await;
                                 }
                             },
                             Err(e) => {
@@ -731,7 +860,8 @@ impl DDAResource {
                         let set = dda_store::KeyValue { key, value };
                         match dda_store_client.set(set).await {
                             Ok(_) => {
-                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await;
+                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                                    .await;
                             }
                             Err(e) => {
                                 log::error!("DDA: StoreSet: {:?}", e.message());
@@ -743,7 +873,8 @@ impl DDAResource {
                         let delete = dda_store::Key { key };
                         match dda_store_client.delete(delete).await {
                             Ok(_) => {
-                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await;
+                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                                    .await;
                             }
                             Err(e) => {
                                 log::error!("DDA: StoreDelete: {:?}", e.message());
@@ -755,7 +886,8 @@ impl DDAResource {
                         let delete_all = dda_store::DeleteAllParams {};
                         match dda_store_client.delete_all(delete_all).await {
                             Ok(_) => {
-                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await;
+                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                                    .await;
                             }
                             Err(e) => {
                                 log::error!("DDA: StoreDeleteAll: {:?}", e.message());
@@ -767,7 +899,8 @@ impl DDAResource {
                         let delete_prefix = dda_store::Key { key };
                         match dda_store_client.delete_prefix(delete_prefix).await {
                             Ok(_) => {
-                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await;
+                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                                    .await;
                             }
                             Err(e) => {
                                 log::error!("DDA: StoreDeletePrefix: {:?}", e.message());
@@ -779,7 +912,8 @@ impl DDAResource {
                         let delete_range = dda_store::Range { start, end };
                         match dda_store_client.delete_range(delete_range).await {
                             Ok(_) => {
-                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string())).await;
+                                respond(edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                                    .await;
                             }
                             Err(e) => {
                                 log::error!("DDA: StoreDeleteRange: {:?}", e.message());
@@ -801,12 +935,17 @@ impl DDAResource {
                                             key: "".to_string(),
                                             value: vec![],
                                         });
-                                        let key_value = dda::DDA::StoreScanPrefixResult(res.key, res.value);
-                                        let r = serde_json::to_string(&key_value).expect("should never happen");
+                                        let key_value =
+                                            dda::DDA::StoreScanPrefixResult(res.key, res.value);
+                                        let r = serde_json::to_string(&key_value)
+                                            .expect("should never happen");
                                         respond(edgeless_dataplane::core::CallRet::Reply(r)).await;
                                     }
                                     Err(status) => {
-                                        log::error!("could not get any result for a query{:?}", status);
+                                        log::error!(
+                                            "could not get any result for a query{:?}",
+                                            status
+                                        );
                                         respond(edgeless_dataplane::core::CallRet::Err).await;
                                     }
                                 };
@@ -829,12 +968,17 @@ impl DDAResource {
                                             key: "".to_string(),
                                             value: vec![],
                                         });
-                                        let key_value = dda::DDA::StoreScanRangeResult(res.key, res.value);
-                                        let r = serde_json::to_string(&key_value).expect("should never happen");
+                                        let key_value =
+                                            dda::DDA::StoreScanRangeResult(res.key, res.value);
+                                        let r = serde_json::to_string(&key_value)
+                                            .expect("should never happen");
                                         respond(edgeless_dataplane::core::CallRet::Reply(r)).await;
                                     }
                                     Err(status) => {
-                                        log::error!("could not get any result for a query{:?}", status);
+                                        log::error!(
+                                            "could not get any result for a query{:?}",
+                                            status
+                                        );
                                         respond(edgeless_dataplane::core::CallRet::Err).await;
                                     }
                                 };
@@ -856,7 +1000,10 @@ impl DDAResource {
             }
         });
         sub_tasks.push(_dda_task);
-        log::info!("DDA resource created, connected to the DDA sidecar at url={}", dda_url);
+        log::info!(
+            "DDA resource created, connected to the DDA sidecar at url={}",
+            dda_url
+        );
         dda_resource.sub_tasks = sub_tasks;
         Ok(dda_resource)
     }

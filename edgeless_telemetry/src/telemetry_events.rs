@@ -67,20 +67,36 @@ pub struct TelemetryHandle {
 }
 
 pub trait TelemetryHandleAPI: Send {
-    fn observe(&mut self, event: TelemetryEvent, event_tags: std::collections::BTreeMap<String, String>);
-    fn fork(&mut self, child_tags: std::collections::BTreeMap<String, String>) -> Box<dyn TelemetryHandleAPI>;
+    fn observe(
+        &mut self,
+        event: TelemetryEvent,
+        event_tags: std::collections::BTreeMap<String, String>,
+    );
+    fn fork(
+        &mut self,
+        child_tags: std::collections::BTreeMap<String, String>,
+    ) -> Box<dyn TelemetryHandleAPI>;
 }
 
 impl TelemetryHandleAPI for TelemetryHandle {
-    fn observe(&mut self, event: TelemetryEvent, event_tags: std::collections::BTreeMap<String, String>) {
+    fn observe(
+        &mut self,
+        event: TelemetryEvent,
+        event_tags: std::collections::BTreeMap<String, String>,
+    ) {
         let mut event_tags = event_tags;
         let mut merged_tags = self.handle_tags.clone();
         merged_tags.append(&mut event_tags);
 
-        self.sender.send(TelemetryProcessorInput::TelemetryEvent(event, merged_tags)).unwrap();
+        self.sender
+            .send(TelemetryProcessorInput::TelemetryEvent(event, merged_tags))
+            .unwrap();
     }
 
-    fn fork(&mut self, child_tags: std::collections::BTreeMap<String, String>) -> Box<dyn TelemetryHandleAPI> {
+    fn fork(
+        &mut self,
+        child_tags: std::collections::BTreeMap<String, String>,
+    ) -> Box<dyn TelemetryHandleAPI> {
         let mut child_tags = child_tags;
         let mut merged_tags = self.handle_tags.clone();
         merged_tags.append(&mut child_tags);
@@ -104,14 +120,22 @@ enum TelemetryProcessorInput {
 }
 
 pub trait EventProcessor: Sync + Send {
-    fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult;
+    fn handle(
+        &mut self,
+        event: &TelemetryEvent,
+        event_tags: &std::collections::BTreeMap<String, String>,
+    ) -> TelemetryProcessingResult;
 }
 
 #[derive(Default)]
 struct EventLogger {}
 
 impl EventProcessor for EventLogger {
-    fn handle(&mut self, event: &TelemetryEvent, event_tags: &std::collections::BTreeMap<String, String>) -> TelemetryProcessingResult {
+    fn handle(
+        &mut self,
+        event: &TelemetryEvent,
+        event_tags: &std::collections::BTreeMap<String, String>,
+    ) -> TelemetryProcessingResult {
         match event {
             TelemetryEvent::FunctionLogEntry(log_level, target, msg) => {
                 log::log!(to_log_level(log_level), "{}: {}", target, msg);
@@ -139,7 +163,11 @@ impl TelemetryProcessorInner {
         }
     }
 
-    async fn handle(&mut self, event: TelemetryEvent, event_tags: std::collections::BTreeMap<String, String>) {
+    async fn handle(
+        &mut self,
+        event: TelemetryEvent,
+        event_tags: std::collections::BTreeMap<String, String>,
+    ) {
         for processor in &mut self.processing_chain {
             let processing_result = processor.handle(&event, &event_tags);
             if processing_result == TelemetryProcessingResult::FINAL {
@@ -164,12 +192,17 @@ impl TelemetryProcessor {
     /// - `performance_target`: optional target that collects samples about
     ///   performance-related events
     ///
-    pub async fn new(prometheus_url: String, performance_target: Option<crate::performance_target::PerformanceTargetInner>) -> anyhow::Result<Self> {
+    pub async fn new(
+        prometheus_url: String,
+        performance_target: Option<crate::performance_target::PerformanceTargetInner>,
+    ) -> anyhow::Result<Self> {
         let mut processing_chain: Vec<Box<dyn EventProcessor>> = vec![];
 
         // Add the performance target, if present.
         if let Some(performance_target) = performance_target {
-            processing_chain.push(Box::new(crate::performance_target::PerformanceTargetOuter::new(performance_target)));
+            processing_chain.push(Box::new(
+                crate::performance_target::PerformanceTargetOuter::new(performance_target),
+            ));
         }
 
         // Create and add the Prometheus target, if required.
@@ -177,7 +210,11 @@ impl TelemetryProcessor {
             match edgeless_api::util::parse_http_host(&prometheus_url) {
                 Ok((_, ip, port)) => {
                     processing_chain.push(Box::new(
-                        crate::prometheus_target::PrometheusEventTarget::new(&format!("{}:{}", &ip, port)).await,
+                        crate::prometheus_target::PrometheusEventTarget::new(&format!(
+                            "{}:{}",
+                            &ip, port
+                        ))
+                        .await,
                     ));
                 }
                 Err(err) => anyhow::bail!("could not create Prometheus server: {}", err),
@@ -190,7 +227,10 @@ impl TelemetryProcessor {
         // Create a channel to receive telemetry events and the processor that
         // will handle them, spawned in a dedicated task.
         let (sender, receiver) = tokio::sync::mpsc::unbounded_channel::<TelemetryProcessorInput>();
-        let inner = TelemetryProcessorInner { processing_chain, receiver };
+        let inner = TelemetryProcessorInner {
+            processing_chain,
+            receiver,
+        };
         tokio::spawn(async move {
             let mut inner = inner;
             inner.run().await;
@@ -199,7 +239,10 @@ impl TelemetryProcessor {
         Ok(Self { sender })
     }
 
-    pub fn get_handle(&self, handle_tags: std::collections::BTreeMap<String, String>) -> TelemetryHandle {
+    pub fn get_handle(
+        &self,
+        handle_tags: std::collections::BTreeMap<String, String>,
+    ) -> TelemetryHandle {
         TelemetryHandle {
             handle_tags,
             sender: self.sender.clone(),

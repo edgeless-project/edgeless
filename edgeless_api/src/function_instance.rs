@@ -84,8 +84,13 @@ impl SpawnFunctionRequest {
 }
 
 #[async_trait::async_trait]
-pub trait FunctionInstanceAPI<FunctionIdType: Clone>: FunctionInstanceAPIClone<FunctionIdType> + Sync + Send {
-    async fn start(&mut self, spawn_request: SpawnFunctionRequest) -> anyhow::Result<crate::common::StartComponentResponse<FunctionIdType>>;
+pub trait FunctionInstanceAPI<FunctionIdType: Clone>:
+    FunctionInstanceAPIClone<FunctionIdType> + Sync + Send
+{
+    async fn start(
+        &mut self,
+        spawn_request: SpawnFunctionRequest,
+    ) -> anyhow::Result<crate::common::StartComponentResponse<FunctionIdType>>;
     async fn stop(&mut self, id: FunctionIdType) -> anyhow::Result<()>;
     async fn patch(&mut self, update: crate::common::PatchRequest) -> anyhow::Result<()>;
 }
@@ -110,7 +115,9 @@ impl Clone for Box<dyn FunctionInstanceAPI<crate::function_instance::InstanceId>
 }
 
 impl Clone for Box<dyn FunctionInstanceAPI<crate::function_instance::DomainManagedInstanceId>> {
-    fn clone(&self) -> Box<dyn FunctionInstanceAPI<crate::function_instance::DomainManagedInstanceId>> {
+    fn clone(
+        &self,
+    ) -> Box<dyn FunctionInstanceAPI<crate::function_instance::DomainManagedInstanceId>> {
         self.clone_box()
     }
 }

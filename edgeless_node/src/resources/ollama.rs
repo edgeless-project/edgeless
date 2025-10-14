@@ -19,7 +19,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for OllamaResourceSpe
     }
 
     fn configurations(&self) -> std::collections::HashMap<String, String> {
-        std::collections::HashMap::from([(String::from("model"), String::from("Model to be used for chatting"))])
+        std::collections::HashMap::from([(
+            String::from("model"),
+            String::from("Model to be used for chatting"),
+        )])
     }
 
     fn version(&self) -> String {
@@ -37,13 +40,18 @@ struct ChatCommand {
     history_id: String,
     prompt: String,
     resource_id: edgeless_api::function_instance::ComponentId,
-    reply_sender: tokio::sync::oneshot::Sender<anyhow::Result<(edgeless_api::function_instance::InstanceId, String)>>,
+    reply_sender: tokio::sync::oneshot::Sender<
+        anyhow::Result<(edgeless_api::function_instance::InstanceId, String)>,
+    >,
 }
 
 enum OllamaCommand {
     Chat(ChatCommand),
     // resource_id, target
-    Patch(edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::InstanceId),
+    Patch(
+        edgeless_api::function_instance::ComponentId,
+        edgeless_api::function_instance::InstanceId,
+    ),
 }
 
 impl std::fmt::Display for OllamaCommand {
@@ -57,7 +65,9 @@ impl std::fmt::Display for OllamaCommand {
                 cmd.prompt.len(),
                 cmd.resource_id
             ),
-            OllamaCommand::Patch(resource_id, target) => write!(f, "resource_id {}, target {}", resource_id, target),
+            OllamaCommand::Patch(resource_id, target) => {
+                write!(f, "resource_id {}, target {}", resource_id, target)
+            }
         }
     }
 }
@@ -66,7 +76,8 @@ pub struct OllamaResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    instances: std::collections::HashMap<edgeless_api::function_instance::ComponentId, OllamaResource>,
+    instances:
+        std::collections::HashMap<edgeless_api::function_instance::ComponentId, OllamaResource>,
     sender: futures::channel::mpsc::UnboundedSender<OllamaCommand>,
     _handle: tokio::task::JoinHandle<()>,
 }
@@ -120,8 +131,9 @@ impl OllamaResource {
                     }
                 };
 
-                let (reply_sender, reply_receiver) =
-                    tokio::sync::oneshot::channel::<anyhow::Result<(edgeless_api::function_instance::InstanceId, String)>>();
+                let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
+                    anyhow::Result<(edgeless_api::function_instance::InstanceId, String)>,
+                >();
                 let _ = sender
                     .send(OllamaCommand::Chat(ChatCommand {
                         model_name: model_name.clone(),
@@ -150,7 +162,9 @@ impl OllamaResource {
             }
         });
 
-        Ok(Self { join_handle: handle })
+        Ok(Self {
+            join_handle: handle,
+        })
     }
 }
 
@@ -181,7 +195,11 @@ impl OllamaResourceProvider {
         let mut receiver: futures::channel::mpsc::UnboundedReceiver<OllamaCommand> = receiver;
 
         // Create a new instance of the ollama connector.
-        let mut ollama = ollama_rs::Ollama::new_with_history(format!("http://{}", ollama_host), ollama_port, ollama_messages_number_limit);
+        let mut ollama = ollama_rs::Ollama::new_with_history(
+            format!("http://{}", ollama_host),
+            ollama_port,
+            ollama_messages_number_limit,
+        );
 
         let _handle = tokio::spawn(async move {
             let mut targets = std::collections::HashMap::new();
@@ -193,7 +211,9 @@ impl OllamaResourceProvider {
                                 .send_chat_messages_with_history(
                                     ollama_rs::generation::chat::request::ChatMessageRequest::new(
                                         cmd.model_name.clone(),
-                                        vec![ollama_rs::generation::chat::ChatMessage::user(cmd.prompt)],
+                                        vec![ollama_rs::generation::chat::ChatMessage::user(
+                                            cmd.prompt,
+                                        )],
                                     ),
                                     cmd.history_id.clone(),
                                 )
@@ -230,18 +250,27 @@ impl OllamaResourceProvider {
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for OllamaResourceProvider {
+impl
+    edgeless_api::resource_configuration::ResourceConfigurationAPI<
+        edgeless_api::function_instance::InstanceId,
+    > for OllamaResourceProvider
+{
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
+    ) -> anyhow::Result<
+        edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>,
+    > {
         let mut lck = self.inner.lock().await;
-        let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
+        let new_id =
+            edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
         let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
-        let telemetry_handle = lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
-            "FUNCTION_ID".to_string(),
-            new_id.function_id.to_string(),
-        )]));
+        let telemetry_handle = lck
+            .telemetry_handle
+            .fork(std::collections::BTreeMap::from([(
+                "FUNCTION_ID".to_string(),
+                new_id.function_id.to_string(),
+            )]));
 
         // Read configuration
         let model = match instance_specification.configuration.get("model") {
@@ -256,10 +285,20 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             }
         };
 
-        match OllamaResource::new(dataplane_handle, telemetry_handle, model.to_string(), new_id, lck.sender.clone()).await {
+        match OllamaResource::new(
+            dataplane_handle,
+            telemetry_handle,
+            model.to_string(),
+            new_id,
+            lck.sender.clone(),
+        )
+        .await
+        {
             Ok(resource) => {
                 lck.instances.insert(new_id.function_id, resource);
-                return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
+                return Ok(edgeless_api::common::StartComponentResponse::InstanceId(
+                    new_id,
+                ));
             }
             Err(err) => {
                 return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
@@ -272,8 +311,15 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         }
     }
 
-    async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
-        self.inner.lock().await.instances.remove(&resource_id.function_id);
+    async fn stop(
+        &mut self,
+        resource_id: edgeless_api::function_instance::InstanceId,
+    ) -> anyhow::Result<()> {
+        self.inner
+            .lock()
+            .await
+            .instances
+            .remove(&resource_id.function_id);
         Ok(())
     }
 
@@ -294,7 +340,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         }
 
         // Add/update the mapping of the resource provider to the target.
-        let _ = lck.sender.send(OllamaCommand::Patch(update.function_id, target)).await;
+        let _ = lck
+            .sender
+            .send(OllamaCommand::Patch(update.function_id, target))
+            .await;
 
         Ok(())
     }
@@ -312,7 +361,8 @@ mod tests {
             .unwrap_or("11434".to_string())
             .parse::<u16>()
             .unwrap_or(11434);
-        let mut ollama = ollama_rs::Ollama::new_with_history(format!("http://{}", address), port, 30);
+        let mut ollama =
+            ollama_rs::Ollama::new_with_history(format!("http://{}", address), port, 30);
 
         let options = ollama_rs::generation::options::GenerationOptions::default()
             .temperature(0.2)
@@ -328,12 +378,18 @@ mod tests {
                 for prompt in &prompts {
                     let res = ollama
                         .generate(
-                            ollama_rs::generation::completion::request::GenerationRequest::new(model.name.clone(), prompt.to_string())
-                                .options(options.clone()),
+                            ollama_rs::generation::completion::request::GenerationRequest::new(
+                                model.name.clone(),
+                                prompt.to_string(),
+                            )
+                            .options(options.clone()),
                         )
                         .await;
                     if let Ok(res) = res {
-                        println!("\nmodel:\t\t{:?}\nprompt:\t\t{}\nresponse:\t{:?}\n", model, prompt, res);
+                        println!(
+                            "\nmodel:\t\t{:?}\nprompt:\t\t{}\nresponse:\t{:?}\n",
+                            model, prompt, res
+                        );
                     }
                 }
 
@@ -344,7 +400,9 @@ mod tests {
                         .send_chat_messages_with_history(
                             ollama_rs::generation::chat::request::ChatMessageRequest::new(
                                 model.name.clone(),
-                                vec![ollama_rs::generation::chat::ChatMessage::user(prompt.to_string())],
+                                vec![ollama_rs::generation::chat::ChatMessage::user(
+                                    prompt.to_string(),
+                                )],
                             ),
                             history_id.clone(),
                         )

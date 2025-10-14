@@ -13,7 +13,13 @@ impl EventMetadata {
     }
 
     pub fn from(trace_id: TraceId, span_id: SpanId) -> EventMetadata {
-        EventMetadata(SpanContext::new(trace_id, span_id, TraceFlags::SAMPLED, true, TraceState::NONE))
+        EventMetadata(SpanContext::new(
+            trace_id,
+            span_id,
+            TraceFlags::SAMPLED,
+            true,
+            TraceState::NONE,
+        ))
     }
 
     pub fn from_bytes(trace_id: [u8; 16], span_id: [u8; 8]) -> EventMetadata {
@@ -62,7 +68,11 @@ impl<'b, C> minicbor::Decode<'b, C> for EventMetadata {
 }
 
 impl<C> minicbor::Encode<C> for EventMetadata {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
         // See https://github.com/twittner/minicbor/blob/develop/minicbor/src/encode.rs#L876
         e.bytes(&self.0.trace_id().to_bytes())
             .and_then(|e| e.bytes(&self.0.span_id().to_bytes()))?

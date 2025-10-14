@@ -13,7 +13,9 @@ pub struct NodeRegister {
 pub enum NodeRegisterRequest {
     UpdateNode(
         edgeless_api::node_registration::UpdateNodeRequest,
-        tokio::sync::oneshot::Sender<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>,
+        tokio::sync::oneshot::Sender<
+            anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>,
+        >,
     ),
 }
 
@@ -44,7 +46,9 @@ impl NodeRegister {
     pub async fn new(
         proxy: std::sync::Arc<tokio::sync::Mutex<dyn super::proxy::Proxy>>,
         proxy_gc_period: tokio::time::Duration,
-        orchestrator_sender: futures::channel::mpsc::UnboundedSender<super::orchestrator::OrchestratorRequest>,
+        orchestrator_sender: futures::channel::mpsc::UnboundedSender<
+            super::orchestrator::OrchestratorRequest,
+        >,
     ) -> (
         Self,
         std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
@@ -54,7 +58,14 @@ impl NodeRegister {
         let (internal_sender, internal_receiver) = futures::channel::mpsc::unbounded();
 
         let main_task = Box::pin(async move {
-            Self::main_task(receiver, internal_receiver, proxy, proxy_gc_period, orchestrator_sender).await;
+            Self::main_task(
+                receiver,
+                internal_receiver,
+                proxy,
+                proxy_gc_period,
+                orchestrator_sender,
+            )
+            .await;
         });
 
         let refresh_task = Box::pin(async move {
@@ -75,13 +86,16 @@ impl NodeRegister {
         internal_receiver: futures::channel::mpsc::UnboundedReceiver<InternalRequest>,
         proxy: std::sync::Arc<tokio::sync::Mutex<dyn super::proxy::Proxy>>,
         proxy_gc_period: tokio::time::Duration,
-        orchestrator_sender: futures::channel::mpsc::UnboundedSender<super::orchestrator::OrchestratorRequest>,
+        orchestrator_sender: futures::channel::mpsc::UnboundedSender<
+            super::orchestrator::OrchestratorRequest,
+        >,
     ) {
         let mut receiver = receiver;
         let mut internal_receiver = internal_receiver;
         let mut orchestrator_sender = orchestrator_sender;
 
-        let mut registered: collections::HashMap<uuid::Uuid, NodeRegisterEntry> = std::collections::HashMap::new();
+        let mut registered: collections::HashMap<uuid::Uuid, NodeRegisterEntry> =
+            std::collections::HashMap::new();
         let mut next_gc_time = tokio::time::Instant::now() + proxy_gc_period;
 
         // main loop that reacts to events on the receiver channels
@@ -184,7 +198,9 @@ impl NodeRegister {
         }
     }
 
-    pub fn get_node_registration_client(&mut self) -> Box<dyn edgeless_api::outer::node_register::NodeRegisterAPI + Send> {
+    pub fn get_node_registration_client(
+        &mut self,
+    ) -> Box<dyn edgeless_api::outer::node_register::NodeRegisterAPI + Send> {
         node_register_client::NodeRegisterClient::new(self.sender.clone())
     }
 }

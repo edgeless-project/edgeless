@@ -11,7 +11,10 @@ pub trait ResourceConfigurationAPI {
         &mut self,
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification,
     ) -> Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse>;
-    async fn stop(&mut self, resource_id: edgeless_api_core::instance_id::InstanceId) -> Result<(), edgeless_api_core::common::ErrorResponse>;
+    async fn stop(
+        &mut self,
+        resource_id: edgeless_api_core::instance_id::InstanceId,
+    ) -> Result<(), edgeless_api_core::common::ErrorResponse>;
     async fn patch(
         &mut self,
         resource_id: edgeless_api_core::resource_configuration::EncodedPatchRequest,
@@ -25,17 +28,32 @@ pub trait ResourceConfigurationAPIDyn {
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> core::pin::Pin<
         alloc::boxed::Box<
-            dyn core::future::Future<Output = Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse>> + 'a,
+            dyn core::future::Future<
+                    Output = Result<
+                        edgeless_api_core::instance_id::InstanceId,
+                        edgeless_api_core::common::ErrorResponse,
+                    >,
+                > + 'a,
         >,
     >;
     fn stop(
         &mut self,
         resource_id: edgeless_api_core::instance_id::InstanceId,
-    ) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>> + '_>>;
+    ) -> core::pin::Pin<
+        alloc::boxed::Box<
+            dyn core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>>
+                + '_,
+        >,
+    >;
     fn patch<'a>(
         &'a mut self,
         patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
-    ) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>> + 'a>>;
+    ) -> core::pin::Pin<
+        alloc::boxed::Box<
+            dyn core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>>
+                + 'a,
+        >,
+    >;
 }
 
 impl<T: ResourceConfigurationAPI> ResourceConfigurationAPIDyn for T {
@@ -44,21 +62,39 @@ impl<T: ResourceConfigurationAPI> ResourceConfigurationAPIDyn for T {
         instance_specification: edgeless_api_core::resource_configuration::EncodedResourceInstanceSpecification<'a>,
     ) -> core::pin::Pin<
         alloc::boxed::Box<
-            dyn core::future::Future<Output = Result<edgeless_api_core::instance_id::InstanceId, edgeless_api_core::common::ErrorResponse>> + 'a,
+            dyn core::future::Future<
+                    Output = Result<
+                        edgeless_api_core::instance_id::InstanceId,
+                        edgeless_api_core::common::ErrorResponse,
+                    >,
+                > + 'a,
         >,
     > {
-        alloc::boxed::Box::pin(<Self as ResourceConfigurationAPI>::start(self, instance_specification))
+        alloc::boxed::Box::pin(<Self as ResourceConfigurationAPI>::start(
+            self,
+            instance_specification,
+        ))
     }
     fn stop(
         &mut self,
         resource_id: edgeless_api_core::instance_id::InstanceId,
-    ) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>> + '_>> {
+    ) -> core::pin::Pin<
+        alloc::boxed::Box<
+            dyn core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>>
+                + '_,
+        >,
+    > {
         alloc::boxed::Box::pin(<Self as ResourceConfigurationAPI>::stop(self, resource_id))
     }
     fn patch<'a>(
         &'a mut self,
         patch_req: edgeless_api_core::resource_configuration::EncodedPatchRequest<'a>,
-    ) -> core::pin::Pin<alloc::boxed::Box<dyn core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>> + 'a>> {
+    ) -> core::pin::Pin<
+        alloc::boxed::Box<
+            dyn core::future::Future<Output = Result<(), edgeless_api_core::common::ErrorResponse>>
+                + 'a,
+        >,
+    > {
         alloc::boxed::Box::pin(<Self as ResourceConfigurationAPI>::patch(self, patch_req))
     }
 }

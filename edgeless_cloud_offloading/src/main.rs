@@ -36,7 +36,13 @@ fn main() -> anyhow::Result<()> {
 
     let config = load_config(&args.config_path)?;
 
+<<<<<<< HEAD
     let async_runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
+=======
+    let async_runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+>>>>>>> feature/anomaly-detection
 
     async_runtime.block_on(async {
         if let Err(e) = run_cloud_offloading_delegated_orc(config).await {
@@ -77,7 +83,14 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
         for node in cloud_nodes.iter_mut() {
             if !node.active && active_orc_nodes.contains(&node.node_id) {
                 node.active = true;
+<<<<<<< HEAD
                 log::info!("Cloud node {} is now active in the orchestrator!", node.node_id);
+=======
+                log::info!(
+                    "Cloud node {} is now active in the orchestrator!",
+                    node.node_id
+                );
+>>>>>>> feature/anomaly-detection
                 // After a node becomes active, we force a rebalance to ensure it receives load
                 rebalancer.rebalance_cluster();
             }
@@ -88,7 +101,12 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
         let mut broken_nodes_to_delete = Vec::new();
 
         for node in &cloud_nodes {
+<<<<<<< HEAD
             if !node.active && node.creation_time.elapsed().as_secs() > NODE_ACTIVATION_TIMEOUT_SECS {
+=======
+            if !node.active && node.creation_time.elapsed().as_secs() > NODE_ACTIVATION_TIMEOUT_SECS
+            {
+>>>>>>> feature/anomaly-detection
                 log::warn!(
                     "Node {} ({}) failed to become active within {} seconds. Marking for deletion.",
                     node.node_id,
@@ -136,7 +154,14 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
             log::warn!("Cluster is overloaded or has fewer nodes than expected. Creating a new cloud node...");
             match create_cloud_node(cloud_input_data.clone()).await {
                 Ok(new_node) => {
+<<<<<<< HEAD
                     log::info!("Successfully initiated creation of new node: {}", new_node.node_id);
+=======
+                    log::info!(
+                        "Successfully initiated creation of new node: {}",
+                        new_node.node_id
+                    );
+>>>>>>> feature/anomaly-detection
                     cloud_nodes.push(new_node);
                 }
                 Err(e) => log::error!("Failed to create cloud node. Full error: {:?}", e),
@@ -147,10 +172,25 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
         if let Some((emptying_id, start_time)) = &node_being_emptied {
             // If there's a node being emptied, check if it's empty and if the cooldown period has passed
             if rebalancer.is_node_empty(emptying_id) {
+<<<<<<< HEAD
                 if start_time.elapsed().as_secs() >= config.scaling.thresholds.delete_cooldown_seconds {
                     log::info!("Node {} is empty and cooldown period is over. Deleting it.", emptying_id);
                     let node_id_to_remove = emptying_id.clone();
                     if let Some(pos) = cloud_nodes.iter().position(|n| n.node_id == node_id_to_remove) {
+=======
+                if start_time.elapsed().as_secs()
+                    >= config.scaling.thresholds.delete_cooldown_seconds
+                {
+                    log::info!(
+                        "Node {} is empty and cooldown period is over. Deleting it.",
+                        emptying_id
+                    );
+                    let node_id_to_remove = emptying_id.clone();
+                    if let Some(pos) = cloud_nodes
+                        .iter()
+                        .position(|n| n.node_id == node_id_to_remove)
+                    {
+>>>>>>> feature/anomaly-detection
                         let node_to_delete = cloud_nodes.remove(pos);
                         if let Err(e) = delete_cloud_node(node_to_delete).await {
                             log::error!("Failed to delete cloud node {}: {}", node_id_to_remove, e);
@@ -158,7 +198,14 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
                     }
                     node_being_emptied = None;
                 } else {
+<<<<<<< HEAD
                     log::info!("Node {} is empty, waiting for cooldown period to finish...", emptying_id);
+=======
+                    log::info!(
+                        "Node {} is empty, waiting for cooldown period to finish...",
+                        emptying_id
+                    );
+>>>>>>> feature/anomaly-detection
                 }
             } else {
                 // Empty and cordon the node
@@ -169,7 +216,12 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
             // We only delete a node if there are more nodes available
             if active_orc_nodes.len() > 1 {
                 // If there's no node being created or emptied, check if we can find an underutilized node to delete
+<<<<<<< HEAD
                 let managed_cloud_node_ids: HashSet<String> = cloud_nodes.iter().map(|n| n.node_id.clone()).collect();
+=======
+                let managed_cloud_node_ids: HashSet<String> =
+                    cloud_nodes.iter().map(|n| n.node_id.clone()).collect();
+>>>>>>> feature/anomaly-detection
                 if let Some(victim_id) = rebalancer.find_node_to_delete(
                     &managed_cloud_node_ids,
                     config.scaling.thresholds.cpu_low_percent,
@@ -211,6 +263,13 @@ fn generate_config(config_path: &str) -> anyhow::Result<()> {
 
 fn load_config(config_path: &str) -> anyhow::Result<Config> {
     let path = PathBuf::from(config_path).join(DEFAULT_CONFIG_FILENAME);
+<<<<<<< HEAD
     let config_str = fs::read_to_string(&path).map_err(|e| anyhow!("Failed to read configuration file at {:?}: {}", path, e))?;
     toml::from_str(&config_str).map_err(|e| anyhow!("Failed to parse configuration file at {:?}: {}", path, e))
+=======
+    let config_str = fs::read_to_string(&path)
+        .map_err(|e| anyhow!("Failed to read configuration file at {:?}: {}", path, e))?;
+    toml::from_str(&config_str)
+        .map_err(|e| anyhow!("Failed to parse configuration file at {:?}: {}", path, e))
+>>>>>>> feature/anomaly-detection
 }

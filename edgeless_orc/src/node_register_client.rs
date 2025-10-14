@@ -19,7 +19,9 @@ impl NodeRegisterClient {
 }
 
 impl edgeless_api::outer::node_register::NodeRegisterAPI for NodeRegisterClient {
-    fn node_registration_api(&mut self) -> Box<dyn edgeless_api::node_registration::NodeRegistrationAPI> {
+    fn node_registration_api(
+        &mut self,
+    ) -> Box<dyn edgeless_api::node_registration::NodeRegistrationAPI> {
         self.node_register_client.clone()
     }
 }
@@ -35,10 +37,15 @@ impl edgeless_api::node_registration::NodeRegistrationAPI for NodeRegisterInnerC
         &mut self,
         request: edgeless_api::node_registration::UpdateNodeRequest,
     ) -> anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse> {
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>>();
+        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<
+            anyhow::Result<edgeless_api::node_registration::UpdateNodeResponse>,
+        >();
         match self
             .sender
-            .send(super::node_register::NodeRegisterRequest::UpdateNode(request.clone(), reply_sender))
+            .send(super::node_register::NodeRegisterRequest::UpdateNode(
+                request.clone(),
+                reply_sender,
+            ))
             .await
         {
             Ok(_) => {}

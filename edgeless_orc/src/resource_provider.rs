@@ -15,7 +15,11 @@ impl std::fmt::Display for ResourceProvider {
             "class_type {}, node_id {}, outputs [{}]",
             self.class_type,
             self.node_id,
-            self.outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
+            self.outputs
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
         )
     }
 }

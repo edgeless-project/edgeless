@@ -12,7 +12,9 @@ pub struct ResourceInstanceSpecification {
 }
 
 #[async_trait::async_trait]
-pub trait ResourceConfigurationAPI<ResourceIdType: Clone>: ResourceConfigurationAPIClone<ResourceIdType> + Sync + Send {
+pub trait ResourceConfigurationAPI<ResourceIdType: Clone>:
+    ResourceConfigurationAPIClone<ResourceIdType> + Sync + Send
+{
     async fn start(
         &mut self,
         instance_specification: ResourceInstanceSpecification,
@@ -42,8 +44,12 @@ impl Clone for Box<dyn ResourceConfigurationAPI<crate::function_instance::Instan
     }
 }
 
-impl Clone for Box<dyn ResourceConfigurationAPI<crate::function_instance::DomainManagedInstanceId>> {
-    fn clone(&self) -> Box<dyn ResourceConfigurationAPI<crate::function_instance::DomainManagedInstanceId>> {
+impl Clone
+    for Box<dyn ResourceConfigurationAPI<crate::function_instance::DomainManagedInstanceId>>
+{
+    fn clone(
+        &self,
+    ) -> Box<dyn ResourceConfigurationAPI<crate::function_instance::DomainManagedInstanceId>> {
         self.clone_box()
     }
 }

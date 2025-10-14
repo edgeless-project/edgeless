@@ -30,10 +30,14 @@ impl CoapNodeRegisterServer {
             loop {
                 let (size, sender) = slf.sock.recv_from(&mut buffer[..]).await.unwrap();
 
-                let (pack, token) = edgeless_api_core::coap_mapping::CoapDecoder::decode(&buffer[..size]).unwrap();
+                let (pack, token) =
+                    edgeless_api_core::coap_mapping::CoapDecoder::decode(&buffer[..size]).unwrap();
                 match pack {
-                    edgeless_api_core::coap_mapping::CoapMessage::NodeRegistration(registration) => {
-                        slf.process_node_registration(&registration, token, sender).await;
+                    edgeless_api_core::coap_mapping::CoapMessage::NodeRegistration(
+                        registration,
+                    ) => {
+                        slf.process_node_registration(&registration, token, sender)
+                            .await;
                     }
                     _ => {
                         log::info!("Unhandled Message");
@@ -58,11 +62,17 @@ impl CoapNodeRegisterServer {
             resource_providers: registration
                 .resources
                 .iter()
-                .map(|core_spec| crate::node_registration::ResourceProviderSpecification {
-                    provider_id: String::from(core_spec.provider_id),
-                    class_type: String::from(core_spec.class_type),
-                    outputs: core_spec.outputs.iter().map(|core_output| String::from(*core_output)).collect(),
-                })
+                .map(
+                    |core_spec| crate::node_registration::ResourceProviderSpecification {
+                        provider_id: String::from(core_spec.provider_id),
+                        class_type: String::from(core_spec.class_type),
+                        outputs: core_spec
+                            .outputs
+                            .iter()
+                            .map(|core_output| String::from(*core_output))
+                            .collect(),
+                    },
+                )
                 .collect(),
             capabilities: crate::node_registration::NodeCapabilities::default(),
             refresh_deadline: std::time::SystemTime::now() + std::time::Duration::from_secs(86400),
@@ -74,17 +84,31 @@ impl CoapNodeRegisterServer {
         let ret = match key_entry {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 entry.insert(token);
-                match self.registration_api.update_node(registration).await.unwrap() {
+                match self
+                    .registration_api
+                    .update_node(registration)
+                    .await
+                    .unwrap()
+                {
                     crate::node_registration::UpdateNodeResponse::Accepted => Some(Ok(())),
-                    crate::node_registration::UpdateNodeResponse::ResponseError(err) => Some(Err(err)),
+                    crate::node_registration::UpdateNodeResponse::ResponseError(err) => {
+                        Some(Err(err))
+                    }
                 }
             }
             std::collections::hash_map::Entry::Occupied(mut entry) => {
                 if entry.get() < &token || token == 0 {
                     entry.insert(token);
-                    match self.registration_api.update_node(registration).await.unwrap() {
+                    match self
+                        .registration_api
+                        .update_node(registration)
+                        .await
+                        .unwrap()
+                    {
                         crate::node_registration::UpdateNodeResponse::Accepted => Some(Ok(())),
-                        crate::node_registration::UpdateNodeResponse::ResponseError(err) => Some(Err(err)),
+                        crate::node_registration::UpdateNodeResponse::ResponseError(err) => {
+                            Some(Err(err))
+                        }
                     }
                 } else {
                     log::info!("Message Duplicate: {} !< {}", entry.get(), token);
@@ -95,17 +119,30 @@ impl CoapNodeRegisterServer {
 
         if let Some(ret) = ret {
             let ((data, sender), _tail) = match ret {
-                Ok(_) => edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, &[], token, &mut self.tx_buffer[..], true),
+                Ok(_) => edgeless_api_core::coap_mapping::COAPEncoder::encode_response(
+                    sender,
+                    &[],
+                    token,
+                    &mut self.tx_buffer[..],
+                    true,
+                ),
                 Err(_) => {
-                    let (data, tail) = edgeless_api_core::coap_mapping::COAPEncoder::encode_error_response(
-                        edgeless_api_core::common::ErrorResponse {
-                            // Passing the error message would be desired. This requires ErrorResponse to be generic over str and strings (or lifetime annotations).
-                            summary: "Server Error",
-                            detail: None,
-                        },
-                        &mut self.tx_buffer[..],
-                    );
-                    edgeless_api_core::coap_mapping::COAPEncoder::encode_response(sender, data, token, &mut tail[..], false)
+                    let (data, tail) =
+                        edgeless_api_core::coap_mapping::COAPEncoder::encode_error_response(
+                            edgeless_api_core::common::ErrorResponse {
+                                // Passing the error message would be desired. This requires ErrorResponse to be generic over str and strings (or lifetime annotations).
+                                summary: "Server Error",
+                                detail: None,
+                            },
+                            &mut self.tx_buffer[..],
+                        );
+                    edgeless_api_core::coap_mapping::COAPEncoder::encode_response(
+                        sender,
+                        data,
+                        token,
+                        &mut tail[..],
+                        false,
+                    )
                 }
             };
             if let Err(err) = self.sock.send_to(data, sender).await {

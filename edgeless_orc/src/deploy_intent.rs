@@ -8,7 +8,10 @@ use std::str::FromStr;
 pub enum DeployIntent {
     /// The component with givel logical identifier should be migrated to
     /// the given target nodes, if possible.
-    Migrate(edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::NodeId>),
+    Migrate(
+        edgeless_api::function_instance::ComponentId,
+        Vec<edgeless_api::function_instance::NodeId>,
+    ),
     /// The node becomes cordoned, i.e., the orchestrator will not assign new
     /// resources or functions to it.
     Cordon(edgeless_api::function_instance::NodeId),
@@ -44,7 +47,11 @@ impl DeployIntent {
                     } else if value == "no" {
                         Ok(DeployIntent::Uncordon(node_id))
                     } else {
-                        anyhow::bail!("ill-formed cordon value for node '{}': {}", tokens[2], value)
+                        anyhow::bail!(
+                            "ill-formed cordon value for node '{}': {}",
+                            tokens[2],
+                            value
+                        )
                     }
                 }
                 _ => anyhow::bail!("unknown intent type '{}'", tokens[1]),
@@ -64,7 +71,11 @@ impl DeployIntent {
 
     pub fn value(&self) -> String {
         match self {
-            Self::Migrate(_, targets) => targets.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
+            Self::Migrate(_, targets) => targets
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
             Self::Cordon(_) => "yes".to_string(),
             Self::Uncordon(_) => "no".to_string(),
         }
@@ -78,7 +89,11 @@ impl std::fmt::Display for DeployIntent {
                 f,
                 "migrate component {} to [{}]",
                 component,
-                target.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                target
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<String>>()
+                    .join(",")
             ),
             DeployIntent::Cordon(node_id) => write!(f, "cordon node_id {}", node_id),
             DeployIntent::Uncordon(node_id) => write!(f, "uncordon node_id {}", node_id),

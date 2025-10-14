@@ -81,7 +81,10 @@ pub enum UpdateDomainResponse {
 
 #[async_trait::async_trait]
 pub trait DomainRegistrationAPI: DomainRegistrationAPIClone + Sync + Send {
-    async fn update_domain(&mut self, request: UpdateDomainRequest) -> anyhow::Result<UpdateDomainResponse>;
+    async fn update_domain(
+        &mut self,
+        request: UpdateDomainRequest,
+    ) -> anyhow::Result<UpdateDomainResponse>;
 }
 
 // https://stackoverflow.com/a/30353928

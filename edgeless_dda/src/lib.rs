@@ -27,11 +27,11 @@ type CorrelationId = String;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub enum DDA {
     // send a DDA message from a function to the outside over an alias
-    ComPublishEvent(PublicationAlias, Vec<u8>),     // event data
-    ComPublishAction(PublicationAlias, Vec<u8>),    // action data
-    ComPublishQuery(PublicationAlias, Vec<u8>),     // query data
+    ComPublishEvent(PublicationAlias, Vec<u8>), // event data
+    ComPublishAction(PublicationAlias, Vec<u8>), // action data
+    ComPublishQuery(PublicationAlias, Vec<u8>), // query data
     ComPublishActionResult(CorrelationId, Vec<u8>), // context, correlation_id, data
-    ComPublishQueryResult(CorrelationId, Vec<u8>),  // correlation_id, data
+    ComPublishQueryResult(CorrelationId, Vec<u8>), // correlation_id, data
 
     // based on the configured subscription, sent from the outside to a function
     // results to calls made from within a function
@@ -96,7 +96,11 @@ fn encode(msg: DDA) -> Vec<u8> {
 
 // NOTE: this is WIP
 #[allow(dead_code)]
-fn call_through_dda<T>(event_name: &str, event: DDA, transform: Option<fn(DDA) -> Result<T, String>>) -> Result<T, String>
+fn call_through_dda<T>(
+    event_name: &str,
+    event: DDA,
+    transform: Option<fn(DDA) -> Result<T, String>>,
+) -> Result<T, String>
 where
     T: Default,
 {
@@ -143,7 +147,10 @@ pub fn publish_action(pub_alias: &str, data: Vec<u8>) -> Result<Vec<u8>, &'stati
     }
 }
 
-pub fn publish_action_result(correlation_id: String, result_data: Vec<u8>) -> Result<(), &'static str> {
+pub fn publish_action_result(
+    correlation_id: String,
+    result_data: Vec<u8>,
+) -> Result<(), &'static str> {
     let msg = DDA::ComPublishActionResult(correlation_id, result_data);
     match call("dda", encode(msg).as_slice()) {
         CallRet::Err => Err("publish_action_result: did not work"),
@@ -165,7 +172,10 @@ pub fn publish_query(pub_alias: &str, data: Vec<u8>) -> Result<Vec<u8>, &'static
     }
 }
 
-pub fn publish_query_result(correlation_id: String, result_data: Vec<u8>) -> Result<(), &'static str> {
+pub fn publish_query_result(
+    correlation_id: String,
+    result_data: Vec<u8>,
+) -> Result<(), &'static str> {
     let msg = DDA::ComPublishQueryResult(correlation_id, result_data);
     match call("dda", encode(msg).as_slice()) {
         CallRet::Err => Err("publish_query_result: did not work"),

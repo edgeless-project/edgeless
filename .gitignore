@@ -18,3 +18,9 @@ symbols.json
 .*bkp
 *.save
 build_functions.log
+
+# Anomaly Detection
+anomaly_detection/outputs/logs/*.log
+anomaly_detection/outputs/dataframes/*.csv
+anomaly_detection/outputs/dataframes/*.parquet
+

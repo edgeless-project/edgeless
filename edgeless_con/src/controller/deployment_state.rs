@@ -42,7 +42,10 @@ impl ActiveWorkflow {
         false
     }
 
-    pub fn mapped_fids(&self, component_name: &str) -> Option<Vec<edgeless_api::function_instance::ComponentId>> {
+    pub fn mapped_fids(
+        &self,
+        component_name: &str,
+    ) -> Option<Vec<edgeless_api::function_instance::ComponentId>> {
         let comp = self.domain_mapping.get(component_name)?;
         Some(vec![comp.lid])
     }
@@ -55,11 +58,13 @@ impl ActiveWorkflow {
     pub fn domain_mapping(&self) -> Vec<edgeless_api::workflow_instance::WorkflowFunctionMapping> {
         self.domain_mapping
             .iter()
-            .map(|(name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
-                name: name.clone(),
-                function_id: component.lid,
-                domain_id: component.domain_id.clone(),
-            })
+            .map(
+                |(name, component)| edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                    name: name.clone(),
+                    function_id: component.lid,
+                    domain_id: component.domain_id.clone(),
+                },
+            )
             .collect()
     }
 
@@ -76,7 +81,10 @@ impl ActiveWorkflow {
         component_names
     }
 
-    pub fn component_output_mapping(&self, component_name: &str) -> std::collections::HashMap<String, String> {
+    pub fn component_output_mapping(
+        &self,
+        component_name: &str,
+    ) -> std::collections::HashMap<String, String> {
         if let Some(function) = self
             .desired_state
             .workflow_functions
@@ -102,8 +110,16 @@ impl ActiveWorkflow {
 impl std::fmt::Display for ActiveComponent {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.component_type {
-            super::ComponentType::Function => write!(f, "function name {}, domain {}, fid {}", self.name, self.domain_id, self.lid),
-            super::ComponentType::Resource => write!(f, "resource name {}, domain {}, fid {}", self.name, self.domain_id, self.lid),
+            super::ComponentType::Function => write!(
+                f,
+                "function name {}, domain {}, fid {}",
+                self.name, self.domain_id, self.lid
+            ),
+            super::ComponentType::Resource => write!(
+                f,
+                "resource name {}, domain {}, fid {}",
+                self.name, self.domain_id, self.lid
+            ),
         }
     }
 }

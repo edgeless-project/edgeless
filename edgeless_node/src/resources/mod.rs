@@ -18,8 +18,11 @@ fn observe_transfer(
     telemetry_handle: &mut Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
 ) -> chrono::DateTime<chrono::Utc> {
     let now = chrono::Utc::now();
-    let created = chrono::DateTime::from_timestamp(created.secs, created.nsecs).unwrap_or(chrono::DateTime::UNIX_EPOCH);
-    let elapsed = (now - created).to_std().unwrap_or(std::time::Duration::ZERO);
+    let created = chrono::DateTime::from_timestamp(created.secs, created.nsecs)
+        .unwrap_or(chrono::DateTime::UNIX_EPOCH);
+    let elapsed = (now - created)
+        .to_std()
+        .unwrap_or(std::time::Duration::ZERO);
     telemetry_handle.observe(
         edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionTransfer(elapsed),
         std::collections::BTreeMap::new(),
@@ -33,7 +36,9 @@ fn observe_execution(
     need_reply: bool,
 ) {
     let now = chrono::Utc::now();
-    let elapsed = (now - started).to_std().unwrap_or(std::time::Duration::ZERO);
+    let elapsed = (now - started)
+        .to_std()
+        .unwrap_or(std::time::Duration::ZERO);
     let event_type = if need_reply { "CALL" } else { "CAST" };
     telemetry_handle.observe(
         edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(elapsed),

@@ -222,9 +222,12 @@ impl std::fmt::Display for FunctionLogEntry {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NodePerformanceSamples {
-    pub function_execution_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<Sample>>,
-    pub function_transfer_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<Sample>>,
-    pub function_log_entries: std::collections::HashMap<crate::function_instance::ComponentId, Vec<FunctionLogEntry>>,
+    pub function_execution_times:
+        std::collections::HashMap<crate::function_instance::ComponentId, Vec<Sample>>,
+    pub function_transfer_times:
+        std::collections::HashMap<crate::function_instance::ComponentId, Vec<Sample>>,
+    pub function_log_entries:
+        std::collections::HashMap<crate::function_instance::ComponentId, Vec<FunctionLogEntry>>,
 }
 
 impl std::fmt::Display for NodeHealthStatus {
@@ -318,7 +321,10 @@ pub enum UpdateNodeResponse {
 
 #[async_trait::async_trait]
 pub trait NodeRegistrationAPI: NodeRegistrationAPIClone + Sync + Send {
-    async fn update_node(&mut self, request: UpdateNodeRequest) -> anyhow::Result<UpdateNodeResponse>;
+    async fn update_node(
+        &mut self,
+        request: UpdateNodeRequest,
+    ) -> anyhow::Result<UpdateNodeResponse>;
 }
 
 impl std::fmt::Display for ResourceProviderSpecification {
@@ -328,7 +334,11 @@ impl std::fmt::Display for ResourceProviderSpecification {
             "provider_id {}, class_type {}, outputs [{}]",
             self.provider_id,
             self.class_type,
-            self.outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(","),
+            self.outputs
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<String>>()
+                .join(","),
         )
     }
 }

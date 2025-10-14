@@ -6,11 +6,20 @@
 macro_rules! export {
     ( $fun:ident ) => {
         #[no_mangle]
-        pub unsafe extern "C" fn handle_cast_asm(node_id_ptr: *mut u8, component_id_ptr: *mut u8, payload_ptr: *mut u8, payload_len: usize) {
+        pub unsafe extern "C" fn handle_cast_asm(
+            node_id_ptr: *mut u8,
+            component_id_ptr: *mut u8,
+            payload_ptr: *mut u8,
+            payload_len: usize,
+        ) {
             let payload: &[u8] = core::slice::from_raw_parts(payload_ptr, payload_len);
             let instance_id = InstanceId {
-                node_id: core::slice::from_raw_parts(node_id_ptr, 16).try_into().unwrap(),
-                component_id: core::slice::from_raw_parts(component_id_ptr, 16).try_into().unwrap(),
+                node_id: core::slice::from_raw_parts(node_id_ptr, 16)
+                    .try_into()
+                    .unwrap(),
+                component_id: core::slice::from_raw_parts(component_id_ptr, 16)
+                    .try_into()
+                    .unwrap(),
             };
 
             $fun::handle_cast(instance_id, payload);
@@ -28,8 +37,12 @@ macro_rules! export {
             let payload: &[u8] = core::slice::from_raw_parts(payload_ptr, payload_len);
 
             let instance_id = InstanceId {
-                node_id: core::slice::from_raw_parts(node_id_ptr, 16).try_into().unwrap(),
-                component_id: core::slice::from_raw_parts(node_id_ptr, 16).try_into().unwrap(),
+                node_id: core::slice::from_raw_parts(node_id_ptr, 16)
+                    .try_into()
+                    .unwrap(),
+                component_id: core::slice::from_raw_parts(node_id_ptr, 16)
+                    .try_into()
+                    .unwrap(),
             };
 
             let ret = $fun::handle_call(instance_id, payload);
@@ -60,7 +73,10 @@ macro_rules! export {
             };
 
             let serialized_state = if serialized_state_len > 0 {
-                Some(core::slice::from_raw_parts(serialized_state_ptr, serialized_state_len))
+                Some(core::slice::from_raw_parts(
+                    serialized_state_ptr,
+                    serialized_state_len,
+                ))
             } else {
                 None
             };

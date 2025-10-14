@@ -28,8 +28,12 @@ pub struct OrchestrationLogic {
 impl OrchestrationLogic {
     pub fn new(orchestration_strategy: crate::OrchestrationStrategy) -> Self {
         match orchestration_strategy {
-            crate::OrchestrationStrategy::Random => log::info!("Orchestration logic strategy: random"),
-            crate::OrchestrationStrategy::RoundRobin => log::info!("Orchestration logic strategy: round-robin"),
+            crate::OrchestrationStrategy::Random => {
+                log::info!("Orchestration logic strategy: random")
+            }
+            crate::OrchestrationStrategy::RoundRobin => {
+                log::info!("Orchestration logic strategy: round-robin")
+            }
         };
 
         Self {
@@ -46,7 +50,10 @@ impl OrchestrationLogic {
     pub fn update_nodes(
         &mut self,
         clients: &std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>,
-        resource_providers: &std::collections::HashMap<String, crate::resource_provider::ResourceProvider>,
+        resource_providers: &std::collections::HashMap<
+            String,
+            crate::resource_provider::ResourceProvider,
+        >,
     ) {
         // Refresh the nodes and weights data structures with the current set of nodes and their capabilities.
         self.nodes.clear();
@@ -67,7 +74,9 @@ impl OrchestrationLogic {
                     .map(|(name, _)| name.clone())
                     .collect(),
             );
-            let mut weight = (std::cmp::max(desc.capabilities.num_cores, desc.capabilities.num_cpus) as f32) * desc.capabilities.clock_freq_cpu;
+            let mut weight = (std::cmp::max(desc.capabilities.num_cores, desc.capabilities.num_cpus)
+                as f32)
+                * desc.capabilities.clock_freq_cpu;
             if weight == 0.0 {
                 // Force a vanishing weight to an arbitrary value.
                 weight = 1.0;
@@ -81,14 +90,20 @@ impl OrchestrationLogic {
     }
 
     /// Filter only the nodes on which the given function can be deployed.
-    pub fn feasible_nodes(&self, spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest, nodes: &Vec<uuid::Uuid>) -> Vec<uuid::Uuid> {
+    pub fn feasible_nodes(
+        &self,
+        spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest,
+        nodes: &Vec<uuid::Uuid>,
+    ) -> Vec<uuid::Uuid> {
         let mut candidates = vec![];
 
         for candidate in nodes {
             if let Some(ndx) = self.nodes.iter().position(|&x| x == *candidate) {
                 if OrchestrationLogic::is_node_feasible(
                     &spawn_req.code.function_class_type,
-                    &crate::deployment_requirements::DeploymentRequirements::from_annotations(&spawn_req.annotations),
+                    &crate::deployment_requirements::DeploymentRequirements::from_annotations(
+                        &spawn_req.annotations,
+                    ),
                     &self.nodes[ndx],
                     &self.capabilities[ndx],
                     &self.resource_providers[ndx],
@@ -150,11 +165,16 @@ impl OrchestrationLogic {
     /// based on a general orchestration strategy as defined in the settings.
     /// Always match the deployment requirements specified with the nodes'
     /// capabilities.
-    pub fn next(&mut self, spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest) -> Option<uuid::Uuid> {
+    pub fn next(
+        &mut self,
+        spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest,
+    ) -> Option<uuid::Uuid> {
         if self.nodes.is_empty() {
             return None;
         }
-        let reqs = crate::deployment_requirements::DeploymentRequirements::from_annotations(&spawn_req.annotations);
+        let reqs = crate::deployment_requirements::DeploymentRequirements::from_annotations(
+            &spawn_req.annotations,
+        );
         match self.orchestration_strategy {
             crate::OrchestrationStrategy::Random => {
                 // Select only the nodes that are feasible.
@@ -228,108 +248,148 @@ mod tests {
         let mut runtime = "RUST_WASM".to_string();
 
         // Empty requirements
-        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         // Match any node_id
         reqs.node_id_match_any.push(node_id);
-        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         reqs.node_id_match_any.push(uuid::Uuid::new_v4());
-        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         reqs.node_id_match_any.clear();
         reqs.node_id_match_any.push(uuid::Uuid::new_v4());
-        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            !crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
         reqs.node_id_match_any.clear();
 
         // Match all labels
         reqs.label_match_all.push("red".to_string());
         caps.labels.push("green".to_string());
-        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            !crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         caps.labels.push("red".to_string());
-        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         reqs.label_match_all.push("blue".to_string());
-        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            !crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         caps.labels.push("blue".to_string());
-        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         // Match all providers
         reqs.resource_match_all.push("file-1".to_string());
-        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            !crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         providers.insert("file-1".to_string());
-        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         providers.insert("file-2".to_string());
         providers.insert("file-3".to_string());
-        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         reqs.resource_match_all.push("file-9".to_string());
-        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            !crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         providers.insert("file-9".to_string());
-        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         // Match TEE and TPM
         reqs.tee = AffinityLevel::Required;
-        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            !crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
         caps.is_tee_running = true;
-        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         reqs.tpm = AffinityLevel::Required;
-        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            !crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
         caps.has_tpm = true;
-        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
 
         // Match runtime
         runtime = "CONTAINER".to_string();
-        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            !crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
         runtime = "".to_string();
-        assert!(!crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            !crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
         runtime = "RUST_WASM".to_string();
-        assert!(crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
-            &runtime, &reqs, &node_id, &caps, &providers
-        ));
+        assert!(
+            crate::orchestration_logic::OrchestrationLogic::is_node_feasible(
+                &runtime, &reqs, &node_id, &caps, &providers
+            )
+        );
     }
 }

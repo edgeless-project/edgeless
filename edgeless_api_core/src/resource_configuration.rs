@@ -15,7 +15,11 @@ pub struct EncodedPatchRequest<'a> {
 }
 
 impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
         let mut e = e.str(self.class_type)?;
         {
             e = e.array(self.configuration.len() as u64)?;
@@ -28,7 +32,10 @@ impl<C> minicbor::Encode<C> for EncodedResourceInstanceSpecification<'_> {
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for EncodedResourceInstanceSpecification<'b> {
-    fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+    fn decode(
+        d: &mut minicbor::Decoder<'b>,
+        _ctx: &mut C,
+    ) -> Result<Self, minicbor::decode::Error> {
         let id = d.str()?;
         let mut configuration = heapless::Vec::<(&'b str, &'b str), 16>::new();
 
@@ -54,7 +61,11 @@ impl<C> minicbor::CborLen<C> for EncodedResourceInstanceSpecification<'_> {
 }
 
 impl<C> minicbor::Encode<C> for EncodedPatchRequest<'_> {
-    fn encode<W: minicbor::encode::Write>(&self, e: &mut minicbor::Encoder<W>, _ctx: &mut C) -> Result<(), minicbor::encode::Error<W::Error>> {
+    fn encode<W: minicbor::encode::Write>(
+        &self,
+        e: &mut minicbor::Encoder<W>,
+        _ctx: &mut C,
+    ) -> Result<(), minicbor::encode::Error<W::Error>> {
         let mut e = e.encode(self.instance_id)?;
         {
             let mut true_callbacks_size: u64 = 0;
@@ -73,12 +84,20 @@ impl<C> minicbor::Encode<C> for EncodedPatchRequest<'_> {
 }
 
 impl<'b, C> minicbor::Decode<'b, C> for EncodedPatchRequest<'b> {
-    fn decode(d: &mut minicbor::Decoder<'b>, _ctx: &mut C) -> Result<Self, minicbor::decode::Error> {
+    fn decode(
+        d: &mut minicbor::Decoder<'b>,
+        _ctx: &mut C,
+    ) -> Result<Self, minicbor::decode::Error> {
         let id = d.decode::<crate::instance_id::InstanceId>()?;
 
         let mut outputs: [Option<(&'b str, crate::instance_id::InstanceId)>; 16] = [None; 16];
 
-        for (outputs_i, item) in d.array_iter::<(&str, crate::instance_id::InstanceId)>().unwrap().flatten().enumerate() {
+        for (outputs_i, item) in d
+            .array_iter::<(&str, crate::instance_id::InstanceId)>()
+            .unwrap()
+            .flatten()
+            .enumerate()
+        {
             outputs[outputs_i] = Some(item);
         }
 
@@ -93,7 +112,10 @@ impl<C> minicbor::CborLen<C> for EncodedPatchRequest<'_> {
     fn cbor_len(&self, ctx: &mut C) -> usize {
         let mut len: usize = self.instance_id.cbor_len(ctx);
 
-        let mut outputs: [(&str, crate::instance_id::InstanceId); 16] = [("" as &str, crate::instance_id::InstanceId::new(uuid::Uuid::new_v4())); 16];
+        let mut outputs: [(&str, crate::instance_id::InstanceId); 16] = [(
+            "" as &str,
+            crate::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
+        ); 16];
 
         let mut num_valid_entries = 0;
         for (outputs_i, (key, val)) in self.output_mapping.into_iter().flatten().enumerate() {
@@ -116,7 +138,12 @@ mod test {
         let mut outputs = heapless::Vec::<(&str, crate::instance_id::InstanceId), 16>::new();
         let configuration = heapless::Vec::<(&str, &str), 16>::new();
 
-        outputs.push(("foo", crate::instance_id::InstanceId::new(uuid::Uuid::new_v4()))).unwrap();
+        outputs
+            .push((
+                "foo",
+                crate::instance_id::InstanceId::new(uuid::Uuid::new_v4()),
+            ))
+            .unwrap();
 
         let id = super::EncodedResourceInstanceSpecification {
             class_type: "class-1",
@@ -127,7 +154,8 @@ mod test {
 
         let len = minicbor::len(id);
 
-        let _id2: super::EncodedResourceInstanceSpecification = minicbor::decode(&buffer[..len]).unwrap();
+        let _id2: super::EncodedResourceInstanceSpecification =
+            minicbor::decode(&buffer[..len]).unwrap();
 
         // assert_eq!(id, id2);
     }

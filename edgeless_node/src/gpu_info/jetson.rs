@@ -126,7 +126,10 @@ pub fn jetson_get_gpu_load() -> i32 {
 pub fn jetson_get_model_name_gpu() -> String {
     if let Ok(contents) = fs::read_to_string("/sys/firmware/devicetree/base/model") {
         // it also trims all non-printable characters like \0 or \n that may exist at the end
-        return contents.chars().filter(|c| c.is_ascii_graphic() || c.is_whitespace()).collect();
+        return contents
+            .chars()
+            .filter(|c| c.is_ascii_graphic() || c.is_whitespace())
+            .collect();
     }
 
     "".to_string()
@@ -199,5 +202,7 @@ pub fn jetson_get_num_gpus() -> i32 {
 /// # Returns
 /// * `bool` - True if running on a Jetson board, otherwise false.
 pub fn is_jetson_board() -> bool {
-    jetson_get_model_name_gpu().to_lowercase().contains("jetson")
+    jetson_get_model_name_gpu()
+        .to_lowercase()
+        .contains("jetson")
 }

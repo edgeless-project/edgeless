@@ -7,9 +7,18 @@ use warp::Filter;
 /// Prometheus collects metrics from targets by scraping metrics HTTP targets. This struct defines that.
 pub struct PrometheusEventTarget {
     _registry: std::sync::Arc<tokio::sync::Mutex<prometheus_client::registry::Registry>>,
-    function_count: prometheus_client::metrics::family::Family<RuntimeLabels, prometheus_client::metrics::gauge::Gauge>,
-    execution_times: prometheus_client::metrics::family::Family<ExecutionLabels, prometheus_client::metrics::histogram::Histogram>,
-    transfer_times: prometheus_client::metrics::family::Family<TransferLabels, prometheus_client::metrics::histogram::Histogram>,
+    function_count: prometheus_client::metrics::family::Family<
+        RuntimeLabels,
+        prometheus_client::metrics::gauge::Gauge,
+    >,
+    execution_times: prometheus_client::metrics::family::Family<
+        ExecutionLabels,
+        prometheus_client::metrics::histogram::Histogram,
+    >,
+    transfer_times: prometheus_client::metrics::family::Family<
+        TransferLabels,
+        prometheus_client::metrics::histogram::Histogram,
+    >,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, prometheus_client::encoding::EncodeLabelSet)]
@@ -49,40 +58,61 @@ struct TransferLabels {
 
 impl PrometheusEventTarget {
     pub async fn new(endpoint: &str) -> Self {
-        let registry = std::sync::Arc::new(tokio::sync::Mutex::new(<prometheus_client::registry::Registry>::default()));
+        let registry = std::sync::Arc::new(tokio::sync::Mutex::new(
+            <prometheus_client::registry::Registry>::default(),
+        ));
 
-        let function_count = prometheus_client::metrics::family::Family::<RuntimeLabels, prometheus_client::metrics::gauge::Gauge>::default();
+        let function_count = prometheus_client::metrics::family::Family::<
+            RuntimeLabels,
+            prometheus_client::metrics::gauge::Gauge,
+        >::default();
 
-        let execution_times =
-            prometheus_client::metrics::family::Family::<ExecutionLabels, prometheus_client::metrics::histogram::Histogram>::new_with_constructor(
-                || {
-                    let buckets = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
-                    prometheus_client::metrics::histogram::Histogram::new(buckets.into_iter())
-                },
-            );
+        let execution_times = prometheus_client::metrics::family::Family::<
+            ExecutionLabels,
+            prometheus_client::metrics::histogram::Histogram,
+        >::new_with_constructor(|| {
+            let buckets = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+            prometheus_client::metrics::histogram::Histogram::new(buckets.into_iter())
+        });
 
-        let transfer_times =
-            prometheus_client::metrics::family::Family::<TransferLabels, prometheus_client::metrics::histogram::Histogram>::new_with_constructor(
-                || {
-                    let buckets = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
-                    prometheus_client::metrics::histogram::Histogram::new(buckets.into_iter())
-                },
-            );
+        let transfer_times = prometheus_client::metrics::family::Family::<
+            TransferLabels,
+            prometheus_client::metrics::histogram::Histogram,
+        >::new_with_constructor(|| {
+            let buckets = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0];
+            prometheus_client::metrics::histogram::Histogram::new(buckets.into_iter())
+        });
 
-        registry.lock().await.register("function_count", "", function_count.clone());
-        registry.lock().await.register("execution_times", "", execution_times.clone());
-        registry.lock().await.register("transfer_times", "", transfer_times.clone());
+        registry
+            .lock()
+            .await
+            .register("function_count", "", function_count.clone());
+        registry
+            .lock()
+            .await
+            .register("execution_times", "", execution_times.clone());
+        registry
+            .lock()
+            .await
+            .register("transfer_times", "", transfer_times.clone());
 
         let reg_clone = registry.clone();
-        let socket_addr: std::net::SocketAddr = endpoint.parse().unwrap_or_else(|_| panic!("invalid endpoint: {}", &endpoint));
+        let socket_addr: std::net::SocketAddr = endpoint
+            .parse()
+            .unwrap_or_else(|_| panic!("invalid endpoint: {}", &endpoint));
         tokio::spawn(async move {
             let metric_handler = warp::path("metrics").then(move || {
                 let cloned = reg_clone.clone();
                 async move {
                     let mut buffer = String::new();
-                    match prometheus_client::encoding::text::encode(&mut buffer, &*cloned.lock().await) {
+                    match prometheus_client::encoding::text::encode(
+                        &mut buffer,
+                        &*cloned.lock().await,
+                    ) {
                         Ok(_) => warp::http::Response::builder().body(buffer),
-                        Err(_) => warp::http::Response::builder().status(500).body("".to_string()),
+                        Err(_) => warp::http::Response::builder()
+                            .status(500)
+                            .body("".to_string()),
                     }
                 }
             });
@@ -107,7 +137,9 @@ impl crate::telemetry_events::EventProcessor for PrometheusEventTarget {
     ) -> crate::telemetry_events::TelemetryProcessingResult {
         match event {
             crate::telemetry_events::TelemetryEvent::FunctionInstantiate(_) => {
-                if let (Some(node_id), Some(function_type)) = (event_tags.get("NODE_ID"), event_tags.get("FUNCTION_TYPE")) {
+                if let (Some(node_id), Some(function_type)) =
+                    (event_tags.get("NODE_ID"), event_tags.get("FUNCTION_TYPE"))
+                {
                     self.function_count
                         .get_or_create(&RuntimeLabels {
                             node_id: node_id.to_string(),
@@ -117,7 +149,9 @@ impl crate::telemetry_events::EventProcessor for PrometheusEventTarget {
                 }
             }
             crate::telemetry_events::TelemetryEvent::FunctionExit(_) => {
-                if let (Some(node_id), Some(function_type)) = (event_tags.get("NODE_ID"), event_tags.get("FUNCTION_TYPE")) {
+                if let (Some(node_id), Some(function_type)) =
+                    (event_tags.get("NODE_ID"), event_tags.get("FUNCTION_TYPE"))
+                {
                     self.function_count
                         .get_or_create(&RuntimeLabels {
                             node_id: node_id.to_string(),
@@ -127,12 +161,16 @@ impl crate::telemetry_events::EventProcessor for PrometheusEventTarget {
                 }
             }
             crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(lat) => {
-                if let (Some(node_id), Some(function_id), Some(invoction_type)) =
-                    (event_tags.get("NODE_ID"), event_tags.get("FUNCTION_ID"), event_tags.get("EVENT_TYPE"))
-                {
-                    let function_type = if let Some(function_type) = event_tags.get("FUNCTION_TYPE") {
+                if let (Some(node_id), Some(function_id), Some(invoction_type)) = (
+                    event_tags.get("NODE_ID"),
+                    event_tags.get("FUNCTION_ID"),
+                    event_tags.get("EVENT_TYPE"),
+                ) {
+                    let function_type = if let Some(function_type) = event_tags.get("FUNCTION_TYPE")
+                    {
                         function_type.to_string()
-                    } else if let Some(resource_class_type) = event_tags.get("RESOURCE_CLASS_TYPE") {
+                    } else if let Some(resource_class_type) = event_tags.get("RESOURCE_CLASS_TYPE")
+                    {
                         resource_class_type.to_string()
                     } else {
                         String::default()
@@ -151,7 +189,9 @@ impl crate::telemetry_events::EventProcessor for PrometheusEventTarget {
                 }
             }
             crate::telemetry_events::TelemetryEvent::FunctionTransfer(lat) => {
-                if let (Some(node_id), Some(function_id)) = (event_tags.get("NODE_ID"), event_tags.get("FUNCTION_ID")) {
+                if let (Some(node_id), Some(function_id)) =
+                    (event_tags.get("NODE_ID"), event_tags.get("FUNCTION_ID"))
+                {
                     self.transfer_times
                         .get_or_create(&TransferLabels {
                             node_id: node_id.to_string(),

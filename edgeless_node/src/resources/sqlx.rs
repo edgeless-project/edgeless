@@ -21,7 +21,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for SqlxResourceSpec 
     }
 
     fn configurations(&self) -> std::collections::HashMap<String, String> {
-        std::collections::HashMap::from([(String::from("url"), String::from("URL of the SQLite database"))])
+        std::collections::HashMap::from([(
+            String::from("url"),
+            String::from("URL of the SQLite database"),
+        )])
     }
 
     fn version(&self) -> String {
@@ -113,7 +116,10 @@ impl SqlxResource {
 
                 if message_data.to_string().contains("SELECT") {
                     let result: sqlx::Result<WorkflowState, sqlx::Error> =
-                        sqlx::query_as(message_data.as_str()).bind(workflow_id).fetch_one(&db).await;
+                        sqlx::query_as(message_data.as_str())
+                            .bind(workflow_id)
+                            .fetch_one(&db)
+                            .await;
 
                     match result {
                         Ok(response) => {
@@ -123,7 +129,9 @@ impl SqlxResource {
                                     .reply(
                                         source_id,
                                         channel_id,
-                                        edgeless_dataplane::core::CallRet::Reply(serde_json::to_string(&response).unwrap_or_default()),
+                                        edgeless_dataplane::core::CallRet::Reply(
+                                            serde_json::to_string(&response).unwrap_or_default(),
+                                        ),
                                         &metadata,
                                     )
                                     .await;
@@ -132,7 +140,12 @@ impl SqlxResource {
                         Err(e) => {
                             log::info!("Response from database: {:?}", e.to_string());
                             dataplane_handle
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(e.to_string()), &metadata)
+                                .reply(
+                                    source_id,
+                                    channel_id,
+                                    edgeless_dataplane::core::CallRet::Reply(e.to_string()),
+                                    &metadata,
+                                )
                                 .await;
                         }
                     }
@@ -140,7 +153,10 @@ impl SqlxResource {
                     || message_data.to_string().contains("UPDATE")
                     || message_data.to_string().contains("DELETE")
                 {
-                    let result = sqlx::query(message_data.as_str()).bind(workflow_id).execute(&db).await;
+                    let result = sqlx::query(message_data.as_str())
+                        .bind(workflow_id)
+                        .execute(&db)
+                        .await;
                     match result {
                         Ok(response) => {
                             log::info!("Response from database: {:?}", response);
@@ -151,7 +167,12 @@ impl SqlxResource {
                                     response.last_insert_rowid()
                                 );
                                 dataplane_handle
-                                    .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(res), &metadata)
+                                    .reply(
+                                        source_id,
+                                        channel_id,
+                                        edgeless_dataplane::core::CallRet::Reply(res),
+                                        &metadata,
+                                    )
                                     .await;
                             }
                         }
@@ -159,14 +180,24 @@ impl SqlxResource {
                         Err(e) => {
                             log::info!("Error from state management: {:?}", e);
                             dataplane_handle
-                                .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply(e.to_string()), &metadata)
+                                .reply(
+                                    source_id,
+                                    channel_id,
+                                    edgeless_dataplane::core::CallRet::Reply(e.to_string()),
+                                    &metadata,
+                                )
                                 .await;
                         }
                     }
                 } else {
                     log::info!("Unknow operation in state management");
                     dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Err, &metadata)
+                        .reply(
+                            source_id,
+                            channel_id,
+                            edgeless_dataplane::core::CallRet::Err,
+                            &metadata,
+                        )
                         .await;
                 };
 
@@ -175,7 +206,9 @@ impl SqlxResource {
             }
         });
 
-        Ok(Self { join_handle: handle })
+        Ok(Self {
+            join_handle: handle,
+        })
     }
 }
 
@@ -190,31 +223,48 @@ impl SqlxResourceProvider {
                 resource_provider_id,
                 dataplane_provider,
                 telemetry_handle,
-                instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, SqlxResource>::new(),
+                instances: std::collections::HashMap::<
+                    edgeless_api::function_instance::InstanceId,
+                    SqlxResource,
+                >::new(),
             })),
         }
     }
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for SqlxResourceProvider {
+impl
+    edgeless_api::resource_configuration::ResourceConfigurationAPI<
+        edgeless_api::function_instance::InstanceId,
+    > for SqlxResourceProvider
+{
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
-        if let (Some(url), workflow_id) = (instance_specification.configuration.get("url"), instance_specification.workflow_id) {
+    ) -> anyhow::Result<
+        edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>,
+    > {
+        if let (Some(url), workflow_id) = (
+            instance_specification.configuration.get("url"),
+            instance_specification.workflow_id,
+        ) {
             let mut lck = self.inner.lock().await;
-            let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
+            let new_id =
+                edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
-            let telemetry_handle = lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
-                "FUNCTION_ID".to_string(),
-                new_id.function_id.to_string(),
-            )]));
+            let telemetry_handle = lck
+                .telemetry_handle
+                .fork(std::collections::BTreeMap::from([(
+                    "FUNCTION_ID".to_string(),
+                    new_id.function_id.to_string(),
+                )]));
 
             match SqlxResource::new(dataplane_handle, telemetry_handle, url, &workflow_id).await {
                 Ok(resource) => {
                     lck.instances.insert(new_id, resource);
-                    return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
+                    return Ok(edgeless_api::common::StartComponentResponse::InstanceId(
+                        new_id,
+                    ));
                 }
                 Err(err) => {
                     return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
@@ -235,7 +285,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         ))
     }
 
-    async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+    async fn stop(
+        &mut self,
+        resource_id: edgeless_api::function_instance::InstanceId,
+    ) -> anyhow::Result<()> {
         self.inner.lock().await.instances.remove(&resource_id);
         Ok(())
     }

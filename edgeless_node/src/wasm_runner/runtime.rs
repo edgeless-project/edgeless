@@ -30,7 +30,11 @@ impl crate::base_runtime::runtime::GuestAPIHostRegister for WasmRuntime {
     ) {
     }
 
-    fn deregister_guest_api_host(&mut self, _instance_id: &edgeless_api::function_instance::InstanceId) {}
+    fn deregister_guest_api_host(
+        &mut self,
+        _instance_id: &edgeless_api::function_instance::InstanceId,
+    ) {
+    }
 
     fn guest_api_host(
         &mut self,

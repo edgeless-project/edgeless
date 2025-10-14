@@ -31,14 +31,20 @@ impl Drop for OwnedByteBuff {
 
 impl OwnedByteBuff {
     pub(crate) unsafe fn new(ptr: *mut u8, len: usize) -> Self {
-        Self { data: ptr, size: len }
+        Self {
+            data: ptr,
+            size: len,
+        }
     }
 
     pub fn new_from_slice(data: &[u8]) -> Self {
         unsafe {
             let ptr = crate::memory::edgeless_mem_alloc(data.len());
             core::slice::from_raw_parts_mut(ptr, data.len()).copy_from_slice(data);
-            Self { data: ptr, size: data.len() }
+            Self {
+                data: ptr,
+                size: data.len(),
+            }
         }
     }
 

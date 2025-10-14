@@ -7,17 +7,25 @@ use std::str::FromStr;
 
 #[derive(Clone)]
 pub struct NodeRegistrationClient {
-    client: Option<crate::grpc_impl::api::node_registration_client::NodeRegistrationClient<tonic::transport::Channel>>,
+    client: Option<
+        crate::grpc_impl::api::node_registration_client::NodeRegistrationClient<
+            tonic::transport::Channel,
+        >,
+    >,
     server_addr: String,
 }
 
 pub struct NodeRegistrationAPIService {
-    pub node_registration_api: tokio::sync::Mutex<Box<dyn crate::node_registration::NodeRegistrationAPI>>,
+    pub node_registration_api:
+        tokio::sync::Mutex<Box<dyn crate::node_registration::NodeRegistrationAPI>>,
 }
 
 impl NodeRegistrationClient {
     pub fn new(server_addr: String) -> Self {
-        Self { client: None, server_addr }
+        Self {
+            client: None,
+            server_addr,
+        }
     }
 
     /// Try connecting, if not already connected.
@@ -52,11 +60,18 @@ impl crate::node_registration::NodeRegistrationAPI for NodeRegistrationClient {
         match self.try_connect().await {
             Ok(_) => {
                 if let Some(client) = &mut self.client {
-                    match client.update_node(tonic::Request::new(serialize_update_node_request(&request))).await {
+                    match client
+                        .update_node(tonic::Request::new(serialize_update_node_request(&request)))
+                        .await
+                    {
                         Ok(res) => parse_update_node_response(&res.into_inner()),
                         Err(err) => {
                             self.disconnect();
-                            Err(anyhow::anyhow!("Error when updating a node at {}: {}", self.server_addr, err.to_string()))
+                            Err(anyhow::anyhow!(
+                                "Error when updating a node at {}: {}",
+                                self.server_addr,
+                                err.to_string()
+                            ))
                         }
                     }
                 } else {
@@ -71,7 +86,9 @@ impl crate::node_registration::NodeRegistrationAPI for NodeRegistrationClient {
 }
 
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::node_registration_server::NodeRegistration for NodeRegistrationAPIService {
+impl crate::grpc_impl::api::node_registration_server::NodeRegistration
+    for NodeRegistrationAPIService
+{
     async fn update_node(
         &self,
         request: tonic::Request<crate::grpc_impl::api::UpdateNodeRequest>,
@@ -86,14 +103,25 @@ impl crate::grpc_impl::api::node_registration_server::NodeRegistration for NodeR
                 )));
             }
         };
-        match self.node_registration_api.lock().await.update_node(parsed_request).await {
+        match self
+            .node_registration_api
+            .lock()
+            .await
+            .update_node(parsed_request)
+            .await
+        {
             Ok(res) => Ok(tonic::Response::new(serialize_update_node_response(&res))),
-            Err(err) => Err(tonic::Status::internal(format!("Error when updating a node: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!(
+                "Error when updating a node: {}",
+                err
+            ))),
         }
     }
 }
 
-fn parse_node_capabilities(api_instance: &crate::grpc_impl::api::NodeCapabilities) -> crate::node_registration::NodeCapabilities {
+fn parse_node_capabilities(
+    api_instance: &crate::grpc_impl::api::NodeCapabilities,
+) -> crate::node_registration::NodeCapabilities {
     crate::node_registration::NodeCapabilities {
         num_cpus: api_instance.num_cpus,
         model_name_cpu: api_instance.model_name_cpu.clone(),
@@ -111,7 +139,9 @@ fn parse_node_capabilities(api_instance: &crate::grpc_impl::api::NodeCapabilitie
     }
 }
 
-fn serialize_node_capabilities(req: &crate::node_registration::NodeCapabilities) -> crate::grpc_impl::api::NodeCapabilities {
+fn serialize_node_capabilities(
+    req: &crate::node_registration::NodeCapabilities,
+) -> crate::grpc_impl::api::NodeCapabilities {
     crate::grpc_impl::api::NodeCapabilities {
         num_cpus: req.num_cpus,
         model_name_cpu: req.model_name_cpu.clone(),
@@ -129,14 +159,19 @@ fn serialize_node_capabilities(req: &crate::node_registration::NodeCapabilities)
     }
 }
 
-fn parse_update_node_request(api_instance: &crate::grpc_impl::api::UpdateNodeRequest) -> anyhow::Result<crate::node_registration::UpdateNodeRequest> {
+fn parse_update_node_request(
+    api_instance: &crate::grpc_impl::api::UpdateNodeRequest,
+) -> anyhow::Result<crate::node_registration::UpdateNodeRequest> {
     let node_id = uuid::Uuid::from_str(api_instance.node_id.as_str())?;
     let mut resource_providers = vec![];
     for resource_provider in &api_instance.resource_providers {
         match parse_resource_provider_specification(resource_provider) {
             Ok(val) => resource_providers.push(val),
             Err(err) => {
-                return Err(anyhow::anyhow!("Ill-formed resource provider in UpdateNodeRequest message: {}", err));
+                return Err(anyhow::anyhow!(
+                    "Ill-formed resource provider in UpdateNodeRequest message: {}",
+                    err
+                ));
             }
         }
     }
@@ -146,7 +181,8 @@ fn parse_update_node_request(api_instance: &crate::grpc_impl::api::UpdateNodeReq
         agent_url: api_instance.agent_url.clone(),
         invocation_url: api_instance.invocation_url.clone(),
         resource_providers,
-        refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(api_instance.refresh_deadline),
+        refresh_deadline: std::time::UNIX_EPOCH
+            + std::time::Duration::from_secs(api_instance.refresh_deadline),
         capabilities: match &api_instance.capabilities {
             Some(val) => parse_node_capabilities(val),
             None => crate::node_registration::NodeCapabilities::default(),
@@ -163,15 +199,23 @@ fn parse_update_node_request(api_instance: &crate::grpc_impl::api::UpdateNodeReq
     })
 }
 
-fn serialize_update_node_response(req: &crate::node_registration::UpdateNodeResponse) -> crate::grpc_impl::api::UpdateNodeResponse {
+fn serialize_update_node_response(
+    req: &crate::node_registration::UpdateNodeResponse,
+) -> crate::grpc_impl::api::UpdateNodeResponse {
     match req {
-        crate::node_registration::UpdateNodeResponse::ResponseError(err) => crate::grpc_impl::api::UpdateNodeResponse {
-            response_error: Some(crate::grpc_impl::api::ResponseError {
-                summary: err.summary.clone(),
-                detail: err.detail.clone(),
-            }),
-        },
-        crate::node_registration::UpdateNodeResponse::Accepted => crate::grpc_impl::api::UpdateNodeResponse { response_error: None },
+        crate::node_registration::UpdateNodeResponse::ResponseError(err) => {
+            crate::grpc_impl::api::UpdateNodeResponse {
+                response_error: Some(crate::grpc_impl::api::ResponseError {
+                    summary: err.summary.clone(),
+                    detail: err.detail.clone(),
+                }),
+            }
+        }
+        crate::node_registration::UpdateNodeResponse::Accepted => {
+            crate::grpc_impl::api::UpdateNodeResponse {
+                response_error: None,
+            }
+        }
     }
 }
 
@@ -189,14 +233,24 @@ fn parse_update_node_response(
     }
 }
 
-fn serialize_update_node_request(req: &crate::node_registration::UpdateNodeRequest) -> crate::grpc_impl::api::UpdateNodeRequest {
+fn serialize_update_node_request(
+    req: &crate::node_registration::UpdateNodeRequest,
+) -> crate::grpc_impl::api::UpdateNodeRequest {
     crate::grpc_impl::api::UpdateNodeRequest {
         node_id: req.node_id.to_string(),
         agent_url: req.agent_url.clone(),
         invocation_url: req.invocation_url.clone(),
-        resource_providers: req.resource_providers.iter().map(serialize_resource_provider_specification).collect(),
+        resource_providers: req
+            .resource_providers
+            .iter()
+            .map(serialize_resource_provider_specification)
+            .collect(),
         capabilities: Some(serialize_node_capabilities(&req.capabilities)),
-        refresh_deadline: req.refresh_deadline.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+        refresh_deadline: req
+            .refresh_deadline
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
         nonce: req.nonce,
         health_status: Some(serialize_node_health_status(&req.health_status)),
         performance_samples: Some(serialize_node_performance_samples(&req.performance_samples)),
@@ -233,7 +287,9 @@ fn serialize_resource_provider_specification(
     }
 }
 
-fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealthStatus) -> crate::node_registration::NodeHealthStatus {
+fn parse_node_health_status(
+    api_instance: &crate::grpc_impl::api::NodeHealthStatus,
+) -> crate::node_registration::NodeHealthStatus {
     crate::node_registration::NodeHealthStatus {
         mem_free: api_instance.mem_free,
         mem_used: api_instance.mem_used,
@@ -259,7 +315,9 @@ fn parse_node_health_status(api_instance: &crate::grpc_impl::api::NodeHealthStat
     }
 }
 
-fn serialize_node_health_status(req: &crate::node_registration::NodeHealthStatus) -> crate::grpc_impl::api::NodeHealthStatus {
+fn serialize_node_health_status(
+    req: &crate::node_registration::NodeHealthStatus,
+) -> crate::grpc_impl::api::NodeHealthStatus {
     crate::grpc_impl::api::NodeHealthStatus {
         mem_free: req.mem_free,
         mem_used: req.mem_used,
@@ -293,7 +351,9 @@ fn parse_sample(api_instance: &crate::grpc_impl::api::Sample) -> crate::node_reg
     }
 }
 
-fn parse_function_log_entry(api_instance: &crate::grpc_impl::api::FunctionLogEntry) -> crate::node_registration::FunctionLogEntry {
+fn parse_function_log_entry(
+    api_instance: &crate::grpc_impl::api::FunctionLogEntry,
+) -> crate::node_registration::FunctionLogEntry {
     crate::node_registration::FunctionLogEntry {
         timestamp_sec: api_instance.timestamp_sec,
         timestamp_ns: api_instance.timestamp_ns,
@@ -302,7 +362,9 @@ fn parse_function_log_entry(api_instance: &crate::grpc_impl::api::FunctionLogEnt
     }
 }
 
-fn parse_node_performance_samples(api_instance: &crate::grpc_impl::api::NodePerformanceSamples) -> crate::node_registration::NodePerformanceSamples {
+fn parse_node_performance_samples(
+    api_instance: &crate::grpc_impl::api::NodePerformanceSamples,
+) -> crate::node_registration::NodePerformanceSamples {
     crate::node_registration::NodePerformanceSamples {
         function_execution_times: api_instance
             .function_execution_times
@@ -324,7 +386,10 @@ fn parse_node_performance_samples(api_instance: &crate::grpc_impl::api::NodePerf
             .function_log_entries
             .iter()
             .filter_map(|x| match uuid::Uuid::from_str(&x.id) {
-                Ok(val) => Some((val, x.entries.iter().map(parse_function_log_entry).collect())),
+                Ok(val) => Some((
+                    val,
+                    x.entries.iter().map(parse_function_log_entry).collect(),
+                )),
                 _ => None,
             })
             .collect(),
@@ -339,7 +404,9 @@ fn serialize_sample(req: &crate::node_registration::Sample) -> crate::grpc_impl:
     }
 }
 
-fn serialize_function_log_entry(req: &crate::node_registration::FunctionLogEntry) -> crate::grpc_impl::api::FunctionLogEntry {
+fn serialize_function_log_entry(
+    req: &crate::node_registration::FunctionLogEntry,
+) -> crate::grpc_impl::api::FunctionLogEntry {
     crate::grpc_impl::api::FunctionLogEntry {
         timestamp_sec: req.timestamp_sec,
         timestamp_ns: req.timestamp_ns,
@@ -348,7 +415,9 @@ fn serialize_function_log_entry(req: &crate::node_registration::FunctionLogEntry
     }
 }
 
-fn serialize_node_performance_samples(req: &crate::node_registration::NodePerformanceSamples) -> crate::grpc_impl::api::NodePerformanceSamples {
+fn serialize_node_performance_samples(
+    req: &crate::node_registration::NodePerformanceSamples,
+) -> crate::grpc_impl::api::NodePerformanceSamples {
     crate::grpc_impl::api::NodePerformanceSamples {
         function_execution_times: req
             .function_execution_times
@@ -463,16 +532,31 @@ mod test {
             },
             performance_samples: NodePerformanceSamples {
                 function_execution_times: std::collections::HashMap::from([
-                    (uuid::Uuid::new_v4(), vec![new_sample(1.0), new_sample(2.5), new_sample(3.0)]),
+                    (
+                        uuid::Uuid::new_v4(),
+                        vec![new_sample(1.0), new_sample(2.5), new_sample(3.0)],
+                    ),
                     (uuid::Uuid::new_v4(), vec![]),
-                    (uuid::Uuid::new_v4(), vec![new_sample(0.1), new_sample(0.2), new_sample(999.0)]),
+                    (
+                        uuid::Uuid::new_v4(),
+                        vec![new_sample(0.1), new_sample(0.2), new_sample(999.0)],
+                    ),
                 ]),
                 function_transfer_times: std::collections::HashMap::from([
-                    (uuid::Uuid::new_v4(), vec![new_sample(1.0), new_sample(2.5), new_sample(3.0)]),
+                    (
+                        uuid::Uuid::new_v4(),
+                        vec![new_sample(1.0), new_sample(2.5), new_sample(3.0)],
+                    ),
                     (uuid::Uuid::new_v4(), vec![]),
-                    (uuid::Uuid::new_v4(), vec![new_sample(0.1), new_sample(0.2), new_sample(999.0)]),
+                    (
+                        uuid::Uuid::new_v4(),
+                        vec![new_sample(0.1), new_sample(0.2), new_sample(999.0)],
+                    ),
                 ]),
-                function_log_entries: std::collections::HashMap::from([(uuid::Uuid::new_v4(), vec![new_log(100.0), new_log(200.1)])]),
+                function_log_entries: std::collections::HashMap::from([(
+                    uuid::Uuid::new_v4(),
+                    vec![new_log(100.0), new_log(200.1)],
+                )]),
             },
         }];
         for msg in messages {

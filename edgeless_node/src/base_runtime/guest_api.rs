@@ -31,26 +31,48 @@ pub enum GuestAPIError {
 impl GuestAPIHost {
     pub async fn cast_alias(&mut self, alias: &str, msg: &str) -> Result<(), GuestAPIError> {
         let shared_metadata = { self.event_metadata.lock().await.clone() };
-        let metadata = shared_metadata.unwrap_or(edgeless_api::function_instance::EventMetadata::empty_dangling_root(0x42a42bdecaf00022u64));
+        let metadata = shared_metadata.unwrap_or(
+            edgeless_api::function_instance::EventMetadata::empty_dangling_root(
+                0x42a42bdecaf00022u64,
+            ),
+        );
         if alias == "self" {
-            self.data_plane.send(self.instance_id, msg.to_string(), &metadata).await;
+            self.data_plane
+                .send(self.instance_id, msg.to_string(), &metadata)
+                .await;
             Ok(())
         } else if let Some(target) = self.callback_table.get_mapping(alias).await {
-            self.data_plane.send(target, msg.to_string(), &metadata).await;
+            self.data_plane
+                .send(target, msg.to_string(), &metadata)
+                .await;
             Ok(())
         } else {
             Err(GuestAPIError::UnknownAlias)
         }
     }
 
-    pub async fn cast_raw(&mut self, target: edgeless_api::function_instance::InstanceId, msg: &str) -> Result<(), GuestAPIError> {
+    pub async fn cast_raw(
+        &mut self,
+        target: edgeless_api::function_instance::InstanceId,
+        msg: &str,
+    ) -> Result<(), GuestAPIError> {
         let shared_metadata = { self.event_metadata.lock().await.clone() };
-        let metadata = shared_metadata.unwrap_or(edgeless_api::function_instance::EventMetadata::empty_dangling_root(0x42a42bdecaf00023u64));
-        self.data_plane.send(target, msg.to_string(), &metadata).await;
+        let metadata = shared_metadata.unwrap_or(
+            edgeless_api::function_instance::EventMetadata::empty_dangling_root(
+                0x42a42bdecaf00023u64,
+            ),
+        );
+        self.data_plane
+            .send(target, msg.to_string(), &metadata)
+            .await;
         Ok(())
     }
 
-    pub async fn call_alias(&mut self, alias: &str, msg: &str) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
+    pub async fn call_alias(
+        &mut self,
+        alias: &str,
+        msg: &str,
+    ) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         if alias == "self" {
             self.call_raw(self.instance_id, msg).await
             // return Ok(self.data_plane.call(self.instance_id.clone(), msg.to_string()).await);
@@ -69,7 +91,11 @@ impl GuestAPIHost {
         msg: &str,
     ) -> Result<edgeless_dataplane::core::CallRet, GuestAPIError> {
         let shared_metadata = { self.event_metadata.lock().await.clone() };
-        let metadata = shared_metadata.unwrap_or(edgeless_api::function_instance::EventMetadata::empty_dangling_root(0x42a42bdecaf00024u64));
+        let metadata = shared_metadata.unwrap_or(
+            edgeless_api::function_instance::EventMetadata::empty_dangling_root(
+                0x42a42bdecaf00024u64,
+            ),
+        );
 
         futures::select! {
             _ = Box::pin(self.poison_pill_receiver.recv()).fuse() => {
@@ -81,9 +107,18 @@ impl GuestAPIHost {
         }
     }
 
-    pub async fn telemetry_log(&mut self, lvl: edgeless_telemetry::telemetry_events::TelemetryLogLevel, target: &str, msg: &str) {
+    pub async fn telemetry_log(
+        &mut self,
+        lvl: edgeless_telemetry::telemetry_events::TelemetryLogLevel,
+        target: &str,
+        msg: &str,
+    ) {
         self.telemetry_handle.observe(
-            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionLogEntry(lvl, target.to_string(), msg.to_string()),
+            edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionLogEntry(
+                lvl,
+                target.to_string(),
+                msg.to_string(),
+            ),
             std::collections::BTreeMap::new(),
         );
     }
@@ -92,12 +127,21 @@ impl GuestAPIHost {
         self.instance_id
     }
 
-    pub async fn delayed_cast(&mut self, delay: u64, target_alias: &str, payload: &str) -> Result<(), GuestAPIError> {
+    pub async fn delayed_cast(
+        &mut self,
+        delay: u64,
+        target_alias: &str,
+        payload: &str,
+    ) -> Result<(), GuestAPIError> {
         let mut cloned_plane = self.data_plane.clone();
         let cloned_msg = payload.to_string();
 
         let shared_metadata = { self.event_metadata.lock().await.clone() };
-        let metadata = shared_metadata.unwrap_or(edgeless_api::function_instance::EventMetadata::empty_dangling_root(0x42a42bdecaf00025u64));
+        let metadata = shared_metadata.unwrap_or(
+            edgeless_api::function_instance::EventMetadata::empty_dangling_root(
+                0x42a42bdecaf00025u64,
+            ),
+        );
 
         let target_instance_id = if target_alias == "self" {
             self.instance_id
@@ -110,7 +154,9 @@ impl GuestAPIHost {
 
         tokio::spawn(async move {
             tokio::time::sleep(tokio::time::Duration::from_millis(delay)).await;
-            cloned_plane.send(target_instance_id, cloned_msg, &metadata).await;
+            cloned_plane
+                .send(target_instance_id, cloned_msg, &metadata)
+                .await;
         });
 
         Ok(())

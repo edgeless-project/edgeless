@@ -4,7 +4,10 @@
 
 #[async_trait::async_trait]
 impl crate::node_management::NodeManagementAPI for super::CoapClient {
-    async fn update_peers(&mut self, request: crate::node_management::UpdatePeersRequest) -> anyhow::Result<()> {
+    async fn update_peers(
+        &mut self,
+        request: crate::node_management::UpdatePeersRequest,
+    ) -> anyhow::Result<()> {
         match request {
             crate::node_management::UpdatePeersRequest::Add(id, url) => {
                 let (_, ip, port) = crate::util::parse_http_host(&url).unwrap();
@@ -50,7 +53,9 @@ impl crate::node_management::NodeManagementAPI for super::CoapClient {
     }
     async fn reset(&mut self) -> anyhow::Result<()> {
         match self
-            .call_with_reply(|token, addr, buffer| edgeless_api_core::coap_mapping::COAPEncoder::encode_reset(addr, token, buffer))
+            .call_with_reply(|token, addr, buffer| {
+                edgeless_api_core::coap_mapping::COAPEncoder::encode_reset(addr, token, buffer)
+            })
             .await
         {
             Ok(_) => Ok(()),

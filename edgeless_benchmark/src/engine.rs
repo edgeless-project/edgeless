@@ -4,7 +4,9 @@
 use crate::workflow_type::WorkflowType;
 use anyhow::anyhow;
 use edgeless_api::outer::controller::ControllerAPI;
-use edgeless_api::workflow_instance::{SpawnWorkflowResponse, WorkflowFunction, WorkflowId, WorkflowInstanceAPI};
+use edgeless_api::workflow_instance::{
+    SpawnWorkflowResponse, WorkflowFunction, WorkflowId, WorkflowInstanceAPI,
+};
 use rand::prelude::*;
 use rand::SeedableRng;
 use std::str::FromStr;
@@ -26,11 +28,18 @@ pub struct Engine {
 }
 
 impl Engine {
-    pub async fn new(controller_url: &str, wf_type: WorkflowType, seed: u64, csv_dumper: crate::csv_dumper::CsvDumper) -> Self {
+    pub async fn new(
+        controller_url: &str,
+        wf_type: WorkflowType,
+        seed: u64,
+        csv_dumper: crate::csv_dumper::CsvDumper,
+    ) -> Self {
         Self {
-            client: edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(controller_url)
-                .await
-                .workflow_instance_api(),
+            client: edgeless_api::grpc_impl::outer::controller::ControllerAPIClient::new(
+                controller_url,
+            )
+            .await
+            .workflow_instance_api(),
             wf_type,
             rng: rand::rngs::StdRng::seed_from_u64(seed),
             wf_id: 0,
@@ -63,24 +72,28 @@ impl Engine {
             }
         };
 
-        let function_class_specification = |path_json: &std::path::Path, path_wasm: &std::path::Path| {
-            let func_spec: edgeless_cli::workflow_spec::WorkflowSpecFunctionClass =
-                serde_json::from_str(&std::fs::read_to_string(path_json).unwrap()).unwrap();
-            edgeless_api::function_instance::FunctionClassSpecification {
-                function_class_id: func_spec.id,
-                function_class_type: func_spec.function_type,
-                function_class_version: func_spec.version,
-                function_class_code: std::fs::read(path_wasm).unwrap(),
-                function_class_outputs: func_spec.outputs,
-            }
-        };
+        let function_class_specification =
+            |path_json: &std::path::Path, path_wasm: &std::path::Path| {
+                let func_spec: edgeless_cli::workflow_spec::WorkflowSpecFunctionClass =
+                    serde_json::from_str(&std::fs::read_to_string(path_json).unwrap()).unwrap();
+                edgeless_api::function_instance::FunctionClassSpecification {
+                    function_class_id: func_spec.id,
+                    function_class_type: func_spec.function_type,
+                    function_class_version: func_spec.version,
+                    function_class_code: std::fs::read(path_wasm).unwrap(),
+                    function_class_outputs: func_spec.outputs,
+                }
+            };
 
         match &self.wf_type {
             WorkflowType::None => {}
             WorkflowType::Single(path_json, path_wasm) => {
                 functions.push(WorkflowFunction {
                     name: "single".to_string(),
-                    function_class_specification: function_class_specification(std::path::Path::new(path_json), std::path::Path::new(path_wasm)),
+                    function_class_specification: function_class_specification(
+                        std::path::Path::new(path_json),
+                        std::path::Path::new(path_wasm),
+                    ),
                     output_mapping: std::collections::HashMap::new(),
                     annotations: std::collections::HashMap::new(),
                 });
@@ -127,17 +140,24 @@ impl Engine {
                             },
                         ),
                     )]);
-                    log::debug!("name {}, annotations {:?} mapping {:?}", name, annotations, output_mapping);
+                    log::debug!(
+                        "name {}, annotations {:?} mapping {:?}",
+                        name,
+                        annotations,
+                        output_mapping
+                    );
 
                     functions.push(WorkflowFunction {
                         name,
-                        function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                            function_class_id: "matrix_mul".to_string(),
-                            function_class_type: "RUST_WASM".to_string(),
-                            function_class_version: "0.1".to_string(),
-                            function_class_code: std::fs::read(&data.function_wasm_path).unwrap(),
-                            function_class_outputs: outputs,
-                        },
+                        function_class_specification:
+                            edgeless_api::function_instance::FunctionClassSpecification {
+                                function_class_id: "matrix_mul".to_string(),
+                                function_class_type: "RUST_WASM".to_string(),
+                                function_class_version: "0.1".to_string(),
+                                function_class_code: std::fs::read(&data.function_wasm_path)
+                                    .unwrap(),
+                                function_class_outputs: outputs,
+                            },
                         output_mapping,
                         annotations,
                     });
@@ -147,7 +167,11 @@ impl Engine {
                     "wf{}, chain size {}, matrix sizes {}",
                     self.wf_id,
                     chain_size,
-                    matrix_sizes.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                    matrix_sizes
+                        .iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .join(",")
                 );
             }
             WorkflowType::VectorMulChain(data) => {
@@ -164,7 +188,8 @@ impl Engine {
                         i => format!("f{}", chain_size - i - 1),
                     };
 
-                    let output_mapping = std::collections::HashMap::from([("out".to_string(), next_func_name)]);
+                    let output_mapping =
+                        std::collections::HashMap::from([("out".to_string(), next_func_name)]);
 
                     let annotations = std::collections::HashMap::from([(
                         "init-payload".to_string(),
@@ -182,19 +207,26 @@ impl Engine {
 
                     functions.push(WorkflowFunction {
                         name,
-                        function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                            function_class_id: "vector_mul".to_string(),
-                            function_class_type: "RUST_WASM".to_string(),
-                            function_class_version: "0.1".to_string(),
-                            function_class_code: std::fs::read(&data.function_wasm_path).unwrap(),
-                            function_class_outputs: vec!["out".to_string()],
-                        },
+                        function_class_specification:
+                            edgeless_api::function_instance::FunctionClassSpecification {
+                                function_class_id: "vector_mul".to_string(),
+                                function_class_type: "RUST_WASM".to_string(),
+                                function_class_version: "0.1".to_string(),
+                                function_class_code: std::fs::read(&data.function_wasm_path)
+                                    .unwrap(),
+                                function_class_outputs: vec!["out".to_string()],
+                            },
                         output_mapping,
                         annotations,
                     });
                 }
 
-                log::info!("wf{}, chain size {}, input size {}", self.wf_id, chain_size, input_size);
+                log::info!(
+                    "wf{}, chain size {}, input size {}",
+                    self.wf_id,
+                    chain_size,
+                    input_size
+                );
             }
             WorkflowType::MapReduce(data) => {
                 //
@@ -217,7 +249,10 @@ impl Engine {
                 //                         └──────────►│  p0-2   ├──────────┘  └──────────►│  p1-2   ├──────────┘
                 //                                     │         │                         │         │
                 //                                     └─────────┘                         └─────────┘
-                let interval = draw(data.min_transaction_interval_ms, data.max_transaction_interval_ms);
+                let interval = draw(
+                    data.min_transaction_interval_ms,
+                    data.max_transaction_interval_ms,
+                );
                 let size = draw(data.min_input_size, data.max_input_size);
                 let stages = draw(data.min_num_stages, data.max_num_stages);
 
@@ -229,10 +264,16 @@ impl Engine {
                         path.join("trigger/function.json").as_path(),
                         path.join("trigger/trigger.wasm").as_path(),
                     ),
-                    output_mapping: std::collections::HashMap::from([("out".to_string(), "s0".to_string())]),
+                    output_mapping: std::collections::HashMap::from([(
+                        "out".to_string(),
+                        "s0".to_string(),
+                    )]),
                     annotations: std::collections::HashMap::from([(
                         "init-payload".to_string(),
-                        format!("out_type=rand_vec,use_base64=true,size={},arrival=c({})", size, interval),
+                        format!(
+                            "out_type=rand_vec,use_base64=true,size={},arrival=c({})",
+                            size, interval
+                        ),
                     )]),
                 });
 
@@ -251,7 +292,8 @@ impl Engine {
                         output_mapping.insert("redis".to_string(), "redis".to_string());
                     }
                     for out in &outputs {
-                        output_mapping.insert(format!("out-{}", out), format!("p{}-{}", stage, out));
+                        output_mapping
+                            .insert(format!("out-{}", out), format!("p{}-{}", stage, out));
                     }
                     functions.push(WorkflowFunction {
                         name: format!("s{}", stage),
@@ -286,10 +328,16 @@ impl Engine {
                                 path.join("bench_process/function.json").as_path(),
                                 path.join("bench_process/bench_process.wasm").as_path(),
                             ),
-                            output_mapping: std::collections::HashMap::from([("out".to_string(), format!("s{}", stage + 1))]),
+                            output_mapping: std::collections::HashMap::from([(
+                                "out".to_string(),
+                                format!("s{}", stage + 1),
+                            )]),
                             annotations: std::collections::HashMap::from([(
                                 "init-payload".to_string(),
-                                format!("forward=true,fibonacci={},allocate={}", fibonacci, allocate),
+                                format!(
+                                    "forward=true,fibonacci={},allocate={}",
+                                    fibonacci, allocate
+                                ),
                             )]),
                         });
                     }
@@ -328,9 +376,13 @@ impl Engine {
                 );
             }
             WorkflowType::JsonSpec(data) => {
-                let spec_string = data.spec_string.replace("@WF_ID", self.wf_id.to_string().as_str());
-                let workflow_spec: edgeless_cli::workflow_spec::WorkflowSpec = serde_json::from_str(&spec_string).unwrap();
-                let mut workflow = edgeless_cli::workflow_spec_to_request(workflow_spec, &data.parent_path)?;
+                let spec_string = data
+                    .spec_string
+                    .replace("@WF_ID", self.wf_id.to_string().as_str());
+                let workflow_spec: edgeless_cli::workflow_spec::WorkflowSpec =
+                    serde_json::from_str(&spec_string).unwrap();
+                let mut workflow =
+                    edgeless_cli::workflow_spec_to_request(workflow_spec, &data.parent_path)?;
                 std::mem::swap(&mut workflow.workflow_functions, &mut functions);
                 std::mem::swap(&mut workflow.workflow_resources, &mut resources);
                 std::mem::swap(&mut workflow.annotations, &mut annotations);
@@ -352,8 +404,11 @@ impl Engine {
             workflow_resources: resources,
             annotations,
         };
-        self.csv_dumper
-            .add("workflow:request", &wf_name, serde_json::to_string(&req).unwrap_or_default().as_str());
+        self.csv_dumper.add(
+            "workflow:request",
+            &wf_name,
+            serde_json::to_string(&req).unwrap_or_default().as_str(),
+        );
 
         // Request the creation of the workflow.
         let res = self.client.start(req).await;
@@ -365,13 +420,16 @@ impl Engine {
                 self.csv_dumper.add(
                     "workflow:response",
                     &wf_name,
-                    serde_json::to_string(&response).unwrap_or_default().as_str(),
+                    serde_json::to_string(&response)
+                        .unwrap_or_default()
+                        .as_str(),
                 );
 
                 match &response {
                     SpawnWorkflowResponse::ResponseError(err) => Err(anyhow!("{}", err)),
                     SpawnWorkflowResponse::WorkflowInstance(val) => {
-                        self.uuid_to_names.insert(val.workflow_id.workflow_id, wf_name.clone());
+                        self.uuid_to_names
+                            .insert(val.workflow_id.workflow_id, wf_name.clone());
                         Ok(val.workflow_id.workflow_id.to_string())
                     }
                 }

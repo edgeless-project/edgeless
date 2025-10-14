@@ -8,7 +8,12 @@ pub struct ContainerRuntimeAPIClient {
 impl ContainerRuntimeAPIClient {
     pub async fn new(api_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
         Ok(Self {
-            guest_api_host: match crate::grpc_impl::inner::guest_api_host::GuestAPIHostClient::new(api_addr, retry_interval).await {
+            guest_api_host: match crate::grpc_impl::inner::guest_api_host::GuestAPIHostClient::new(
+                api_addr,
+                retry_interval,
+            )
+            .await
+            {
                 Ok(val) => Box::new(val),
                 Err(err) => return Err(err),
             },
@@ -37,11 +42,17 @@ impl GuestAPIHostServer {
             let workflow_api = workflow_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&container_runtime_url) {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start ContainerRuntimeAPI GRPC Server at {}", container_runtime_url);
+                    log::info!(
+                        "Start ContainerRuntimeAPI GRPC Server at {}",
+                        container_runtime_url
+                    );
 
                     match tonic::transport::Server::builder()
                         .add_service(
-                            crate::grpc_impl::api::guest_api_host_server::GuestApiHostServer::new(workflow_api).max_decoding_message_size(usize::MAX),
+                            crate::grpc_impl::api::guest_api_host_server::GuestApiHostServer::new(
+                                workflow_api,
+                            )
+                            .max_decoding_message_size(usize::MAX),
                         )
                         .serve(host)
                         .await

@@ -12,13 +12,20 @@
 ///
 #[derive(Clone)]
 pub struct DomainRegistrationAPIClient {
-    client: Option<crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient<tonic::transport::Channel>>,
+    client: Option<
+        crate::grpc_impl::api::domain_registration_client::DomainRegistrationClient<
+            tonic::transport::Channel,
+        >,
+    >,
     server_addr: String,
 }
 
 impl DomainRegistrationAPIClient {
     pub fn new(server_addr: String) -> Self {
-        Self { client: None, server_addr }
+        Self {
+            client: None,
+            server_addr,
+        }
     }
 
     /// Try connecting, if not already connected.
@@ -53,7 +60,12 @@ impl crate::domain_registration::DomainRegistrationAPI for DomainRegistrationAPI
         match self.try_connect().await {
             Ok(_) => {
                 if let Some(client) = &mut self.client {
-                    match client.update_domain(tonic::Request::new(serialize_update_domain_request(&request))).await {
+                    match client
+                        .update_domain(tonic::Request::new(serialize_update_domain_request(
+                            &request,
+                        )))
+                        .await
+                    {
                         Ok(res) => parse_update_domain_response(&res.into_inner()),
                         Err(err) => {
                             self.disconnect();
@@ -76,11 +88,14 @@ impl crate::domain_registration::DomainRegistrationAPI for DomainRegistrationAPI
 }
 
 pub struct DomainRegistrationAPIServer {
-    pub domain_registration_api: tokio::sync::Mutex<Box<dyn crate::domain_registration::DomainRegistrationAPI>>,
+    pub domain_registration_api:
+        tokio::sync::Mutex<Box<dyn crate::domain_registration::DomainRegistrationAPI>>,
 }
 
 #[async_trait::async_trait]
-impl crate::grpc_impl::api::domain_registration_server::DomainRegistration for DomainRegistrationAPIServer {
+impl crate::grpc_impl::api::domain_registration_server::DomainRegistration
+    for DomainRegistrationAPIServer
+{
     async fn update_domain(
         &self,
         request: tonic::Request<crate::grpc_impl::api::UpdateDomainRequest>,
@@ -95,14 +110,25 @@ impl crate::grpc_impl::api::domain_registration_server::DomainRegistration for D
                 )));
             }
         };
-        match self.domain_registration_api.lock().await.update_domain(parsed_request).await {
+        match self
+            .domain_registration_api
+            .lock()
+            .await
+            .update_domain(parsed_request)
+            .await
+        {
             Ok(res) => Ok(tonic::Response::new(serialize_update_domain_response(&res))),
-            Err(err) => Err(tonic::Status::internal(format!("Error when updating a node: {}", err))),
+            Err(err) => Err(tonic::Status::internal(format!(
+                "Error when updating a node: {}",
+                err
+            ))),
         }
     }
 }
 
-pub fn parse_domain_capabilities(api_instance: &crate::grpc_impl::api::DomainCapabilities) -> crate::domain_registration::DomainCapabilities {
+pub fn parse_domain_capabilities(
+    api_instance: &crate::grpc_impl::api::DomainCapabilities,
+) -> crate::domain_registration::DomainCapabilities {
     crate::domain_registration::DomainCapabilities {
         num_nodes: api_instance.num_nodes,
         num_cpus: api_instance.num_cpus,
@@ -115,12 +141,18 @@ pub fn parse_domain_capabilities(api_instance: &crate::grpc_impl::api::DomainCap
         disk_tot_space: api_instance.disk_tot_space,
         num_gpus: api_instance.num_gpus,
         mem_size_gpu: api_instance.mem_size_gpu,
-        resource_providers: std::collections::HashSet::from_iter(api_instance.resource_providers.iter().cloned()),
-        resource_classes: std::collections::HashSet::from_iter(api_instance.resource_classes.iter().cloned()),
+        resource_providers: std::collections::HashSet::from_iter(
+            api_instance.resource_providers.iter().cloned(),
+        ),
+        resource_classes: std::collections::HashSet::from_iter(
+            api_instance.resource_classes.iter().cloned(),
+        ),
     }
 }
 
-pub fn serialize_domain_capabilities(req: &crate::domain_registration::DomainCapabilities) -> crate::grpc_impl::api::DomainCapabilities {
+pub fn serialize_domain_capabilities(
+    req: &crate::domain_registration::DomainCapabilities,
+) -> crate::grpc_impl::api::DomainCapabilities {
     crate::grpc_impl::api::DomainCapabilities {
         num_nodes: req.num_nodes,
         num_cpus: req.num_cpus,
@@ -133,8 +165,16 @@ pub fn serialize_domain_capabilities(req: &crate::domain_registration::DomainCap
         disk_tot_space: req.disk_tot_space,
         num_gpus: req.num_gpus,
         mem_size_gpu: req.mem_size_gpu,
-        resource_providers: req.resource_providers.iter().cloned().collect::<Vec<String>>(),
-        resource_classes: req.resource_classes.iter().cloned().collect::<Vec<String>>(),
+        resource_providers: req
+            .resource_providers
+            .iter()
+            .cloned()
+            .collect::<Vec<String>>(),
+        resource_classes: req
+            .resource_classes
+            .iter()
+            .cloned()
+            .collect::<Vec<String>>(),
     }
 }
 
@@ -149,29 +189,38 @@ fn parse_update_domain_request(
         domain_id: api_instance.domain_id.clone(),
         orchestrator_url: api_instance.orchestrator_url.clone(),
         capabilities,
-        refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(api_instance.refresh_deadline),
+        refresh_deadline: std::time::UNIX_EPOCH
+            + std::time::Duration::from_secs(api_instance.refresh_deadline),
         counter: api_instance.counter,
         nonce: api_instance.nonce,
     })
 }
 
-fn serialize_update_domain_response(req: &crate::domain_registration::UpdateDomainResponse) -> crate::grpc_impl::api::UpdateDomainResponse {
+fn serialize_update_domain_response(
+    req: &crate::domain_registration::UpdateDomainResponse,
+) -> crate::grpc_impl::api::UpdateDomainResponse {
     match req {
-        crate::domain_registration::UpdateDomainResponse::ResponseError(err) => crate::grpc_impl::api::UpdateDomainResponse {
-            response_error: Some(crate::grpc_impl::api::ResponseError {
-                summary: err.summary.clone(),
-                detail: err.detail.clone(),
-            }),
-            reset: false,
-        },
-        crate::domain_registration::UpdateDomainResponse::Accepted => crate::grpc_impl::api::UpdateDomainResponse {
-            response_error: None,
-            reset: false,
-        },
-        crate::domain_registration::UpdateDomainResponse::Reset => crate::grpc_impl::api::UpdateDomainResponse {
-            response_error: None,
-            reset: true,
-        },
+        crate::domain_registration::UpdateDomainResponse::ResponseError(err) => {
+            crate::grpc_impl::api::UpdateDomainResponse {
+                response_error: Some(crate::grpc_impl::api::ResponseError {
+                    summary: err.summary.clone(),
+                    detail: err.detail.clone(),
+                }),
+                reset: false,
+            }
+        }
+        crate::domain_registration::UpdateDomainResponse::Accepted => {
+            crate::grpc_impl::api::UpdateDomainResponse {
+                response_error: None,
+                reset: false,
+            }
+        }
+        crate::domain_registration::UpdateDomainResponse::Reset => {
+            crate::grpc_impl::api::UpdateDomainResponse {
+                response_error: None,
+                reset: true,
+            }
+        }
     }
 }
 
@@ -179,12 +228,14 @@ fn parse_update_domain_response(
     api_instance: &crate::grpc_impl::api::UpdateDomainResponse,
 ) -> anyhow::Result<crate::domain_registration::UpdateDomainResponse> {
     match api_instance.response_error.as_ref() {
-        Some(err) => Ok(crate::domain_registration::UpdateDomainResponse::ResponseError(
-            crate::common::ResponseError {
-                summary: err.summary.clone(),
-                detail: err.detail.clone(),
-            },
-        )),
+        Some(err) => Ok(
+            crate::domain_registration::UpdateDomainResponse::ResponseError(
+                crate::common::ResponseError {
+                    summary: err.summary.clone(),
+                    detail: err.detail.clone(),
+                },
+            ),
+        ),
         None => match api_instance.reset {
             false => Ok(crate::domain_registration::UpdateDomainResponse::Accepted),
             true => Ok(crate::domain_registration::UpdateDomainResponse::Reset),
@@ -192,12 +243,18 @@ fn parse_update_domain_response(
     }
 }
 
-fn serialize_update_domain_request(req: &crate::domain_registration::UpdateDomainRequest) -> crate::grpc_impl::api::UpdateDomainRequest {
+fn serialize_update_domain_request(
+    req: &crate::domain_registration::UpdateDomainRequest,
+) -> crate::grpc_impl::api::UpdateDomainRequest {
     crate::grpc_impl::api::UpdateDomainRequest {
         domain_id: req.domain_id.clone(),
         orchestrator_url: req.orchestrator_url.clone(),
         capabilities: Some(serialize_domain_capabilities(&req.capabilities)),
-        refresh_deadline: req.refresh_deadline.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs(),
+        refresh_deadline: req
+            .refresh_deadline
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
         counter: req.counter,
         nonce: req.nonce,
     }
@@ -238,8 +295,14 @@ mod test {
                     disk_tot_space: 7,
                     num_gpus: 8,
                     mem_size_gpu: 9,
-                    resource_providers: std::collections::HashSet::from(["e".to_string(), "f".to_string()]),
-                    resource_classes: std::collections::HashSet::from(["g".to_string(), "h".to_string()]),
+                    resource_providers: std::collections::HashSet::from([
+                        "e".to_string(),
+                        "f".to_string(),
+                    ]),
+                    resource_classes: std::collections::HashSet::from([
+                        "g".to_string(),
+                        "h".to_string(),
+                    ]),
                 },
                 refresh_deadline: std::time::UNIX_EPOCH + std::time::Duration::from_secs(313714800),
                 counter: 42,

@@ -9,7 +9,8 @@ impl super::resource_provider_specs::ResourceProviderSpecs for KafkaEgressResour
     }
 
     fn description(&self) -> String {
-        r"Send a message to an external Apache Kafka server -- see https://kafka.apache.org/".to_string()
+        r"Send a message to an external Apache Kafka server -- see https://kafka.apache.org/"
+            .to_string()
     }
 
     fn outputs(&self) -> Vec<String> {
@@ -22,7 +23,10 @@ impl super::resource_provider_specs::ResourceProviderSpecs for KafkaEgressResour
                 String::from("brokers"),
                 String::from("Comma-separated list of initial brokers to access the cluster"),
             ),
-            (String::from("topic"), String::from("Topic to which messages are posted")),
+            (
+                String::from("topic"),
+                String::from("Topic to which messages are posted"),
+            ),
         ])
     }
 
@@ -40,7 +44,8 @@ pub struct KafkaEgressResourceProviderInner {
     resource_provider_id: edgeless_api::function_instance::InstanceId,
     dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    instances: std::collections::HashMap<edgeless_api::function_instance::InstanceId, KafkaEgressResource>,
+    instances:
+        std::collections::HashMap<edgeless_api::function_instance::InstanceId, KafkaEgressResource>,
 }
 
 pub struct KafkaEgressResource {
@@ -65,7 +70,9 @@ impl KafkaEgressResource {
         let kafka_brokers = kafka_brokers.to_string();
         let kafka_topic = kafka_topic.to_string();
 
-        let producer: rdkafka::producer::BaseProducer = rdkafka::config::ClientConfig::new().set("bootstrap.servers", &kafka_brokers).create()?;
+        let producer: rdkafka::producer::BaseProducer = rdkafka::config::ClientConfig::new()
+            .set("bootstrap.servers", &kafka_brokers)
+            .create()?;
 
         log::info!("KafkaEgressResource created, brokers: {}", kafka_brokers);
 
@@ -91,13 +98,21 @@ impl KafkaEgressResource {
                     }
                 };
 
-                if let Err(e) = producer.send(rdkafka::producer::BaseRecord::to(&kafka_topic).payload(&message_data).key("")) {
+                if let Err(e) = producer.send(
+                    rdkafka::producer::BaseRecord::to(&kafka_topic)
+                        .payload(&message_data)
+                        .key(""),
+                ) {
                     log::error!("Failed to send message to topic '{}': {:?}", kafka_topic, e);
                 }
 
                 if need_reply {
                     dataplane_handle
-                        .reply(source_id, channel_id, edgeless_dataplane::core::CallRet::Reply("".to_string()))
+                        .reply(
+                            source_id,
+                            channel_id,
+                            edgeless_dataplane::core::CallRet::Reply("".to_string()),
+                        )
                         .await;
                 }
 
@@ -105,7 +120,9 @@ impl KafkaEgressResource {
             }
         });
 
-        Ok(Self { join_handle: handle })
+        Ok(Self {
+            join_handle: handle,
+        })
     }
 }
 
@@ -120,34 +137,49 @@ impl KafkaEgressResourceProvider {
                 resource_provider_id,
                 dataplane_provider,
                 telemetry_handle,
-                instances: std::collections::HashMap::<edgeless_api::function_instance::InstanceId, KafkaEgressResource>::new(),
+                instances: std::collections::HashMap::<
+                    edgeless_api::function_instance::InstanceId,
+                    KafkaEgressResource,
+                >::new(),
             })),
         }
     }
 }
 
 #[async_trait::async_trait]
-impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api::function_instance::InstanceId> for KafkaEgressResourceProvider {
+impl
+    edgeless_api::resource_configuration::ResourceConfigurationAPI<
+        edgeless_api::function_instance::InstanceId,
+    > for KafkaEgressResourceProvider
+{
     async fn start(
         &mut self,
         instance_specification: edgeless_api::resource_configuration::ResourceInstanceSpecification,
-    ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>> {
+    ) -> anyhow::Result<
+        edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::InstanceId>,
+    > {
         if let (Some(brokers), Some(topic)) = (
             instance_specification.configuration.get("brokers"),
             instance_specification.configuration.get("topic"),
         ) {
             let mut lck = self.inner.lock().await;
-            let new_id = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
+            let new_id =
+                edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
             let dataplane_handle = lck.dataplane_provider.get_handle_for(new_id).await;
-            let telemetry_handle = lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
-                "FUNCTION_ID".to_string(),
-                new_id.function_id.to_string(),
-            )]));
+            let telemetry_handle = lck
+                .telemetry_handle
+                .fork(std::collections::BTreeMap::from([(
+                    "FUNCTION_ID".to_string(),
+                    new_id.function_id.to_string(),
+                )]));
 
-            match KafkaEgressResource::new(dataplane_handle, telemetry_handle, brokers, topic).await {
+            match KafkaEgressResource::new(dataplane_handle, telemetry_handle, brokers, topic).await
+            {
                 Ok(resource) => {
                     lck.instances.insert(new_id, resource);
-                    return Ok(edgeless_api::common::StartComponentResponse::InstanceId(new_id));
+                    return Ok(edgeless_api::common::StartComponentResponse::InstanceId(
+                        new_id,
+                    ));
                 }
                 Err(err) => {
                     return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
@@ -168,7 +200,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         ))
     }
 
-    async fn stop(&mut self, resource_id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
+    async fn stop(
+        &mut self,
+        resource_id: edgeless_api::function_instance::InstanceId,
+    ) -> anyhow::Result<()> {
         self.inner.lock().await.instances.remove(&resource_id);
         Ok(())
     }

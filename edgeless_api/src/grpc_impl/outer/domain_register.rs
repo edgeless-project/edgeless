@@ -8,13 +8,19 @@ pub struct DomainRegisterAPIClient {
 impl DomainRegisterAPIClient {
     pub async fn new(api_addr: String) -> Self {
         Self {
-            domain_registration_client: Box::new(crate::grpc_impl::inner::domain_registration::DomainRegistrationAPIClient::new(api_addr)),
+            domain_registration_client: Box::new(
+                crate::grpc_impl::inner::domain_registration::DomainRegistrationAPIClient::new(
+                    api_addr,
+                ),
+            ),
         }
     }
 }
 
 impl crate::outer::domain_register::DomainRegisterAPI for DomainRegisterAPIClient {
-    fn domain_registration_api(&mut self) -> Box<dyn crate::domain_registration::DomainRegistrationAPI> {
+    fn domain_registration_api(
+        &mut self,
+    ) -> Box<dyn crate::domain_registration::DomainRegistrationAPI> {
         self.domain_registration_client.clone()
     }
 }
@@ -27,14 +33,21 @@ impl DomainRegistrationAPIServer {
         domain_registration_url: String,
     ) -> futures::future::BoxFuture<'static, ()> {
         let mut domain_register_api = domain_register_api;
-        let domain_registration_api = crate::grpc_impl::inner::domain_registration::DomainRegistrationAPIServer {
-            domain_registration_api: tokio::sync::Mutex::new(domain_register_api.domain_registration_api()),
-        };
+        let domain_registration_api =
+            crate::grpc_impl::inner::domain_registration::DomainRegistrationAPIServer {
+                domain_registration_api: tokio::sync::Mutex::new(
+                    domain_register_api.domain_registration_api(),
+                ),
+            };
         Box::pin(async move {
             let domain_registration_api = domain_registration_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&domain_registration_url) {
+            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&domain_registration_url)
+            {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start DomainRegisterAPI GRPC Server at {}", domain_registration_url);
+                    log::info!(
+                        "Start DomainRegisterAPI GRPC Server at {}",
+                        domain_registration_url
+                    );
 
                     match tonic::transport::Server::builder()
                         .add_service(

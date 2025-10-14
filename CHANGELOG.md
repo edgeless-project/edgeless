@@ -10,6 +10,12 @@ New features:
 
 New features:
 
+- Add intent to cordon/uncordon nodes at an ε-ORC. When a node is cordoned, new functions/resources are not assigned to it, irrespective of the orchestrator's policy and deployment constraints. Cordoning can be realized via `proxy_cli`.
+
+## [1.1.0] - 2025-07-15
+
+New features:
+
 - Add ε-CON support to multiple orchestration domains.
 - Implement dynamic cluster formation, with domain capabilities announced by
   the ε-ORCs (periodically refreshed).

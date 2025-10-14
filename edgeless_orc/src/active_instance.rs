@@ -33,7 +33,9 @@ impl ActiveInstance {
     pub fn workflow_id(&self) -> String {
         match &self {
             Self::Function(spawn_function_request, _) => spawn_function_request.workflow_id.clone(),
-            Self::Resource(resource_instance_specification, _) => resource_instance_specification.workflow_id.clone(),
+            Self::Resource(resource_instance_specification, _) => {
+                resource_instance_specification.workflow_id.clone()
+            }
         }
     }
     /// Return a stripped copy of the instance.
@@ -55,13 +57,20 @@ impl serde::Serialize for ActiveInstance {
     {
         match *self {
             ActiveInstance::Function(ref req, ref ids) => {
-                let mut tv = serializer.serialize_tuple_variant("ActiveInstance", 0, "Function", 2)?;
+                let mut tv =
+                    serializer.serialize_tuple_variant("ActiveInstance", 0, "Function", 2)?;
                 tv.serialize_field(req)?;
-                tv.serialize_field::<Vec<String>>(ids.iter().map(|x| x.to_string()).collect::<Vec<String>>().as_ref())?;
+                tv.serialize_field::<Vec<String>>(
+                    ids.iter()
+                        .map(|x| x.to_string())
+                        .collect::<Vec<String>>()
+                        .as_ref(),
+                )?;
                 tv.end()
             }
             ActiveInstance::Resource(ref req, ref id) => {
-                let mut tv = serializer.serialize_tuple_variant("ActiveInstance", 1, "Resource", 2)?;
+                let mut tv =
+                    serializer.serialize_tuple_variant("ActiveInstance", 1, "Resource", 2)?;
                 tv.serialize_field(req)?;
                 tv.serialize_field(id.to_string().as_str())?;
                 tv.end()
