@@ -47,10 +47,10 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
     )
     .await;
 
-    // Create the performance target.
+    // Create the performance target & provider, one for both the local
+    // and portal sides of the balancer. The local node_id will appear on
+    // performance samples.
     let telemetry_performance_target = edgeless_telemetry::performance_target::PerformanceTargetInner::new();
-
-    // Create the telemetry provider.
     let telemetry_provider = match edgeless_telemetry::telemetry_events::TelemetryProcessor::new(
         settings.telemetry.metrics_url.clone(),
         if settings.telemetry.performance_samples {
@@ -65,60 +65,38 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
         Err(err) => panic!("could not build the telemetry provider: {}", err),
     };
 
-    // Create the resources.
+    // Create the portal resource, one for both the local and portal sides.
     let class_type = "portal";
     let provider_id = format!("portal-{}", settings.general.domain);
-    let local_resource_provider_specifications = vec![edgeless_api::node_registration::ResourceProviderSpecification {
+    let resource_provider_specifications = vec![edgeless_api::node_registration::ResourceProviderSpecification {
         provider_id: provider_id.clone(),
         class_type: class_type.to_string(),
         outputs: vec!["out".to_string()],
     }];
-    let local_resources = std::collections::HashMap::from([(
-        provider_id.clone(),
-        edgeless_node::agent::ResourceDesc {
-            class_type: class_type.to_string(),
-            client: Box::new(
-                portal::PortalResourceProvider::new(
-                    local_data_plane.clone(),
-                    Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                        ("RESOURCE_CLASS_TYPE".to_string(), class_type.to_string()),
-                        ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
-                        ("NODE_ID".to_string(), settings.local.node_id.to_string()),
-                    ]))),
-                    edgeless_api::function_instance::InstanceId::new(settings.local.node_id),
-                )
-                .await,
-            ),
-        },
-    )]);
-    let portal_resource_provider_specifications = vec![edgeless_api::node_registration::ResourceProviderSpecification {
-        provider_id: provider_id.clone(),
-        class_type: class_type.to_string(),
-        outputs: vec!["out".to_string()],
-    }];
-    let portal_resources = std::collections::HashMap::from([(
-        provider_id.clone(),
-        edgeless_node::agent::ResourceDesc {
-            class_type: class_type.to_string(),
-            client: Box::new(
-                portal::PortalResourceProvider::new(
-                    portal_data_plane.clone(),
-                    Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                        ("RESOURCE_CLASS_TYPE".to_string(), class_type.to_string()),
-                        ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
-                        ("NODE_ID".to_string(), settings.portal.node_id.to_string()),
-                    ]))),
-                    edgeless_api::function_instance::InstanceId::new(settings.portal.node_id),
-                )
-                .await,
-            ),
-        },
-    )]);
+    let resource_client = Box::new(
+        portal::PortalResourceProvider::new(
+            local_data_plane.clone(),
+            portal_data_plane.clone(),
+            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                ("RESOURCE_CLASS_TYPE".to_string(), class_type.to_string()),
+                ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                ("NODE_ID".to_string(), settings.local.node_id.to_string()),
+            ]))),
+            edgeless_api::function_instance::InstanceId::new(settings.local.node_id),
+        )
+        .await,
+    );
 
-    // Create the local and portal agent.
+    // Create the local and portal agents.
     let (mut local_agent, local_agent_task) = edgeless_node::agent::Agent::new(
         std::collections::HashMap::new(),
-        local_resources,
+        std::collections::HashMap::from([(
+            provider_id.clone(),
+            edgeless_node::agent::ResourceDesc {
+                class_type: class_type.to_string(),
+                client: resource_client.clone(),
+            },
+        )]),
         settings.local.node_id,
         local_data_plane.clone(),
     );
@@ -127,7 +105,13 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
 
     let (mut portal_agent, portal_agent_task) = edgeless_node::agent::Agent::new(
         std::collections::HashMap::new(),
-        portal_resources,
+        std::collections::HashMap::from([(
+            provider_id.clone(),
+            edgeless_node::agent::ResourceDesc {
+                class_type: class_type.to_string(),
+                client: resource_client.clone(),
+            },
+        )]),
         settings.portal.node_id,
         portal_data_plane.clone(),
     );
@@ -138,7 +122,7 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
     // notify updates (periodically refreshed), for the local and portal parts.
     let (_local_subscriber, local_subscriber_task, local_refresh_task) = edgeless_node::node_subscriber::NodeSubscriber::new(
         settings.local,
-        local_resource_provider_specifications.clone(),
+        resource_provider_specifications.clone(),
         edgeless_api::node_registration::NodeCapabilities::default(),
         None,
         telemetry_performance_target.clone(),
@@ -148,7 +132,7 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
     capabilities.labels.push(format!("portal-domain={}", settings.general.domain));
     let (_portal_subscriber, portal_subscriber_task, portal_refresh_task) = edgeless_node::node_subscriber::NodeSubscriber::new(
         settings.portal,
-        portal_resource_provider_specifications.clone(),
+        resource_provider_specifications,
         capabilities,
         None,
         telemetry_performance_target,
