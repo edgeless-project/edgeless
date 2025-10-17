@@ -11,9 +11,9 @@ enum Role {
 
 impl Role {
     pub fn new(val: &str) -> anyhow::Result<Self> {
-        if val.to_ascii_lowercase() == "sink" {
+        if val.eq_ignore_ascii_case("sink") {
             Ok(Self::Sink)
-        } else if val.to_ascii_lowercase() == "source" {
+        } else if val.eq_ignore_ascii_case("source") {
             Ok(Self::Source)
         } else {
             anyhow::bail!("invalid role: {val}")
@@ -38,9 +38,9 @@ enum Domain {
 
 impl Domain {
     pub fn new(val: &str) -> anyhow::Result<Self> {
-        if val.to_ascii_lowercase() == "local" {
+        if val.eq_ignore_ascii_case("local") {
             Ok(Self::Local)
-        } else if val.to_ascii_lowercase() == "portal" {
+        } else if val.eq_ignore_ascii_case("portal") {
             Ok(Self::Portal)
         } else {
             anyhow::bail!("invalid domain: {val}")
@@ -58,9 +58,11 @@ impl std::fmt::Display for Domain {
 }
 
 /// A PortalResource can be created only when the following happens
+///
 /// - a resource is created in the local domain
 /// - a resource is created in the portal domain
 /// - a patch command is issued
+///
 /// The `PortalPartialResource` holds partial information until then.
 struct PortalPartialResource {
     /// Physical identifier used in the local domain.
@@ -320,7 +322,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         let id = if let Some(target_id) = update.output_mapping.get("out") {
             let mut lck = self.inner.lock().await;
             if let Some((id, partial_resource)) = lck.partial.iter_mut().find(|(_k, v)| v.matching(&update.function_id)) {
-                partial_resource.target_id = Some(target_id.clone());
+                partial_resource.target_id = Some(*target_id);
                 *id
             } else {
                 anyhow::bail!("could not patch portal resource {}: no matching resources", update.function_id);

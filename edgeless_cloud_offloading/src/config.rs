@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct Config {
     pub general: GeneralConfig,
     pub cluster: ClusterConfig,
@@ -20,7 +20,7 @@ pub struct ClusterConfig {
     pub minimum_nodes: usize,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct CloudProviderConfig {
     pub aws: AwsConfig,
 }
@@ -33,7 +33,7 @@ pub struct AwsConfig {
     pub security_group_id: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 pub struct ScalingConfig {
     pub thresholds: ThresholdsConfig,
 }
@@ -46,17 +46,6 @@ pub struct ThresholdsConfig {
     pub cpu_low_percent: f64,
     pub mem_low_percent: f64,
     pub delete_cooldown_seconds: u64,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            general: GeneralConfig::default(),
-            cluster: ClusterConfig::default(),
-            cloud_provider: CloudProviderConfig::default(),
-            scaling: ScalingConfig::default(),
-        }
-    }
 }
 
 impl Default for GeneralConfig {
@@ -75,12 +64,6 @@ impl Default for ClusterConfig {
     }
 }
 
-impl Default for CloudProviderConfig {
-    fn default() -> Self {
-        Self { aws: AwsConfig::default() }
-    }
-}
-
 impl Default for AwsConfig {
     fn default() -> Self {
         Self {
@@ -88,14 +71,6 @@ impl Default for AwsConfig {
             ami_id: "ami-035085b5449b0383a".to_string(),
             instance_type: "t2.medium".to_string(),
             security_group_id: "sg-xxxxxxxxxxxxxxxxx".to_string(),
-        }
-    }
-}
-
-impl Default for ScalingConfig {
-    fn default() -> Self {
-        Self {
-            thresholds: ThresholdsConfig::default(),
         }
     }
 }

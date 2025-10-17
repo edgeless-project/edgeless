@@ -184,7 +184,7 @@ impl DataplaneHandle {
     ) {
         let mut lck = self.output_chain.lock().await;
         for link in &mut lck.iter_mut() {
-            if link.handle_send(&target, msg.clone(), &self.slf, &created, channel_id, &metadata).await == LinkProcessingResult::FINAL {
+            if link.handle_send(&target, msg.clone(), &self.slf, &created, channel_id, metadata).await == LinkProcessingResult::FINAL {
                 return;
             }
         }

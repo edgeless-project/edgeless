@@ -7,6 +7,8 @@ use futures::StreamExt;
 use rand::{seq::SliceRandom, SeedableRng};
 use std::{io::Write, str::FromStr};
 
+use crate::controller::deployment_state::ActiveWorkflow;
+
 pub struct OrchestratorDesc {
     pub client: Box<dyn edgeless_api::outer::orc::OrchestratorAPI>,
     pub orchestrator_url: String,
@@ -16,15 +18,25 @@ pub struct OrchestratorDesc {
     pub nonce: u64,
 }
 
+#[derive(Default, Debug)]
+pub struct PortalDesc {
+    /// Name of the domain that acts as a portal for inter-domain workflows.
+    pub domain_bal: String,
+    /// Domains interconnected.
+    pub domains: std::collections::HashSet<String>,
+}
+
 pub struct ControllerTask {
     persistence_filename: String,
     workflow_instance_receiver: futures::channel::mpsc::UnboundedReceiver<super::ControllerRequest>,
     domain_registration_receiver: futures::channel::mpsc::UnboundedReceiver<super::DomainRegisterRequest>,
     internal_receiver: futures::channel::mpsc::UnboundedReceiver<super::InternalRequest>,
     orchestrators: std::collections::HashMap<String, OrchestratorDesc>,
+    portal_desc: Option<PortalDesc>,
     active_workflows: std::collections::HashMap<edgeless_api::workflow_instance::WorkflowId, super::deployment_state::ActiveWorkflow>,
     orphan_workflows: std::collections::BTreeMap<edgeless_api::workflow_instance::WorkflowId, edgeless_api::workflow_instance::SpawnWorkflowRequest>,
     rng: rand::rngs::StdRng,
+    last_portal_resource_id: u64,
 }
 
 type PersistedWorkflows = Vec<(String, edgeless_api::workflow_instance::SpawnWorkflowRequest)>;
@@ -48,9 +60,11 @@ impl ControllerTask {
             domain_registration_receiver,
             internal_receiver,
             orchestrators: std::collections::HashMap::new(),
+            portal_desc: None,
             active_workflows: std::collections::HashMap::new(),
             orphan_workflows,
             rng: rand::rngs::StdRng::from_entropy(),
+            last_portal_resource_id: 0,
         }
     }
 
@@ -67,9 +81,11 @@ impl ControllerTask {
             domain_registration_receiver,
             internal_receiver,
             orchestrators,
+            portal_desc: None,
             active_workflows: std::collections::HashMap::new(),
             orphan_workflows: std::collections::BTreeMap::new(),
             rng: rand::rngs::StdRng::from_entropy(),
+            last_portal_resource_id: 0,
         }
     }
 
@@ -179,10 +195,8 @@ impl ControllerTask {
                                 Ok(val) => Ok(val),
                                 Err(spawn_req) => Err(anyhow::anyhow!("could not start workflow: {:?}", spawn_req))
                             };
-                            if let Ok(reply) = &reply {
-                                if matches!(reply, edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_)) {
-                                    self.persist();
-                                }
+                            if let Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_)) = &reply {
+                                self.persist();
                             }
                             if let Err(err) = reply_sender.send(reply) {
                                 log::error!("Unhandled: {:?}", err);
@@ -245,50 +259,208 @@ impl ControllerTask {
             );
         }
 
-        // Find a domain that can host all the workflow's functions and
-        // resources.
-        //
-        // [TODO] It is also possible to split a workflow across multiple
-        // domains, but this requires an inter-domain dataplane, which is not
-        // yet supported as of today (Nov 2024).
-        //
-
-        let candidate_domains = Self::compatible_domains(&self.orchestrators, &spawn_workflow_request);
-        let target_domain = match candidate_domains.choose(&mut self.rng) {
-            Some(val) => val,
-            None => {
-                return Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
-                    edgeless_api::common::ResponseError {
-                        summary: "Workflow creation failed".to_string(),
-                        detail: Some("No single domain supporting all the functions/resources found".to_string()),
-                    },
-                ));
-            }
-        };
-
-        // Assign a new identifier to the newly-created workflow.
+        // Optimistically identify a new identifier for the workflow that
+        // will be created, which will go unused if creation fails.
         let wf_id = edgeless_api::workflow_instance::WorkflowId {
             workflow_id: uuid::Uuid::new_v4(),
         };
 
-        self.relocate_workflow(&wf_id, spawn_workflow_request, target_domain).await
+        // Find a domain that can host all the workflow's functions and
+        // resources.
+        let candidate_domains = Self::workflow_compatible_domains(&self.orchestrators, &spawn_workflow_request);
+
+        match candidate_domains.choose(&mut self.rng) {
+            Some(target_domain) => {
+                let domain_assignments = Self::fill_domains(&spawn_workflow_request, target_domain);
+                self.relocate_workflow(&wf_id, spawn_workflow_request, domain_assignments).await
+            }
+            None => {
+                // No single domain was able to host the workflow.
+                // Try again with multiple domains attached to the portal, if any.
+                let domain_assignments = self.domain_assignments_portal(&spawn_workflow_request);
+
+                if domain_assignments.is_empty() {
+                    Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
+                        edgeless_api::common::ResponseError {
+                            summary: "Workflow creation failed".to_string(),
+                            detail: None,
+                        },
+                    ))
+                } else {
+                    self.relocate_workflow(&wf_id, spawn_workflow_request, domain_assignments).await
+                }
+            }
+        }
+    }
+
+    /// Assign to all function/resources the same `target_domain`.
+    fn fill_domains(
+        spawn_workflow_request: &edgeless_api::workflow_instance::SpawnWorkflowRequest,
+        target_domain: &str,
+    ) -> std::collections::HashMap<String, String> {
+        let functions: std::collections::HashMap<String, String> = spawn_workflow_request
+            .workflow_functions
+            .iter()
+            .map(|function| (function.name.clone(), target_domain.to_string()))
+            .collect();
+        let mut resources: std::collections::HashMap<String, String> = spawn_workflow_request
+            .workflow_resources
+            .iter()
+            .map(|resource| (resource.name.clone(), target_domain.to_string()))
+            .collect();
+        resources.extend(functions);
+        resources
     }
 
     async fn relocate_workflow(
         &mut self,
         wf_id: &edgeless_api::workflow_instance::WorkflowId,
         spawn_workflow_request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
-        target_domain: &str,
+        domain_assignments: std::collections::HashMap<String, String>,
     ) -> anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse, edgeless_api::workflow_instance::SpawnWorkflowRequest> {
-        self.active_workflows.insert(
-            wf_id.clone(),
-            super::deployment_state::ActiveWorkflow {
-                desired_state: spawn_workflow_request.clone(),
-                domain_mapping: std::collections::HashMap::new(),
-            },
+        // Return immediately if the workflow spec is not valid.
+        if let Err(err) = spawn_workflow_request.is_valid() {
+            return Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
+                edgeless_api::common::ResponseError {
+                    summary: "Workflow creation failed".to_string(),
+                    detail: Some(err.to_string()),
+                },
+            ));
+        }
+
+        assert!(
+            !self.active_workflows.contains_key(wf_id),
+            "trying to activate WF {} which is already active",
+            wf_id
         );
 
-        let active_workflow = self.active_workflows.get(wf_id).unwrap().clone();
+        // Make sure that all the function/resources are mapped.
+        if log::log_enabled!(log::Level::Debug) {
+            for component in spawn_workflow_request.all_component_names() {
+                assert!(
+                    domain_assignments.contains_key(&component),
+                    "function/resource {} is not mapped to a domain",
+                    component
+                );
+            }
+        }
+
+        // Define the workflow specification supporting inter-domain patches.
+        #[derive(Debug)]
+        struct NewResource {
+            name: String,
+            configurations: std::collections::HashMap<String, String>,
+            output_mapping: std::collections::HashMap<String, String>,
+            domain: String,
+        }
+        let mut new_resources = vec![];
+        #[derive(Debug)]
+        struct UpdateOutputMapping {
+            name: String,
+            channel: String,
+            new_target: String,
+        }
+        let mut update_output_mappings = vec![];
+        let mut augmented_spec = spawn_workflow_request.clone();
+        for (component, output_mappings) in augmented_spec.output_mappings() {
+            let origin_domain = domain_assignments.get(&component).unwrap();
+            for (channel, target_component_name) in output_mappings {
+                let target_domain = domain_assignments.get(&target_component_name).unwrap();
+
+                if origin_domain == target_domain {
+                    continue;
+                }
+
+                assert!(
+                    self.portal_desc.is_some(),
+                    "trying to patch functions/resources across domains without a portal"
+                );
+                let domain_bal = self.portal_desc.as_ref().unwrap().domain_bal.clone();
+
+                // Create the first pair of portal resources (sink).
+                self.last_portal_resource_id += 1;
+                let id = self.last_portal_resource_id;
+                let first_resource_name = format!("portal-{}-sink-local", id);
+                new_resources.push(NewResource {
+                    name: first_resource_name.clone(),
+                    configurations: std::collections::HashMap::from([
+                        (String::from("role"), String::from("sink")),
+                        (String::from("domain"), String::from("local")),
+                        (String::from("id"), id.to_string()),
+                    ]),
+                    output_mapping: std::collections::HashMap::new(),
+                    domain: origin_domain.clone(),
+                });
+                let next_resource_name = format!("portal-{}-source-portal", id + 1);
+                new_resources.push(NewResource {
+                    name: format!("portal-{}-sink-portal", id),
+                    configurations: std::collections::HashMap::from([
+                        (String::from("role"), String::from("sink")),
+                        (String::from("domain"), String::from("portal")),
+                        (String::from("id"), id.to_string()),
+                    ]),
+                    output_mapping: std::collections::HashMap::from([(String::from("out"), next_resource_name.clone())]),
+                    domain: domain_bal.clone(),
+                });
+
+                // Create the second pair of portal resources (source).
+                self.last_portal_resource_id += 1;
+                let id = self.last_portal_resource_id;
+                new_resources.push(NewResource {
+                    name: next_resource_name,
+                    configurations: std::collections::HashMap::from([
+                        (String::from("role"), String::from("source")),
+                        (String::from("domain"), String::from("portal")),
+                        (String::from("id"), id.to_string()),
+                    ]),
+                    output_mapping: std::collections::HashMap::new(),
+                    domain: domain_bal.clone(),
+                });
+                new_resources.push(NewResource {
+                    name: format!("portal-{}-source-local", id),
+                    configurations: std::collections::HashMap::from([
+                        (String::from("role"), String::from("source")),
+                        (String::from("domain"), String::from("local")),
+                        (String::from("id"), id.to_string()),
+                    ]),
+                    output_mapping: std::collections::HashMap::from([(String::from("out"), target_component_name.clone())]),
+                    domain: target_domain.clone(),
+                });
+
+                // Change the target in the original component.
+                update_output_mappings.push(UpdateOutputMapping {
+                    name: component.clone(),
+                    channel,
+                    new_target: first_resource_name,
+                });
+            }
+        }
+        println!("XXX {:?}", new_resources);
+
+        // Add the new resources to the augmented workflow and update the
+        // domain mapping.
+        let mut domain_assignments = domain_assignments;
+        for new_resource in new_resources {
+            domain_assignments.insert(new_resource.name.clone(), new_resource.domain);
+            augmented_spec.workflow_resources.push(edgeless_api::workflow_instance::WorkflowResource {
+                name: new_resource.name,
+                class_type: String::from("portal"),
+                output_mapping: new_resource.output_mapping,
+                configurations: new_resource.configurations,
+            });
+        }
+
+        // Update the output mappings of regular functions/resources.
+        for UpdateOutputMapping { name, channel, new_target } in update_output_mappings {
+            augmented_spec.update_mapping(&name, &channel, new_target);
+        }
+
+        // Create the descriptor that will hold the active workflow.
+        let mut workflow = super::deployment_state::ActiveWorkflow {
+            desired_state: spawn_workflow_request,
+            augmented_spec: None, // set later
+            domain_mapping: std::collections::HashMap::new(),
+        };
 
         // Keep the last error.
         let mut res: Result<(), String> = Ok(());
@@ -298,23 +470,27 @@ impl ControllerTask {
         //
 
         // Start the functions on the orchestration domain.
-        for function in &spawn_workflow_request.workflow_functions {
+        for function in &augmented_spec.workflow_functions {
             if res.is_err() {
                 log::error!("Could not start a function {}", res.clone().unwrap_err());
                 break;
             }
 
-            res = self.start_workflow_function_in_domain(wf_id, function, target_domain).await;
+            res = self
+                .start_workflow_function_in_domain(wf_id, &mut workflow, function, domain_assignments.get(&function.name).unwrap())
+                .await;
         }
 
         // Start the resources on the orchestration domain.
-        for resource in &spawn_workflow_request.workflow_resources {
+        for resource in &augmented_spec.workflow_resources {
             if res.is_err() {
                 log::error!("Could not start a resource {}", res.clone().unwrap_err());
                 break;
             }
 
-            res = self.start_workflow_resource_in_domain(wf_id, resource, target_domain).await;
+            res = self
+                .start_workflow_resource_in_domain(wf_id, &mut workflow, resource, domain_assignments.get(&resource.name).unwrap())
+                .await;
         }
 
         //
@@ -323,7 +499,7 @@ impl ControllerTask {
         //
 
         // Loop on all the functions and resources of the workflow.
-        for component_name in &active_workflow.components() {
+        for component_name in workflow.components() {
             if res.is_err() {
                 log::error!("Could not patch the component {}, reason: {}", component_name, res.clone().unwrap_err());
                 break;
@@ -332,19 +508,44 @@ impl ControllerTask {
             // Loop on all the identifiers for this function/resource
             // (once for each orchestration domain to which the
             // function/resource was allocated).
-            for origin_fid in self.active_workflows.get_mut(wf_id).unwrap().mapped_fids(component_name).unwrap() {
-                let output_mapping = self.output_mapping_for(wf_id, component_name).await;
+            for origin_fid in workflow.mapped_fids(&component_name).unwrap() {
+                let output_mapping = workflow.output_mapping_for(&component_name);
 
                 if output_mapping.is_empty() {
                     continue;
                 }
 
-                let component_type = self.active_workflows.get_mut(wf_id).unwrap().component_type(component_name).unwrap();
+                let component_type = workflow.component_type(&component_name).unwrap();
+                let origin_domain = domain_assignments.get(&component_name).unwrap();
+
+                // Make sure that the all the components to be patched are in
+                // the same domain.
+                if log::log_enabled!(log::Level::Debug) {
+                    for target_component in workflow.component_output_mapping(&component_name).values() {
+                        let target_domain = domain_assignments.get(target_component).unwrap();
+                        assert!(
+                            origin_domain == target_domain,
+                            "invalid mapping at WFID {} across domains {} ({}) -> {} ({}) ",
+                            wf_id,
+                            component_name,
+                            origin_domain,
+                            target_component,
+                            target_domain
+                        );
+                    }
+                }
+
                 res = self
-                    .patch_outputs(target_domain, origin_fid, component_type, output_mapping, component_name)
+                    .patch_outputs(origin_domain, origin_fid, component_type, output_mapping, &component_name)
                     .await;
             }
         }
+
+        // Add the augmented spec to the workflow.
+        workflow.augmented_spec = Some(augmented_spec);
+
+        // Add the newly-created workflow to the container of active ones.
+        self.active_workflows.insert(wf_id.clone(), workflow);
 
         //
         // If all went OK, notify the client that the workflow
@@ -439,7 +640,7 @@ impl ControllerTask {
     fn inspect(&self, wf_id: edgeless_api::workflow_instance::WorkflowId) -> anyhow::Result<edgeless_api::workflow_instance::WorkflowInfo> {
         if let Some(workflow) = self.active_workflows.get(&wf_id) {
             Ok(edgeless_api::workflow_instance::WorkflowInfo {
-                request: workflow.desired_state.clone(),
+                request: workflow.augmented_spec.clone().unwrap(),
                 status: edgeless_api::workflow_instance::WorkflowInstance {
                     workflow_id: wf_id.clone(),
                     domain_mapping: workflow
@@ -478,6 +679,9 @@ impl ControllerTask {
         Ok(ret)
     }
 
+    /// Update domain information.
+    ///
+    /// Also update portal domain.
     async fn update_domain(
         &mut self,
         update_domain_request: &edgeless_api::domain_registration::UpdateDomainRequest,
@@ -493,7 +697,7 @@ impl ControllerTask {
             ));
         }
 
-        match self.orchestrators.get_mut(&update_domain_request.domain_id) {
+        let (ret, update_portal_domain) = match self.orchestrators.get_mut(&update_domain_request.domain_id) {
             None => {
                 log::info!(
                     "New domain '{}' with {} nodes",
@@ -516,16 +720,18 @@ impl ControllerTask {
 
                 // It is a new orchestration domain. Therefore, we ask the
                 // orchestrator to reset to a clean state.
-                Ok(edgeless_api::domain_registration::UpdateDomainResponse::Reset)
+                (Ok(edgeless_api::domain_registration::UpdateDomainResponse::Reset), true)
             }
             Some(desc) => {
-                // If the nonce is differen: this is a new instance of an
+                // If the nonce is different: this is a new instance of an
                 // orchestration domain, which must be reset.
                 // Otherwise, if the counter has not been incremented, then
                 // update only the refresh deadline, all the other fields are
                 // assumed to remain the same.
 
+                let update_portal_domain;
                 let response = if desc.nonce == update_domain_request.nonce && desc.counter == update_domain_request.counter {
+                    update_portal_domain = false;
                     edgeless_api::domain_registration::UpdateDomainResponse::Accepted
                 } else {
                     log::info!(
@@ -544,6 +750,7 @@ impl ControllerTask {
                             Box::new(edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&update_domain_request.orchestrator_url).await?);
                     }
 
+                    update_portal_domain = true;
                     if desc.nonce == update_domain_request.nonce {
                         edgeless_api::domain_registration::UpdateDomainResponse::Accepted
                     } else {
@@ -552,7 +759,56 @@ impl ControllerTask {
                     }
                 };
                 desc.refresh_deadline = update_domain_request.refresh_deadline;
-                Ok(response)
+                (Ok(response), update_portal_domain)
+            }
+        };
+
+        if update_portal_domain {
+            self.update_portal_domain().await;
+        }
+
+        ret
+    }
+
+    async fn update_portal_domain(&mut self) {
+        self.portal_desc = None;
+        for (domain_bal, desc) in &self.orchestrators {
+            let domains = desc.capabilities.portal_domains();
+            assert!(!domain_bal.is_empty());
+            if !domains.is_empty() {
+                // Remove those domains that do not advertise a portal resource.
+                let mut confirmed_domains = std::collections::HashSet::new();
+                for domain in &domains {
+                    if let Some(desc) = self.orchestrators.get(domain) {
+                        if desc.capabilities.resource_classes.contains("portal") {
+                            confirmed_domains.insert(domain.clone());
+                        }
+                    }
+                }
+
+                // If there are no confirmed domains in the portal (or if there
+                // is a single domain), skip it as a candidate.
+                if confirmed_domains.len() <= 1 {
+                    continue;
+                }
+
+                // If there are multiple portal candidates, the first one
+                // found is considered and the others are ignored.
+                if let Some(portal_desc) = &self.portal_desc {
+                    log::warn!(
+                        "found multiple candidate portal domains: ignoring {}, using {}",
+                        domain_bal,
+                        portal_desc.domain_bal
+                    );
+                    continue;
+                }
+
+                // Candidate found. We continue with the loop only to warn
+                // about possible other candidate portal domains (ignored).
+                self.portal_desc = Some(PortalDesc {
+                    domain_bal: domain_bal.clone(),
+                    domains: confirmed_domains,
+                });
             }
         }
     }
@@ -580,9 +836,10 @@ impl ControllerTask {
         };
 
         if let Some(desc) = self.orchestrators.get(&request.domain_id) {
-            if Self::is_compatible(desc, workflow) {
+            if Self::is_workflow_compatible(desc, workflow) {
                 if let Some(spec) = self.stop_workflow(&request.workflow_id).await {
-                    match self.relocate_workflow(&request.workflow_id, spec, &request.domain_id).await {
+                    let domain_assignments = Self::fill_domains(&spec, &request.domain_id);
+                    match self.relocate_workflow(&request.workflow_id, spec, domain_assignments).await {
                         Ok(response) => {
                             if let edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_) = response {
                                 log::info!(
@@ -668,37 +925,109 @@ impl ControllerTask {
 
     /// Return true if the given orchestration domain is compatible with the
     /// workflow request, i.e., it can host all its functions and resources.
-    fn is_compatible(desc: &OrchestratorDesc, workflow: &edgeless_api::workflow_instance::SpawnWorkflowRequest) -> bool {
+    fn is_workflow_compatible(desc: &OrchestratorDesc, workflow: &edgeless_api::workflow_instance::SpawnWorkflowRequest) -> bool {
         for function in &workflow.workflow_functions {
-            if !desc
-                .capabilities
-                .runtimes
-                .contains(&function.function_class_specification.function_class_type)
-            {
+            if !Self::is_function_compatible(desc, function) {
                 return false;
             }
         }
         for resource in &workflow.workflow_resources {
-            if !desc.capabilities.resource_classes.contains(&resource.class_type) {
+            if !Self::is_resource_compatible(desc, resource) {
                 return false;
             }
         }
         true
     }
 
+    /// Return true if the given function is compatible with a domain.
+    fn is_function_compatible(desc: &OrchestratorDesc, function: &edgeless_api::workflow_instance::WorkflowFunction) -> bool {
+        desc.capabilities
+            .runtimes
+            .contains(&function.function_class_specification.function_class_type)
+    }
+
+    /// Return true if the given resource is compatible with a domain.
+    fn is_resource_compatible(desc: &OrchestratorDesc, resource: &edgeless_api::workflow_instance::WorkflowResource) -> bool {
+        desc.capabilities.resource_classes.contains(&resource.class_type)
+    }
+
+    /// Return a candidate assignment of functions/resources to domains,
+    /// including the possibility to use the portal (if any) for inter-domain
+    /// workflows, or an empty map if a full mapping is not possible.
+    ///
+    /// Return immediately an empty map if there is no portal.
+    ///
+    /// The map returned the function/resource name as key and the domain
+    /// selected as value.
+    fn domain_assignments_portal(
+        &mut self,
+        workflow: &edgeless_api::workflow_instance::SpawnWorkflowRequest,
+    ) -> std::collections::HashMap<String, String> {
+        let mut ret = std::collections::HashMap::new();
+
+        if let Some(portal_desc) = &self.portal_desc {
+            assert!(
+                portal_desc.domains.len() > 1,
+                "too few domains for a portal: {}",
+                portal_desc.domains.len()
+            );
+        }
+
+        for function in &workflow.workflow_functions {
+            if let Some(domain) = Self::function_compatible_domains(&self.orchestrators, function).choose(&mut self.rng) {
+                ret.insert(function.name.clone(), domain.clone());
+            } else {
+                return std::collections::HashMap::new();
+            }
+        }
+        for resource in &workflow.workflow_resources {
+            if let Some(domain) = Self::resource_compatible_domains(&self.orchestrators, resource).choose(&mut self.rng) {
+                ret.insert(resource.name.clone(), domain.clone());
+            } else {
+                return std::collections::HashMap::new();
+            }
+        }
+
+        ret
+    }
+
     /// Return the list of orchestration domains that are compatible with the
     /// given workflow request.
-    fn compatible_domains(
+    fn workflow_compatible_domains(
         orchestrators: &std::collections::HashMap<String, OrchestratorDesc>,
         workflow_request: &edgeless_api::workflow_instance::SpawnWorkflowRequest,
     ) -> Vec<String> {
-        let mut ret = vec![];
-        for (domain_id, desc) in orchestrators {
-            if Self::is_compatible(desc, workflow_request) {
-                ret.push(domain_id.clone());
-            }
-        }
-        ret
+        orchestrators
+            .iter()
+            .filter(|(_domain_id, desc)| Self::is_workflow_compatible(desc, workflow_request))
+            .map(|(domain_id, _desc)| domain_id.clone())
+            .collect()
+    }
+
+    /// Return the list of orchestration domains that are compatible with the
+    /// given function.
+    fn function_compatible_domains(
+        orchestrators: &std::collections::HashMap<String, OrchestratorDesc>,
+        function: &edgeless_api::workflow_instance::WorkflowFunction,
+    ) -> Vec<String> {
+        orchestrators
+            .iter()
+            .filter(|(_domain_id, desc)| Self::is_function_compatible(desc, function))
+            .map(|(domain_id, _desc)| domain_id.clone())
+            .collect()
+    }
+
+    /// Return the list of orchestration domains that are compatible with the
+    /// given resource.
+    fn resource_compatible_domains(
+        orchestrators: &std::collections::HashMap<String, OrchestratorDesc>,
+        resource: &edgeless_api::workflow_instance::WorkflowResource,
+    ) -> Vec<String> {
+        orchestrators
+            .iter()
+            .filter(|(_domain_id, desc)| Self::is_resource_compatible(desc, resource))
+            .map(|(domain_id, _desc)| domain_id.clone())
+            .collect()
     }
 
     /// Check all active workflows.
@@ -728,7 +1057,7 @@ impl ControllerTask {
         let mut workflow_requests_fixable = vec![];
         let mut workflow_requests_unfixable = std::collections::BTreeMap::new();
         while let Some((wf_id, workflow_request)) = self.orphan_workflows.pop_first() {
-            match Self::compatible_domains(&self.orchestrators, &workflow_request).choose(&mut self.rng) {
+            match Self::workflow_compatible_domains(&self.orchestrators, &workflow_request).choose(&mut self.rng) {
                 None => {
                     workflow_requests_unfixable.insert(wf_id, workflow_request);
                 }
@@ -744,7 +1073,8 @@ impl ControllerTask {
         // orphan list.
         for (new_domain, wf_id, workflow_request) in workflow_requests_fixable {
             assert!(!new_domain.is_empty());
-            match self.relocate_workflow(&wf_id, workflow_request, &new_domain).await {
+            let domain_assignments = Self::fill_domains(&workflow_request, &new_domain);
+            match self.relocate_workflow(&wf_id, workflow_request, domain_assignments).await {
                 Ok(response) => {
                     if let edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_) = response {
                         log::info!("orphan workflow assigned to domain '{}'", new_domain);
@@ -761,6 +1091,7 @@ impl ControllerTask {
     async fn start_workflow_function_in_domain(
         &mut self,
         wf_id: &edgeless_api::workflow_instance::WorkflowId,
+        workflow: &mut ActiveWorkflow,
         function: &edgeless_api::workflow_instance::WorkflowFunction,
         domain: &str,
     ) -> Result<(), String> {
@@ -791,7 +1122,7 @@ impl ControllerTask {
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                     log::info!("workflow {} function {} started with fid {}", wf_id.to_string(), function.name, &id);
                     // id.node_id is unused
-                    self.active_workflows.get_mut(wf_id).unwrap().domain_mapping.insert(
+                    workflow.domain_mapping.insert(
                         function.name.clone(),
                         super::deployment_state::ActiveComponent {
                             component_type: super::ComponentType::Function,
@@ -810,6 +1141,7 @@ impl ControllerTask {
     async fn start_workflow_resource_in_domain(
         &mut self,
         wf_id: &edgeless_api::workflow_instance::WorkflowId,
+        workflow: &mut ActiveWorkflow,
         resource: &edgeless_api::workflow_instance::WorkflowResource,
         domain: &str,
     ) -> Result<(), String> {
@@ -832,7 +1164,7 @@ impl ControllerTask {
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                     log::info!("workflow {} resource {} started with fid {}", wf_id.to_string(), resource.name, &id);
                     // id.node_id is unused
-                    self.active_workflows.get_mut(wf_id).unwrap().domain_mapping.insert(
+                    workflow.domain_mapping.insert(
                         resource.name.clone(),
                         super::deployment_state::ActiveComponent {
                             component_type: super::ComponentType::Resource,
@@ -846,43 +1178,6 @@ impl ControllerTask {
             },
             Err(err) => Err(format!("failed interaction when starting a resource: {}", err)),
         }
-    }
-
-    async fn output_mapping_for(
-        &mut self,
-        wf_id: &edgeless_api::workflow_instance::WorkflowId,
-        component_name: &str,
-    ) -> std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> {
-        let workflow_mapping: std::collections::HashMap<String, String> =
-            self.active_workflows.get(wf_id).unwrap().component_output_mapping(component_name);
-
-        let mut output_mapping = std::collections::HashMap::new();
-
-        // Loop on all the channels that needed to be
-        // mapped for this function/resource.
-        for (from_channel, to_name) in workflow_mapping {
-            // Loop on all the identifiers for the
-            // target function/resource (once for each
-            // assigned orchestration domain).
-            for target_fid in self.active_workflows.get(wf_id).unwrap().mapped_fids(&to_name).unwrap() {
-                // [TODO] Issue#96 The output_mapping
-                // structure should be changed so that
-                // multiple values are possible (with
-                // weights), and this change must be applied
-                // to runners, as well.
-                // For now, we just keep
-                // overwriting the same entry.
-                output_mapping.insert(
-                    from_channel.clone(),
-                    edgeless_api::function_instance::InstanceId {
-                        node_id: uuid::Uuid::nil(),
-                        function_id: target_fid,
-                    },
-                );
-            }
-        }
-
-        output_mapping
     }
 
     async fn patch_outputs(
