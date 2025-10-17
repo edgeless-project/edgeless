@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+
 use std::str::FromStr;
 
 const WORKFLOW_ID_NONE: uuid::Uuid = uuid::uuid!("00000000-0000-0000-0000-ffff00000000");
@@ -63,6 +64,21 @@ pub struct WorkflowResource {
     pub configurations: std::collections::HashMap<String, String>,
 }
 
+impl WorkflowResource {
+    pub fn is_valid(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(!self.name.is_empty(), "empty name in resource");
+        anyhow::ensure!(!self.class_type.is_empty(), "empty class type in resource");
+        anyhow::ensure!(
+            !self
+                .output_mapping
+                .iter()
+                .any(|(channel, component)| channel.is_empty() || component.is_empty()),
+            "empty channel or component in output_mapping of a resource"
+        );
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct WorkflowFunction {
     pub name: String,
@@ -71,11 +87,100 @@ pub struct WorkflowFunction {
     pub annotations: std::collections::HashMap<String, String>,
 }
 
+impl WorkflowFunction {
+    pub fn is_valid(&self) -> anyhow::Result<()> {
+        anyhow::ensure!(!self.name.is_empty(), "empty name in function");
+        anyhow::ensure!(
+            !self
+                .output_mapping
+                .iter()
+                .any(|(channel, component)| channel.is_empty() || component.is_empty()),
+            "empty channel or component in output_mapping of a function"
+        );
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SpawnWorkflowRequest {
     pub workflow_functions: Vec<WorkflowFunction>,
     pub workflow_resources: Vec<WorkflowResource>,
     pub annotations: std::collections::HashMap<String, String>,
+}
+
+impl SpawnWorkflowRequest {
+    /// Return the union of all the names of the components mentioned
+    /// by the workflow, as component to be either started or mapped to.
+    pub fn all_component_names(&self) -> std::collections::HashSet<String> {
+        let source_components = self.source_components();
+        let mut mapped_components = self.mapped_components();
+        mapped_components.extend(source_components);
+        mapped_components
+    }
+
+    /// Return the names of the components that should be started.
+    pub fn source_components(&self) -> std::collections::HashSet<String> {
+        let mut ret: std::collections::HashSet<String> = self.workflow_functions.iter().map(|x| x.name.clone()).collect();
+        ret.extend(self.workflow_resources.iter().map(|x| x.name.clone()));
+        ret
+    }
+
+    /// Return the names of the components to which others map.
+    pub fn mapped_components(&self) -> std::collections::HashSet<String> {
+        let mut ret: std::collections::HashSet<String> = self.workflow_functions.iter().flat_map(|x| x.output_mapping.values()).cloned().collect();
+        ret.extend(self.workflow_resources.iter().flat_map(|x| x.output_mapping.values()).cloned());
+        ret
+    }
+
+    /// Change the target for a given channel of a function/resource.
+    ///
+    /// Ignore if the function/resource, or channel mapping, does not exist.
+    pub fn update_mapping(&mut self, name: &str, channel: &str, new_target: String) {
+        if let Some(function) = self.workflow_functions.iter_mut().find(|x| x.name == *name) {
+            if let Some(mapping) = function.output_mapping.get_mut(channel) {
+                *mapping = new_target;
+            }
+        } else if let Some(resource) = self.workflow_resources.iter_mut().find(|x| x.name == *name) {
+            if let Some(mapping) = resource.output_mapping.get_mut(channel) {
+                *mapping = new_target;
+            }
+        }
+    }
+
+    /// Return the output mappings of all the components, both functions and
+    /// resources.
+    pub fn output_mappings(&self) -> std::collections::HashMap<String, std::collections::HashMap<String, String>> {
+        let function_mappings: std::collections::HashMap<String, std::collections::HashMap<String, String>> = self
+            .workflow_functions
+            .iter()
+            .map(|function| (function.name.clone(), function.output_mapping.clone()))
+            .collect();
+        let mut resource_mappings: std::collections::HashMap<String, std::collections::HashMap<String, String>> = self
+            .workflow_resources
+            .iter()
+            .map(|function| (function.name.clone(), function.output_mapping.clone()))
+            .collect();
+        resource_mappings.extend(function_mappings);
+        resource_mappings
+    }
+
+    /// Check if the workflow is valid.
+    pub fn is_valid(&self) -> anyhow::Result<()> {
+        for function in &self.workflow_functions {
+            function.is_valid()?;
+        }
+        for resource in &self.workflow_resources {
+            resource.is_valid()?;
+        }
+        anyhow::ensure!(self
+            .mapped_components()
+            .difference(&self.source_components())
+            .collect::<Vec<&String>>()
+            .is_empty());
+
+        // self.workflow_functions.
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize)]
@@ -124,5 +229,120 @@ where
 impl Clone for Box<dyn WorkflowInstanceAPI> {
     fn clone(&self) -> Box<dyn WorkflowInstanceAPI> {
         self.clone_box()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::function_instance::FunctionClassSpecification;
+
+    use super::*;
+
+    #[test]
+    fn test_spawn_workflow_request_empty() {
+        let spec = SpawnWorkflowRequest {
+            workflow_functions: vec![],
+            workflow_resources: vec![],
+            annotations: std::collections::HashMap::new(),
+        };
+
+        assert!(spec.all_component_names().is_empty());
+        assert!(spec.mapped_components().is_empty());
+        assert!(spec.source_components().is_empty());
+        assert!(spec.is_valid().is_ok());
+        assert!(spec.output_mappings().is_empty());
+    }
+
+    #[test]
+    fn test_spawn_workflow_request_accessors() {
+        let spec = SpawnWorkflowRequest {
+            workflow_functions: vec![
+                WorkflowFunction {
+                    name: String::from("f1"),
+                    function_class_specification: FunctionClassSpecification {
+                        function_class_id: String::from("function-class-id"),
+                        function_class_type: String::from("function-class-type"),
+                        function_class_version: String::from("function-class-version"),
+                        function_class_code: String::from("function-classcode").into(),
+                        function_class_outputs: vec![],
+                    },
+                    output_mapping: std::collections::HashMap::from([
+                        (String::from("out1"), String::from("r1")),
+                        (String::from("out2"), String::from("f2")),
+                    ]),
+                    annotations: std::collections::HashMap::new(),
+                },
+                WorkflowFunction {
+                    name: String::from("f2"),
+                    function_class_specification: FunctionClassSpecification {
+                        function_class_id: String::from("function-class-id"),
+                        function_class_type: String::from("function-class-type"),
+                        function_class_version: String::from("function-class-version"),
+                        function_class_code: String::from("function-classcode").into(),
+                        function_class_outputs: vec![],
+                    },
+                    output_mapping: std::collections::HashMap::from([
+                        (String::from("out1"), String::from("f1")),
+                        (String::from("out2"), String::from("r1")),
+                    ]),
+                    annotations: std::collections::HashMap::new(),
+                },
+                WorkflowFunction {
+                    name: String::from("f3"),
+                    function_class_specification: FunctionClassSpecification {
+                        function_class_id: String::from("function-class-id"),
+                        function_class_type: String::from("function-class-type"),
+                        function_class_version: String::from("function-class-version"),
+                        function_class_code: String::from("function-classcode").into(),
+                        function_class_outputs: vec![],
+                    },
+                    output_mapping: std::collections::HashMap::new(),
+                    annotations: std::collections::HashMap::new(),
+                },
+            ],
+            workflow_resources: vec![WorkflowResource {
+                name: String::from("r1"),
+                class_type: String::from("resource-class"),
+                output_mapping: std::collections::HashMap::from([
+                    (String::from("out1"), String::from("f2")),
+                    (String::from("out2"), String::from("f1")),
+                ]),
+                configurations: std::collections::HashMap::new(),
+            }],
+            annotations: std::collections::HashMap::new(),
+        };
+
+        assert!(spec.is_valid().is_ok());
+
+        assert_eq!(
+            std::collections::HashSet::from([String::from("f1"), String::from("r1"), String::from("f2"), String::from("f3")]),
+            spec.all_component_names()
+        );
+        assert_eq!(
+            std::collections::HashSet::from([String::from("f1"), String::from("r1"), String::from("f2")]),
+            spec.mapped_components()
+        );
+        assert_eq!(
+            std::collections::HashSet::from([String::from("f1"), String::from("r1"), String::from("f2"), String::from("f3")]),
+            spec.source_components()
+        );
+        assert_eq!(
+            std::collections::HashMap::from([
+                (
+                    String::from("f1"),
+                    std::collections::HashMap::from([(String::from("out1"), String::from("r1")), (String::from("out2"), String::from("f2"))])
+                ),
+                (
+                    String::from("r1"),
+                    std::collections::HashMap::from([(String::from("out1"), String::from("f2")), (String::from("out2"), String::from("f1"))])
+                ),
+                (
+                    String::from("f2"),
+                    std::collections::HashMap::from([(String::from("out1"), String::from("f1")), (String::from("out2"), String::from("r1"))])
+                ),
+                (String::from("f3"), std::collections::HashMap::new()),
+            ]),
+            spec.output_mappings()
+        );
     }
 }

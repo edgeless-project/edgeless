@@ -7,6 +7,10 @@ pub struct ActiveWorkflow {
     // Workflow as it was requested by the client.
     pub desired_state: edgeless_api::workflow_instance::SpawnWorkflowRequest,
 
+    // Workflow augmented with portal resources, if needed to enable
+    // cross-domain interactions.
+    pub augmented_spec: Option<edgeless_api::workflow_instance::SpawnWorkflowRequest>,
+
     // Mapping of each function/resource to a list of domains.
     pub domain_mapping: std::collections::HashMap<String, ActiveComponent>,
 }
@@ -96,6 +100,43 @@ impl ActiveWorkflow {
         }
 
         std::collections::HashMap::new()
+    }
+
+    /// Return an output_mapping for the given component.
+    ///
+    /// Returned map:
+    /// - key: channel name
+    /// - value: PID
+    pub fn output_mapping_for(&self, component_name: &str) -> std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> {
+        let workflow_mapping: std::collections::HashMap<String, String> = self.component_output_mapping(component_name);
+
+        let mut output_mapping = std::collections::HashMap::new();
+
+        // Loop on all the channels that needed to be
+        // mapped for this function/resource.
+        for (from_channel, to_name) in workflow_mapping {
+            // Loop on all the identifiers for the
+            // target function/resource (once for each
+            // assigned orchestration domain).
+            for target_fid in self.mapped_fids(&to_name).unwrap() {
+                // [TODO] Issue#96 The output_mapping
+                // structure should be changed so that
+                // multiple values are possible (with
+                // weights), and this change must be applied
+                // to runners, as well.
+                // For now, we just keep
+                // overwriting the same entry.
+                output_mapping.insert(
+                    from_channel.clone(),
+                    edgeless_api::function_instance::InstanceId {
+                        node_id: uuid::Uuid::nil(),
+                        function_id: target_fid,
+                    },
+                );
+            }
+        }
+
+        output_mapping
     }
 }
 

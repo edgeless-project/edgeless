@@ -5,7 +5,6 @@ use clap::Parser;
 use cloud_offloading::rebalancer::Rebalancer;
 use cloud_offloading::{create_cloud_node, delete_cloud_node, CloudNodeData, CloudNodeInputData};
 use config::Config;
-use log;
 use std::collections::HashSet;
 use std::fs;
 use std::path::PathBuf;

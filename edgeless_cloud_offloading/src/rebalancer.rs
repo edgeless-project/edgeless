@@ -303,8 +303,8 @@ impl Rebalancer {
                 continue;
             }
 
-            let is_cpu_low = node_desc.cpu_usage_percent().map_or(false, |cpu| cpu < cpu_threshold);
-            let is_mem_low = node_desc.memory_usage_percent().map_or(false, |mem| mem < mem_threshold);
+            let is_cpu_low = node_desc.cpu_usage_percent().is_some_and(|cpu| cpu < cpu_threshold);
+            let is_mem_low = node_desc.memory_usage_percent().is_some_and(|mem| mem < mem_threshold);
 
             if is_cpu_low && is_mem_low {
                 log::warn!(
@@ -322,7 +322,7 @@ impl Rebalancer {
 
     pub fn is_node_empty(&self, node_id: &str) -> bool {
         if let Ok(uuid) = Uuid::parse_str(node_id) {
-            self.nodes.get(&uuid).map_or(true, |node| node.function_instances.is_empty())
+            self.nodes.get(&uuid).is_none_or(|node| node.function_instances.is_empty())
         } else {
             true
         }

@@ -1,7 +1,6 @@
 use aws_config::Region;
 use aws_sdk_ec2::types::{InstanceType, Tag};
 use base64::{engine::general_purpose::STANDARD, Engine as _};
-use log;
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use std::time::Instant;
@@ -29,7 +28,7 @@ pub struct CloudNodeData {
 
 fn generate_instance_name() -> String {
     let random_string: String = thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
-    format!("EDGELESS-Node-{}", random_string)
+    format!("EDGELESS-Node-{random_string}")
 }
 
 pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNodeData, Box<dyn std::error::Error>> {
