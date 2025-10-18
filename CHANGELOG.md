@@ -4,7 +4,20 @@
 
 New features:
 
-- Add intent to cordon/uncordon nodes at an ε-ORC. When a node is cordoned, new functions/resources are not assigned to it, irrespective of the orchestrator's policy and deployment constraints. Cordoning can be realized via `proxy_cli`.
+- Add intent to cordon/uncordon nodes at an ε-ORC. When a node is cordoned, new
+  functions/resources are not assigned to it, irrespective of the orchestrator's
+  policy and deployment constraints. Cordoning can be realized via `proxy_cli`.
+- Add support to inter-domain workflows via the ε-BAL. When a cluster has
+  multiple domains, an additional _portal domain_ should be created. Then,
+  each regular domain needs an ε-BAL, which also registers with the ε-ORC of
+  the portal domain. The edgeless_cli is updated with a new command to migrate
+  a single component of a workflow to a target domain.
+
+API changes:
+
+- Modify MigrateWorkflowRequest to also include the name of the component
+  of a workflow to be migrated. If empty, the request is to migrate the
+  whole workflow.
 
 ## [1.1.0] - 2025-07-15
 

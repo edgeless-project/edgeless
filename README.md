@@ -96,16 +96,12 @@ Advanced topics:
 - [Benchmarking EDGELESS](documentation/benchmark.md)
 - [Docker container runtime](documentation/container-runtime.md)
 - [A multi-domain example](documentation/example_multidomain.md)
+- [Inter-domain workflows](documentation/interdomain_workflows.md)
 
 ## Known limitations
 
 Currently there are several known limitations, including the following ones:
 
-- The dataplane is limited within a single orchestration domain and realized
-  through a full-mesh interconnection between all the nodes.
-- The ε-BAL is a mere skeleton with no logic.
-- The ε-CON allocates all the functions/resources of a workflow together to
-  the same domain.
 - No workflow-level annotations are supported.
 - The payload of events is not encrypted.
 - There currently are no guarantees on stability and API stability.
