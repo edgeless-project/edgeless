@@ -11,12 +11,26 @@ struct Args {
     config_file: String,
     #[arg(short, long, default_value_t = String::from(""))]
     template: String,
+    /// Print the version number and quit.
+    #[arg(long, default_value_t = false)]
+    version: bool,
 }
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let args = Args::parse();
+    if args.version {
+        println!(
+            "{}.{}.{}{}{}",
+            env!("CARGO_PKG_VERSION_MAJOR"),
+            env!("CARGO_PKG_VERSION_MINOR"),
+            env!("CARGO_PKG_VERSION_PATCH"),
+            if env!("CARGO_PKG_VERSION_PRE").is_empty() { "" } else { "-" },
+            env!("CARGO_PKG_VERSION_PRE")
+        );
+        return Ok(());
+    }
     if !args.template.is_empty() {
         edgeless_api::util::create_template(&args.template, edgeless_orc::edgeless_orc_default_conf().as_str())?;
         return Ok(());

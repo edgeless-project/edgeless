@@ -27,6 +27,9 @@ struct Args {
     available_resources: bool,
     #[arg(long, default_value_t = false)]
     output_json: bool,
+    /// Print the version number and quit.
+    #[arg(long, default_value_t = false)]
+    version: bool,
 }
 
 fn read_conf_from_file(filename: &str) -> anyhow::Result<edgeless_node::EdgelessNodeSettings> {
@@ -42,7 +45,17 @@ fn main() -> anyhow::Result<()> {
     // console_subscriber::init();
 
     let args = Args::parse();
-
+    if args.version {
+        println!(
+            "{}.{}.{}{}{}",
+            env!("CARGO_PKG_VERSION_MAJOR"),
+            env!("CARGO_PKG_VERSION_MINOR"),
+            env!("CARGO_PKG_VERSION_PATCH"),
+            if env!("CARGO_PKG_VERSION_PRE").is_empty() { "" } else { "-" },
+            env!("CARGO_PKG_VERSION_PRE")
+        );
+        return Ok(());
+    }
     // Create a template node configuration and exit.
     if !args.template.is_empty() {
         edgeless_api::util::create_template(&args.template, edgeless_node::edgeless_node_default_conf().as_str())?;

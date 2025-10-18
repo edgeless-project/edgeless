@@ -1141,67 +1141,6 @@ mod system_tests {
         assert_eq!(3, num_portal_nodes);
         assert_eq!(regular_domains, domains_advertised);
 
-        // // Create 100 workflows
-        // let mut workflow_ids = vec![];
-        // let mut domains = std::collections::HashSet::new();
-        // for wf_i in 0..100 {
-        //     let err_str = format!("wf#{}, nodes in cluster {}", wf_i, nodes_in_cluster(3, &mut client).await);
-        //     let res = client
-        //         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-        //             workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
-        //                 name: "f1".to_string(),
-        //                 function_class_specification: fixture_spec(),
-        //                 output_mapping: std::collections::HashMap::new(),
-        //                 annotations: std::collections::HashMap::new(),
-        //             }],
-        //             workflow_resources: vec![],
-        //             annotations: std::collections::HashMap::new(),
-        //         })
-        //         .await;
-        //     workflow_ids.push(match res {
-        //         Ok(response) => match &response {
-        //             edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => {
-        //                 panic!("workflow rejected [{}]: {}", err_str, err)
-        //             }
-        //             edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val) => {
-        //                 assert_eq!(1, val.domain_mapping.len());
-        //                 assert_eq!("f1", val.domain_mapping[0].name);
-        //                 domains.insert(val.domain_mapping[0].domain_id.clone());
-        //                 val.workflow_id.clone()
-        //             }
-        //         },
-        //         Err(err) => panic!("could not start the workflow [{}]: {}", err_str, err),
-        //     });
-        // }
-        // assert_eq!(100, wf_list(&mut client).await.len());
-
-        // let mut all_domains = std::collections::HashSet::new();
-        // for i in 0..3 {
-        //     all_domains.insert(format!("domain-{}", i));
-        // }
-        // assert_eq!(all_domains, domains);
-        // assert_eq!(all_domains, domains_used(&mut client).await);
-
-        // // Tear down one orchestration domain.
-        // tear_down_domain("domain-1", &mut handles);
-        // all_domains.remove("domain-1");
-        // for _ in 0..100 {
-        //     if domains_used(&mut client).await == all_domains {
-        //         break;
-        //     }
-        //     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-        // }
-        // assert_eq!(all_domains, domains_used(&mut client).await);
-
-        // // Stop the workflows
-        // for workflow_id in workflow_ids {
-        //     match client.stop(workflow_id).await {
-        //         Ok(_) => {}
-        //         Err(err) => panic!("could not stop the workflow: {}", err),
-        //     }
-        // }
-        // assert!(wf_list(&mut client).await.is_empty());
-
         terminate(handles)
     }
 }

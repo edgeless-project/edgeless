@@ -29,12 +29,26 @@ struct Args {
     /// Use the first non-loopback IP address to bind local sockets instead of 127.0.0.1.
     #[arg(long, short)]
     bind_to_nonloopback: bool,
+    /// Print the version number and quit.
+    #[arg(long, default_value_t = false)]
+    version: bool,
 }
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
     let args = Args::parse();
 
+    if args.version {
+        println!(
+            "{}.{}.{}{}{}",
+            env!("CARGO_PKG_VERSION_MAJOR"),
+            env!("CARGO_PKG_VERSION_MINOR"),
+            env!("CARGO_PKG_VERSION_PATCH"),
+            if env!("CARGO_PKG_VERSION_PRE").is_empty() { "" } else { "-" },
+            env!("CARGO_PKG_VERSION_PRE")
+        );
+        return Ok(());
+    }
     if args.templates {
         let last_port = generate_configs(args.config_path, args.num_of_nodes, args.initial_port, args.bind_to_nonloopback)?;
         log::info!("Templates written, last port used: {}", last_port);

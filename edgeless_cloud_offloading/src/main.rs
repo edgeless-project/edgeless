@@ -22,12 +22,26 @@ struct Args {
     /// Directory in which to save the configuration files.
     #[arg(long, default_value_t = String::from("./"))]
     config_path: String,
+    /// Print the version number and quit.
+    #[arg(long, default_value_t = false)]
+    version: bool,
 }
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
     let args = Args::parse();
 
+    if args.version {
+        println!(
+            "{}.{}.{}{}{}",
+            env!("CARGO_PKG_VERSION_MAJOR"),
+            env!("CARGO_PKG_VERSION_MINOR"),
+            env!("CARGO_PKG_VERSION_PATCH"),
+            if env!("CARGO_PKG_VERSION_PRE").is_empty() { "" } else { "-" },
+            env!("CARGO_PKG_VERSION_PRE")
+        );
+        return Ok(());
+    }
     if args.templates {
         generate_config(&args.config_path)?;
         return Ok(());
