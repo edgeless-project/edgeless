@@ -453,9 +453,12 @@ message UpdateDomainResponse {
 // Message to request the migration of a workflow to another domain.
 message MigrateWorkflowRequest {
     // The workflow to be migrated.
-    WorkflowId workflow_id = 1;
+    WorkflowId workflow_id   = 1;
     // The domain to which the workflow should be migrated.
-    DomainId domain_id     = 2;
+    DomainId   domain_id     = 2;
+    // If not empty, only apply migration to the function/resource specified
+    // by the given name.
+    string     component     = 3;
 }
 
 // Event types.

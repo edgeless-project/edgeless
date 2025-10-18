@@ -56,6 +56,14 @@ impl ActiveWorkflow {
         item.map(|item| item.component_type.clone())
     }
 
+    /// Return the current domain assignments
+    pub fn domain_assignments(&self) -> std::collections::HashMap<String, String> {
+        self.domain_mapping
+            .iter()
+            .map(|(component, active)| (component.clone(), active.domain_id.clone()))
+            .collect()
+    }
+
     pub fn domain_mapping(&self) -> Vec<edgeless_api::workflow_instance::WorkflowFunctionMapping> {
         self.domain_mapping
             .iter()

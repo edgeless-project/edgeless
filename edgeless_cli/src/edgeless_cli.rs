@@ -24,6 +24,7 @@ enum WorkflowCommands {
     Start { spec_file: String },
     Stop { id: String },
     Migrate { id: String, domain: String },
+    MigrateComponent { id: String, domain: String, component: String },
     List {},
     Inspect { id: String },
 }
@@ -232,6 +233,26 @@ async fn main() -> anyhow::Result<()> {
                             .migrate(edgeless_api::workflow_instance::MigrateWorkflowRequest {
                                 workflow_id: edgeless_api::workflow_instance::WorkflowId::new(&id)?,
                                 domain_id: domain.clone(),
+                                component: String::default(),
+                            })
+                            .await?
+                        {
+                            SpawnWorkflowResponse::ResponseError(response_error) => println!(
+                                "migration of {} to {} failed: {} ({})",
+                                id,
+                                domain,
+                                response_error.summary,
+                                response_error.detail.unwrap_or_default()
+                            ),
+                            SpawnWorkflowResponse::WorkflowInstance(_workflow_instance) => println!("migration of {} to {} successful", id, domain),
+                        }
+                    }
+                    WorkflowCommands::MigrateComponent { id, domain, component } => {
+                        match wf_client
+                            .migrate(edgeless_api::workflow_instance::MigrateWorkflowRequest {
+                                workflow_id: edgeless_api::workflow_instance::WorkflowId::new(&id)?,
+                                domain_id: domain.clone(),
+                                component,
                             })
                             .await?
                         {

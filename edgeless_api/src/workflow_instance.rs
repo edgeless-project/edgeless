@@ -132,6 +132,16 @@ impl SpawnWorkflowRequest {
         ret
     }
 
+    /// Retrieve the function with given component name, if any.
+    pub fn get_function(&self, name: &str) -> Option<&WorkflowFunction> {
+        self.workflow_functions.iter().find(|x| x.name == name)
+    }
+
+    /// Retrieve the resource with given component name, if any.
+    pub fn get_resource(&self, name: &str) -> Option<&WorkflowResource> {
+        self.workflow_resources.iter().find(|x| x.name == name)
+    }
+
     /// Change the target for a given channel of a function/resource.
     ///
     /// Ignore if the function/resource, or channel mapping, does not exist.
@@ -199,6 +209,7 @@ pub enum SpawnWorkflowResponse {
 pub struct MigrateWorkflowRequest {
     pub workflow_id: WorkflowId,
     pub domain_id: String,
+    pub component: String,
 }
 
 #[async_trait::async_trait]
