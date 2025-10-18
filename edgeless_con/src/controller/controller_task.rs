@@ -882,12 +882,12 @@ impl ControllerTask {
                         if let edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_) = response {
                             log::info!(
                                 "workflow '{}' {}successfully migrated to domain '{}'",
+                                request.workflow_id,
                                 if request.component.is_empty() {
                                     String::default()
                                 } else {
                                     format!("component '{}' ", request.component)
                                 },
-                                request.workflow_id,
                                 request.domain_id
                             );
                             Ok(response)

@@ -8,7 +8,7 @@ mod system_tests {
     // use super::*;
 
     use edgeless_api::outer::controller::ControllerAPI;
-    use edgeless_api::workflow_instance::WorkflowInstanceAPI;
+    use edgeless_api::workflow_instance::{MigrateWorkflowRequest, WorkflowInstanceAPI};
     use edgeless_orc::proxy::Proxy;
 
     struct AbortHandles {
@@ -1003,7 +1003,7 @@ mod system_tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     #[serial_test::serial]
     async fn system_test_orchestration_node_cordoning_resources_redis() -> anyhow::Result<()> {
-        let _ = env_logger::try_init();
+        // let _ = env_logger::try_init();
 
         // Skip the test if there is no local Redis listening on default port.
         let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true, None) {
@@ -1113,10 +1113,28 @@ mod system_tests {
         terminate(handles)
     }
 
+    fn workflow_response_or_panic(
+        response: anyhow::Result<edgeless_api::workflow_instance::SpawnWorkflowResponse>,
+    ) -> edgeless_api::workflow_instance::WorkflowInstance {
+        match response {
+            Ok(response) => match response {
+                edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(err) => panic!("workflow rejected: {}", err),
+                edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(val) => val,
+            },
+            Err(err) => panic!("could not start the workflow: {}", err),
+        }
+    }
+
     #[tokio::test]
     #[serial_test::serial]
     async fn system_test_balancer() -> anyhow::Result<()> {
         let _ = env_logger::try_init();
+
+        let removeme_filename = format!("removeme-balancer.log");
+
+        let cleanup = || {
+            let _ = std::fs::remove_file(removeme_filename.clone());
+        };
 
         // Create a controller and 3 orchestration domains.
         let mut setup_conf = setup(3, 1, None).await;
@@ -1141,6 +1159,169 @@ mod system_tests {
         assert_eq!(3, num_portal_nodes);
         assert_eq!(regular_domains, domains_advertised);
 
+        // Create a workflow: f1 -> f2 -> log.
+        cleanup();
+        let workflow = workflow_response_or_panic(
+            client
+                .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
+                    workflow_functions: vec![
+                        edgeless_api::workflow_instance::WorkflowFunction {
+                            name: "f1".to_string(),
+                            function_class_specification: fixture_spec(),
+                            output_mapping: std::collections::HashMap::from([("out1".to_string(), "f2".to_string())]),
+                            annotations: std::collections::HashMap::from([("init-payload".to_string(), "8".to_string())]),
+                        },
+                        edgeless_api::workflow_instance::WorkflowFunction {
+                            name: "f2".to_string(),
+                            function_class_specification: fixture_spec(),
+                            output_mapping: std::collections::HashMap::from([("out1".to_string(), "log".to_string())]),
+                            annotations: std::collections::HashMap::new(),
+                        },
+                    ],
+                    workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
+                        name: "log".to_string(),
+                        class_type: "file-log".to_string(),
+                        output_mapping: std::collections::HashMap::new(),
+                        configurations: std::collections::HashMap::from([("filename".to_string(), removeme_filename.clone())]),
+                    }],
+                    annotations: std::collections::HashMap::new(),
+                })
+                .await,
+        );
+
+        let domain_id = workflow.domain_mapping.first().unwrap().domain_id.clone();
+        assert!(
+            !workflow.domain_mapping.iter().any(|x| x.domain_id != domain_id),
+            "the initial mapping must deploy the entire workflow on the same domain"
+        );
+        assert_eq!(3, workflow.domain_mapping.len());
+
+        assert_eq!(1, wf_list(&mut client).await.len());
+
+        // Migrate f1 to another domain.
+        let another_domain_id = regular_domains.iter().find(|x| **x != domain_id).unwrap().clone();
+
+        let workflow = workflow_response_or_panic(
+            client
+                .migrate(MigrateWorkflowRequest {
+                    workflow_id: workflow.workflow_id.clone(),
+                    domain_id: another_domain_id.clone(),
+                    component: String::from("f1"),
+                })
+                .await,
+        );
+
+        assert_eq!(Some(another_domain_id.clone()), workflow.domain("f1"));
+        assert_eq!(Some(domain_id.clone()), workflow.domain("f2"));
+        assert_eq!(Some(domain_id.clone()), workflow.domain("log"));
+        assert_eq!(7, workflow.domain_mapping.len());
+
+        // Migrate f1 back to the original domain.
+        let workflow = workflow_response_or_panic(
+            client
+                .migrate(MigrateWorkflowRequest {
+                    workflow_id: workflow.workflow_id.clone(),
+                    domain_id: domain_id.clone(),
+                    component: String::from("f1"),
+                })
+                .await,
+        );
+
+        assert_eq!(Some(domain_id.clone()), workflow.domain("f1"));
+        assert_eq!(Some(domain_id.clone()), workflow.domain("f2"));
+        assert_eq!(Some(domain_id.clone()), workflow.domain("log"));
+        assert_eq!(3, workflow.domain_mapping.len());
+
+        // Migrate everything to another domain, one component at a time.
+        let workflow = workflow_response_or_panic(
+            client
+                .migrate(MigrateWorkflowRequest {
+                    workflow_id: workflow.workflow_id.clone(),
+                    domain_id: another_domain_id.clone(),
+                    component: String::from("f1"),
+                })
+                .await,
+        );
+
+        assert_eq!(Some(another_domain_id.clone()), workflow.domain("f1"));
+        assert_eq!(Some(domain_id.clone()), workflow.domain("f2"));
+        assert_eq!(Some(domain_id.clone()), workflow.domain("log"));
+        assert_eq!(7, workflow.domain_mapping.len());
+
+        let workflow = workflow_response_or_panic(
+            client
+                .migrate(MigrateWorkflowRequest {
+                    workflow_id: workflow.workflow_id.clone(),
+                    domain_id: another_domain_id.clone(),
+                    component: String::from("f2"),
+                })
+                .await,
+        );
+
+        assert_eq!(Some(another_domain_id.clone()), workflow.domain("f1"));
+        assert_eq!(Some(another_domain_id.clone()), workflow.domain("f2"));
+        assert_eq!(Some(domain_id.clone()), workflow.domain("log"));
+        assert_eq!(7, workflow.domain_mapping.len());
+
+        let workflow = workflow_response_or_panic(
+            client
+                .migrate(MigrateWorkflowRequest {
+                    workflow_id: workflow.workflow_id.clone(),
+                    domain_id: another_domain_id.clone(),
+                    component: String::from("log"),
+                })
+                .await,
+        );
+
+        assert_eq!(Some(another_domain_id.clone()), workflow.domain("f1"));
+        assert_eq!(Some(another_domain_id.clone()), workflow.domain("f2"));
+        assert_eq!(Some(another_domain_id.clone()), workflow.domain("log"));
+        assert_eq!(3, workflow.domain_mapping.len());
+
+        assert!(
+            !workflow.domain_mapping.iter().any(|x| x.domain_id != another_domain_id),
+            "migration failed"
+        );
+
+        // Migrate each function/resource to a different domain.
+        let third_domain_id = regular_domains
+            .iter()
+            .find(|x| **x != domain_id && **x != another_domain_id)
+            .unwrap()
+            .clone();
+
+        let workflow = workflow_response_or_panic(
+            client
+                .migrate(MigrateWorkflowRequest {
+                    workflow_id: workflow.workflow_id.clone(),
+                    domain_id: domain_id.clone(),
+                    component: String::from("f1"),
+                })
+                .await,
+        );
+        let workflow = workflow_response_or_panic(
+            client
+                .migrate(MigrateWorkflowRequest {
+                    workflow_id: workflow.workflow_id.clone(),
+                    domain_id: third_domain_id.clone(),
+                    component: String::from("f2"),
+                })
+                .await,
+        );
+
+        assert_eq!(Some(domain_id.clone()), workflow.domain("f1"));
+        assert_eq!(Some(third_domain_id.clone()), workflow.domain("f2"));
+        assert_eq!(Some(another_domain_id.clone()), workflow.domain("log"));
+        assert_eq!(11, workflow.domain_mapping.len());
+
+        // Stop the workflow.
+        match client.stop(workflow.workflow_id.clone()).await {
+            Ok(_) => {}
+            Err(err) => panic!("could not stop the workflow: {}", err),
+        }
+        assert!(wf_list(&mut client).await.is_empty());
+
+        cleanup();
         terminate(handles)
     }
 }

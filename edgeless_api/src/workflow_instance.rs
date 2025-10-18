@@ -56,6 +56,18 @@ pub struct WorkflowInstance {
     pub domain_mapping: Vec<WorkflowFunctionMapping>,
 }
 
+impl WorkflowInstance {
+    /// Return the domain associated with a given function/resource, if any.
+    pub fn domain(&self, component: &str) -> Option<String> {
+        for domain_mapping in &self.domain_mapping {
+            if domain_mapping.name == component {
+                return Some(domain_mapping.domain_id.clone());
+            }
+        }
+        None
+    }
+}
+
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct WorkflowResource {
     pub name: String,
