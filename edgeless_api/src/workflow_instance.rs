@@ -158,7 +158,7 @@ impl SpawnWorkflowRequest {
         let mut resource_mappings: std::collections::HashMap<String, std::collections::HashMap<String, String>> = self
             .workflow_resources
             .iter()
-            .map(|function| (function.name.clone(), function.output_mapping.clone()))
+            .map(|resource| (resource.name.clone(), resource.output_mapping.clone()))
             .collect();
         resource_mappings.extend(function_mappings);
         resource_mappings

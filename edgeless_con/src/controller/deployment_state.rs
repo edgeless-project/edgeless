@@ -67,58 +67,24 @@ impl ActiveWorkflow {
             .collect()
     }
 
-    pub fn components(&self) -> Vec<String> {
-        // Collect all the names+output_mapping from the
-        // functions and resources of this workflow.
-        let mut component_names = vec![];
-        for function in &self.desired_state.workflow_functions {
-            component_names.push(function.name.clone());
-        }
-        for resource in &self.desired_state.workflow_resources {
-            component_names.push(resource.name.clone());
-        }
-        component_names
-    }
-
-    pub fn component_output_mapping(&self, component_name: &str) -> std::collections::HashMap<String, String> {
-        if let Some(function) = self
-            .desired_state
-            .workflow_functions
-            .iter()
-            .find(|wf_function| wf_function.name == component_name)
-        {
-            return function.output_mapping.clone();
-        }
-
-        if let Some(resource) = self
-            .desired_state
-            .workflow_resources
-            .iter()
-            .find(|wf_resource| wf_resource.name == component_name)
-        {
-            return resource.output_mapping.clone();
-        }
-
-        std::collections::HashMap::new()
-    }
-
-    /// Return an output_mapping for the given component.
+    /// Convert a logical output_mapping to a physical one.
     ///
     /// Returned map:
     /// - key: channel name
     /// - value: PID
-    pub fn output_mapping_for(&self, component_name: &str) -> std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> {
-        let workflow_mapping: std::collections::HashMap<String, String> = self.component_output_mapping(component_name);
-
-        let mut output_mapping = std::collections::HashMap::new();
+    pub fn physical_mapping(
+        &self,
+        logical_mapping: &std::collections::HashMap<String, String>,
+    ) -> std::collections::HashMap<String, edgeless_api::function_instance::InstanceId> {
+        let mut ret = std::collections::HashMap::new();
 
         // Loop on all the channels that needed to be
         // mapped for this function/resource.
-        for (from_channel, to_name) in workflow_mapping {
+        for (from_channel, to_name) in logical_mapping {
             // Loop on all the identifiers for the
             // target function/resource (once for each
             // assigned orchestration domain).
-            for target_fid in self.mapped_fids(&to_name).unwrap() {
+            for target_fid in self.mapped_fids(to_name).unwrap() {
                 // [TODO] Issue#96 The output_mapping
                 // structure should be changed so that
                 // multiple values are possible (with
@@ -126,7 +92,7 @@ impl ActiveWorkflow {
                 // to runners, as well.
                 // For now, we just keep
                 // overwriting the same entry.
-                output_mapping.insert(
+                ret.insert(
                     from_channel.clone(),
                     edgeless_api::function_instance::InstanceId {
                         node_id: uuid::Uuid::nil(),
@@ -136,7 +102,7 @@ impl ActiveWorkflow {
             }
         }
 
-        output_mapping
+        ret
     }
 }
 

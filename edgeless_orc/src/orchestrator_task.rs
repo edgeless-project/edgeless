@@ -402,6 +402,18 @@ impl OrchestratorTask {
     /// Return the list of resource providers that are feasible for the given
     /// resource specification.
     fn feasible_providers(&self, resource_req: &edgeless_api::resource_configuration::ResourceInstanceSpecification) -> Vec<String> {
+        // Special case for portal resources: always select that for the
+        // domain specified in the configuration.
+        if resource_req.class_type == "portal" && Some(&String::from("portal")) == resource_req.configuration.get("domain") {
+            if let Some(domain_name) = resource_req.configuration.get("domain_name") {
+                let resource_name = format!("portal-{domain_name}");
+                if let Some(provider_id) = self.resource_providers.keys().find(|provider_id| **provider_id == resource_name) {
+                    return vec![provider_id.to_string()];
+                }
+            }
+            return vec![];
+        }
+
         let cordoned_nodes = self
             .nodes
             .iter()

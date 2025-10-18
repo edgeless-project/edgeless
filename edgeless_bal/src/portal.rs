@@ -3,7 +3,7 @@
 
 use edgeless_dataplane::core::Message;
 
-#[derive(PartialEq, Clone, Copy)]
+#[derive(PartialEq, Clone, Copy, Debug)]
 enum Role {
     Sink,
     Source,
@@ -30,7 +30,7 @@ impl std::fmt::Display for Role {
     }
 }
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 enum Domain {
     Local,
     Portal,
@@ -64,6 +64,7 @@ impl std::fmt::Display for Domain {
 /// - a patch command is issued
 ///
 /// The `PortalPartialResource` holds partial information until then.
+#[derive(Debug)]
 struct PortalPartialResource {
     /// Physical identifier used in the local domain.
     local_id: Option<edgeless_api::function_instance::InstanceId>,
@@ -76,6 +77,8 @@ struct PortalPartialResource {
     /// in the domain-bal, otherwise it is a function/resource in a
     /// regular domain.
     target_id: Option<edgeless_api::function_instance::InstanceId>,
+    /// Domain name.
+    domain_name: Option<String>,
 }
 
 impl PortalPartialResource {
@@ -85,6 +88,7 @@ impl PortalPartialResource {
             portal_id: None,
             role,
             target_id: None,
+            domain_name: None,
         }
     }
 
@@ -109,9 +113,16 @@ impl PortalPartialResource {
         edgeless_api::function_instance::InstanceId,
         Role,
         edgeless_api::function_instance::InstanceId,
+        String,
     )> {
-        if self.local_id.is_some() && self.portal_id.is_some() && self.target_id.is_some() {
-            Some((self.local_id.unwrap(), self.portal_id.unwrap(), self.role, self.target_id.unwrap()))
+        if self.local_id.is_some() && self.portal_id.is_some() && self.target_id.is_some() && self.domain_name.is_some() {
+            Some((
+                self.local_id.unwrap(),
+                self.portal_id.unwrap(),
+                self.role,
+                self.target_id.unwrap(),
+                self.domain_name.clone().unwrap(),
+            ))
         } else {
             None
         }
@@ -124,7 +135,8 @@ pub struct PortalResourceProvider {
 }
 
 pub struct PortalResourceProviderInner {
-    resource_provider_id: edgeless_api::function_instance::InstanceId,
+    local_node_id: edgeless_api::function_instance::NodeId,
+    portal_node_id: edgeless_api::function_instance::NodeId,
     local_dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     portal_dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
@@ -144,17 +156,31 @@ impl Drop for PortalResource {
     }
 }
 
+struct PortalResourceCtor {
+    local_dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+    portal_dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
+    local_id: edgeless_api::function_instance::InstanceId,
+    portal_id: edgeless_api::function_instance::InstanceId,
+    role: Role,
+    target_id: edgeless_api::function_instance::InstanceId,
+    domain_name: String,
+    telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
+}
+
 /// Portal resource, to teleport messages from one domain to another.
 impl PortalResource {
-    async fn new(
-        local_dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
-        portal_dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
-        local_id: edgeless_api::function_instance::InstanceId,
-        portal_id: edgeless_api::function_instance::InstanceId,
-        role: Role,
-        target_id: edgeless_api::function_instance::InstanceId,
-        telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-    ) -> anyhow::Result<Self> {
+    async fn new(portal_resource_ctor: PortalResourceCtor) -> anyhow::Result<Self> {
+        let PortalResourceCtor {
+            local_dataplane_handle,
+            portal_dataplane_handle,
+            local_id,
+            portal_id,
+            role,
+            target_id,
+            domain_name,
+            telemetry_handle,
+        } = portal_resource_ctor;
+
         let (mut dataplane_in_handle, mut dataplane_out_handle) = if role == Role::Sink {
             (local_dataplane_handle, portal_dataplane_handle)
         } else {
@@ -162,7 +188,7 @@ impl PortalResource {
         };
         let mut telemetry_handle = telemetry_handle;
 
-        log::info!("Portal created with role {role}, local ID {local_id}, portal ID {portal_id}, target ID {target_id}",);
+        log::info!("Portal created with role {role}, local ID {local_id}, portal ID {portal_id}, target ID {target_id}, domain {domain_name}",);
 
         let handle = tokio::spawn(async move {
             loop {
@@ -206,14 +232,16 @@ impl PortalResource {
 
 impl PortalResourceProvider {
     pub async fn new(
+        local_node_id: edgeless_api::function_instance::NodeId,
+        portal_node_id: edgeless_api::function_instance::NodeId,
         local_dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
         portal_dataplane_provider: edgeless_dataplane::handle::DataplaneProvider,
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
-        resource_provider_id: edgeless_api::function_instance::InstanceId,
     ) -> Self {
         Self {
             inner: std::sync::Arc::new(tokio::sync::Mutex::new(PortalResourceProviderInner {
-                resource_provider_id,
+                local_node_id,
+                portal_node_id,
                 local_dataplane_provider,
                 portal_dataplane_provider,
                 telemetry_handle,
@@ -227,20 +255,21 @@ impl PortalResourceProvider {
         let mut lck = self.inner.lock().await;
 
         if let Some(partial) = lck.partial.get(&id) {
-            if let Some((local_id, portal_id, role, target_id)) = partial.complete() {
+            if let Some((local_id, portal_id, role, target_id, domain_name)) = partial.complete() {
                 lck.partial.remove(&id);
-                let resource = PortalResource::new(
-                    lck.local_dataplane_provider.get_handle_for(local_id).await,
-                    lck.portal_dataplane_provider.get_handle_for(portal_id).await,
+                let resource = PortalResource::new(PortalResourceCtor {
+                    local_dataplane_handle: lck.local_dataplane_provider.get_handle_for(local_id).await,
+                    portal_dataplane_handle: lck.portal_dataplane_provider.get_handle_for(portal_id).await,
                     local_id,
                     portal_id,
                     role,
                     target_id,
-                    lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
+                    domain_name,
+                    telemetry_handle: lck.telemetry_handle.fork(std::collections::BTreeMap::from([(
                         "FUNCTION_ID".to_string(),
                         local_id.function_id.to_string(),
                     )])),
-                )
+                })
                 .await?;
                 lck.instances.insert(id, resource);
             }
@@ -256,6 +285,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
     ///
     /// - role [string]: one of {sink, source};
     /// - domain [string]: one of {local, portal};
+    /// - domain_name [string]: the name of the domain for this portal
     /// - id [u64]: unique identifier of the resource to match local with portal
     ///
     /// All the fields are mandatory, no defaults.
@@ -266,11 +296,15 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         // Read resource configuration.
         let role = Role::new(specs.configuration.get("role").unwrap_or(&String::from("unspecified")))?;
         let domain = Domain::new(specs.configuration.get("domain").unwrap_or(&String::from("unspecified")))?;
+        let domain_name = specs.configuration.get("domain_name").cloned().unwrap_or(String::default());
         let id = specs.configuration.get("id").unwrap_or(&String::default()).parse::<u64>()?;
 
         let ret = {
             let mut lck = self.inner.lock().await;
-            let pid = edgeless_api::function_instance::InstanceId::new(lck.resource_provider_id.node_id);
+            let pid = match domain {
+                Domain::Local => edgeless_api::function_instance::InstanceId::new(lck.local_node_id),
+                Domain::Portal => edgeless_api::function_instance::InstanceId::new(lck.portal_node_id),
+            };
 
             let partial = lck.partial.entry(id).or_insert(PortalPartialResource::new(role));
             anyhow::ensure!(
@@ -290,15 +324,17 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                     pid
                 );
                 partial.local_id = Some(pid);
+                assert!(domain_name.is_empty());
             } else {
                 anyhow::ensure!(
                     partial.portal_id.is_none(),
-                    "invalid configuration of portal resource ID {}: trying to change porta, ID from {} to {}",
+                    "invalid configuration of portal resource ID {}: trying to change portal ID from {} to {}",
                     id,
                     partial.portal_id.unwrap(),
                     pid
                 );
                 partial.portal_id = Some(pid);
+                partial.domain_name = Some(domain_name);
             }
             Ok(edgeless_api::common::StartComponentResponse::InstanceId(pid))
         };
