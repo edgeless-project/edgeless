@@ -215,7 +215,6 @@ impl Agent {
 
                     let res = if let Some(provider_id) = resource_instances.get(&update.function_id) {
                         if let Some(resource_desc) = resource_providers.get_mut(provider_id) {
-                            log::info!("Patch resource provider_id {} fid {}", provider_id, update.function_id);
                             resource_desc.client.patch(update).await
                         } else {
                             Err(anyhow::anyhow!(

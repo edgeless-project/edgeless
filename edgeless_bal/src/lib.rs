@@ -73,8 +73,10 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
         class_type: class_type.to_string(),
         outputs: vec!["out".to_string()],
     }];
-    let resource_client = Box::new(
+    let client = Box::new(
         portal::PortalResourceProvider::new(
+            settings.local.node_id,
+            settings.portal.node_id,
             local_data_plane.clone(),
             portal_data_plane.clone(),
             Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
@@ -82,7 +84,6 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
                 ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
                 ("NODE_ID".to_string(), settings.local.node_id.to_string()),
             ]))),
-            edgeless_api::function_instance::InstanceId::new(settings.local.node_id),
         )
         .await,
     );
@@ -94,7 +95,7 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
             provider_id.clone(),
             edgeless_node::agent::ResourceDesc {
                 class_type: class_type.to_string(),
-                client: resource_client.clone(),
+                client: client.clone(),
             },
         )]),
         settings.local.node_id,
@@ -109,7 +110,7 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
             provider_id.clone(),
             edgeless_node::agent::ResourceDesc {
                 class_type: class_type.to_string(),
-                client: resource_client.clone(),
+                client,
             },
         )]),
         settings.portal.node_id,

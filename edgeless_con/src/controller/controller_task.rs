@@ -397,6 +397,7 @@ impl ControllerTask {
                     configurations: std::collections::HashMap::from([
                         (String::from("role"), String::from("sink")),
                         (String::from("domain"), String::from("portal")),
+                        (String::from("domain_name"), origin_domain.clone()),
                         (String::from("id"), id.to_string()),
                     ]),
                     output_mapping: std::collections::HashMap::from([(String::from("out"), next_resource_name.clone())]),
@@ -411,6 +412,7 @@ impl ControllerTask {
                     configurations: std::collections::HashMap::from([
                         (String::from("role"), String::from("source")),
                         (String::from("domain"), String::from("portal")),
+                        (String::from("domain_name"), target_domain.clone()),
                         (String::from("id"), id.to_string()),
                     ]),
                     output_mapping: std::collections::HashMap::new(),
@@ -435,7 +437,6 @@ impl ControllerTask {
                 });
             }
         }
-        println!("XXX {:?}", new_resources);
 
         // Add the new resources to the augmented workflow and update the
         // domain mapping.
@@ -499,7 +500,7 @@ impl ControllerTask {
         //
 
         // Loop on all the functions and resources of the workflow.
-        for component_name in workflow.components() {
+        for component_name in augmented_spec.source_components() {
             if res.is_err() {
                 log::error!("Could not patch the component {}, reason: {}", component_name, res.clone().unwrap_err());
                 break;
@@ -509,9 +510,9 @@ impl ControllerTask {
             // (once for each orchestration domain to which the
             // function/resource was allocated).
             for origin_fid in workflow.mapped_fids(&component_name).unwrap() {
-                let output_mapping = workflow.output_mapping_for(&component_name);
+                let physical_mapping = workflow.physical_mapping(augmented_spec.output_mappings().get(&component_name).unwrap());
 
-                if output_mapping.is_empty() {
+                if physical_mapping.is_empty() {
                     continue;
                 }
 
@@ -521,7 +522,7 @@ impl ControllerTask {
                 // Make sure that the all the components to be patched are in
                 // the same domain.
                 if log::log_enabled!(log::Level::Debug) {
-                    for target_component in workflow.component_output_mapping(&component_name).values() {
+                    for target_component in augmented_spec.output_mappings().get(&component_name).unwrap().values() {
                         let target_domain = domain_assignments.get(target_component).unwrap();
                         assert!(
                             origin_domain == target_domain,
@@ -536,7 +537,7 @@ impl ControllerTask {
                 }
 
                 res = self
-                    .patch_outputs(origin_domain, origin_fid, component_type, output_mapping, &component_name)
+                    .patch_outputs(origin_domain, origin_fid, component_type, physical_mapping, &component_name)
                     .await;
             }
         }
@@ -1075,7 +1076,7 @@ impl ControllerTask {
                 }
                 Some(new_domain) => {
                     // The workflow can be assigned to a single domain.
-                    let domain_assignments = Self::fill_domains(&workflow_request, &new_domain);
+                    let domain_assignments = Self::fill_domains(&workflow_request, new_domain);
                     workflow_requests_fixable.push(WorkflowRequestFixable {
                         wf_id,
                         workflow_request,
