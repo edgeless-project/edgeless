@@ -811,6 +811,12 @@ impl ControllerTask {
                 });
             }
         }
+
+        if let Some(portal_desc) = &self.portal_desc {
+            log::info!("portal domain {}, with access to {:?}", portal_desc.domain_bal, portal_desc.domains);
+        } else {
+            log::info!("no portal domain found: cross-domain workflows are not possible");
+        }
     }
 
     /// Migrate a workflow to a target domain.
@@ -914,9 +920,11 @@ impl ControllerTask {
             }
         }
 
-        // If some domains were removed there might be new orphans.
+        // If some domains were removed there might be new orphans, and the
+        // portal domain status might have changed.
         if domains_removed {
             self.find_new_orphans().await;
+            self.update_portal_domain().await;
         }
 
         // Try to fix orphans.
@@ -971,20 +979,32 @@ impl ControllerTask {
                 "too few domains for a portal: {}",
                 portal_desc.domains.len()
             );
-        }
 
-        for function in &workflow.workflow_functions {
-            if let Some(domain) = Self::function_compatible_domains(&self.orchestrators, function).choose(&mut self.rng) {
-                ret.insert(function.name.clone(), domain.clone());
-            } else {
-                return std::collections::HashMap::new();
+            for function in &workflow.workflow_functions {
+                let compatible_domains = self
+                    .orchestrators
+                    .iter()
+                    .filter(|(domain_id, desc)| portal_desc.domains.contains(*domain_id) && Self::is_function_compatible(desc, function))
+                    .map(|(domain_id, _desc)| domain_id.clone())
+                    .collect::<Vec<String>>();
+                if let Some(domain) = compatible_domains.choose(&mut self.rng) {
+                    ret.insert(function.name.clone(), domain.clone());
+                } else {
+                    return std::collections::HashMap::new();
+                }
             }
-        }
-        for resource in &workflow.workflow_resources {
-            if let Some(domain) = Self::resource_compatible_domains(&self.orchestrators, resource).choose(&mut self.rng) {
-                ret.insert(resource.name.clone(), domain.clone());
-            } else {
-                return std::collections::HashMap::new();
+            for resource in &workflow.workflow_resources {
+                let compatible_domains = self
+                    .orchestrators
+                    .iter()
+                    .filter(|(domain_id, desc)| portal_desc.domains.contains(*domain_id) && Self::is_resource_compatible(desc, resource))
+                    .map(|(domain_id, _desc)| domain_id.clone())
+                    .collect::<Vec<String>>();
+                if let Some(domain) = compatible_domains.choose(&mut self.rng) {
+                    ret.insert(resource.name.clone(), domain.clone());
+                } else {
+                    return std::collections::HashMap::new();
+                }
             }
         }
 
@@ -1000,32 +1020,6 @@ impl ControllerTask {
         orchestrators
             .iter()
             .filter(|(_domain_id, desc)| Self::is_workflow_compatible(desc, workflow_request))
-            .map(|(domain_id, _desc)| domain_id.clone())
-            .collect()
-    }
-
-    /// Return the list of orchestration domains that are compatible with the
-    /// given function.
-    fn function_compatible_domains(
-        orchestrators: &std::collections::HashMap<String, OrchestratorDesc>,
-        function: &edgeless_api::workflow_instance::WorkflowFunction,
-    ) -> Vec<String> {
-        orchestrators
-            .iter()
-            .filter(|(_domain_id, desc)| Self::is_function_compatible(desc, function))
-            .map(|(domain_id, _desc)| domain_id.clone())
-            .collect()
-    }
-
-    /// Return the list of orchestration domains that are compatible with the
-    /// given resource.
-    fn resource_compatible_domains(
-        orchestrators: &std::collections::HashMap<String, OrchestratorDesc>,
-        resource: &edgeless_api::workflow_instance::WorkflowResource,
-    ) -> Vec<String> {
-        orchestrators
-            .iter()
-            .filter(|(_domain_id, desc)| Self::is_resource_compatible(desc, resource))
             .map(|(domain_id, _desc)| domain_id.clone())
             .collect()
     }
@@ -1053,15 +1047,41 @@ impl ControllerTask {
     /// Try to fix all orphan workflows by stopping it on their current domain
     /// and starting it again on another that compatible with it.
     async fn try_fix_orphans(&mut self) {
+        struct WorkflowRequestFixable {
+            wf_id: edgeless_api::workflow_instance::WorkflowId,
+            workflow_request: edgeless_api::workflow_instance::SpawnWorkflowRequest,
+            domain_assignments: std::collections::HashMap<String, String>,
+        }
+
         // Find workflows that can be fixed, i.e., assigned to a compatible domain.
         let mut workflow_requests_fixable = vec![];
         let mut workflow_requests_unfixable = std::collections::BTreeMap::new();
         while let Some((wf_id, workflow_request)) = self.orphan_workflows.pop_first() {
             match Self::workflow_compatible_domains(&self.orchestrators, &workflow_request).choose(&mut self.rng) {
                 None => {
-                    workflow_requests_unfixable.insert(wf_id, workflow_request);
+                    // Try again with multiple domains attached to the portal, if any.
+                    let domain_assignments = self.domain_assignments_portal(&workflow_request);
+                    if domain_assignments.is_empty() {
+                        // The workflow cannot be relocated.
+                        workflow_requests_unfixable.insert(wf_id, workflow_request);
+                    } else {
+                        // The workflow can be relocated to multiple domains.
+                        workflow_requests_fixable.push(WorkflowRequestFixable {
+                            wf_id,
+                            workflow_request,
+                            domain_assignments,
+                        })
+                    }
                 }
-                Some(new_domain) => workflow_requests_fixable.push((new_domain.clone(), wf_id, workflow_request)),
+                Some(new_domain) => {
+                    // The workflow can be assigned to a single domain.
+                    let domain_assignments = Self::fill_domains(&workflow_request, &new_domain);
+                    workflow_requests_fixable.push(WorkflowRequestFixable {
+                        wf_id,
+                        workflow_request,
+                        domain_assignments,
+                    })
+                }
             };
         }
         assert!(self.orphan_workflows.is_empty());
@@ -1071,14 +1091,16 @@ impl ControllerTask {
         // Try to deploy the orphan workflows to the assigned orchestration
         // domains. If this fails for some workflows, they go back to the
         // orphan list.
-        for (new_domain, wf_id, workflow_request) in workflow_requests_fixable {
-            assert!(!new_domain.is_empty());
-            let domain_assignments = Self::fill_domains(&workflow_request, &new_domain);
+        for WorkflowRequestFixable {
+            wf_id,
+            workflow_request,
+            domain_assignments,
+        } in workflow_requests_fixable
+        {
             match self.relocate_workflow(&wf_id, workflow_request, domain_assignments).await {
                 Ok(response) => {
                     if let edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(_) = response {
-                        log::info!("orphan workflow assigned to domain '{}'", new_domain);
-                        continue;
+                        log::info!("orphan workflow {} relocated ", wf_id);
                     }
                 }
                 Err(workflow_request) => {
