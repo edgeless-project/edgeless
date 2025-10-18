@@ -843,38 +843,36 @@ impl ControllerTask {
         };
 
         let domain_assignments = if request.component.is_empty() {
-            Self::fill_domains(&workflow, &request.domain_id)
-        } else {
-            if let Some(active_workflow) = self.active_workflows.get(&request.workflow_id) {
-                let mut cur_assignments = active_workflow.domain_assignments();
-                if let Some(cur_domain) = cur_assignments.get_mut(&request.component) {
-                    if *cur_domain == request.domain_id {
-                        return Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
-                            edgeless_api::common::ResponseError {
-                                summary: String::from("Ignoring request to migrate component to the same domain"),
-                                detail: Some(request.domain_id.to_string()),
-                            },
-                        ));
-                    } else {
-                        *cur_domain = request.domain_id.clone();
-                        cur_assignments
-                    }
-                } else {
+            Self::fill_domains(workflow, &request.domain_id)
+        } else if let Some(active_workflow) = self.active_workflows.get(&request.workflow_id) {
+            let mut cur_assignments = active_workflow.domain_assignments();
+            if let Some(cur_domain) = cur_assignments.get_mut(&request.component) {
+                if *cur_domain == request.domain_id {
                     return Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
                         edgeless_api::common::ResponseError {
-                            summary: String::from("Invalid component name specified in migration request"),
-                            detail: Some(request.component.clone()),
+                            summary: String::from("Ignoring request to migrate component to the same domain"),
+                            detail: Some(request.domain_id.to_string()),
                         },
                     ));
+                } else {
+                    *cur_domain = request.domain_id.clone();
+                    cur_assignments
                 }
             } else {
                 return Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
                     edgeless_api::common::ResponseError {
-                        summary: String::from("Cannot migrate a single component of an orphan workflow"),
-                        detail: Some(request.workflow_id.to_string()),
+                        summary: String::from("Invalid component name specified in migration request"),
+                        detail: Some(request.component.clone()),
                     },
                 ));
             }
+        } else {
+            return Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
+                edgeless_api::common::ResponseError {
+                    summary: String::from("Cannot migrate a single component of an orphan workflow"),
+                    detail: Some(request.workflow_id.to_string()),
+                },
+            ));
         };
 
         if self.is_domain_assignment_feasible(workflow, &domain_assignments) {
