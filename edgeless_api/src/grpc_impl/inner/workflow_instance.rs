@@ -352,6 +352,7 @@ fn parse_migrate_workflow_request(
         Ok(crate::workflow_instance::MigrateWorkflowRequest {
             workflow_id: parse_workflow_id(workflow_id)?,
             domain_id: domain_id.domain_id.clone(),
+            component: api_workflow.component.clone(),
         })
     } else {
         anyhow::bail!("missing workflow_id or domain_id in MigrateWorkflowRequest");
@@ -446,6 +447,7 @@ fn serialize_migrate_workflow_request(
         domain_id: Some(crate::grpc_impl::api::DomainId {
             domain_id: crate_mapping.domain_id.clone(),
         }),
+        component: crate_mapping.component.clone(),
     }
 }
 
