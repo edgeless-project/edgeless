@@ -56,6 +56,9 @@ struct Args {
     /// Header of additional fields recorded in the CSV output file.
     #[arg(long, default_value_t = String::from(""))]
     additional_header: String,
+    /// Print the version number and quit.
+    #[arg(long, default_value_t = false)]
+    version: bool,
 }
 
 #[derive(PartialEq, Eq, Debug)]
@@ -99,6 +102,17 @@ async fn main() -> anyhow::Result<()> {
 
     let args = Args::parse();
 
+    if args.version {
+        println!(
+            "{}.{}.{}{}{}",
+            env!("CARGO_PKG_VERSION_MAJOR"),
+            env!("CARGO_PKG_VERSION_MINOR"),
+            env!("CARGO_PKG_VERSION_PATCH"),
+            if env!("CARGO_PKG_VERSION_PRE").is_empty() { "" } else { "-" },
+            env!("CARGO_PKG_VERSION_PRE")
+        );
+        return Ok(());
+    }
     anyhow::ensure!(
         args.warmup <= args.duration,
         "workflow warm-up ({} s) >= experiment duration ({} s)",

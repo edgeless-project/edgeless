@@ -21,6 +21,9 @@ struct Args {
     /// How to print the node identifiers. One of: uuid, labels
     #[arg(long, default_value_t = String::from("uuid"))]
     node_print_format: String,
+    /// Print the version number and quit.
+    #[arg(long, default_value_t = false)]
+    version: bool,
 }
 
 enum NodePrintFormat {
@@ -103,7 +106,17 @@ fn main() -> anyhow::Result<()> {
     env_logger::init();
 
     let args = Args::parse();
-
+    if args.version {
+        println!(
+            "{}.{}.{}{}{}",
+            env!("CARGO_PKG_VERSION_MAJOR"),
+            env!("CARGO_PKG_VERSION_MINOR"),
+            env!("CARGO_PKG_VERSION_PATCH"),
+            if env!("CARGO_PKG_VERSION_PRE").is_empty() { "" } else { "-" },
+            env!("CARGO_PKG_VERSION_PRE")
+        );
+        return Ok(());
+    }
     anyhow::ensure!(args.proxy_type.to_lowercase() == "redis", "unknown proxy type: {}", args.proxy_type);
 
     let mut proxy = match edgeless_orc::proxy_redis::ProxyRedis::new(&args.redis_url, false, None) {
