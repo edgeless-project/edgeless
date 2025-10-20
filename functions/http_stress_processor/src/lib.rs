@@ -13,20 +13,16 @@ use edgeless_function::*;
 // Planned to allow their modification via annotations or 'init-payload'
 // -------------------------------
 
-const STRESS_MODE: &str = "image";    // "cpu" | "image"
+const STRESS_MODE: &str = "cpu";    // "cpu" | "image"
 
 // CPU mode
 const STRESS_CPU_ITERS: u64 = 300;
 
 // IMAGE mode
-const STRESS_IMAGE_W: u32 = 1024;
-const STRESS_IMAGE_H: u32 = 1024;
+const STRESS_IMAGE_W: u32 = 128;
+const STRESS_IMAGE_H: u32 = 128;
 const STRESS_IMAGE_ITERS: usize = 20;
 const STRESS_IMAGE_SIGMA: f32 = 2.0;
-
-fn stress_image_get_config() -> (u32, u32, usize, f32) {
-    (STRESS_IMAGE_W, STRESS_IMAGE_H, STRESS_IMAGE_ITERS, STRESS_IMAGE_SIGMA)
-}
 
 
 // -------------------------------
@@ -65,38 +61,32 @@ fn stress_cpu_run(iters: u64) {
 // -------------------------------
 // IMAGE workload (in-memory blur loop)
 // -------------------------------
-mod image_stress {
-    use image::{imageops::blur, ImageBuffer, Rgba, RgbaImage};
+fn stress_image_run(w: u32, h: u32, iters: usize, sigma: f32) {
+    let mut img = vec![0f32; w*h];
 
-    pub fn synthetic_rgba(w: u32, h: u32) -> RgbaImage {
-        // Generate an image to process. Checkerboard + gradient to avoid trivial kernels
-        let mut img: RgbaImage = ImageBuffer::new(w, h);
-        for y in 0..h {
-            for x in 0..w {
-                let g = ((x ^ y) & 0xff) as u8;
-                let r = (((x * 13 + y * 7) & 0xff) as u8).wrapping_add((x % 251) as u8);
-                let b = g.wrapping_add(((y * 11) & 0xff) as u8);
-                img.put_pixel(x, y, Rgba([r, g, b, 255]));
-            }
-        }
-        img
+    for y in 0..h { for x in 0..w {
+        // sinusoids to have non-trivial data
+        img[y*w+x] = 0.5 + 0.5*((x as f32)*0.11).sin()*((y as f32)*0.07).cos();
+    }}
+
+    let radius = (3.0*STRESS_IMAGE_SIGMA).ceil() as usize;
+    for _ in 0..STRESS_IMAGE_ITERS {
+        // Apply Gaussian blur in-place
+        fastblur::gaussian_blur_f32(&mut img, w, h, radius);
     }
 
-    pub fn image_stress_run(w: u32, h: u32, iters: usize, sigma: f32) {
-        log::info!("Starting IMAGE stress: {}x{}, iters={}, sigma={}", w, h, iters, sigma);
-        let mut img = synthetic_rgba(w, h);
-        for i in 0..iters {
-            // blur(&RgbaImage, sigma) -> RgbaImage
-            img = blur(&img, sigma);
-            if i % 50 == 0 { log::info!("blur iteration {} / {}", i, iters); }
-        }
-        // Prevent optimization out
-        let checksum: u64 = img.pixels().fold(
-            0u64,
-            |acc, p| acc.wrapping_add((p[0] as u64) << 1 ^ (p[1] as u64) << 2 ^ (p[2] as u64))
-        );
-        log::info!("IMAGE stress completed, checksum=0x{:x}", checksum);
-    }
+    // Calculate a checksum to prevent optimization out
+    let mut sum: u64 = 0xcbf29ce484222325;
+    for &v in &img { sum ^= (v.to_bits() as u64).rotate_left(13).wrapping_mul(0x100000001b3); }
+
+    log::info!(
+        "image_stress_blur done ({}x{}, iters={}, sigma={:.1}) checksum=0x{:x}",
+        w,
+        h,
+        STRESS_IMAGE_ITERS,
+        STRESS_IMAGE_SIGMA,
+        sum
+    );
 }
 
 
@@ -127,7 +117,7 @@ impl EdgeFunction for HttpStressProcessor {
         log::info!("Method 'Cast' running in workload mode='{}'", STRESS_MODE);
         match STRESS_MODE {
             "image" => {
-                image_stress::image_stress_run(
+                stress_image_run(
                     STRESS_IMAGE_W,
                     STRESS_IMAGE_H,
                     STRESS_IMAGE_ITERS,

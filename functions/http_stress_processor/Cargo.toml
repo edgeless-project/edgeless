@@ -25,7 +25,7 @@ crate-type = ["cdylib"]
 [dependencies]
 edgeless_function = { path = "../../edgeless_function" }
 log = "0.4"
-image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+fastblur = "0.2"
 
 # image = { version = "0.25", optional = true, default-features = false, features = ["png","jpeg"] }
 
