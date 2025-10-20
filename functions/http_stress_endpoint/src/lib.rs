@@ -4,8 +4,10 @@ use edgeless_http::*;
 
 struct HttpStressEndpoint;
 
-//   Static variable, defined at init time. OnecLock<T> ensures it can only be declared once
+//   Static variable, defined at init time. OnecLock<T> is a Rust synchronization primitive that ensures that 
+//   the passed struct is initialized only once but can be shared multiple times (see explanation).
 // static CONFIGURATION: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+// static STATE: std::sync::OnceLock<std::sync::Mutex<ExampleState>> = std::sync::OnceLock::new();
 
 impl EdgeFunction for HttpStressEndpoint {
 
@@ -67,14 +69,22 @@ impl EdgeFunction for HttpStressEndpoint {
         let req: EdgelessHTTPRequest = edgeless_http::request_from_string(str_message).unwrap();
 
         // Send event to another function (if the request had a body)
-        if let Some(body) = req.body {
-            log::info!("Sending event with body");
-            cast("parameters", &body);    // output name is 'parameters'.   I think I have to send it with .as_bytes() ?
-            log::info!("Success!!");
-        } else {
-            log::info!("Sending event without body");
-            cast("parameters", b"");
-            log::info!("Success!!");
+        match req.body {
+            Some(bytes) => match String::from_utf8(bytes) {
+                Ok(content) => {
+                    log::info!("Sending event with body");
+                    cast("parameters", content.as_bytes());    // output name: 'parameters'
+                    log::info!("Success!!");
+                }
+                Err(_) => {
+                    log::warn!("WARNING: Body is not valid UTF-8 string. Next function will not be invoked.");
+                }
+            },
+            None => {
+                log::info!("Sending event without body");
+                cast("parameters", b"");
+                log::info!("Success!!");
+            }
         }
 
         //   Prepare a response to the HTTP request

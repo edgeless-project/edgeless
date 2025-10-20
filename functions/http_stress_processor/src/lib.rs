@@ -16,7 +16,7 @@ use edgeless_function::*;
 const STRESS_MODE: &str = "image";    // "cpu" | "image"
 
 // CPU mode
-const STRESS_CPU_MS: u64 = 5_000;      // 5s per cast
+const STRESS_CPU_ITERS: u64 = 300;
 
 // IMAGE mode
 const STRESS_IMAGE_W: u32 = 1024;
@@ -24,39 +24,16 @@ const STRESS_IMAGE_H: u32 = 1024;
 const STRESS_IMAGE_ITERS: usize = 20;
 const STRESS_IMAGE_SIGMA: f32 = 2.0;
 
-
-fn stress_get_mode() -> &'static str { STRESS_MODE }
-
 fn stress_image_get_config() -> (u32, u32, usize, f32) {
     (STRESS_IMAGE_W, STRESS_IMAGE_H, STRESS_IMAGE_ITERS, STRESS_IMAGE_SIGMA)
 }
 
 
 // -------------------------------
-// CPU-heavy workload (pure compute, bounded by duration)
+// CPU-heavy workload (intensive trigonometric and bitwise computations)
 // -------------------------------
-fn cpu_burn_for_ms(ms: u64) {
-    // Aproxima “tiempo” por número de ciclos para evitar usar Instant en WASM.
-    // 1 “chunk” ≈ el trabajo de un bloque interior; ajusta el factor si quieres más/menos carga.
-    let chunks = (ms as usize).saturating_mul(40);
-    let mut acc_f = 0.0f64;
-    let mut acc_i: u64 = 0xcbf29ce484222325;
-    for _ in 0..chunks {
-        for k in 0..20_000 {
-            let x = (k as f64) * 0.000_123_456 + acc_f;
-            let y = x.sin() * x.cos() + 1.000_000_1;
-            acc_f = std::hint::black_box(acc_f + y * x.recip());
-        }
-        for k in 0..50_000u64 {
-            let z = k.wrapping_mul(0x9E37_79B9_7F4A_7C15) ^ acc_i.rotate_left(13);
-            acc_i = std::hint::black_box(acc_i.wrapping_add(z ^ (k << 1)));
-        }
-        let _ = std::hint::black_box(is_probably_prime((acc_i as u32 | 1).max(3)));
-    }
-    log::info!("cpu_burn (wasm/ms) done: acc_f={:.6} acc_i=0x{:x}", acc_f, acc_i);
-}
-
 fn is_probably_prime(n0: u32) -> bool {
+    if n0 < 4 { return n0 > 1; }
     if n0 % 2 == 0 { return n0 == 2; }
     let mut d = 3u32;
     let limit = (n0 as f64).sqrt() as u32;
@@ -67,11 +44,21 @@ fn is_probably_prime(n0: u32) -> bool {
     true
 }
 
-fn stress_cpu_run(ms: u64) {
-    log::info!("Starting CPU stress for {} ms", ms);
-    cpu_burn_for_ms(ms);
-    log::info!("CPU stress completed (wasm32 single-thread)");
+fn stress_cpu_run(iters: u64) {
+    let mut acc_f = 0.0f64;
+    let mut acc_i: u64 = 0xcbf29ce484222325;
+    for i in 0..iters {
+        let x = (i as f64) * 0.000_123_456 + acc_f;
+        let y = x.sin() * x.cos() + 1.000_000_1;
+        acc_f += y * x.recip();
+    
+        let z = i.wrapping_mul(0x9E37_79B9) ^ acc_i.rotate_left(7);
+        acc_i = acc_i.wrapping_add(z ^ (i as u64) << 1);
+    }
 
+    let _ = is_probably_prime((acc_i as u32) | 1);
+
+    log::info!("CPU stress completed");
 }
 
 
@@ -137,19 +124,20 @@ impl EdgeFunction for HttpStressProcessor {
         let str_message = core::str::from_utf8(encoded_message).unwrap();
         log::info!("Method 'Cast' called, MSG: {:?}", str_message);
 
-        // CHANGED
-        let mode = stress_get_mode();
-        log::info!("http_stress_processor: 'Cast' running in workload mode='{}'", mode);
-        match mode {
+        log::info!("Method 'Cast' running in workload mode='{}'", STRESS_MODE);
+        match STRESS_MODE {
             "image" => {
-                let (w, h, iters, sigma) = stress_image_get_config();
-                image_stress::image_stress_run(w, h, iters, sigma);
+                image_stress::image_stress_run(
+                    STRESS_IMAGE_W,
+                    STRESS_IMAGE_H,
+                    STRESS_IMAGE_ITERS,
+                    STRESS_IMAGE_SIGMA,
+                );
             }
             _ => {
-                stress_cpu_run(STRESS_CPU_MS);
+                stress_cpu_run(STRESS_CPU_ITERS);
             }
         }
-    
     }
 
     // Called at synchronous events with return value
