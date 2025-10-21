@@ -322,7 +322,7 @@ impl ControllerTask {
         if let Err(err) = spawn_workflow_request.is_valid() {
             return Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
                 edgeless_api::common::ResponseError {
-                    summary: "Workflow creation failed".to_string(),
+                    summary: "Invalid workflow creation request".to_string(),
                     detail: Some(err.to_string()),
                 },
             ));
@@ -555,27 +555,26 @@ impl ControllerTask {
         // all the functions and resources that have been started.
         //
 
-        if res.is_err() {
-            log::error!("Workflow start failed, stopping");
-            self.stop_workflow(wf_id).await;
-        }
-
-        let reply = match res {
-            Ok(_) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(
+        if let Err(err) = res {
+            log::error!("Relocation of workflow {} failed: {}", wf_id, err);
+            if let Some(spawn_workflow_request) = self.stop_workflow(wf_id).await {
+                Err(spawn_workflow_request)
+            } else {
+                Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
+                    edgeless_api::common::ResponseError {
+                        summary: "Workflow creation failed".to_string(),
+                        detail: Some(err),
+                    },
+                ))
+            }
+        } else {
+            Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(
                 edgeless_api::workflow_instance::WorkflowInstance {
                     workflow_id: wf_id.clone(),
                     domain_mapping: self.active_workflows.get(wf_id).unwrap().domain_mapping(),
                 },
-            )),
-            Err(err) => Ok(edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(
-                edgeless_api::common::ResponseError {
-                    summary: "Workflow creation failed".to_string(),
-                    detail: Some(err),
-                },
-            )),
-        };
-
-        reply
+            ))
+        }
     }
 
     async fn stop_workflow(
@@ -893,7 +892,7 @@ impl ControllerTask {
                             Ok(response)
                         } else {
                             panic!(
-                                "relocation of the workflow '{}' has triggered a non-implemented sequence",
+                                "relocation of workflow '{}' has triggered a non-implemented sequence",
                                 request.workflow_id
                             );
                         }

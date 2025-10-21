@@ -56,7 +56,7 @@ mod system_tests {
             let (task, handle) = futures::future::abortable(edgeless_orc::edgeless_orc_main(edgeless_orc::EdgelessOrcSettings {
                 general: edgeless_orc::EdgelessOrcGeneralSettings {
                     domain_register_url: domain_register_url.clone(),
-                    subscription_refresh_interval_sec: 1,
+                    subscription_refresh_interval_sec: 5,
                     domain_id: domain_id.clone(),
                     orchestrator_url: orchestrator_url.to_string(),
                     orchestrator_url_announced: orchestrator_url.to_string(),
@@ -104,7 +104,7 @@ mod system_tests {
                         invocation_url_coap: None,
                         invocation_url_announced_coap: None,
                         node_register_url: node_register_url.clone(),
-                        subscription_refresh_interval_sec: 2,
+                        subscription_refresh_interval_sec: 5,
                     },
                     telemetry: edgeless_node::EdgelessNodeTelemetrySettings {
                         metrics_url: format!("http://{}:{}", address, next_port()),
@@ -164,7 +164,7 @@ mod system_tests {
         let (task, handle) = futures::future::abortable(edgeless_orc::edgeless_orc_main(edgeless_orc::EdgelessOrcSettings {
             general: edgeless_orc::EdgelessOrcGeneralSettings {
                 domain_register_url: setup_conf.domain_register_url.to_string(),
-                subscription_refresh_interval_sec: 1,
+                subscription_refresh_interval_sec: 5,
                 domain_id: domain_portal.clone(),
                 orchestrator_url: orchestrator_url.to_string(),
                 orchestrator_url_announced: orchestrator_url.to_string(),
@@ -206,7 +206,7 @@ mod system_tests {
                     invocation_url_coap: None,
                     invocation_url_announced_coap: None,
                     node_register_url: node_register_url_local,
-                    subscription_refresh_interval_sec: 2,
+                    subscription_refresh_interval_sec: 5,
                 },
                 portal: edgeless_node::EdgelessNodeGeneralSettings {
                     node_id: node_id_portal,
@@ -217,7 +217,7 @@ mod system_tests {
                     invocation_url_coap: None,
                     invocation_url_announced_coap: None,
                     node_register_url: node_register_url_portal.clone(),
-                    subscription_refresh_interval_sec: 2,
+                    subscription_refresh_interval_sec: 5,
                 },
                 telemetry: edgeless_node::EdgelessNodeTelemetrySettings {
                     metrics_url: format!("http://{}:{}", address, next_port()),
@@ -1125,10 +1125,34 @@ mod system_tests {
         }
     }
 
+    async fn inspect_domain_assignment(
+        wf_id: edgeless_api::workflow_instance::WorkflowId,
+        expected_mapping: std::collections::HashMap<&str, &String>,
+        client: &mut Box<(dyn WorkflowInstanceAPI)>,
+    ) {
+        if let Ok(edgeless_api::workflow_instance::WorkflowInfo { request: _, status }) = client.inspect(wf_id.clone()).await {
+            assert_eq!(wf_id, status.workflow_id);
+            for edgeless_api::workflow_instance::WorkflowFunctionMapping {
+                name,
+                function_id: _,
+                domain_id,
+            } in status.domain_mapping
+            {
+                if let Some(expected_domain) = expected_mapping.get(name.as_str()) {
+                    assert_eq!(
+                        *expected_domain, &domain_id,
+                        "workflow {} function {} expected assigned to domain {} but it is assigned to domain {} instead",
+                        wf_id, name, expected_domain, domain_id
+                    );
+                }
+            }
+        }
+    }
+
     #[tokio::test]
     #[serial_test::serial]
     async fn system_test_balancer() -> anyhow::Result<()> {
-        let _ = env_logger::try_init();
+        // let _ = env_logger::try_init();
 
         let removeme_filename = format!("removeme-balancer.log");
 
@@ -1196,11 +1220,24 @@ mod system_tests {
         );
         assert_eq!(3, workflow.domain_mapping.len());
 
+        let another_domain_id = regular_domains.iter().find(|x| **x != domain_id).unwrap().clone();
+        let third_domain_id = regular_domains
+            .iter()
+            .find(|x| **x != domain_id && **x != another_domain_id)
+            .unwrap()
+            .clone();
+
+        println!("domain_id {domain_id}, another_domain_id {another_domain_id}, third_domain_id {third_domain_id}");
+
         assert_eq!(1, wf_list(&mut client).await.len());
+        inspect_domain_assignment(
+            workflow.workflow_id.clone(),
+            std::collections::HashMap::from([("f1", &domain_id), ("f2", &domain_id), ("log", &domain_id)]),
+            &mut client,
+        )
+        .await;
 
         // Migrate f1 to another domain.
-        let another_domain_id = regular_domains.iter().find(|x| **x != domain_id).unwrap().clone();
-
         let workflow = workflow_response_or_panic(
             client
                 .migrate(MigrateWorkflowRequest {
@@ -1215,6 +1252,12 @@ mod system_tests {
         assert_eq!(Some(domain_id.clone()), workflow.domain("f2"));
         assert_eq!(Some(domain_id.clone()), workflow.domain("log"));
         assert_eq!(7, workflow.domain_mapping.len());
+        inspect_domain_assignment(
+            workflow.workflow_id.clone(),
+            std::collections::HashMap::from([("f1", &another_domain_id), ("f2", &domain_id), ("log", &domain_id)]),
+            &mut client,
+        )
+        .await;
 
         // Migrate f1 back to the original domain.
         let workflow = workflow_response_or_panic(
@@ -1231,6 +1274,12 @@ mod system_tests {
         assert_eq!(Some(domain_id.clone()), workflow.domain("f2"));
         assert_eq!(Some(domain_id.clone()), workflow.domain("log"));
         assert_eq!(3, workflow.domain_mapping.len());
+        inspect_domain_assignment(
+            workflow.workflow_id.clone(),
+            std::collections::HashMap::from([("f1", &domain_id), ("f2", &domain_id), ("log", &domain_id)]),
+            &mut client,
+        )
+        .await;
 
         // Migrate everything to another domain, one component at a time.
         let workflow = workflow_response_or_panic(
@@ -1247,6 +1296,12 @@ mod system_tests {
         assert_eq!(Some(domain_id.clone()), workflow.domain("f2"));
         assert_eq!(Some(domain_id.clone()), workflow.domain("log"));
         assert_eq!(7, workflow.domain_mapping.len());
+        inspect_domain_assignment(
+            workflow.workflow_id.clone(),
+            std::collections::HashMap::from([("f1", &another_domain_id), ("f2", &domain_id), ("log", &domain_id)]),
+            &mut client,
+        )
+        .await;
 
         let workflow = workflow_response_or_panic(
             client
@@ -1262,6 +1317,12 @@ mod system_tests {
         assert_eq!(Some(another_domain_id.clone()), workflow.domain("f2"));
         assert_eq!(Some(domain_id.clone()), workflow.domain("log"));
         assert_eq!(7, workflow.domain_mapping.len());
+        inspect_domain_assignment(
+            workflow.workflow_id.clone(),
+            std::collections::HashMap::from([("f1", &another_domain_id), ("f2", &another_domain_id), ("log", &domain_id)]),
+            &mut client,
+        )
+        .await;
 
         let workflow = workflow_response_or_panic(
             client
@@ -1277,6 +1338,12 @@ mod system_tests {
         assert_eq!(Some(another_domain_id.clone()), workflow.domain("f2"));
         assert_eq!(Some(another_domain_id.clone()), workflow.domain("log"));
         assert_eq!(3, workflow.domain_mapping.len());
+        inspect_domain_assignment(
+            workflow.workflow_id.clone(),
+            std::collections::HashMap::from([("f1", &another_domain_id), ("f2", &another_domain_id), ("log", &another_domain_id)]),
+            &mut client,
+        )
+        .await;
 
         assert!(
             !workflow.domain_mapping.iter().any(|x| x.domain_id != another_domain_id),
@@ -1284,12 +1351,6 @@ mod system_tests {
         );
 
         // Migrate each function/resource to a different domain.
-        let third_domain_id = regular_domains
-            .iter()
-            .find(|x| **x != domain_id && **x != another_domain_id)
-            .unwrap()
-            .clone();
-
         let workflow = workflow_response_or_panic(
             client
                 .migrate(MigrateWorkflowRequest {
@@ -1313,6 +1374,12 @@ mod system_tests {
         assert_eq!(Some(third_domain_id.clone()), workflow.domain("f2"));
         assert_eq!(Some(another_domain_id.clone()), workflow.domain("log"));
         assert_eq!(11, workflow.domain_mapping.len());
+        inspect_domain_assignment(
+            workflow.workflow_id.clone(),
+            std::collections::HashMap::from([("f1", &domain_id), ("f2", &third_domain_id), ("log", &another_domain_id)]),
+            &mut client,
+        )
+        .await;
 
         // Stop the workflow.
         match client.stop(workflow.workflow_id.clone()).await {
