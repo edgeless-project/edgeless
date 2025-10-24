@@ -9,3 +9,4 @@ pub mod api {
 mod common;
 mod inner;
 pub mod outer;
+pub mod tls_config;

@@ -25,10 +25,12 @@ pub async fn edgeless_con_main(settings: EdgelessConSettings) {
     let workflow_instance_server_task = edgeless_api::grpc_impl::outer::controller::WorkflowInstanceAPIServer::run(
         controller.get_workflow_instance_client(),
         settings.controller_url,
+        Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
     );
     let domain_register_server_task = edgeless_api::grpc_impl::outer::domain_register::DomainRegistrationAPIServer::run(
         controller.get_domain_register_client(),
         settings.domain_register_url,
+        Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
     );
 
     futures::join!(controller_task, refresh_task, workflow_instance_server_task, domain_register_server_task);

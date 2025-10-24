@@ -43,7 +43,9 @@ fn main() -> anyhow::Result<()> {
     // env_logger::init() with the next line. These two options are exclusive.
     env_logger::init();
     // console_subscriber::init();
-
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
     let args = Args::parse();
     if args.version {
         println!(

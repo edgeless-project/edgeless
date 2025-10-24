@@ -36,7 +36,10 @@ impl ClientDesc {
                     Box::new(edgeless_api::coap_impl::CoapClient::new(addr).await)
                 }
                 edgeless_api::util::Proto::HTTP | edgeless_api::util::Proto::HTTPS => {
-                    Box::new(edgeless_api::grpc_impl::outer::agent::AgentAPIClient::new(&request.agent_url))
+                    Box::new(edgeless_api::grpc_impl::outer::agent::AgentAPIClient::new(
+                        &request.agent_url,
+                        Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
+                    ))
                 }
             },
             capabilities: request.capabilities.clone(),

@@ -12,7 +12,11 @@ struct Args {
 
 async fn edgeless_container_function_main(endpoint: String) {
     let (mut container_function, container_function_task) = edgeless_container_function::container_function::ContainerFunction::new();
-    let server_task = edgeless_api::grpc_impl::outer::container_function::GuestAPIFunctionServer::run(container_function.get_api_client(), endpoint);
+    let server_task = edgeless_api::grpc_impl::outer::container_function::GuestAPIFunctionServer::run(
+        container_function.get_api_client(),
+        endpoint,
+        Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
+    );
     futures::join!(container_function_task, server_task);
 }
 

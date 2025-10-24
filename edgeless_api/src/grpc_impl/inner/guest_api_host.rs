@@ -12,18 +12,31 @@ pub struct GuestAPIHostService {
 
 impl GuestAPIHostClient {
     pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
+        Self::new_with_tls(server_addr, retry_interval, None).await
+    }
+
+    pub async fn new_with_tls(
+        server_addr: &str,
+        retry_interval: Option<u64>,
+        tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>,
+    ) -> anyhow::Result<Self> {
+        let server_addr = server_addr.to_string();
+        let tls_config = tls_config.unwrap_or_else(|| crate::grpc_impl::tls_config::TlsConfig::global_client().clone());
+
         loop {
-            match crate::grpc_impl::api::guest_api_host_client::GuestApiHostClient::connect(server_addr.to_string()).await {
-                Ok(client) => {
-                    let client = client.max_decoding_message_size(usize::MAX);
+            match tls_config.create_client_channel(&server_addr).await {
+                Ok(channel) => {
+                    let client = crate::grpc_impl::api::guest_api_host_client::GuestApiHostClient::new(channel).max_decoding_message_size(usize::MAX);
                     return Ok(Self { client });
                 }
-                Err(err) => match retry_interval {
-                    Some(val) => tokio::time::sleep(tokio::time::Duration::from_secs(val)).await,
-                    None => {
+                Err(err) => {
+                    if let Some(interval) = retry_interval {
+                        log::debug!("Waiting for GuestAPIHost at {}: {}", server_addr, err);
+                        tokio::time::sleep(tokio::time::Duration::from_secs(interval)).await;
+                    } else {
                         return Err(anyhow::anyhow!("Error when connecting to {}: {}", server_addr, err));
                     }
-                },
+                }
             }
         }
     }

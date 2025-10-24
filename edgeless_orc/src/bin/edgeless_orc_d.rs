@@ -18,7 +18,9 @@ struct Args {
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
-
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
     let args = Args::parse();
     if args.version {
         println!(

@@ -26,6 +26,7 @@ impl WorkflowInstanceAPIServer {
     pub fn run(
         controller_api: Box<dyn crate::outer::controller::ControllerAPI + Send>,
         controller_url: String,
+        tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>,
     ) -> futures::future::BoxFuture<'static, ()> {
         let mut controller_api = controller_api;
         let workflow_api = crate::grpc_impl::inner::workflow_instance::WorkflowInstanceAPIServer {
@@ -37,7 +38,31 @@ impl WorkflowInstanceAPIServer {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start ControllerAPI GRPC Server at {}", controller_url);
 
-                    match tonic::transport::Server::builder()
+                    let mut server_builder = tonic::transport::Server::builder();
+
+                    if let Some(tls_config) = tls_config {
+                        match tls_config.create_server_tls_config() {
+                            Ok(Some(config)) => {
+                                log::info!("TLS enabled for GRPC server");
+                                match server_builder.tls_config(config) {
+                                    Ok(builder) => server_builder = builder,
+                                    Err(e) => {
+                                        log::error!("Failed to apply TLS config: {}", e);
+                                        return;
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                log::info!("TLS disabled for GRPC server");
+                            }
+                            Err(e) => {
+                                log::error!("Failed to create TLS config: {}", e);
+                                return;
+                            }
+                        }
+                    }
+
+                    match server_builder
                         .add_service(
                             crate::grpc_impl::api::workflow_instance_server::WorkflowInstanceServer::new(workflow_api)
                                 .max_decoding_message_size(usize::MAX),

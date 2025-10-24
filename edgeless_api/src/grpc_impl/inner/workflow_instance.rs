@@ -12,13 +12,22 @@ pub struct WorkflowInstanceAPIClient {
 
 impl WorkflowInstanceAPIClient {
     pub async fn new(server_addr: &str) -> Self {
+        Self::new_with_tls(server_addr, None).await
+    }
+
+    pub async fn new_with_tls(server_addr: &str, tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>) -> Self {
+        let server_addr = server_addr.to_string();
+        let tls_config = tls_config.unwrap_or_else(|| crate::grpc_impl::tls_config::TlsConfig::global_client().clone());
+
         loop {
-            match crate::grpc_impl::api::workflow_instance_client::WorkflowInstanceClient::connect(server_addr.to_string()).await {
-                Ok(client) => {
-                    let client = client.max_decoding_message_size(usize::MAX);
+            match tls_config.create_client_channel(&server_addr).await {
+                Ok(channel) => {
+                    let client =
+                        crate::grpc_impl::api::workflow_instance_client::WorkflowInstanceClient::new(channel).max_decoding_message_size(usize::MAX);
                     return Self { client };
                 }
-                Err(_) => {
+                Err(err) => {
+                    log::debug!("Waiting for WorkflowInstanceAPI at {}: {}", server_addr, err);
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
                 }
             }

@@ -9,6 +9,7 @@ use std::str::FromStr;
 pub struct NodeRegistrationClient {
     client: Option<crate::grpc_impl::api::node_registration_client::NodeRegistrationClient<tonic::transport::Channel>>,
     server_addr: String,
+    tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>,
 }
 
 pub struct NodeRegistrationAPIService {
@@ -16,8 +17,12 @@ pub struct NodeRegistrationAPIService {
 }
 
 impl NodeRegistrationClient {
-    pub fn new(server_addr: String) -> Self {
-        Self { client: None, server_addr }
+    pub fn new(server_addr: String, tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>) -> Self {
+        Self {
+            client: None,
+            server_addr,
+            tls_config,
+        }
     }
 
     /// Try connecting, if not already connected.
@@ -26,13 +31,16 @@ impl NodeRegistrationClient {
     /// Otherwise, the client is set to some value (connected).
     async fn try_connect(&mut self) -> anyhow::Result<()> {
         if self.client.is_none() {
-            self.client = match crate::grpc_impl::api::node_registration_client::NodeRegistrationClient::connect(self.server_addr.clone()).await {
-                Ok(client) => {
-                    let client = client.max_decoding_message_size(usize::MAX);
-                    Some(client)
-                }
-                Err(err) => anyhow::bail!(err),
-            }
+            let tls_config = if let Some(config) = &self.tls_config {
+                config.clone()
+            } else {
+                crate::grpc_impl::tls_config::TlsConfig::global_client().clone()
+            };
+
+            let channel = tls_config.create_client_channel(&self.server_addr).await?;
+
+            self.client =
+                Some(crate::grpc_impl::api::node_registration_client::NodeRegistrationClient::new(channel).max_decoding_message_size(usize::MAX));
         }
         Ok(())
     }

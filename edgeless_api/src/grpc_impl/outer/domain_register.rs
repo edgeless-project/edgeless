@@ -6,9 +6,12 @@ pub struct DomainRegisterAPIClient {
 }
 
 impl DomainRegisterAPIClient {
-    pub async fn new(api_addr: String) -> Self {
+    pub async fn new(api_addr: String, tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>) -> Self {
         Self {
-            domain_registration_client: Box::new(crate::grpc_impl::inner::domain_registration::DomainRegistrationAPIClient::new(api_addr)),
+            domain_registration_client: Box::new(crate::grpc_impl::inner::domain_registration::DomainRegistrationAPIClient::new(
+                api_addr,
+                tls_config.clone(),
+            )),
         }
     }
 }
@@ -25,6 +28,7 @@ impl DomainRegistrationAPIServer {
     pub fn run(
         domain_register_api: Box<dyn crate::outer::domain_register::DomainRegisterAPI + Send>,
         domain_registration_url: String,
+        tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>,
     ) -> futures::future::BoxFuture<'static, ()> {
         let mut domain_register_api = domain_register_api;
         let domain_registration_api = crate::grpc_impl::inner::domain_registration::DomainRegistrationAPIServer {
@@ -36,7 +40,31 @@ impl DomainRegistrationAPIServer {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start DomainRegisterAPI GRPC Server at {}", domain_registration_url);
 
-                    match tonic::transport::Server::builder()
+                    let mut server_builder = tonic::transport::Server::builder();
+
+                    if let Some(tls_config) = tls_config {
+                        match tls_config.create_server_tls_config() {
+                            Ok(Some(config)) => {
+                                log::info!("TLS enabled for GRPC server");
+                                match server_builder.tls_config(config) {
+                                    Ok(builder) => server_builder = builder,
+                                    Err(e) => {
+                                        log::error!("Failed to apply TLS config: {}", e);
+                                        return;
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                log::info!("TLS disabled for GRPC server");
+                            }
+                            Err(e) => {
+                                log::error!("Failed to create TLS config: {}", e);
+                                return;
+                            }
+                        }
+                    }
+
+                    match server_builder
                         .add_service(
                             crate::grpc_impl::api::domain_registration_server::DomainRegistrationServer::new(domain_registration_api)
                                 .max_decoding_message_size(usize::MAX),
