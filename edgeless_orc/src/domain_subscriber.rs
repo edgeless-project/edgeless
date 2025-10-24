@@ -72,7 +72,11 @@ impl DomainSubscriber {
         let mut receiver = receiver;
 
         let mut client: edgeless_api::grpc_impl::outer::domain_register::DomainRegisterAPIClient =
-            edgeless_api::grpc_impl::outer::domain_register::DomainRegisterAPIClient::new(controller_url).await;
+            edgeless_api::grpc_impl::outer::domain_register::DomainRegisterAPIClient::new(
+                controller_url,
+                Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_client().clone()),
+            )
+            .await;
         let mut last_caps = edgeless_api::domain_registration::DomainCapabilities::default();
         let mut counter = 0;
         let mut orc_sender = None;

@@ -183,7 +183,9 @@ async fn workflow_inspect(wf_client: &mut Box<dyn edgeless_api::workflow_instanc
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
-
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
     let args = Args::parse();
     if args.version {
         println!(

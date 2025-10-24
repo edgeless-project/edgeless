@@ -79,17 +79,67 @@ pub struct InvocationAPIClient {
 
 impl InvocationAPIClient {
     pub async fn new(server_addr: &str) -> Self {
+        Self::new_with_tls(server_addr, None).await
+    }
+
+    pub async fn new_with_tls(server_addr: &str, tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>) -> Self {
+        let server_addr = server_addr.to_string();
+        let tls_config = tls_config.unwrap_or_else(|| crate::grpc_impl::tls_config::TlsConfig::global_client().clone());
+
         loop {
-            match crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient::connect(server_addr.to_string()).await {
-                Ok(client) => {
-                    let client = client.max_decoding_message_size(usize::MAX);
-                    return Self { client };
+            if tls_config.tpm_handle.is_some() && tls_config.client_cert_path.is_some() && tls_config.client_ca_path.is_some() {
+                log::info!("TLS enabled for InvocationAPI client with TPM integration");
+                match tls_config.create_channel_with_tpm(&server_addr).await {
+                    Ok(channel) => {
+                        let client = crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient::new(channel)
+                            .max_decoding_message_size(usize::MAX);
+                        return Self { client };
+                    }
+                    Err(err) => {
+                        log::warn!("Failed to create TPM-backed TLS channel for InvocationAPI at {}: {}", server_addr, err);
+                    }
                 }
-                Err(_) => {
-                    log::debug!("Waiting for InvocationAPI");
-                    tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            } else {
+                log::info!("TLS enabled for InvocationAPI client");
+                let client_tls_config = match tls_config.create_client_tls_config() {
+                    Ok(cfg) => cfg,
+                    Err(err) => {
+                        log::error!("Failed to create client TLS configuration for InvocationAPI at {}: {}", server_addr, err);
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        continue;
+                    }
+                };
+
+                let endpoint = match tonic::transport::Endpoint::from_shared(server_addr.clone()) {
+                    Ok(ep) => ep,
+                    Err(err) => {
+                        log::error!("Failed to create endpoint for InvocationAPI at {}: {}", server_addr, err);
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        continue;
+                    }
+                };
+
+                let endpoint = match endpoint.tls_config(client_tls_config) {
+                    Ok(ep) => ep,
+                    Err(err) => {
+                        log::error!("Failed to configure TLS for InvocationAPI endpoint at {}: {}", server_addr, err);
+                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        continue;
+                    }
+                };
+
+                match crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient::connect(endpoint.clone()).await {
+                    Ok(client) => {
+                        let client = client.max_decoding_message_size(usize::MAX);
+                        return Self { client };
+                    }
+                    Err(err) => {
+                        log::debug!("Waiting for InvocationAPI at {}: {}", server_addr, err);
+                    }
                 }
             }
+
+            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         }
     }
 }
@@ -133,7 +183,11 @@ impl crate::grpc_impl::api::function_invocation_server::FunctionInvocation for I
 pub struct InvocationAPIServer {}
 
 impl InvocationAPIServer {
-    pub fn run(data_plane: Box<dyn crate::invocation::InvocationAPI>, invocation_url: String) -> futures::future::BoxFuture<'static, ()> {
+    pub fn run(
+        data_plane: Box<dyn crate::invocation::InvocationAPI>,
+        invocation_url: String,
+        tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>,
+    ) -> futures::future::BoxFuture<'static, ()> {
         let data_plane = data_plane;
         let function_api = super::invocation::InvocationAPIServerHandler {
             root_api: tokio::sync::Mutex::new(data_plane),
@@ -143,7 +197,32 @@ impl InvocationAPIServer {
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&invocation_url) {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start InvocationAPI GRPC Server at {}", invocation_url);
-                    match tonic::transport::Server::builder()
+
+                    let mut server_builder = tonic::transport::Server::builder();
+
+                    if let Some(tls_config) = tls_config {
+                        match tls_config.create_server_tls_config() {
+                            Ok(Some(config)) => {
+                                log::info!("TLS enabled for GRPC server");
+                                match server_builder.tls_config(config) {
+                                    Ok(builder) => server_builder = builder,
+                                    Err(e) => {
+                                        log::error!("Failed to apply TLS config: {}", e);
+                                        return;
+                                    }
+                                }
+                            }
+                            Ok(None) => {
+                                log::info!("TLS disabled for GRPC server");
+                            }
+                            Err(e) => {
+                                log::error!("Failed to create TLS config: {}", e);
+                                return;
+                            }
+                        }
+                    }
+
+                    match server_builder
                         .add_service(
                             crate::grpc_impl::api::function_invocation_server::FunctionInvocationServer::new(function_api)
                                 .max_decoding_message_size(usize::MAX),

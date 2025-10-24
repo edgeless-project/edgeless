@@ -212,6 +212,7 @@ impl DataplaneProvider {
         let _server = tokio::spawn(edgeless_api::grpc_impl::outer::invocation::InvocationAPIServer::run(
             clone_provider.lock().await.incomming_api().await,
             invocation_url,
+            Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
         ));
 
         if let Some(invocation_url_coap) = invocation_url_coap {

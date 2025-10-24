@@ -708,7 +708,7 @@ impl ControllerTask {
                     update_domain_request.domain_id.clone(),
                     OrchestratorDesc {
                         client: Box::new(
-                            edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&update_domain_request.orchestrator_url).await?,
+                            edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&update_domain_request.orchestrator_url, None).await?,
                         ),
                         orchestrator_url: update_domain_request.orchestrator_url.clone(),
                         capabilities: update_domain_request.capabilities.clone(),
@@ -746,8 +746,9 @@ impl ControllerTask {
                     // Re-create the client only if needed.
                     if desc.orchestrator_url != update_domain_request.orchestrator_url {
                         desc.orchestrator_url = update_domain_request.orchestrator_url.clone();
-                        desc.client =
-                            Box::new(edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&update_domain_request.orchestrator_url).await?);
+                        desc.client = Box::new(
+                            edgeless_api::grpc_impl::outer::orc::OrchestratorAPIClient::new(&update_domain_request.orchestrator_url, None).await?,
+                        );
                     }
 
                     update_portal_domain = true;

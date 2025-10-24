@@ -12,17 +12,31 @@ pub struct GuestAPIFunctionService {
 
 impl GuestAPIFunctionClient {
     pub async fn new(server_addr: &str, timeout: std::time::Duration) -> anyhow::Result<Self> {
+        Self::new_with_tls(server_addr, timeout, None).await
+    }
+
+    pub async fn new_with_tls(
+        server_addr: &str,
+        timeout: std::time::Duration,
+        tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>,
+    ) -> anyhow::Result<Self> {
         let ts = std::time::Instant::now();
+        let server_addr = server_addr.to_string();
+        let tls_config = tls_config.unwrap_or_else(|| crate::grpc_impl::tls_config::TlsConfig::global_client().clone());
+
         loop {
-            match crate::grpc_impl::api::guest_api_function_client::GuestApiFunctionClient::connect(server_addr.to_string()).await {
-                Ok(client) => {
-                    let client = client.max_decoding_message_size(usize::MAX);
+            match tls_config.create_client_channel(&server_addr).await {
+                Ok(channel) => {
+                    let client =
+                        crate::grpc_impl::api::guest_api_function_client::GuestApiFunctionClient::new(channel).max_decoding_message_size(usize::MAX);
                     return Ok(Self { client });
                 }
                 Err(err) => {
                     if ts.elapsed() >= timeout {
                         return Err(anyhow::anyhow!("Error when connecting to {}: {}", server_addr, err));
                     }
+                    log::debug!("Waiting for GuestAPIFunction at {}: {}", server_addr, err);
+                    tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
                 }
             }
         }
