@@ -100,7 +100,11 @@ impl NodeSubscriber {
         let subscription_refresh_interval_sec = settings.subscription_refresh_interval_sec;
 
         let mut receiver = receiver;
-        let mut client = edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIClient::new(node_register_url).await;
+        let mut client = edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIClient::new(
+            node_register_url,
+            Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
+        )
+        .await;
         let mut telemetry_performance_target = telemetry_performance_target;
 
         // Internal data structures to query system/process information.

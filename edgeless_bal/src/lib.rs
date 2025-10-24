@@ -101,8 +101,11 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
         settings.local.node_id,
         local_data_plane.clone(),
     );
-    let local_agent_api_server =
-        edgeless_api::grpc_impl::outer::agent::AgentAPIServer::run(local_agent.get_api_client(), settings.local.agent_url.clone());
+    let local_agent_api_server = edgeless_api::grpc_impl::outer::agent::AgentAPIServer::run(
+        local_agent.get_api_client(),
+        settings.local.agent_url.clone(),
+        Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
+    );
 
     let (mut portal_agent, portal_agent_task) = edgeless_node::agent::Agent::new(
         std::collections::HashMap::new(),
@@ -116,8 +119,11 @@ pub async fn edgeless_bal_main(settings: EdgelessBalSettings) {
         settings.portal.node_id,
         portal_data_plane.clone(),
     );
-    let portal_agent_api_server =
-        edgeless_api::grpc_impl::outer::agent::AgentAPIServer::run(portal_agent.get_api_client(), settings.portal.agent_url.clone());
+    let portal_agent_api_server = edgeless_api::grpc_impl::outer::agent::AgentAPIServer::run(
+        portal_agent.get_api_client(),
+        settings.portal.agent_url.clone(),
+        Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
+    );
 
     // Create the component that subscribes to the node register to
     // notify updates (periodically refreshed), for the local and portal parts.

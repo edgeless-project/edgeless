@@ -742,6 +742,7 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
                 let server_task = edgeless_api::grpc_impl::outer::container_runtime::GuestAPIHostServer::run(
                     container_runtime_api,
                     container_runtime_settings.guest_api_host_url,
+                    Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
                 );
 
                 let (container_runtime_client, mut container_runtime_task_s) =
@@ -778,7 +779,11 @@ pub async fn edgeless_node_main(settings: EdgelessNodeSettings) {
     // Create the agent.
     let runtimes = runners.keys().map(|x| x.to_string()).collect::<Vec<String>>();
     let (mut agent, agent_task) = agent::Agent::new(runners, resources, settings.general.node_id, data_plane.clone());
-    let agent_api_server = edgeless_api::grpc_impl::outer::agent::AgentAPIServer::run(agent.get_api_client(), settings.general.agent_url.clone());
+    let agent_api_server = edgeless_api::grpc_impl::outer::agent::AgentAPIServer::run(
+        agent.get_api_client(),
+        settings.general.agent_url.clone(),
+        Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
+    );
 
     // Create the component that subscribes to the node register to
     // notify updates (periodically refreshed).

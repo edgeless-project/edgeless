@@ -148,8 +148,11 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     let (mut orchestrator, orchestrator_task, orchestrator_refresh_task) =
         orchestrator::Orchestrator::new(settings.baseline.clone(), proxy.clone(), subscriber.get_subscriber_sender()).await;
 
-    let orchestrator_server =
-        edgeless_api::grpc_impl::outer::orc::OrchestratorAPIServer::run(orchestrator.get_api_client(), settings.general.orchestrator_url);
+    let orchestrator_server = edgeless_api::grpc_impl::outer::orc::OrchestratorAPIServer::run(
+        orchestrator.get_api_client(),
+        settings.general.orchestrator_url,
+        Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
+    );
 
     // Create the node register.
     let (mut node_register, node_register_task, node_register_refresh_task) =
@@ -158,6 +161,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     let node_register_server = edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIServer::run(
         node_register.get_node_registration_client(),
         settings.general.node_register_url,
+        Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
     );
 
     let node_register_coap_server = if let Some(url) = settings.general.node_register_coap_url {
