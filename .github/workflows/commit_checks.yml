@@ -32,6 +32,10 @@ jobs:
         password: ${{ secrets.github_token }}
     steps:
       - uses: actions/checkout@v3
+      - name: Install TPM2-TSS
+        run: |
+          apt-get update
+          apt-get install -y libtss2-dev pkg-config
       - name: Build x64 Release
         run: cargo build --release
       - name: Upload Binaries
