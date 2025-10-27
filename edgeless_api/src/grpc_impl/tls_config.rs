@@ -32,7 +32,13 @@ struct CombinedTlsConfig {
 
 impl CombinedTlsConfig {
     fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mut file = File::open(path.as_ref())?;
+        let mut file = File::open(path.as_ref()).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                anyhow::anyhow!("TLS configuration file '{}' not found", path.as_ref().display())
+            } else {
+                anyhow::anyhow!("Failed to open TLS configuration file '{}': {}", path.as_ref().display(), e)
+            }
+        })?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
         let cfg: CombinedTlsConfig = toml::from_str(&contents)?;
@@ -81,7 +87,13 @@ impl Default for TlsConfig {
 impl TlsConfig {
     /// Loads TLS configuration from the TOML file
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self> {
-        let mut file = File::open(path.as_ref())?;
+        let mut file = File::open(path.as_ref()).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                anyhow::anyhow!("TLS configuration file '{}' not found", path.as_ref().display())
+            } else {
+                anyhow::anyhow!("Failed to open TLS configuration file '{}': {}", path.as_ref().display(), e)
+            }
+        })?;
         let mut contents = String::new();
         file.read_to_string(&mut contents)?;
 
@@ -197,21 +209,33 @@ impl TlsConfig {
     }
 
     pub async fn create_client_channel(&self, server_addr: &str) -> Result<Channel> {
-        let cfg = TlsConfig::from_file("tls_config.toml")?;
-        if cfg.tpm_handle.is_some() && cfg.client_cert_path.is_some() && cfg.client_ca_path.is_some() {
-            log::info!("Creating channel with TPM integration");
-            return cfg.create_channel_with_tpm(server_addr).await;
-        }
+        match TlsConfig::from_file("tls_config.toml") {
+            Ok(cfg) => {
+                if cfg.tpm_handle.is_some() && cfg.client_cert_path.is_some() && cfg.client_ca_path.is_some() {
+                    log::info!("Creating channel with TPM integration");
+                    return cfg.create_channel_with_tpm(server_addr).await;
+                }
 
-        let endpoint = Endpoint::from_shared(server_addr.to_string())?;
+                let endpoint = Endpoint::from_shared(server_addr.to_string())?;
 
-        if cfg.client_ca_path.is_some() {
-            log::info!("Applying TLS configuration");
-            let tls_config = cfg.create_client_tls_config()?;
-            return Ok(endpoint.tls_config(tls_config)?.connect().await?);
+                if cfg.client_ca_path.is_some() {
+                    log::info!("Applying TLS configuration");
+                    let tls_config = cfg.create_client_tls_config()?;
+                    return Ok(endpoint.tls_config(tls_config)?.connect().await?);
+                }
+                log::info!("Using plaintext connection (no TLS)");
+                Ok(endpoint.connect().await?)
+            }
+            Err(e) => {
+                if e.to_string().contains("not found") {
+                    log::warn!("TLS configuration file 'tls_config.toml' not found. Continuing with plaintext connection (no TLS).");
+                } else {
+                    log::warn!("Failed to load TLS configuration: {}. Continuing with plaintext connection (no TLS).", e);
+                }
+                let endpoint = Endpoint::from_shared(server_addr.to_string())?;
+                Ok(endpoint.connect().await?)
+            }
         }
-        log::info!("Using plaintext connection (no TLS)");
-        Ok(endpoint.connect().await?)
     }
 
     /// Returns a global server TLS configuration loaded from 'tls_config.toml'
@@ -219,7 +243,11 @@ impl TlsConfig {
         SERVER_TLS_CONFIG.get_or_init(|| match CombinedTlsConfig::from_file("tls_config.toml") {
             Ok(cfg) => cfg.server.unwrap_or_else(TlsConfig::default),
             Err(err) => {
-                log::warn!("Failed to load server TLS config: {err}");
+                if err.to_string().contains("not found") {
+                    log::warn!("TLS configuration file 'tls_config.toml' not found. Using default TLS configuration (no TLS).");
+                } else {
+                    log::warn!("Failed to load server TLS config: {}. Using default TLS configuration (no TLS).", err);
+                }
                 TlsConfig::default()
             }
         })
@@ -236,7 +264,11 @@ impl TlsConfig {
                 }
             }
             Err(err) => {
-                log::warn!("Failed to load client TLS config: {}", err);
+                if err.to_string().contains("not found") {
+                    log::warn!("TLS configuration file 'tls_config.toml' not found. Using default TLS configuration (no TLS).");
+                } else {
+                    log::warn!("Failed to load client TLS config: {}. Using default TLS configuration (no TLS).", err);
+                }
                 TlsConfig::default()
             }
         })
