@@ -2182,7 +2182,7 @@ dependencies = [
  "env_logger 0.10.2",
  "futures 0.3.31",
  "log",
- "rand",
+ "rand 0.8.5",
  "rand_distr",
  "rand_pcg",
  "redis",
@@ -2206,7 +2206,7 @@ dependencies = [
  "futures 0.3.31",
  "log",
  "mailparse",
- "rand",
+ "rand 0.8.5",
  "rand_distr",
  "rand_pcg",
  "reqwest 0.11.27",
@@ -8756,7 +8756,7 @@ version = "0.2.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be0ecb0db480561e9a7642b5d3e4187c128914e58aa84330b9493e3eb68c5e7f"
 dependencies = [
- "futures",
+ "futures 0.3.31",
  "js-sys",
  "parking_lot 0.11.2",
  "pin-utils",

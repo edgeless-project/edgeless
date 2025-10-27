@@ -333,59 +333,78 @@ impl Engine {
                 );
             }
             WorkflowType::JsonSpec(data) => {
-                let spec_string = data.spec_string.replace("@WF_ID", self.wf_id.to_string().as_str());
-                let workflow_spec: edgeless_cli::workflow_spec::WorkflowSpec = serde_json::from_str(&spec_string).unwrap();
+                let mut spec_string = data.spec_string.replace("@WF_ID", self.wf_id.to_string().as_str());
+                // easy way to inject randomness into the spec
+                spec_string = spec_string.replace("@RNG", rand::thread_rng().gen::<u64>().to_string().as_str());
+                let workflow_spec: edgeless_api::workflow_instance::SpawnWorkflowRequest = serde_json::from_str(&spec_string).unwrap();
+                log::info!("wf{}, json spec {}", self.wf_id, spec_string);
                 let mut workflow =
                     edgeless_cli::workflow_spec_to_request(workflow_spec, &data.parent_path).expect("could not create a correct workflow");
-                std::mem::swap(&mut workflow.workflow_functions, &mut functions);
-                std::mem::swap(&mut workflow.workflow_resources, &mut resources);
+                std::mem::swap(&mut workflow.functions, &mut functions);
+                std::mem::swap(&mut workflow.resources, &mut resources);
                 std::mem::swap(&mut workflow.annotations, &mut annotations);
             }
+            // Used to test DDA chains and the blocking behavior. 
             WorkflowType::DDAChain(ddachain_data) => {
-                // TODO(dda): fix this
-                // let chain_size = draw(ddachain_data.max_chain_length, ddachain_data.max_chain_length);
+                // add the first function
+                functions.push(WorkflowFunction {
+                    name: "first".to_string(),
+                    class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                        id: "dda_chain".to_string(),
+                        function_type: "RUST_WASM".to_string(),
+                        version: "0.1".to_string(),
+                        binary: Some(std::fs::read(&ddachain_data.function_wasm_path).expect("could not read wasm file for dda_chain")),
+                        code: Some(ddachain_data.function_wasm_path.clone()),
+                        outputs: vec!["out".to_string()],
+                    },
+                    output_mapping: std::collections::HashMap::from([("out".to_string(), "f0".to_string())]),
+                    annotations: std::collections::HashMap::from([("init-payload".to_string(), format!("is_first=true,is_last=false,num_middle_blocks={}", ddachain_data.chain_length))]),
+                });
 
-                // for i in 0..chain_size {
-                //     let name = match i {
-                //         0 => "client".to_string(),
-                //         i => format!("f{}", i - 1),
-                //     };
-                //     let next_func_name = match chain_size - i - 1 {
-                //         0 => "client".to_string(),
-                //         i => format!("f{}", chain_size - i - 1),
-                //     };
+                // add the middle (fanned-out) functions
+                for i in 0..ddachain_data.chain_length {
+                    let mut output_mapping = std::collections::HashMap::from([("out".to_string(), format!("f{}", i + 1))]);
 
-                //     let mut output_mapping = std::collections::HashMap::from([("out".to_string(), next_func_name)]);
-                //     output_mapping.insert("metric".to_string(), "metrics-collector".to_string());
+                    let annotations = std::collections::HashMap::from([(
+                        "init-payload".to_string(),
+                        format!(
+                            "is_first=false,is_last=false,num_middle_blocks={}",
+                            ddachain_data.chain_length
+                        )
+                        .to_string(),
+                    )]);
 
-                //     let annotations = std::collections::HashMap::from([(
-                //         "init-payload".to_string(),
-                //         format!(
-                //             "is_client={};{}",
-                //             i,
-                //             match i {
-                //                 0 => "true",
-                //                 _ => "false",
-                //             },
-                //         )
-                //         .to_string(),
-                //     )]);
+                    functions.push(WorkflowFunction {
+                        name: format!("f{}", i),
+                        class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                            id: "dda_chain".to_string(),
+                            function_type: "RUST_WASM".to_string(),
+                            version: "0.1".to_string(),
+                            binary: Some(std::fs::read(&ddachain_data.function_wasm_path).expect("could not read wasm file for dda_chain")),
+                            code: Some(ddachain_data.function_wasm_path.clone()),
+                            outputs: output_mapping.keys().cloned().collect(),
+                        },
+                        output_mapping,
+                        annotations,
+                    });
+                }
 
-                //     functions.push(WorkflowFunction {
-                //         name,
-                //         function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                //             function_class_id: "vector_mul".to_string(),
-                //             function_class_type: "RUST_WASM".to_string(),
-                //             function_class_version: "0.1".to_string(),
-                //             function_class_code: std::fs::read(&ddachain_data.function_wasm_path).unwrap(),
-                //             function_class_outputs: vec!["metric".to_string(), "out".to_string()],
-                //         },
-                //         output_mapping,
-                //         annotations,
-                //     });
-                // }
+                // add the last function 
+                functions.push(WorkflowFunction {
+                    name: format!("last"),
+                    class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                        id: "dda_chain".to_string(),
+                        function_type: "RUST_WASM".to_string(),
+                        version: "0.1".to_string(),
+                        binary: Some(std::fs::read(&ddachain_data.function_wasm_path).expect("could not read wasm file for dda_chain")),
+                        code: Some(ddachain_data.function_wasm_path.clone()),
+                        outputs: vec!["out".to_string()],
+                    },
+                    output_mapping: std::collections::HashMap::from([("out".to_string(), "first".to_string())]),
+                    annotations: std::collections::HashMap::from([("init-payload".to_string(), format!("is_first=false,is_last=true,num_middle_blocks={}", ddachain_data.chain_length))]),
+                });
 
-                // log::info!("wf{}, chain size {}, input size {}", self.wf_id, chain_size, input_size);
+                log::info!("wf{}, dda chain length {}", self.wf_id, ddachain_data.chain_length);
             }
         };
 
@@ -404,21 +423,9 @@ impl Engine {
             resources,
             annotations,
         };
+        log::info!("requesting workflow creation: {:?}", req);
         self.csv_dumper
-            .add("workflow:request", &wf_name, serde_json::to_string(&req).unwrap_or_default().as_str());
-
-        log::info!(
-            "spawning a new workflow: {}",
-            serde_json::to_string_pretty(&req).expect("cannot serialize request")
-        );
-
-        // TODO: fix this
-        // self.client
-        //     .set(format!("workflow:{}:begin", wf_name).as_str(), &crate::utils::timestamp_now());
-        // self.client.set(
-        //     format!("workflow:{}:request", wf_name).as_str(),
-        //     serde_json::to_string(&req).unwrap_or_default().as_str(),
-        // );
+            .add("workflow:request", &wf_name, format!("{:?}", req).as_str()); // avoids printing the lengthy binary
 
         // Request the creation of the workflow.
         let res = self.client.start(req).await;
@@ -427,6 +434,7 @@ impl Engine {
         // workflow:$wf_name:response
         match res {
             Ok(response) => {
+                self.csv_dumper.add("workflow:start", wf_name.as_str(), "");
                 self.csv_dumper.add(
                     "workflow:response",
                     &wf_name,
@@ -450,6 +458,7 @@ impl Engine {
     pub async fn stop_workflow(&mut self, uuid: &str) -> anyhow::Result<()> {
         if let Some(wf_name) = self.uuid_to_names.get(&uuid::Uuid::from_str(uuid).unwrap()) {
             self.csv_dumper.add("workflow:end", wf_name, "");
+            self.uuid_to_names.remove(&uuid::Uuid::from_str(uuid).unwrap());
         }
         let res = self.client.stop(WorkflowId::from_string(uuid)).await;
         match res {

@@ -1,7 +1,0 @@
-{
-    "min_chain_length": 5,
-    "max_chain_length": 5,
-    "min_input_size": 1000,
-    "max_input_size": 1000,
-    "function_wasm_path": "functions/vector_mul/vector_mul.wasm"
-}

@@ -8,9 +8,10 @@ use edgeless_api::function_instance::InstanceId;
 use edgeless_api::resource_configuration::ResourceConfigurationAPI;
 use serde::Deserialize;
 use serde_json::Error;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 use uuid::Uuid;
+use std::sync::atomic::AtomicI64;
 
 pub struct DdaResourceSpec {}
 
@@ -501,7 +502,7 @@ impl DDAResource {
         // Spawn asynchrounous task to handle edgeless dataplane events -
         // these are incoming events from e.g. edgeless functions that need to
         // be sent out etc.
-        let id: u128 = 0;
+        let mut queue_size: std::sync::Arc<AtomicI64> = std::sync::Arc::new(AtomicI64::new(0));
         let mut dataplane_handle = dataplane_handle.clone();
         let _dda_task = tokio::spawn(async move {
             loop {

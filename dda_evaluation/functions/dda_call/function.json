@@ -1,9 +1,0 @@
-{
-    "id": "func",
-    "function_type": "RUST_WASM",
-    "version": "0.1",
-    "outputs": [
-        "dda",
-        "metric"
-    ]
-}

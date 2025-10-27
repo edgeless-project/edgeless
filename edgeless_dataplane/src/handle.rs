@@ -144,8 +144,8 @@ impl DataplaneHandle {
         self.next_id += 1;
         // Potential Leak: This is only received if a message is received (or
         // the handle is dropped)
-        let dataplane_size = self.current_size.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        log::error!("dataplane instance: {}, queue size: {}", self.slf, dataplane_size);
+        // let dataplane_size = self.current_size.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        // log::error!("dataplane instance: {}, queue size: {}", self.slf, dataplane_size);
         {
             self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
         }
