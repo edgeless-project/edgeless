@@ -19,7 +19,7 @@ mod system_tests {
 
     struct SetupReturn {
         abort_handles: AbortHandles,
-        wf_api: Box<(dyn WorkflowInstanceAPI)>,
+        wf_api: Box<dyn WorkflowInstanceAPI>,
         last_port_used: i32,
         domain_register_url: String,
         node_register_urls: Vec<String>,
@@ -96,7 +96,7 @@ mod system_tests {
                 let invocation_url = format!("http://{}:{}", address, next_port());
                 let (task, handle) = futures::future::abortable(edgeless_node::edgeless_node_main(edgeless_node::EdgelessNodeSettings {
                     general: edgeless_node::EdgelessNodeGeneralSettings {
-                        node_id: node_id.clone(),
+                        node_id,
                         agent_url: agent_url.clone(),
                         agent_url_announced: agent_url,
                         invocation_url: invocation_url.clone(),
@@ -198,7 +198,7 @@ mod system_tests {
             let (task, handle) = futures::future::abortable(edgeless_bal::edgeless_bal_main(edgeless_bal::EdgelessBalSettings {
                 general: edgeless_bal::EdgelessBalGeneralSettings { domain },
                 local: edgeless_node::EdgelessNodeGeneralSettings {
-                    node_id: node_id_local.clone(),
+                    node_id: node_id_local,
                     agent_url: agent_url_local.clone(),
                     agent_url_announced: agent_url_local,
                     invocation_url: invocation_url_local.clone(),
@@ -231,11 +231,11 @@ mod system_tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
     }
 
-    async fn wf_list(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> Vec<edgeless_api::workflow_instance::WorkflowId> {
+    async fn wf_list(client: &mut Box<dyn WorkflowInstanceAPI>) -> Vec<edgeless_api::workflow_instance::WorkflowId> {
         (client.list().await).unwrap_or_default()
     }
 
-    async fn domains_used(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> std::collections::HashSet<String> {
+    async fn domains_used(client: &mut Box<dyn WorkflowInstanceAPI>) -> std::collections::HashSet<String> {
         let mut ret = std::collections::HashSet::new();
         for wf_id in wf_list(client).await {
             let wf_info = client.inspect(wf_id).await.expect("Could not find a workflow just listed");
@@ -246,7 +246,7 @@ mod system_tests {
         ret
     }
 
-    async fn nodes_in_domain(domain_id: &str, client: &mut Box<(dyn WorkflowInstanceAPI)>) -> u32 {
+    async fn nodes_in_domain(domain_id: &str, client: &mut Box<dyn WorkflowInstanceAPI>) -> u32 {
         let res = client.domains(String::default()).await.unwrap_or_default();
         if res.is_empty() {
             return 0;
@@ -258,7 +258,7 @@ mod system_tests {
         }
     }
 
-    async fn nodes_in_bal_domain(client: &mut Box<(dyn WorkflowInstanceAPI)>) -> (u32, std::collections::HashSet<String>) {
+    async fn nodes_in_bal_domain(client: &mut Box<dyn WorkflowInstanceAPI>) -> (u32, std::collections::HashSet<String>) {
         let res = client.domains(String::from("domain-bal")).await.unwrap_or_default();
         if let Some(entry) = res.get("domain-bal") {
             (entry.num_nodes, entry.portal_domains())
@@ -267,7 +267,7 @@ mod system_tests {
         }
     }
 
-    async fn nodes_in_cluster(num_domains: u32, client: &mut Box<(dyn WorkflowInstanceAPI)>) -> u32 {
+    async fn nodes_in_cluster(num_domains: u32, client: &mut Box<dyn WorkflowInstanceAPI>) -> u32 {
         let mut num_nodes_founds = 0;
         for domain_id in 0..num_domains {
             num_nodes_founds += nodes_in_domain(format!("domain-{}", domain_id).as_str(), client).await;
@@ -305,7 +305,7 @@ mod system_tests {
     }
 
     async fn create_single_function_workflows(
-        client: &mut Box<(dyn WorkflowInstanceAPI)>,
+        client: &mut Box<dyn WorkflowInstanceAPI>,
         n: usize,
     ) -> Vec<edgeless_api::workflow_instance::WorkflowId> {
         let mut ret = vec![];
@@ -337,7 +337,7 @@ mod system_tests {
     }
 
     async fn create_single_resource_workflows(
-        client: &mut Box<(dyn WorkflowInstanceAPI)>,
+        client: &mut Box<dyn WorkflowInstanceAPI>,
         n: usize,
     ) -> Vec<edgeless_api::workflow_instance::WorkflowId> {
         let mut ret = vec![];
@@ -1129,7 +1129,7 @@ mod system_tests {
     async fn inspect_domain_assignment(
         wf_id: edgeless_api::workflow_instance::WorkflowId,
         expected_mapping: std::collections::HashMap<&str, &String>,
-        client: &mut Box<(dyn WorkflowInstanceAPI)>,
+        client: &mut Box<dyn WorkflowInstanceAPI>,
     ) {
         if let Ok(edgeless_api::workflow_instance::WorkflowInfo { request: _, status }) = client.inspect(wf_id.clone()).await {
             assert_eq!(wf_id, status.workflow_id);
@@ -1155,10 +1155,10 @@ mod system_tests {
     async fn system_test_balancer() -> anyhow::Result<()> {
         // let _ = env_logger::try_init();
 
-        let removeme_filename = format!("removeme-balancer.log");
+        let removeme_filename = "removeme-balancer.log";
 
         let cleanup = || {
-            let _ = std::fs::remove_file(removeme_filename.clone());
+            let _ = std::fs::remove_file(removeme_filename);
         };
 
         // Create a controller and 3 orchestration domains.
@@ -1207,7 +1207,7 @@ mod system_tests {
                         name: "log".to_string(),
                         class_type: "file-log".to_string(),
                         output_mapping: std::collections::HashMap::new(),
-                        configurations: std::collections::HashMap::from([("filename".to_string(), removeme_filename.clone())]),
+                        configurations: std::collections::HashMap::from([("filename".to_string(), removeme_filename.to_string())]),
                     }],
                     annotations: std::collections::HashMap::new(),
                 })

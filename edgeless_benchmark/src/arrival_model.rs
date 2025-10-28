@@ -182,8 +182,8 @@ mod test {
             interarrival_sum += (arrival_time - now) as f64;
             lifetime_sum += (end_time - arrival_time) as f64;
         }
-        assert_eq!(1, crate::utils::to_seconds((interarrival_sum / 10000 as f64) as u64).round() as u64);
-        assert_eq!(10, crate::utils::to_seconds((lifetime_sum / 10000 as f64) as u64).round() as u64);
+        assert_eq!(1, crate::utils::to_seconds((interarrival_sum / 10000_f64) as u64).round() as u64);
+        assert_eq!(10, crate::utils::to_seconds((lifetime_sum / 10000_f64) as u64).round() as u64);
     }
 
     #[test]

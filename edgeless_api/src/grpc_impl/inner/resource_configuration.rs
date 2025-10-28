@@ -70,11 +70,7 @@ where
                         Ok(res) => CommonConverters::parse_start_component_response(&res.into_inner()),
                         Err(err) => {
                             self.disconnect();
-                            Err(anyhow::anyhow!(
-                                "Error when starting a resource at {}: {}",
-                                self.server_addr,
-                                err.to_string()
-                            ))
+                            Err(anyhow::anyhow!("Error when starting a resource at {}: {}", self.server_addr, err))
                         }
                     }
                 } else {
@@ -95,11 +91,7 @@ where
                         Ok(_) => Ok(()),
                         Err(err) => {
                             self.disconnect();
-                            Err(anyhow::anyhow!(
-                                "Error when stopping a resource at {}: {}",
-                                self.server_addr,
-                                err.to_string()
-                            ))
+                            Err(anyhow::anyhow!("Error when stopping a resource at {}: {}", self.server_addr, err))
                         }
                     }
                 } else {
@@ -120,11 +112,7 @@ where
                         Ok(_) => Ok(()),
                         Err(err) => {
                             self.disconnect();
-                            Err(anyhow::anyhow!(
-                                "Error when patching a resource at {}: {}",
-                                self.server_addr,
-                                err.to_string()
-                            ))
+                            Err(anyhow::anyhow!("Error when patching a resource at {}: {}", self.server_addr, err))
                         }
                     }
                 } else {

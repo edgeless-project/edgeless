@@ -161,7 +161,7 @@ mod test {
             source: fid_source,
             stream_id: 0,
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
-            created: created.clone(),
+            created,
             metadata: edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00015u128, 0x42a42bdecaf00016u64),
         })
         .await
@@ -175,7 +175,7 @@ mod test {
                 source: fid_source,
                 stream_id: 0,
                 data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
-                created: created.clone(),
+                created,
                 metadata: edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00013u128, 0x42a42bdecaf00014u64),
             })
             .await
@@ -189,7 +189,7 @@ mod test {
             source: fid_source,
             stream_id: 0,
             data: edgeless_api::invocation::EventData::Cast("Test".to_string()),
-            created: created.clone(),
+            created,
             metadata: metad_1.clone(),
         })
         .await

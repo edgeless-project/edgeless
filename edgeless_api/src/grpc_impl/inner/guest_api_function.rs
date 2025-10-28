@@ -48,45 +48,33 @@ impl crate::guest_api_function::GuestAPIFunction for GuestAPIFunctionClient {
     async fn boot(&mut self, boot_data: crate::guest_api_function::BootData) -> anyhow::Result<()> {
         match self.client.boot(tonic::Request::new(serialize_boot_data(&boot_data))).await {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Communication error while booting a function instance: {}",
-                err.to_string()
-            )),
+            Err(err) => Err(anyhow::anyhow!("Communication error while booting a function instance: {}", err)),
         }
     }
 
     async fn init(&mut self, init_data: crate::guest_api_function::FunctionInstanceInit) -> anyhow::Result<()> {
         match self.client.init(tonic::Request::new(serialize_function_instance_init(&init_data))).await {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Communication error while initializing a function instance: {}",
-                err.to_string()
-            )),
+            Err(err) => Err(anyhow::anyhow!("Communication error while initializing a function instance: {}", err)),
         }
     }
     async fn cast(&mut self, event: crate::guest_api_function::InputEventData) -> anyhow::Result<()> {
         match self.client.cast(tonic::Request::new(serialize_input_event_data(&event))).await {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while casting an event: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while casting an event: {}", err)),
         }
     }
 
     async fn call(&mut self, event: crate::guest_api_function::InputEventData) -> anyhow::Result<crate::guest_api_function::CallReturn> {
         match self.client.call(tonic::Request::new(serialize_input_event_data(&event))).await {
             Ok(msg) => parse_call_return(&msg.into_inner()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Communication error while calling a function instance: {}",
-                err.to_string()
-            )),
+            Err(err) => Err(anyhow::anyhow!("Communication error while calling a function instance: {}", err)),
         }
     }
     async fn stop(&mut self) -> anyhow::Result<()> {
         match self.client.stop(tonic::Request::new(())).await {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Communication error while stopping function instance: {}",
-                err.to_string()
-            )),
+            Err(err) => Err(anyhow::anyhow!("Communication error while stopping function instance: {}", err)),
         }
     }
 }

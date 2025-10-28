@@ -152,17 +152,11 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
             anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::DomainManagedInstanceId>>,
         >();
         if let Err(err) = self.sender.send(OrchestratorRequest::StartFunction(request, reply_sender)).await {
-            return Err(anyhow::anyhow!(
-                "Orchestrator channel error when creating a function instance: {}",
-                err.to_string()
-            ));
+            return Err(anyhow::anyhow!("Orchestrator channel error when creating a function instance: {}", err));
         }
         match reply_receiver.await {
             Ok(f_id) => f_id,
-            Err(err) => Err(anyhow::anyhow!(
-                "Orchestrator channel error when creating a function instance: {}",
-                err.to_string()
-            )),
+            Err(err) => Err(anyhow::anyhow!("Orchestrator channel error when creating a function instance: {}", err)),
         }
     }
 
@@ -170,10 +164,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
         log::debug!("FunctionInstance::stop() {:?}", id);
         match self.sender.send(OrchestratorRequest::StopFunction(id)).await {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Orchestrator channel error when stopping a function instance: {}",
-                err.to_string()
-            )),
+            Err(err) => Err(anyhow::anyhow!("Orchestrator channel error when stopping a function instance: {}", err)),
         }
     }
 
@@ -183,7 +174,7 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Orchestrator channel error when updating the links of a function instance: {}",
-                err.to_string()
+                err
             )),
         }
     }
@@ -202,17 +193,11 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             anyhow::Result<edgeless_api::common::StartComponentResponse<edgeless_api::function_instance::DomainManagedInstanceId>>,
         >();
         if let Err(err) = self.sender.send(OrchestratorRequest::StartResource(request, reply_sender)).await {
-            return Err(anyhow::anyhow!(
-                "Orchestrator channel error when starting a resource: {}",
-                err.to_string()
-            ));
+            return Err(anyhow::anyhow!("Orchestrator channel error when starting a resource: {}", err));
         }
         match reply_receiver.await {
             Ok(f_id) => f_id,
-            Err(err) => Err(anyhow::anyhow!(
-                "Orchestrator channel error when starting a resource: {}",
-                err.to_string()
-            )),
+            Err(err) => Err(anyhow::anyhow!("Orchestrator channel error when starting a resource: {}", err)),
         }
     }
 
@@ -220,10 +205,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         log::debug!("ResourceConfigurationAPI::stop() {:?}", id);
         match self.sender.send(OrchestratorRequest::StopResource(id)).await {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Orchestrator channel error when stopping a resource: {}",
-                err.to_string()
-            )),
+            Err(err) => Err(anyhow::anyhow!("Orchestrator channel error when stopping a resource: {}", err)),
         }
     }
 
@@ -233,7 +215,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             Ok(_) => Ok(()),
             Err(err) => Err(anyhow::anyhow!(
                 "Orchestrator channel error when updating the links of a function instance: {}",
-                err.to_string()
+                err
             )),
         }
     }
