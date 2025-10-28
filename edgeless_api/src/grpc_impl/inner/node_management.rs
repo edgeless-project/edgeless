@@ -59,7 +59,7 @@ impl crate::node_management::NodeManagementAPI for NodeManagementClient {
                 if let Some(client) = &mut self.client {
                     if let Err(err) = client.update_peers(tonic::Request::new(serialize_update_peers_request(&request))).await {
                         self.disconnect();
-                        anyhow::bail!("Error when updating peers at {}: {}", self.server_addr, err.to_string());
+                        anyhow::bail!("Error when updating peers at {}: {}", self.server_addr, err);
                     } else {
                         Ok(())
                     }
@@ -78,7 +78,7 @@ impl crate::node_management::NodeManagementAPI for NodeManagementClient {
                 if let Some(client) = &mut self.client {
                     if let Err(err) = client.reset(tonic::Request::new(())).await {
                         self.disconnect();
-                        anyhow::bail!("Error when resetting at {}: {}", self.server_addr, err.to_string());
+                        anyhow::bail!("Error when resetting at {}: {}", self.server_addr, err);
                     } else {
                         Ok(())
                     }

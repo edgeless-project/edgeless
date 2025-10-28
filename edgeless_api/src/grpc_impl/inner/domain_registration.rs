@@ -65,11 +65,7 @@ impl crate::domain_registration::DomainRegistrationAPI for DomainRegistrationAPI
                         Ok(res) => parse_update_domain_response(&res.into_inner()),
                         Err(err) => {
                             self.disconnect();
-                            Err(anyhow::anyhow!(
-                                "Error when updating a domain at {}: {}",
-                                self.server_addr,
-                                err.to_string()
-                            ))
+                            Err(anyhow::anyhow!("Error when updating a domain at {}: {}", self.server_addr, err))
                         }
                     }
                 } else {
@@ -213,12 +209,13 @@ fn serialize_update_domain_request(req: &crate::domain_registration::UpdateDomai
 
 #[cfg(test)]
 mod test {
-    use std::u64;
-
-    use super::*;
     use crate::domain_registration::DomainCapabilities;
     use crate::domain_registration::UpdateDomainRequest;
     use crate::domain_registration::UpdateDomainResponse;
+    use crate::grpc_impl::inner::domain_registration::parse_update_domain_request;
+    use crate::grpc_impl::inner::domain_registration::parse_update_domain_response;
+    use crate::grpc_impl::inner::domain_registration::serialize_update_domain_request;
+    use crate::grpc_impl::inner::domain_registration::serialize_update_domain_response;
 
     #[test]
     fn serialize_deserialize_update_domain_request() {

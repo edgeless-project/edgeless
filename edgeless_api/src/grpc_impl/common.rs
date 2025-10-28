@@ -259,7 +259,7 @@ mod tests {
             EventMetadata::from_uints(1, 0),
             EventMetadata::from_uints(1, 2),
             EventMetadata::from_uints(0x42a42bdecaf00005u128, 0x42a42bdecaf00006u64),
-            EventMetadata::from_uints(std::u128::MAX, std::u64::MAX),
+            EventMetadata::from_uints(u128::MAX, u64::MAX),
         ];
         for some_i in inputs {
             let ser = EventSerializedMetadata::from(&some_i);

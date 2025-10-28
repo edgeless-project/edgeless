@@ -374,23 +374,23 @@ impl edgeless_api::function_instance::FunctionInstanceAPI<edgeless_api::function
             .sender
             .send(AgentRequest::SpawnFunction(request, rsp_sender))
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a function instance: {}", err.to_string()))?;
+            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a function instance: {}", err))?;
         rsp_receiver
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a function instance: {}", err.to_string()))
+            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a function instance: {}", err))
     }
     async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
         self.sender
             .send(AgentRequest::StopFunction(id))
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when stopping a function instance: {}", err.to_string()))
+            .map_err(|err| anyhow::anyhow!("Agent channel error when stopping a function instance: {}", err))
     }
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
         self.sender
             .send(AgentRequest::PatchFunction(update))
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when patching a function instance: {}", err.to_string()))
+            .map_err(|err| anyhow::anyhow!("Agent channel error when patching a function instance: {}", err))
     }
 }
 
@@ -400,13 +400,13 @@ impl edgeless_api::node_management::NodeManagementAPI for NodeManagementClient {
         self.sender
             .send(AgentRequest::UpdatePeers(request))
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when updating a node's peers: {}", err.to_string()))
+            .map_err(|err| anyhow::anyhow!("Agent channel error when updating a node's peers: {}", err))
     }
     async fn reset(&mut self) -> anyhow::Result<()> {
         self.sender
             .send(AgentRequest::Reset())
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when resetting a node: {}", err.to_string()))
+            .map_err(|err| anyhow::anyhow!("Agent channel error when resetting a node: {}", err))
     }
 }
 
@@ -422,20 +422,20 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             .sender
             .send(AgentRequest::SpawnResource(request, rsp_sender))
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err.to_string()))?;
+            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err))?;
         rsp_receiver
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err.to_string()))
+            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err))
     }
     async fn stop(&mut self, id: edgeless_api::function_instance::InstanceId) -> anyhow::Result<()> {
         let (rsp_sender, rsp_receiver) = futures::channel::oneshot::channel::<anyhow::Result<()>>();
         self.sender
             .send(AgentRequest::StopResource(id, rsp_sender))
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err.to_string()))?;
+            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err))?;
         rsp_receiver
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err.to_string()))?
+            .map_err(|err| anyhow::anyhow!("Agent channel error when creating a resource instance: {}", err))?
     }
 
     async fn patch(&mut self, update: edgeless_api::common::PatchRequest) -> anyhow::Result<()> {
@@ -443,10 +443,10 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         self.sender
             .send(AgentRequest::PatchResource(update, rsp_sender))
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when patching a resource instance: {}", err.to_string()))?;
+            .map_err(|err| anyhow::anyhow!("Agent channel error when patching a resource instance: {}", err))?;
         rsp_receiver
             .await
-            .map_err(|err| anyhow::anyhow!("Agent channel error when patching a resource instance: {}", err.to_string()))?
+            .map_err(|err| anyhow::anyhow!("Agent channel error when patching a resource instance: {}", err))?
     }
 }
 

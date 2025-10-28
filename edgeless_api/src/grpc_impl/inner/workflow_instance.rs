@@ -47,7 +47,7 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             .await;
         match ret {
             Ok(ret) => return super::workflow_instance::parse_workflow_spawn_response(&ret.into_inner()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while starting a workflow: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while starting a workflow: {}", err)),
         }
     }
     async fn stop(&mut self, id: crate::workflow_instance::WorkflowId) -> anyhow::Result<()> {
@@ -57,7 +57,7 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             .await;
         match ret {
             Ok(_) => return Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while stopping a workflow: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while stopping a workflow: {}", err)),
         }
     }
     async fn list(&mut self) -> anyhow::Result<Vec<crate::workflow_instance::WorkflowId>> {
@@ -73,7 +73,7 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
                     })
                     .collect());
             }
-            Err(err) => Err(anyhow::anyhow!("Communication error while listing workflows: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while listing workflows: {}", err)),
         }
     }
     async fn inspect(&mut self, id: crate::workflow_instance::WorkflowId) -> anyhow::Result<crate::workflow_instance::WorkflowInfo> {
@@ -95,7 +95,7 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
 
                 return Ok(crate::workflow_instance::WorkflowInfo { request, status });
             }
-            Err(err) => Err(anyhow::anyhow!("Communication error while listing workflows: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while listing workflows: {}", err)),
         }
     }
     async fn domains(
@@ -108,7 +108,7 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             .await;
         match ret {
             Ok(ret) => return super::workflow_instance::parse_domain_capabilities_list(&ret.into_inner()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while listing workflows: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while listing workflows: {}", err)),
         }
     }
     async fn migrate(
@@ -123,7 +123,7 @@ impl crate::workflow_instance::WorkflowInstanceAPI for WorkflowInstanceAPIClient
             .await;
         match ret {
             Ok(ret) => return super::workflow_instance::parse_workflow_spawn_response(&ret.into_inner()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while migrating a workflow: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while migrating a workflow: {}", err)),
         }
     }
 }

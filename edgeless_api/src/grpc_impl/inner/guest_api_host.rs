@@ -47,25 +47,25 @@ impl crate::guest_api_host::GuestAPIHost for GuestAPIHostClient {
     async fn cast(&mut self, event: crate::guest_api_host::OutputEventData) -> anyhow::Result<()> {
         match self.client.cast(tonic::Request::new(serialize_output_event_data(&event))).await {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while casting an event: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while casting an event: {}", err)),
         }
     }
     async fn cast_raw(&mut self, event: crate::guest_api_host::OutputEventDataRaw) -> anyhow::Result<()> {
         match self.client.cast_raw(tonic::Request::new(serialize_output_event_data_raw(&event))).await {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while raw-casting an event: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while raw-casting an event: {}", err)),
         }
     }
     async fn call(&mut self, event: crate::guest_api_host::OutputEventData) -> anyhow::Result<crate::guest_api_function::CallReturn> {
         match self.client.call(tonic::Request::new(serialize_output_event_data(&event))).await {
             Ok(msg) => super::guest_api_function::parse_call_return(&msg.into_inner()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while calling a function: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while calling a function: {}", err)),
         }
     }
     async fn call_raw(&mut self, event: crate::guest_api_host::OutputEventDataRaw) -> anyhow::Result<crate::guest_api_function::CallReturn> {
         match self.client.call_raw(tonic::Request::new(serialize_output_event_data_raw(&event))).await {
             Ok(msg) => super::guest_api_function::parse_call_return(&msg.into_inner()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while raw-calling a function: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while raw-calling a function: {}", err)),
         }
     }
     async fn telemetry_log(&mut self, event: crate::guest_api_host::TelemetryLogEvent) -> anyhow::Result<()> {
@@ -75,28 +75,25 @@ impl crate::guest_api_host::GuestAPIHost for GuestAPIHostClient {
             .await
         {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!(
-                "Communication error while emitting a telemetry log event: {}",
-                err.to_string()
-            )),
+            Err(err) => Err(anyhow::anyhow!("Communication error while emitting a telemetry log event: {}", err)),
         }
     }
     async fn slf(&mut self) -> anyhow::Result<edgeless_api_core::instance_id::InstanceId> {
         match self.client.slf(tonic::Request::new(())).await {
             Ok(msg) => crate::grpc_impl::common::CommonConverters::parse_instance_id(&msg.into_inner()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while casting an event: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while casting an event: {}", err)),
         }
     }
     async fn delayed_cast(&mut self, event: crate::guest_api_host::DelayedEventData) -> anyhow::Result<()> {
         match self.client.delayed_cast(tonic::Request::new(serialize_delayed_event_data(&event))).await {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while casting a delayed event: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while casting a delayed event: {}", err)),
         }
     }
     async fn sync(&mut self, event: crate::guest_api_host::SyncData) -> anyhow::Result<()> {
         match self.client.sync(tonic::Request::new(serialize_sync_data(&event))).await {
             Ok(_) => Ok(()),
-            Err(err) => Err(anyhow::anyhow!("Communication error while synchronizing data: {}", err.to_string())),
+            Err(err) => Err(anyhow::anyhow!("Communication error while synchronizing data: {}", err)),
         }
     }
 }

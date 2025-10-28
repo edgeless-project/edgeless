@@ -181,8 +181,8 @@ impl TlsConfig {
             .ok_or_else(|| anyhow::anyhow!("TPM handle is required for TPM integration"))?;
 
         // Parse TPM handle from string to u32
-        let tpm_handle_value = if tpm_handle.starts_with("0x") {
-            u32::from_str_radix(&tpm_handle[2..], 16)?
+        let tpm_handle_value = if let Some(stripped) = tpm_handle.strip_prefix("0x") {
+            u32::from_str_radix(stripped, 16)?
         } else {
             tpm_handle.parse::<u32>()?
         };
@@ -256,13 +256,7 @@ impl TlsConfig {
     /// Returns a global client TLS configuration loaded from 'tls_config.toml'
     pub fn global_client() -> &'static TlsConfig {
         CLIENT_TLS_CONFIG.get_or_init(|| match CombinedTlsConfig::from_file("tls_config.toml") {
-            Ok(combined) => {
-                if let Some(client_cfg) = combined.client {
-                    client_cfg
-                } else {
-                    TlsConfig::default()
-                }
-            }
+            Ok(combined) => combined.client.unwrap_or_default(),
             Err(err) => {
                 if err.to_string().contains("not found") {
                     log::warn!("TLS configuration file 'tls_config.toml' not found. Using default TLS configuration (no TLS).");
@@ -285,7 +279,7 @@ pub struct ClientCertResolver {
 fn get_chain(client_cert_path: &Path, client_tpm_key_handle: u32) -> anyhow::Result<(Vec<CertificateDer<'static>>, TpmSigningKey)> {
     let certificates = load_certs(client_cert_path);
     let mut client_auth_roots = RootCertStore::empty();
-    for (_index, ca) in certificates.iter().enumerate() {
+    for ca in &certificates {
         client_auth_roots.add(ca.clone()).unwrap();
     }
 
@@ -335,13 +329,13 @@ fn make_ssl_conn(client_ca_path: &str, client_cert_path: &str, client_tpm_key_ha
     let certs = rustls_pemfile::certs(&mut buf)
         .collect::<Result<Vec<_>, _>>()
         .expect("Failed to parse certs");
-    roots.add_parsable_certificates(certs.into_iter());
+    roots.add_parsable_certificates(certs);
 
     let mut config = ClientConfig::builder()
         .with_root_certificates(roots) //Verify the SERVER using the Root CA previously provided
         .with_client_cert_resolver(Arc::new(ClientCertResolver {
             client_cert_path: client_cert_path.into(),
-            client_tpm_key_handle: client_tpm_key_handle,
+            client_tpm_key_handle,
         }));
     config.alpn_protocols = vec![b"h2".to_vec()];
     Arc::new(config)

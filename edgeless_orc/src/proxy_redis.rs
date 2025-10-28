@@ -915,7 +915,7 @@ mod test {
         assert_eq!(function_instances.len(), 10);
         for (_instance, nodes) in function_instances {
             assert_eq!(nodes.len(), 1);
-            assert!(nodes.first().is_some());
+            assert!(!nodes.is_empty());
             assert!(nodes.first().unwrap() == &node1_id);
         }
 
@@ -1129,12 +1129,12 @@ mod test {
         let mut nodes = std::collections::HashMap::new();
         let (mock_node_sender, _mock_node_receiver) = futures::channel::mpsc::unbounded::<crate::orchestrator::test::MockAgentEvent>();
         nodes.insert(
-            node_id.clone(),
+            node_id,
             crate::client_desc::ClientDesc {
                 agent_url: "http://127.0.0.1:10000".to_string(),
                 invocation_url: "http://127.0.0.1:10001".to_string(),
                 api: Box::new(crate::orchestrator::test::MockNode {
-                    node_id: node_id.clone(),
+                    node_id,
                     sender: mock_node_sender,
                 }) as Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
                 capabilities: edgeless_api::node_registration::NodeCapabilities::minimum(),
@@ -1146,7 +1146,7 @@ mod test {
         assert!(redis_proxy.updated(crate::proxy::Category::NodeCapabilities));
 
         let mut nodes_expected = std::collections::HashMap::new();
-        nodes_expected.insert(node_id.clone(), edgeless_api::node_registration::NodeCapabilities::minimum());
+        nodes_expected.insert(node_id, edgeless_api::node_registration::NodeCapabilities::minimum());
 
         assert_eq!(nodes_expected, redis_proxy.fetch_node_capabilities());
         assert!(!redis_proxy.updated(crate::proxy::Category::NodeCapabilities));
