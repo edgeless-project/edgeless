@@ -100,11 +100,12 @@ impl NodeSubscriber {
         let subscription_refresh_interval_sec = settings.subscription_refresh_interval_sec;
 
         let mut receiver = receiver;
-        let mut client = edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIClient::new(
+        let mut node_registration_api = edgeless_api::grpc_impl::outer::node_register::NodeRegisterAPIClient::new(
             node_register_url,
             Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_server().clone()),
         )
-        .await;
+        .await
+        .node_registration_api();
         let mut telemetry_performance_target = telemetry_performance_target;
 
         // Internal data structures to query system/process information.
@@ -151,7 +152,7 @@ impl NodeSubscriber {
                             function_log_entries: metrics.function_log_entries,
                         },
                     };
-                    match client.node_registration_api().update_node(update_node_request).await {
+                    match node_registration_api.update_node(update_node_request).await {
                         Ok(response) => {
                             if let edgeless_api::node_registration::UpdateNodeResponse::ResponseError(err) = response {
                                 log::error!("Update of node '{}' rejected by node register: {}", node_id, err);
