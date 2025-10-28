@@ -10,3 +10,7 @@ mod common;
 mod inner;
 pub mod outer;
 pub mod tls_config;
+#[cfg(not(target_os = "macos"))]
+pub mod tls_config_mtls;
+#[cfg(target_os = "macos")]
+pub mod tls_config_none;

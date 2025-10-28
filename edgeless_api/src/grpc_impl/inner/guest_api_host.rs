@@ -12,16 +12,8 @@ pub struct GuestAPIHostService {
 
 impl GuestAPIHostClient {
     pub async fn new(server_addr: &str, retry_interval: Option<u64>) -> anyhow::Result<Self> {
-        Self::new_with_tls(server_addr, retry_interval, None).await
-    }
-
-    pub async fn new_with_tls(
-        server_addr: &str,
-        retry_interval: Option<u64>,
-        tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>,
-    ) -> anyhow::Result<Self> {
         let server_addr = server_addr.to_string();
-        let tls_config = tls_config.unwrap_or_else(|| crate::grpc_impl::tls_config::TlsConfig::global_client().clone());
+        let tls_config = crate::grpc_impl::tls_config::TlsConfig::global_client();
 
         loop {
             match tls_config.create_client_channel(&server_addr).await {
