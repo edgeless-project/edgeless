@@ -79,16 +79,12 @@ pub struct InvocationAPIClient {
 
 impl InvocationAPIClient {
     pub async fn new(server_addr: &str) -> Self {
-        Self::new_with_tls(server_addr, None).await
-    }
-
-    pub async fn new_with_tls(server_addr: &str, tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>) -> Self {
         let server_addr = server_addr.to_string();
-        let tls_config = tls_config.unwrap_or_else(|| crate::grpc_impl::tls_config::TlsConfig::global_client().clone());
+        let tls_config = crate::grpc_impl::tls_config::TlsConfig::global_client();
 
         loop {
-            if tls_config.tpm_handle.is_some() && tls_config.client_cert_path.is_some() && tls_config.client_ca_path.is_some() {
-                log::info!("TLS enabled for InvocationAPI client with TPM integration");
+            if tls_config.is_tpm_enabled() {
+                log::info!("Created InvocationAPI client with TPM integration");
                 match tls_config.create_channel_with_tpm(&server_addr).await {
                     Ok(channel) => {
                         let client = crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient::new(channel)
@@ -100,7 +96,7 @@ impl InvocationAPIClient {
                     }
                 }
             } else {
-                log::info!("TLS enabled for InvocationAPI client");
+                log::info!("Created InvocationAPI client");
                 let client_tls_config = match tls_config.create_client_tls_config() {
                     Ok(cfg) => cfg,
                     Err(err) => {

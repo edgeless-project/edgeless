@@ -12,12 +12,8 @@ pub struct WorkflowInstanceAPIClient {
 
 impl WorkflowInstanceAPIClient {
     pub async fn new(server_addr: &str) -> Self {
-        Self::new_with_tls(server_addr, None).await
-    }
-
-    pub async fn new_with_tls(server_addr: &str, tls_config: Option<crate::grpc_impl::tls_config::TlsConfig>) -> Self {
         let server_addr = server_addr.to_string();
-        let tls_config = tls_config.unwrap_or_else(|| crate::grpc_impl::tls_config::TlsConfig::global_client().clone());
+        let tls_config = crate::grpc_impl::tls_config::TlsConfig::global_client();
 
         loop {
             match tls_config.create_client_channel(&server_addr).await {
