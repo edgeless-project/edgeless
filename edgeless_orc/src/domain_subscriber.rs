@@ -71,12 +71,12 @@ impl DomainSubscriber {
     ) {
         let mut receiver = receiver;
 
-        let mut client: edgeless_api::grpc_impl::outer::domain_register::DomainRegisterAPIClient =
-            edgeless_api::grpc_impl::outer::domain_register::DomainRegisterAPIClient::new(
-                controller_url,
-                Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_client().clone()),
-            )
-            .await;
+        let mut domain_registration_api = edgeless_api::grpc_impl::outer::domain_register::DomainRegisterAPIClient::new(
+            controller_url,
+            Some(edgeless_api::grpc_impl::tls_config::TlsConfig::global_client().clone()),
+        )
+        .await
+        .domain_registration_api();
         let mut last_caps = edgeless_api::domain_registration::DomainCapabilities::default();
         let mut counter = 0;
         let mut orc_sender = None;
@@ -93,7 +93,7 @@ impl DomainSubscriber {
                     orc_sender = Some(new_orc_sender);
                 }
                 DomainSubscriberRequest::Refresh() => {
-                    log::debug!("Subscriber Refresh");
+                    log::debug!("Domain Subscriber Refresh");
                     // The refresh deadline is set to twice the refresh period
                     // to reduce the likelihood of a race condition on the
                     // domain register side.
@@ -105,7 +105,7 @@ impl DomainSubscriber {
                         counter,
                         nonce,
                     };
-                    match client.domain_registration_api().update_domain(update_domain_request).await {
+                    match domain_registration_api.update_domain(update_domain_request).await {
                         Ok(response) => {
                             match response {
                                 edgeless_api::domain_registration::UpdateDomainResponse::ResponseError(err) => {
