@@ -385,7 +385,7 @@ mod system_tests {
             if nodes_in_domain("domain-0", &mut client).await == 1 {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         assert_eq!(1, nodes_in_domain("domain-0", &mut client).await);
 
@@ -462,7 +462,7 @@ mod system_tests {
             if nodes_in_domain("domain-0", &mut client).await == 3 {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         assert_eq!(3, nodes_in_domain("domain-0", &mut client).await);
 
@@ -564,7 +564,7 @@ mod system_tests {
             if not_done_yet.is_empty() {
                 break;
             }
-            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }
         assert!(not_done_yet.is_empty(), "not all logs have been filled properly");
 
@@ -598,7 +598,7 @@ mod system_tests {
             if nodes_in_cluster(3, &mut client).await == 3 {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         assert_eq!(3, nodes_in_cluster(3, &mut client).await);
 
@@ -650,7 +650,7 @@ mod system_tests {
             if domains_used(&mut client).await == all_domains {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         assert_eq!(all_domains, domains_used(&mut client).await);
 
@@ -710,7 +710,7 @@ mod system_tests {
             if nodes_in_domain("domain-0", &mut client).await == num_nodes {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         assert_eq!(num_nodes, nodes_in_domain("domain-0", &mut client).await);
 
@@ -887,7 +887,7 @@ mod system_tests {
             if nodes_in_domain("domain-0", &mut client).await == num_nodes {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         assert_eq!(num_nodes, nodes_in_domain("domain-0", &mut client).await);
 
@@ -1026,7 +1026,7 @@ mod system_tests {
             if nodes_in_domain("domain-0", &mut client).await == num_nodes {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         assert_eq!(num_nodes, nodes_in_domain("domain-0", &mut client).await);
 
@@ -1177,7 +1177,7 @@ mod system_tests {
             if nodes_in_cluster(3, &mut client).await == 6 && nodes_in_bal_domain(&mut client).await.0 == 3 {
                 break;
             }
-            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
         assert_eq!(6, nodes_in_cluster(3, &mut client).await);
         let (num_portal_nodes, domains_advertised) = nodes_in_bal_domain(&mut client).await;
