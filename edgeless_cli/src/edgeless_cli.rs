@@ -221,13 +221,13 @@ async fn main() -> anyhow::Result<()> {
                             Ok(response) => {
                                 match &response {
                                     SpawnWorkflowResponse::ResponseError(err) => {
-                                        println!("{:?}", err);
+                                        println!("{}", err.summary);
                                     }
                                     SpawnWorkflowResponse::WorkflowInstance(val) => {
                                         println!("{}", val.workflow_id.workflow_id);
                                     }
                                 }
-                                log::info!("{:?}", response)
+                                log::debug!("{:?}", response)
                             }
                             Err(err) => println!("{}", err),
                         }

@@ -29,7 +29,7 @@ pub struct WorkflowResource {
     /// provide standard outputs that must be mapped - consult the documentation
     /// to find out more.
     pub output_mapping: std::collections::HashMap<String, String>,
-    /// Key-value configuration of the resource instance.
+    /// Key-value configuration and annotations of the resource instance.
     pub configurations: std::collections::HashMap<String, String>,
 }
 

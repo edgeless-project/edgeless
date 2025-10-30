@@ -91,4 +91,49 @@ impl DeploymentRequirements {
             tpm,
         }
     }
+
+    /// Return true if the given node's characteristics are compatible with
+    /// these deployment requirements.
+    ///
+    /// Parameters:
+    /// - `node_id`: ID of this node.
+    /// - `capabilities`: capabilities of this node.
+    /// - `resource_providers`: resource providers offered by this node.
+    pub fn is_feasible(
+        &self,
+        node_id: &uuid::Uuid,
+        capabilities: &edgeless_api::node_registration::NodeCapabilities,
+        resource_providers: &std::collections::HashSet<String>,
+    ) -> bool {
+        if !self.node_id_match_any.is_empty() && !self.node_id_match_any.contains(node_id) {
+            return false;
+        }
+        for label in self.label_match_all.iter() {
+            if !capabilities.labels.contains(label) {
+                return false;
+            }
+        }
+        for provider in self.resource_match_all.iter() {
+            if !resource_providers.contains(provider) {
+                return false;
+            }
+        }
+        match self.tee {
+            crate::affinity_level::AffinityLevel::Required => {
+                if !capabilities.is_tee_running {
+                    return false;
+                }
+            }
+            crate::affinity_level::AffinityLevel::NotRequired => {}
+        }
+        match self.tpm {
+            crate::affinity_level::AffinityLevel::Required => {
+                if !capabilities.has_tpm {
+                    return false;
+                }
+            }
+            crate::affinity_level::AffinityLevel::NotRequired => {}
+        }
+        true
+    }
 }

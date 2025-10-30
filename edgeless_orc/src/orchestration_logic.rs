@@ -111,39 +111,7 @@ impl OrchestrationLogic {
         capabilities: &edgeless_api::node_registration::NodeCapabilities,
         resource_providers: &std::collections::HashSet<String>,
     ) -> bool {
-        if !capabilities.runtimes.iter().any(|x| x == runtime) {
-            return false;
-        }
-        if !reqs.node_id_match_any.is_empty() && !reqs.node_id_match_any.contains(node_id) {
-            return false;
-        }
-        for label in reqs.label_match_all.iter() {
-            if !capabilities.labels.contains(label) {
-                return false;
-            }
-        }
-        for provider in reqs.resource_match_all.iter() {
-            if !resource_providers.contains(provider) {
-                return false;
-            }
-        }
-        match reqs.tee {
-            crate::affinity_level::AffinityLevel::Required => {
-                if !capabilities.is_tee_running {
-                    return false;
-                }
-            }
-            crate::affinity_level::AffinityLevel::NotRequired => {}
-        }
-        match reqs.tpm {
-            crate::affinity_level::AffinityLevel::Required => {
-                if !capabilities.has_tpm {
-                    return false;
-                }
-            }
-            crate::affinity_level::AffinityLevel::NotRequired => {}
-        }
-        true
+        capabilities.runtimes.contains(&runtime.to_string()) && reqs.is_feasible(node_id, capabilities, resource_providers)
     }
 
     /// Select the next node on which a function instance should be spawned,
