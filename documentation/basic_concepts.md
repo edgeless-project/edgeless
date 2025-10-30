@@ -141,7 +141,8 @@ Resources contain the following elements:
 * The configuration of the resource instance (`configurations`). Each
   resource requires a specific set of key-values. For instance, the
   `http-ingress` resource shown in the example needs the host name
-  and type of HTTP command to match the incoming requests.
+  and type of HTTP command to match the incoming requests. _Deployment
+  requirements can be added here, see `annotations` for functions_
 
 The example above shows a workflow consisting of an http-ingress and two
 processing functions.

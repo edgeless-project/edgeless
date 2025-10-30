@@ -12,6 +12,15 @@ New features:
   each regular domain needs an ε-BAL, which also registers with the ε-ORC of
   the portal domain. The edgeless_cli is updated with a new command to migrate
   a single component of a workflow to a target domain.
+- Enable resource deployment constraints, which can be specified in the
+  `configurations` field using the same syntax as function's annotations.
+
+Improvements:
+
+- Refactor the workflow specifications so that the Rust field names match the
+  ones in the JSON encoding.
+- Add a `binary` field to the function specification dedicated to containing
+  the bytecode of WASM functions.
 
 API changes:
 

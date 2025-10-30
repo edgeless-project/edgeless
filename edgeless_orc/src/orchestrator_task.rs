@@ -195,7 +195,7 @@ impl OrchestratorTask {
             std::collections::HashSet::from_iter(origin_instances.iter().map(|x| &x.node_id));
         anyhow::ensure!(target_node_ids != origin_node_ids, "instance already running on the migration target(s)");
 
-        // Do the migration of the function of resource.
+        // Do the migration of the function or resource.
         if let Some(spawn_req) = spawn_req {
             // Filter out the unfeasible targets.
             let target_node_ids = self.orchestration_logic.feasible_nodes(&spawn_req, targets);
@@ -422,7 +422,12 @@ impl OrchestratorTask {
         self.resource_providers
             .iter()
             .filter_map(|(provider_id, provider)| {
-                if provider.class_type == resource_req.class_type && !cordoned_nodes.contains(&provider.node_id) {
+                let capabilities = &self.nodes.get(&provider.node_id).unwrap().capabilities;
+                let deployment_requirements = crate::deployment_requirements::DeploymentRequirements::from_annotations(&resource_req.configuration);
+                if provider.class_type == resource_req.class_type
+                    && !cordoned_nodes.contains(&provider.node_id)
+                    && deployment_requirements.is_feasible(&provider.node_id, capabilities, &std::collections::HashSet::default())
+                {
                     Some(provider_id.clone())
                 } else {
                     None
@@ -441,6 +446,14 @@ impl OrchestratorTask {
             if desc.cordoned {
                 return false;
             }
+        }
+        let capabilities = &self.nodes.get(node_id).unwrap().capabilities;
+        if !crate::deployment_requirements::DeploymentRequirements::from_annotations(&resource_req.configuration).is_feasible(
+            node_id,
+            capabilities,
+            &std::collections::HashSet::default(),
+        ) {
+            return false;
         }
         for provider in self.resource_providers.values() {
             if resource_req.class_type == provider.class_type && *node_id == provider.node_id {
