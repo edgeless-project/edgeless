@@ -13,8 +13,8 @@ function echo_g(){ echo -e "${CLR_GREEN}$*${CLR_RST}"; }
 function echo_y(){ echo -e "${CLR_YELLOW}$*${CLR_RST}"; }
 # =========================================================== 
 
-artifacts="build.log build_functions.log edgeless_bal.log edgeless_con.log edgeless_orc.log edgeless_node.log my-local-file.log reading-errors.log skipped.log err.log metric.log sqlite.db"
-confs="balancer.toml controller.toml orchestrator.toml node.toml cli.toml"
+artifacts="build.log build_functions.log edgeless_con.log edgeless_orc.log edgeless_node.log my-local-file.log out.log reading-errors.log skipped.log err.log metric.log sqlite.db"
+confs="controller.toml orchestrator.toml node.toml cli.toml"
 specialized_workflows="container dda_demo dda_test esp32_resources redis vector_mul matrix_mul ollama kafka_egress serverless"
 
 echo_y "> Checking for existing files"
@@ -54,7 +54,6 @@ fi
 
 echo
 echo_y "> Creating configuration files"
-target/debug/edgeless_bal_d -t balancer.toml
 target/debug/edgeless_con_d -t controller.toml
 target/debug/edgeless_orc_d -t orchestrator.toml
 target/debug/edgeless_node_d -t node.toml
@@ -63,8 +62,6 @@ target/debug/edgeless_cli -t cli.toml
 echo
 echo_y "> Starting orchestrator, controller, and a node"
 pids=()
-RUST_LOG=info target/debug/edgeless_bal_d >& edgeless_bal.log &
-pids+=($!)
 RUST_LOG=info target/debug/edgeless_con_d >& edgeless_con.log &
 pids+=($!)
 RUST_LOG=info target/debug/edgeless_orc_d >& edgeless_orc.log &
