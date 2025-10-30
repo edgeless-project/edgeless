@@ -299,12 +299,12 @@ impl ControllerTask {
         target_domain: &str,
     ) -> std::collections::HashMap<String, String> {
         let functions: std::collections::HashMap<String, String> = spawn_workflow_request
-            .workflow_functions
+            .functions
             .iter()
             .map(|function| (function.name.clone(), target_domain.to_string()))
             .collect();
         let mut resources: std::collections::HashMap<String, String> = spawn_workflow_request
-            .workflow_resources
+            .resources
             .iter()
             .map(|resource| (resource.name.clone(), target_domain.to_string()))
             .collect();
@@ -443,7 +443,7 @@ impl ControllerTask {
         let mut domain_assignments = domain_assignments;
         for new_resource in new_resources {
             domain_assignments.insert(new_resource.name.clone(), new_resource.domain);
-            augmented_spec.workflow_resources.push(edgeless_api::workflow_instance::WorkflowResource {
+            augmented_spec.resources.push(edgeless_api::workflow_instance::WorkflowResource {
                 name: new_resource.name,
                 class_type: String::from("portal"),
                 output_mapping: new_resource.output_mapping,
@@ -471,7 +471,7 @@ impl ControllerTask {
         //
 
         // Start the functions on the orchestration domain.
-        for function in &augmented_spec.workflow_functions {
+        for function in &augmented_spec.functions {
             if res.is_err() {
                 log::error!("Could not start a function {}", res.clone().unwrap_err());
                 break;
@@ -483,7 +483,7 @@ impl ControllerTask {
         }
 
         // Start the resources on the orchestration domain.
-        for resource in &augmented_spec.workflow_resources {
+        for resource in &augmented_spec.resources {
             if res.is_err() {
                 log::error!("Could not start a resource {}", res.clone().unwrap_err());
                 break;
@@ -967,12 +967,12 @@ impl ControllerTask {
     /// Return true if the given orchestration domain is compatible with the
     /// workflow request, i.e., it can host all its functions and resources.
     fn is_workflow_compatible(desc: &OrchestratorDesc, workflow: &edgeless_api::workflow_instance::SpawnWorkflowRequest) -> bool {
-        for function in &workflow.workflow_functions {
+        for function in &workflow.functions {
             if !Self::is_function_compatible(desc, function) {
                 return false;
             }
         }
-        for resource in &workflow.workflow_resources {
+        for resource in &workflow.resources {
             if !Self::is_resource_compatible(desc, resource) {
                 return false;
             }
@@ -982,9 +982,7 @@ impl ControllerTask {
 
     /// Return true if the given function is compatible with a domain.
     fn is_function_compatible(desc: &OrchestratorDesc, function: &edgeless_api::workflow_instance::WorkflowFunction) -> bool {
-        desc.capabilities
-            .runtimes
-            .contains(&function.function_class_specification.function_class_type)
+        desc.capabilities.runtimes.contains(&function.class_specification.function_type)
     }
 
     /// Return true if the given resource is compatible with a domain.
@@ -1013,7 +1011,7 @@ impl ControllerTask {
                 portal_desc.domains.len()
             );
 
-            for function in &workflow.workflow_functions {
+            for function in &workflow.functions {
                 let compatible_domains = self
                     .orchestrators
                     .iter()
@@ -1026,7 +1024,7 @@ impl ControllerTask {
                     return std::collections::HashMap::new();
                 }
             }
-            for resource in &workflow.workflow_resources {
+            for resource in &workflow.resources {
                 let compatible_domains = self
                     .orchestrators
                     .iter()
@@ -1211,7 +1209,7 @@ impl ControllerTask {
             .fn_client(domain)
             .ok_or(format!("No function client for domain: {}", domain))?
             .start(edgeless_api::function_instance::SpawnFunctionRequest {
-                code: function.function_class_specification.clone(),
+                spec: function.class_specification.clone(),
                 annotations: function.annotations.clone(),
                 state_specification: edgeless_api::function_instance::StateSpecification {
                     state_id: uuid::Uuid::new_v4(),
@@ -1352,19 +1350,20 @@ mod tests {
         assert_eq!(expected_state, actual_state);
 
         for i in 0..10 {
-            let workflow_functions = vec![edgeless_api::workflow_instance::WorkflowFunction {
+            let functions = vec![edgeless_api::workflow_instance::WorkflowFunction {
                 name: format!("f{}", i),
-                function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                    function_class_id: "test".to_string(),
-                    function_class_type: "RUST_WASM".to_string(),
-                    function_class_version: "0.1".to_string(),
-                    function_class_code: include_bytes!("../../../functions/system_test/system_test.wasm").to_vec(),
-                    function_class_outputs: vec!["out1".to_string(), "out2".to_string(), "err".to_string(), "log".to_string()],
+                class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                    id: "test".to_string(),
+                    function_type: "RUST_WASM".to_string(),
+                    version: "0.1".to_string(),
+                    binary: Some(include_bytes!("../../../functions/system_test/system_test.wasm").to_vec()),
+                    code: None,
+                    outputs: vec!["out1".to_string(), "out2".to_string(), "err".to_string(), "log".to_string()],
                 },
                 output_mapping: std::collections::HashMap::new(),
                 annotations: std::collections::HashMap::new(),
             }];
-            let workflow_resources = vec![edgeless_api::workflow_instance::WorkflowResource {
+            let resources = vec![edgeless_api::workflow_instance::WorkflowResource {
                 name: "log".to_string(),
                 class_type: "file-log".to_string(),
                 output_mapping: std::collections::HashMap::new(),
@@ -1372,8 +1371,8 @@ mod tests {
             }];
             let annotations = std::collections::HashMap::from([("ann1".to_string(), "val1".to_string())]);
             let request = SpawnWorkflowRequest {
-                workflow_functions,
-                workflow_resources,
+                functions,
+                resources,
                 annotations,
             };
             expected_state.workflows.push((uuid::Uuid::new_v4().to_string(), request));

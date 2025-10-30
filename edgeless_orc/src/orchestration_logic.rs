@@ -87,7 +87,7 @@ impl OrchestrationLogic {
         for candidate in nodes {
             if let Some(ndx) = self.nodes.iter().position(|&x| x == *candidate) {
                 if OrchestrationLogic::is_node_feasible(
-                    &spawn_req.code.function_class_type,
+                    &spawn_req.spec.function_type,
                     &crate::deployment_requirements::DeploymentRequirements::from_annotations(&spawn_req.annotations),
                     &self.nodes[ndx],
                     &self.capabilities[ndx],
@@ -162,7 +162,7 @@ impl OrchestrationLogic {
                 let mut high: f32 = 0.0;
                 for i in 0..self.nodes.len() {
                     if Self::is_node_feasible(
-                        &spawn_req.code.function_class_type,
+                        &spawn_req.spec.function_type,
                         &reqs,
                         &self.nodes[i],
                         &self.capabilities[i],
@@ -197,7 +197,7 @@ impl OrchestrationLogic {
                     self.round_robin_current_index += 1;
 
                     if Self::is_node_feasible(
-                        &spawn_req.code.function_class_type,
+                        &spawn_req.spec.function_type,
                         &reqs,
                         &self.nodes[cand_ndx],
                         &self.capabilities[cand_ndx],

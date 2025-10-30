@@ -28,7 +28,8 @@ pub trait FunctionInstance: Send + 'static {
         instance_id: &edgeless_api::function_instance::InstanceId,
         runtime_configuration: std::collections::HashMap<String, String>,
         guest_api_host: &mut Option<crate::base_runtime::guest_api::GuestAPIHost>,
-        code: &[u8],
+        binary: &[u8],
+        code: &str,
     ) -> Result<Box<Self>, FunctionInstanceError>;
     async fn init(&mut self, init_payload: Option<&str>, serialized_state: Option<&str>) -> Result<(), FunctionInstanceError>;
     async fn cast(&mut self, src: &edgeless_api::function_instance::InstanceId, msg: &str) -> Result<(), FunctionInstanceError>;

@@ -111,7 +111,7 @@ impl Rebalancer {
 
         let mut instances = self.proxy.fetch_function_instance_requests();
         for (lid, req) in &mut instances {
-            let runtime = req.code.function_class_type.clone();
+            let runtime = req.spec.function_type.clone();
             let deployment_requirements = edgeless_orc::deployment_requirements::DeploymentRequirements::from_annotations(&req.annotations);
 
             let feasible_nodes: Vec<_> = self

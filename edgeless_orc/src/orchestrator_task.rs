@@ -78,7 +78,7 @@ impl OrchestratorTask {
         while let Some(req) = self.receiver.next().await {
             match req {
                 crate::orchestrator::OrchestratorRequest::StartFunction(spawn_req, reply_channel) => {
-                    log::debug!("Orchestrator StartFunction {}", spawn_req.code.to_short_string());
+                    log::debug!("Orchestrator StartFunction {}", spawn_req.spec.to_short_string());
                     let res = self.start_function(&spawn_req).await;
                     if let Err(err) = reply_channel.send(res) {
                         log::error!("Orchestrator channel error in SPAWN: {:?}", err);
@@ -485,7 +485,7 @@ impl OrchestratorTask {
             }
             Err(err) => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                 edgeless_api::common::ResponseError {
-                    summary: format!("Could not start function {}", spawn_req.code.to_short_string()),
+                    summary: format!("Could not start function {}", spawn_req.spec.to_short_string()),
                     detail: Some(err.to_string()),
                 },
             )),

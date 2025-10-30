@@ -38,15 +38,17 @@ message StateSpecification {
 // Message defining the function class specification.
 message FunctionClassSpecification {
     // Function class identifier.
-    string function_class_id  = 1;
+    string id  = 1;
     // Run-time agent type this function is made for.
-    string function_class_type = 2;
+    string function_type = 2;
     // Function class version.
-    string function_class_version = 3;
-    // Inline function's code (if present).
-    optional bytes function_class_code = 4;
-    // Output channels in which the function may generate new. Can be empty.
-    repeated string function_class_outputs = 5;
+    string version = 3;
+    // Inline function's code. Can be empty.
+    bytes binary = 4;
+    // Code information, depends on the runtime.
+    string code = 5;
+    // Possible output channels. Can be empty.
+    repeated string outputs = 6;
 }
 
 // Message to request the creation a new function instance.

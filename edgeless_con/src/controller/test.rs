@@ -154,20 +154,21 @@ async fn single_function_start_stop() {
     assert!(mock_orc_receiver.try_next().is_err());
 
     let function_class_specification = edgeless_api::function_instance::FunctionClassSpecification {
-        function_class_id: "fc1".to_string(),
-        function_class_type: "RUST_WASM".to_string(),
-        function_class_version: "0.1".to_string(),
-        function_class_code: vec![],
-        function_class_outputs: vec![],
+        id: "fc1".to_string(),
+        function_type: "RUST_WASM".to_string(),
+        version: "0.1".to_string(),
+        binary: None,
+        code: None,
+        outputs: vec![],
     };
     let start_workflow_request = edgeless_api::workflow_instance::SpawnWorkflowRequest {
-        workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
+        functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
             name: "f1".to_string(),
-            function_class_specification: function_class_specification.clone(),
+            class_specification: function_class_specification.clone(),
             output_mapping: std::collections::HashMap::new(),
             annotations: std::collections::HashMap::new(),
         }],
-        workflow_resources: vec![],
+        resources: vec![],
         annotations: std::collections::HashMap::new(),
     };
     let response = wf_client.start(start_workflow_request).await.unwrap();
@@ -186,7 +187,7 @@ async fn single_function_start_stop() {
     assert!(new_func_id.is_nil());
     if let MockFunctionInstanceEvent::StartFunction((id, spawn_req)) = mock_orc_receiver.try_next().unwrap().unwrap() {
         new_func_id = id;
-        assert_eq!(function_class_specification, spawn_req.code);
+        assert_eq!(function_class_specification, spawn_req.spec);
         assert!(spawn_req.annotations.is_empty());
         // TODO check state specifications
     } else {
@@ -216,19 +217,20 @@ async fn resource_to_function_start_stop() {
 
     let response = wf_client
         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-            workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
+            functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
                 name: "f1".to_string(),
-                function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                    function_class_id: "fc1".to_string(),
-                    function_class_type: "RUST_WASM".to_string(),
-                    function_class_version: "0.1".to_string(),
-                    function_class_code: vec![],
-                    function_class_outputs: vec![],
+                class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                    id: "fc1".to_string(),
+                    function_type: "RUST_WASM".to_string(),
+                    version: "0.1".to_string(),
+                    binary: None,
+                    code: None,
+                    outputs: vec![],
                 },
                 output_mapping: std::collections::HashMap::new(),
                 annotations: std::collections::HashMap::new(),
             }],
-            workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
+            resources: vec![edgeless_api::workflow_instance::WorkflowResource {
                 name: "r1".to_string(),
                 class_type: "test-res".to_string(),
                 output_mapping: std::collections::HashMap::from([("test_out".to_string(), "f1".to_string())]),
@@ -318,33 +320,35 @@ async fn function_link_loop_start_stop() {
 
     let response = wf_client
         .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-            workflow_functions: vec![
+            functions: vec![
                 edgeless_api::workflow_instance::WorkflowFunction {
                     name: "f1".to_string(),
-                    function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                        function_class_id: "fc1".to_string(),
-                        function_class_type: "RUST_WASM".to_string(),
-                        function_class_version: "0.1".to_string(),
-                        function_class_code: vec![],
-                        function_class_outputs: vec!["output-1".to_string()],
+                    class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                        id: "fc1".to_string(),
+                        function_type: "RUST_WASM".to_string(),
+                        version: "0.1".to_string(),
+                        binary: None,
+                        code: None,
+                        outputs: vec!["output-1".to_string()],
                     },
                     output_mapping: std::collections::HashMap::from([("output-1".to_string(), "f2".to_string())]),
                     annotations: std::collections::HashMap::new(),
                 },
                 edgeless_api::workflow_instance::WorkflowFunction {
                     name: "f2".to_string(),
-                    function_class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                        function_class_id: "fc2".to_string(),
-                        function_class_type: "RUST_WASM".to_string(),
-                        function_class_version: "0.1".to_string(),
-                        function_class_code: vec![],
-                        function_class_outputs: vec!["output-2".to_string()],
+                    class_specification: edgeless_api::function_instance::FunctionClassSpecification {
+                        id: "fc2".to_string(),
+                        function_type: "RUST_WASM".to_string(),
+                        version: "0.1".to_string(),
+                        binary: None,
+                        code: None,
+                        outputs: vec!["output-2".to_string()],
                     },
                     output_mapping: std::collections::HashMap::from([("output-2".to_string(), "f1".to_string())]),
                     annotations: std::collections::HashMap::new(),
                 },
             ],
-            workflow_resources: vec![],
+            resources: vec![],
             annotations: std::collections::HashMap::new(),
         })
         .await

@@ -334,12 +334,13 @@ async fn clear_events(receivers: &mut std::collections::HashMap<uuid::Uuid, futu
 
 fn make_spawn_function_request(class_id: &str) -> edgeless_api::function_instance::SpawnFunctionRequest {
     edgeless_api::function_instance::SpawnFunctionRequest {
-        code: FunctionClassSpecification {
-            function_class_id: class_id.to_string(),
-            function_class_type: "RUST_WASM".to_string(),
-            function_class_version: "0.1".to_string(),
-            function_class_code: "function_code".as_bytes().to_vec(),
-            function_class_outputs: vec![],
+        spec: FunctionClassSpecification {
+            id: class_id.to_string(),
+            function_type: "RUST_WASM".to_string(),
+            version: "0.1".to_string(),
+            binary: Some("function_code".as_bytes().to_vec()),
+            code: None,
+            outputs: vec![],
         },
         annotations: std::collections::HashMap::new(),
         state_specification: StateSpecification {
@@ -818,7 +819,7 @@ async fn test_orc_node_with_fun_disconnects() {
                     assert_eq!(node_id, new_instance_id.node_id);
                     new_node_id = new_instance_id.node_id;
                     pid_2 = new_instance_id.function_id;
-                    assert_eq!("f2", spawn_req_rcvd.code.function_class_id);
+                    assert_eq!("f2", spawn_req_rcvd.spec.id);
                 }
                 MockAgentEvent::PatchFunction(patch_request) => {
                     log::info!("patch-function");
@@ -1356,7 +1357,7 @@ async fn test_orc_recreate_fun_after_disconnect() {
             match event {
                 MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd)) => {
                     log::info!("{:?}", spawn_req_rcvd);
-                    assert_eq!("f2", spawn_req_rcvd.code.function_class_id);
+                    assert_eq!("f2", spawn_req_rcvd.spec.id);
                 }
                 MockAgentEvent::PatchFunction(patch_request) => assert!(patch_request.output_mapping.contains_key("out")),
                 MockAgentEvent::UpdatePeers(_update) => {
@@ -1487,7 +1488,7 @@ async fn test_orc_migrate_function() {
         let (node_id, event) = wait_for_event_multiple(&mut setup.nodes).await;
         match event {
             MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd)) => {
-                assert_eq!("fc-1", spawn_req_rcvd.code.function_class_id);
+                assert_eq!("fc-1", spawn_req_rcvd.spec.id);
                 assert_eq!(another_node, node_id);
             }
             MockAgentEvent::StopFunction(_new_instance_id) => {
@@ -2149,6 +2150,6 @@ fn test_orc_feasible_nodes() {
         .insert("node_id_match_any".to_string(), all_nodes.first().unwrap().to_string());
 
     // Wrong run-time
-    fun1_req.code.function_class_type = "non-existing-runtime".to_string();
+    fun1_req.spec.function_type = "non-existing-runtime".to_string();
     assert!(logic.feasible_nodes(&fun1_req, &all_nodes).is_empty());
 }

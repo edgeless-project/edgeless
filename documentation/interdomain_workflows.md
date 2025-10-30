@@ -49,7 +49,7 @@ for the example is illustrated below.
 
 ## Orchestration
 
-Even if a portal domain is availale, the ε-CON always tries to assign all the
+Even if a portal domain is available, the ε-CON always tries to assign all the
 functions/resources of a workflow to the same domain.
 
 Workflows are only deployed across multiple domains if a single domain cannot
