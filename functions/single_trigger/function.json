@@ -1,7 +1,7 @@
 {
     "id": "single_trigger",
     "function_type": "RUST_WASM",
-    "version": "0.1",
+    "version": "0.2",
     "build": "Cargo.toml",
     "outputs": [
         "out"

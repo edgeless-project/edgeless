@@ -1,0 +1,151 @@
+{
+    "functions": [
+        {
+            "name": "single_trigger-1",
+            "class_specification": {
+                "id": "single_trigger",
+                "function_type": "RUST_WASM",
+                "version": "0.2",
+                "code": "../../functions/single_trigger/single_trigger.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "load_balance"
+            },
+            "annotations": {
+                "init-payload": "delay_ms=1000,message=trigger1"
+            }
+        },
+        {
+            "name": "single_trigger-2",
+            "class_specification": {
+                "id": "single_trigger",
+                "function_type": "RUST_WASM",
+                "version": "0.2",
+                "code": "../../functions/single_trigger/single_trigger.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "load_balance"
+            },
+            "annotations": {
+                "init-payload": "delay_ms=1000,message=trigger2"
+            }
+        },
+        {
+            "name": "single_trigger-3",
+            "class_specification": {
+                "id": "single_trigger",
+                "function_type": "RUST_WASM",
+                "version": "0.2",
+                "code": "../../functions/single_trigger/single_trigger.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "load_balance"
+            },
+            "annotations": {
+                "init-payload": "delay_ms=1000,message=trigger3"
+            }
+        },
+        {
+            "name": "load_balance",
+            "class_specification": {
+                "id": "load_balance",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/load_balance/load_balance.wasm",
+                "outputs": []
+            },
+            "output_mapping": {
+                "out1": "sloppy_test-1",
+                "out2": "sloppy_test-2",
+                "out3": "sloppy_test-3"
+            },
+            "annotations": {
+                "init-payload": "num_outputs=3"
+            }
+        },
+        {
+            "name": "sloppy_test-1",
+            "class_specification": {
+                "id": "sloppy_test",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/sloppy_test/sloppy_test.wasm",
+                "outputs": []
+            },
+            "output_mapping": {
+                "out": "dup"
+            },
+            "annotations": {
+                "init-payload": "delay_ms=1000"
+            }
+        },
+        {
+            "name": "sloppy_test-2",
+            "class_specification": {
+                "id": "sloppy_test",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/sloppy_test/sloppy_test.wasm",
+                "outputs": []
+            },
+            "output_mapping": {
+                "out": "dup"
+            },
+            "annotations": {
+                "init-payload": "delay_ms=1000"
+            }
+        },
+        {
+            "name": "sloppy_test-3",
+            "class_specification": {
+                "id": "sloppy_test",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/sloppy_test/sloppy_test.wasm",
+                "outputs": []
+            },
+            "output_mapping": {
+                "out": "dup"
+            },
+            "annotations": {
+                "init-payload": "delay_ms=1000"
+            }
+        },
+        {
+            "name": "dup",
+            "class_specification": {
+                "id": "dup",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../../functions/dup/dup.wasm",
+                "outputs": []
+            },
+            "output_mapping": {
+                "out1": "load_balance",
+                "out2": "file-log"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "file-log",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "out.log",
+                "add-timestamp": "true"
+            }
+        }
+    ],
+    "annotations": {}
+}

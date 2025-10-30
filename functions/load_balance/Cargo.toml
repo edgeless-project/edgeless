@@ -1,6 +1,5 @@
-# SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+# SPDX-FileCopyrightText: © 2025 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 # SPDX-License-Identifier: MIT
-
 [workspace]
 
 [profile.dev]
@@ -14,13 +13,13 @@ codegen-units = 1
 strip = true
 
 [package]
-name = "single_trigger"
-version = "0.2.0"
+name = "load_balance"
+version = "0.1.0"
 authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it>"]
 edition = "2021"
 
 [lib]
-name = "single_trigger"
+name = "load_balance"
 path = "src/lib.rs"
 crate-type = ["cdylib"]
 

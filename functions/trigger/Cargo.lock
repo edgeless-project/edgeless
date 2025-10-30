@@ -22,8 +22,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b5e6163cb8c49088c2c36f57875e58ccd8c87c7427f7fbd50ea6710b2f3f2e8f"
 
 [[package]]
-name = "single_trigger"
-version = "0.1.0"
+name = "trigger"
+version = "0.2.0"
 dependencies = [
  "base64",
  "edgeless_function",
