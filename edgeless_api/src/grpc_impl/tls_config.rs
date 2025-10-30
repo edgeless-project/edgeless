@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2025 Miguel Mesa-Simon <miguelangel.mesasimon@infineon.com>
+// SPDX-License-Identifier: MIT
+
 #[derive(Debug, serde::Deserialize, Clone)]
 pub struct TlsConfig {
     /// Path to the Server's Cert
