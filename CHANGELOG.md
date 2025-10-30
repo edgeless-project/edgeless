@@ -14,6 +14,8 @@ New features:
   a single component of a workflow to a target domain.
 - Enable resource deployment constraints, which can be specified in the
   `configurations` field using the same syntax as function's annotations.
+- Add function load_balance, which serves incoming messages in a round-robin
+  fashion. The number of outputs is configured in the `init-payload` annotation.
 
 Improvements:
 
@@ -21,6 +23,8 @@ Improvements:
   ones in the JSON encoding.
 - Add a `binary` field to the function specification dedicated to containing
   the bytecode of WASM functions.
+- Release version 0.2 of single_trigger, which now has the option of waiting an
+  initial delay before sending out the trigger
 
 API changes:
 
