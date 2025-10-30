@@ -277,11 +277,12 @@ mod system_tests {
 
     fn fixture_spec() -> edgeless_api::function_instance::FunctionClassSpecification {
         edgeless_api::function_instance::FunctionClassSpecification {
-            function_class_id: "system_test".to_string(),
-            function_class_type: "RUST_WASM".to_string(),
-            function_class_version: "0.1".to_string(),
-            function_class_code: include_bytes!("../../functions/system_test/system_test.wasm").to_vec(),
-            function_class_outputs: vec!["out1".to_string(), "out2".to_string(), "err".to_string(), "log".to_string()],
+            id: "system_test".to_string(),
+            function_type: "RUST_WASM".to_string(),
+            version: "0.1".to_string(),
+            binary: Some(include_bytes!("../../functions/system_test/system_test.wasm").to_vec()),
+            code: None,
+            outputs: vec!["out1".to_string(), "out2".to_string(), "err".to_string(), "log".to_string()],
         }
     }
 
@@ -311,13 +312,13 @@ mod system_tests {
         for i in 0..n {
             if let Ok(res) = client
                 .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                    workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
+                    functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
                         name: "f1".to_string(),
-                        function_class_specification: fixture_spec(),
+                        class_specification: fixture_spec(),
                         output_mapping: std::collections::HashMap::new(),
                         annotations: std::collections::HashMap::new(),
                     }],
-                    workflow_resources: vec![],
+                    resources: vec![],
                     annotations: std::collections::HashMap::new(),
                 })
                 .await
@@ -343,8 +344,8 @@ mod system_tests {
         for i in 0..n {
             if let Ok(res) = client
                 .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                    workflow_functions: vec![],
-                    workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
+                    functions: vec![],
+                    resources: vec![edgeless_api::workflow_instance::WorkflowResource {
                         name: "log".to_string(),
                         class_type: "file-log".to_string(),
                         output_mapping: std::collections::HashMap::new(),
@@ -393,13 +394,13 @@ mod system_tests {
         for _ in 0..10 {
             let res = client
                 .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                    workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
+                    functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
                         name: "f1".to_string(),
-                        function_class_specification: fixture_spec(),
+                        class_specification: fixture_spec(),
                         output_mapping: std::collections::HashMap::new(),
                         annotations: std::collections::HashMap::new(),
                     }],
-                    workflow_resources: vec![],
+                    resources: vec![],
                     annotations: std::collections::HashMap::new(),
                 })
                 .await;
@@ -481,10 +482,10 @@ mod system_tests {
         for workflow_i in 0..num_workflows {
             let res = client
                 .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                    workflow_functions: vec![
+                    functions: vec![
                         edgeless_api::workflow_instance::WorkflowFunction {
                             name: "f1".to_string(),
-                            function_class_specification: fixture_spec(),
+                            class_specification: fixture_spec(),
                             output_mapping: std::collections::HashMap::from([
                                 ("out1".to_string(), "f2".to_string()),
                                 ("out2".to_string(), "f3".to_string()),
@@ -494,18 +495,18 @@ mod system_tests {
                         },
                         edgeless_api::workflow_instance::WorkflowFunction {
                             name: "f2".to_string(),
-                            function_class_specification: fixture_spec(),
+                            class_specification: fixture_spec(),
                             output_mapping: std::collections::HashMap::from([("log".to_string(), "log".to_string())]),
                             annotations: std::collections::HashMap::new(),
                         },
                         edgeless_api::workflow_instance::WorkflowFunction {
                             name: "f3".to_string(),
-                            function_class_specification: fixture_spec(),
+                            class_specification: fixture_spec(),
                             output_mapping: std::collections::HashMap::from([("log".to_string(), "log".to_string())]),
                             annotations: std::collections::HashMap::new(),
                         },
                     ],
-                    workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
+                    resources: vec![edgeless_api::workflow_instance::WorkflowResource {
                         name: "log".to_string(),
                         class_type: "file-log".to_string(),
                         output_mapping: std::collections::HashMap::new(),
@@ -608,13 +609,13 @@ mod system_tests {
             let err_str = format!("wf#{}, nodes in cluster {}", wf_i, nodes_in_cluster(3, &mut client).await);
             let res = client
                 .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                    workflow_functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
+                    functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
                         name: "f1".to_string(),
-                        function_class_specification: fixture_spec(),
+                        class_specification: fixture_spec(),
                         output_mapping: std::collections::HashMap::new(),
                         annotations: std::collections::HashMap::new(),
                     }],
-                    workflow_resources: vec![],
+                    resources: vec![],
                     annotations: std::collections::HashMap::new(),
                 })
                 .await;
@@ -724,10 +725,10 @@ mod system_tests {
         cleanup();
         let res = client
             .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                workflow_functions: vec![
+                functions: vec![
                     edgeless_api::workflow_instance::WorkflowFunction {
                         name: "f1".to_string(),
-                        function_class_specification: fixture_spec(),
+                        class_specification: fixture_spec(),
                         output_mapping: std::collections::HashMap::from([
                             ("out1".to_string(), "f2".to_string()),
                             ("out2".to_string(), "f3".to_string()),
@@ -736,18 +737,18 @@ mod system_tests {
                     },
                     edgeless_api::workflow_instance::WorkflowFunction {
                         name: "f2".to_string(),
-                        function_class_specification: fixture_spec(),
+                        class_specification: fixture_spec(),
                         output_mapping: std::collections::HashMap::from([("log".to_string(), "log".to_string())]),
                         annotations: std::collections::HashMap::new(),
                     },
                     edgeless_api::workflow_instance::WorkflowFunction {
                         name: "f3".to_string(),
-                        function_class_specification: fixture_spec(),
+                        class_specification: fixture_spec(),
                         output_mapping: std::collections::HashMap::from([("log".to_string(), "log".to_string())]),
                         annotations: std::collections::HashMap::new(),
                     },
                 ],
-                workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
+                resources: vec![edgeless_api::workflow_instance::WorkflowResource {
                     name: "log".to_string(),
                     class_type: "file-log".to_string(),
                     output_mapping: std::collections::HashMap::new(),
@@ -1188,21 +1189,21 @@ mod system_tests {
         let workflow = workflow_response_or_panic(
             client
                 .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
-                    workflow_functions: vec![
+                    functions: vec![
                         edgeless_api::workflow_instance::WorkflowFunction {
                             name: "f1".to_string(),
-                            function_class_specification: fixture_spec(),
+                            class_specification: fixture_spec(),
                             output_mapping: std::collections::HashMap::from([("out1".to_string(), "f2".to_string())]),
                             annotations: std::collections::HashMap::from([("init-payload".to_string(), "8".to_string())]),
                         },
                         edgeless_api::workflow_instance::WorkflowFunction {
                             name: "f2".to_string(),
-                            function_class_specification: fixture_spec(),
+                            class_specification: fixture_spec(),
                             output_mapping: std::collections::HashMap::from([("out1".to_string(), "log".to_string())]),
                             annotations: std::collections::HashMap::new(),
                         },
                     ],
-                    workflow_resources: vec![edgeless_api::workflow_instance::WorkflowResource {
+                    resources: vec![edgeless_api::workflow_instance::WorkflowResource {
                         name: "log".to_string(),
                         class_type: "file-log".to_string(),
                         output_mapping: std::collections::HashMap::new(),

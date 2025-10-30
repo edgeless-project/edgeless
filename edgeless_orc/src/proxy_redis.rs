@@ -846,12 +846,13 @@ mod test {
                 logical_physical_ids.last().unwrap().0,
                 crate::active_instance::ActiveInstance::Function(
                     SpawnFunctionRequest {
-                        code: edgeless_api::function_instance::FunctionClassSpecification {
-                            function_class_id: "fun".to_string(),
-                            function_class_type: "class".to_string(),
-                            function_class_version: "1.0".to_string(),
-                            function_class_code: vec![],
-                            function_class_outputs: vec!["out1".to_string(), "out2".to_string()],
+                        spec: edgeless_api::function_instance::FunctionClassSpecification {
+                            id: "fun".to_string(),
+                            function_type: "class".to_string(),
+                            version: "1.0".to_string(),
+                            binary: None,
+                            code: None,
+                            outputs: vec!["out1".to_string(), "out2".to_string()],
                         },
                         annotations: std::collections::HashMap::new(),
                         state_specification: edgeless_api::function_instance::StateSpecification {

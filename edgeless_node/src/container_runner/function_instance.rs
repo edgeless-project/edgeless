@@ -22,9 +22,10 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
         instance_id: &edgeless_api::function_instance::InstanceId,
         runtime_configuration: std::collections::HashMap<String, String>,
         _guest_api_host: &mut Option<crate::base_runtime::guest_api::GuestAPIHost>,
-        code: &[u8],
+        _binary: &[u8],
+        code: &str,
     ) -> Result<Box<Self>, crate::base_runtime::FunctionInstanceError> {
-        let fun_spec = String::from_utf8(code.to_vec()).unwrap_or_default();
+        let fun_spec = code.to_string();
         log::info!("container run-time: instantiate {}", fun_spec);
 
         // Assume the fun_spec is one of (examples):

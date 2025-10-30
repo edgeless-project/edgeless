@@ -28,7 +28,8 @@ struct FunctionInstanceTask<FunctionInstanceType: FunctionInstance> {
     guest_api_host: Option<super::guest_api::GuestAPIHost>,
     telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
     guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
-    code: Vec<u8>,
+    binary: Vec<u8>,
+    code: String,
     data_plane: edgeless_dataplane::handle::DataplaneHandle,
     serialized_state: Option<String>,
     init_payload: Option<String>,
@@ -72,7 +73,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
                 telemetry_handle,
                 guest_api_host_register,
                 guest_api_host,
-                spawn_req.code.function_class_code.clone(),
+                spawn_req.spec.binary.clone().unwrap_or_default(),
+                spawn_req.spec.code.clone().unwrap_or_default(),
                 data_plane,
                 serialized_state,
                 spawn_req.annotations.get("init-payload").cloned(),
@@ -116,7 +118,8 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
         telemetry_handle: Box<dyn edgeless_telemetry::telemetry_events::TelemetryHandleAPI>,
         guest_api_host_register: std::sync::Arc<tokio::sync::Mutex<Box<dyn super::runtime::GuestAPIHostRegister + Send>>>,
         guest_api_host: super::guest_api::GuestAPIHost,
-        code: Vec<u8>,
+        binary: Vec<u8>,
+        code: String,
         data_plane: edgeless_dataplane::handle::DataplaneHandle,
         serialized_state: Option<String>,
         init_param: Option<String>,
@@ -130,6 +133,7 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             guest_api_host: Some(guest_api_host),
             telemetry_handle,
             guest_api_host_register,
+            binary,
             code,
             data_plane,
             serialized_state,
@@ -168,8 +172,16 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceTask<FunctionInstan
             runtime_configuration = register.configuration();
         }
 
-        self.function_instance =
-            Some(FunctionInstanceType::instantiate(&self.instance_id, runtime_configuration, &mut self.guest_api_host.take(), &self.code).await?);
+        self.function_instance = Some(
+            FunctionInstanceType::instantiate(
+                &self.instance_id,
+                runtime_configuration,
+                &mut self.guest_api_host.take(),
+                &self.binary,
+                &self.code,
+            )
+            .await?,
+        );
 
         self.telemetry_handle.observe(
             edgeless_telemetry::telemetry_events::TelemetryEvent::FunctionInstantiate(start.elapsed()),

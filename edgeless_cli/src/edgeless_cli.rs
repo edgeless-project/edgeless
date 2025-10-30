@@ -3,7 +3,6 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-mod workflow_spec;
 use cargo::GlobalContext;
 use clap::Parser;
 use edgeless_api::{outer::controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
@@ -151,9 +150,9 @@ async fn workflow_inspect(wf_client: &mut Box<dyn edgeless_api::workflow_instanc
     anyhow::ensure!(info.is_some(), "unknown or invalid workflow {}", id);
     let info = info.unwrap();
     assert_eq!(id, info.status.workflow_id.to_string());
-    for fun in info.request.workflow_functions {
+    for fun in info.request.functions {
         println!("* function {}", fun.name);
-        println!("{}", fun.function_class_specification.to_short_string());
+        println!("{}", fun.class_specification.to_short_string());
         for (out, next) in fun.output_mapping {
             println!("OUT {} -> {}", out, next);
         }
@@ -161,7 +160,7 @@ async fn workflow_inspect(wf_client: &mut Box<dyn edgeless_api::workflow_instanc
             println!("F_ANN {} -> {}", name, annotation);
         }
     }
-    for res in info.request.workflow_resources {
+    for res in info.request.resources {
         println!("* resource {}", res.name);
         println!("{}", res.class_type);
         for (out, next) in res.output_mapping {
@@ -211,7 +210,7 @@ async fn main() -> anyhow::Result<()> {
                     WorkflowCommands::Start { spec_file } => {
                         log::debug!("Start Workflow");
 
-                        let workflow_spec: edgeless_cli::workflow_spec::WorkflowSpec =
+                        let workflow_spec: edgeless_api::workflow_instance::SpawnWorkflowRequest =
                             serde_json::from_str(&std::fs::read_to_string(spec_file.clone()).unwrap()).unwrap();
                         let parent_path = std::path::Path::new(&spec_file)
                             .parent()
@@ -303,7 +302,8 @@ async fn main() -> anyhow::Result<()> {
                     let cargo_project_path = spec_file_path.parent().unwrap().to_path_buf();
                     let cargo_manifest = cargo_project_path.join("Cargo.toml");
 
-                    let function_spec: workflow_spec::WorkflowSpecFunctionClass = serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
+                    let function_spec: edgeless_api::function_instance::FunctionClassSpecification =
+                        serde_json::from_str(&std::fs::read_to_string(spec_file.clone())?)?;
                     let build_dir = std::env::temp_dir().join(format!("edgeless-{}-{}", function_spec.id, uuid::Uuid::new_v4()));
 
                     let context = GlobalContext::default().expect("Could not construct a global context for the workspace");

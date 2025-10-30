@@ -218,11 +218,16 @@ pub fn parse_function_class_specification(
     api_spec: &grpc_stubs::FunctionClassSpecification,
 ) -> anyhow::Result<crate::function_instance::FunctionClassSpecification> {
     Ok(crate::function_instance::FunctionClassSpecification {
-        function_class_id: api_spec.function_class_id.clone(),
-        function_class_type: api_spec.function_class_type.clone(),
-        function_class_version: api_spec.function_class_version.clone(),
-        function_class_code: api_spec.function_class_code().to_vec(),
-        function_class_outputs: api_spec.function_class_outputs.clone(),
+        id: api_spec.id.clone(),
+        function_type: api_spec.function_type.clone(),
+        version: api_spec.version.clone(),
+        binary: if api_spec.binary.is_empty() {
+            None
+        } else {
+            Some(api_spec.binary.clone())
+        },
+        code: if api_spec.code.is_empty() { None } else { Some(api_spec.code.clone()) },
+        outputs: api_spec.outputs.clone(),
     })
 }
 
@@ -230,7 +235,7 @@ pub fn parse_spawn_function_request(
     api_request: &crate::grpc_impl::api::SpawnFunctionRequest,
 ) -> anyhow::Result<crate::function_instance::SpawnFunctionRequest> {
     Ok(crate::function_instance::SpawnFunctionRequest {
-        code: parse_function_class_specification(match api_request.code.as_ref() {
+        spec: parse_function_class_specification(match api_request.code.as_ref() {
             Some(val) => val,
             None => {
                 return Err(anyhow::anyhow!("Request does not contain actor class."));
@@ -264,17 +269,18 @@ pub fn serialize_function_class_specification(
     spec: &crate::function_instance::FunctionClassSpecification,
 ) -> crate::grpc_impl::api::FunctionClassSpecification {
     crate::grpc_impl::api::FunctionClassSpecification {
-        function_class_id: spec.function_class_id.clone(),
-        function_class_type: spec.function_class_type.clone(),
-        function_class_version: spec.function_class_version.clone(),
-        function_class_code: Some(spec.function_class_code.clone()),
-        function_class_outputs: spec.function_class_outputs.clone(),
+        id: spec.id.clone(),
+        function_type: spec.function_type.clone(),
+        version: spec.version.clone(),
+        binary: spec.binary.clone().unwrap_or_default(),
+        code: spec.code.clone().unwrap_or_default(),
+        outputs: spec.outputs.clone(),
     }
 }
 
 pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFunctionRequest) -> crate::grpc_impl::api::SpawnFunctionRequest {
     crate::grpc_impl::api::SpawnFunctionRequest {
-        code: Some(serialize_function_class_specification(&req.code)),
+        code: Some(serialize_function_class_specification(&req.spec)),
         annotations: req.annotations.clone(),
         state_specification: Some(serialize_state_specification(&req.state_specification)),
         workflow_id: req.workflow_id.clone(),
@@ -305,12 +311,13 @@ mod tests {
     #[test]
     fn serialize_deserialize_spawn_function_request() {
         let messages = vec![SpawnFunctionRequest {
-            code: FunctionClassSpecification {
-                function_class_id: "my-func-id".to_string(),
-                function_class_type: "WASM".to_string(),
-                function_class_version: "1.0.0".to_string(),
-                function_class_code: "binary-code".as_bytes().to_vec(),
-                function_class_outputs: vec!["out".to_string(), "err".to_string()],
+            spec: FunctionClassSpecification {
+                id: "my-func-id".to_string(),
+                function_type: "WASM".to_string(),
+                version: "1.0.0".to_string(),
+                binary: Some("binary-code".as_bytes().to_vec()),
+                code: Some("code-location".to_string()),
+                outputs: vec!["out".to_string(), "err".to_string()],
             },
             annotations: std::collections::HashMap::from([("key1".to_string(), "value1".to_string())]),
             state_specification: StateSpecification {

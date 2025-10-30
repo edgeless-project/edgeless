@@ -244,7 +244,7 @@ fn parse_workflow_id(api_id: &crate::grpc_impl::api::WorkflowId) -> anyhow::Resu
 fn parse_workflow_function(api_function: &crate::grpc_impl::api::WorkflowFunction) -> anyhow::Result<crate::workflow_instance::WorkflowFunction> {
     Ok(crate::workflow_instance::WorkflowFunction {
         name: api_function.name.clone(),
-        function_class_specification: super::function_instance::parse_function_class_specification(match &api_function.class_spec.as_ref() {
+        class_specification: super::function_instance::parse_function_class_specification(match &api_function.class_spec.as_ref() {
             Some(val) => val,
             None => return Err(anyhow::anyhow!("Missing Workflow FunctionClass")),
         })?,
@@ -266,13 +266,13 @@ fn parse_workflow_spawn_request(
     api_request: &crate::grpc_impl::api::SpawnWorkflowRequest,
 ) -> anyhow::Result<crate::workflow_instance::SpawnWorkflowRequest> {
     Ok(crate::workflow_instance::SpawnWorkflowRequest {
-        workflow_functions: api_request
+        functions: api_request
             .workflow_functions
             .iter()
             .map(parse_workflow_function)
             .filter_map(|f| f.ok())
             .collect(),
-        workflow_resources: api_request
+        resources: api_request
             .workflow_resources
             .iter()
             .filter_map(|f| parse_workflow_resource(f).ok())
@@ -370,7 +370,7 @@ fn serialize_workflow_function(crate_function: &crate::workflow_instance::Workfl
         name: crate_function.name.clone(),
         annotations: crate_function.annotations.clone(),
         class_spec: Some(super::function_instance::serialize_function_class_specification(
-            &crate_function.function_class_specification,
+            &crate_function.class_specification,
         )),
         output_mapping: crate_function.output_mapping.clone(),
     }
@@ -387,8 +387,8 @@ fn serialize_workflow_resource(crate_resource: &crate::workflow_instance::Workfl
 
 fn serialize_workflow_spawn_request(crate_request: &crate::workflow_instance::SpawnWorkflowRequest) -> crate::grpc_impl::api::SpawnWorkflowRequest {
     crate::grpc_impl::api::SpawnWorkflowRequest {
-        workflow_functions: crate_request.workflow_functions.iter().map(serialize_workflow_function).collect(),
-        workflow_resources: crate_request.workflow_resources.iter().map(serialize_workflow_resource).collect(),
+        workflow_functions: crate_request.functions.iter().map(serialize_workflow_function).collect(),
+        workflow_resources: crate_request.resources.iter().map(serialize_workflow_resource).collect(),
         annotations: crate_request.annotations.clone(),
     }
 }
@@ -483,12 +483,13 @@ mod tests {
     fn serialize_deserialize_workflow_function() {
         let messages = vec![WorkflowFunction {
             name: "f1".to_string(),
-            function_class_specification: FunctionClassSpecification {
-                function_class_id: "my_fun_class".to_string(),
-                function_class_type: "my_fun_class_type".to_string(),
-                function_class_version: "0.0.1".to_string(),
-                function_class_code: "byte-code".to_string().as_bytes().to_vec(),
-                function_class_outputs: vec!["out1".to_string(), "out2".to_string()],
+            class_specification: FunctionClassSpecification {
+                id: "my_fun_class".to_string(),
+                function_type: "my_fun_class_type".to_string(),
+                version: "0.0.1".to_string(),
+                binary: Some("byte-code".to_string().as_bytes().to_vec()),
+                code: Some("code-location".to_string()),
+                outputs: vec!["out1".to_string(), "out2".to_string()],
             },
             output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),
             annotations: HashMap::from([("ann1".to_string(), "val1".to_string()), ("ann2".to_string(), "val2".to_string())]),
@@ -522,20 +523,21 @@ mod tests {
     #[test]
     fn serialize_deserialize_workflow_workflow_spawn_request() {
         let messages = vec![SpawnWorkflowRequest {
-            workflow_functions: vec![WorkflowFunction {
+            functions: vec![WorkflowFunction {
                 name: "f1".to_string(),
-                function_class_specification: FunctionClassSpecification {
-                    function_class_id: "my_fun_class".to_string(),
-                    function_class_type: "my_fun_class_type".to_string(),
-                    function_class_version: "0.0.1".to_string(),
-                    function_class_code: "byte-code".to_string().as_bytes().to_vec(),
-                    function_class_outputs: vec!["out1".to_string(), "out2".to_string()],
+                class_specification: FunctionClassSpecification {
+                    id: "my_fun_class".to_string(),
+                    function_type: "my_fun_class_type".to_string(),
+                    version: "0.0.1".to_string(),
+                    binary: Some("byte-code".to_string().as_bytes().to_vec()),
+                    code: Some("code-location".to_string()),
+                    outputs: vec!["out1".to_string(), "out2".to_string()],
                 },
                 output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),
                 annotations: HashMap::from([("ann1".to_string(), "val1".to_string()), ("ann2".to_string(), "val2".to_string())]),
             }],
             annotations: HashMap::from([("ann1".to_string(), "val1".to_string()), ("ann2".to_string(), "val2".to_string())]),
-            workflow_resources: vec![WorkflowResource {
+            resources: vec![WorkflowResource {
                 name: "res1".to_string(),
                 class_type: "my_res_class_type".to_string(),
                 output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),

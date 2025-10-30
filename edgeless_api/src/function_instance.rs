@@ -7,6 +7,8 @@ pub use edgeless_api_core::event_metadata::*;
 pub use edgeless_api_core::event_timestamp::*;
 pub use edgeless_api_core::instance_id::*;
 
+include!("function_instance_structs.rs");
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum StatePolicy {
     Transient,
@@ -29,32 +31,30 @@ impl Default for StateSpecification {
     }
 }
 
-#[derive(Debug, Clone, serde::Deserialize, serde::Serialize, PartialEq, Default)]
-pub struct FunctionClassSpecification {
-    /// Function class identifier.
-    pub function_class_id: String,
-    /// Run-time agent type this function is made for.
-    pub function_class_type: String,
-    /// Function class version.
-    pub function_class_version: String,
-    /// Inline function's code (if present).
-    pub function_class_code: Vec<u8>,
-    /// Output channels in which the function may generate new. Can be empty.
-    pub function_class_outputs: Vec<String>,
-}
-
 impl FunctionClassSpecification {
     pub fn to_short_string(&self) -> String {
         format!(
-            "run-time {} class {} version {}",
-            self.function_class_type, self.function_class_id, self.function_class_version
+            "run-time {} class {} version {} code {:?}",
+            self.function_type, self.id, self.version, self.code
         )
+    }
+
+    /// Return a version of the object with the binary stripped.
+    pub fn strip(&self) -> Self {
+        Self {
+            id: self.id.clone(),
+            function_type: self.function_type.clone(),
+            version: self.version.clone(),
+            binary: None,
+            code: self.code.clone(),
+            outputs: self.outputs.clone(),
+        }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SpawnFunctionRequest {
-    pub code: FunctionClassSpecification,
+    pub spec: FunctionClassSpecification,
     pub annotations: std::collections::HashMap<String, String>,
     pub state_specification: StateSpecification,
     pub workflow_id: String,
@@ -63,19 +63,8 @@ pub struct SpawnFunctionRequest {
 impl SpawnFunctionRequest {
     /// Remove the function_class_code from the return value if RUST_WASM.
     pub fn strip(&self) -> Self {
-        let function_class_code = if self.code.function_class_type == "RUST_WASM" {
-            vec![]
-        } else {
-            self.code.function_class_code.clone()
-        };
         Self {
-            code: FunctionClassSpecification {
-                function_class_id: self.code.function_class_id.clone(),
-                function_class_type: self.code.function_class_type.clone(),
-                function_class_version: self.code.function_class_version.clone(),
-                function_class_code,
-                function_class_outputs: self.code.function_class_outputs.clone(),
-            },
+            spec: self.spec.strip(),
             annotations: self.annotations.clone(),
             state_specification: self.state_specification.clone(),
             workflow_id: self.workflow_id.clone(),

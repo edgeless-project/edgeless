@@ -40,6 +40,7 @@ pub struct RuntimeTask<FunctionInstanceType: super::FunctionInstance> {
     functions: std::collections::HashMap<uuid::Uuid, super::function_instance_runner::FunctionInstanceRunner<FunctionInstanceType>>,
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum RuntimeRequest {
     Start(
         edgeless_api::function_instance::InstanceId,

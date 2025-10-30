@@ -95,16 +95,16 @@ impl Agent {
         while let Some(req) = receiver.next().await {
             match req {
                 AgentRequest::SpawnFunction(spawn_req, responder) => {
-                    log::debug!("Agent SpawnFunction {:?}", spawn_req.code.to_short_string());
+                    log::debug!("Agent SpawnFunction {:?}", spawn_req.spec.to_short_string());
 
                     // Get runner for function_class of spawn_req
-                    let res = match function_runtimes.get_mut(&spawn_req.code.function_class_type) {
+                    let res = match function_runtimes.get_mut(&spawn_req.spec.function_type) {
                         Some(runner) => {
                             // Assign a new physical identifier to the function instance being created.
                             let instance_id = edgeless_api::function_instance::InstanceId::new(node_id);
 
                             // Save function_class for further interaction.
-                            function_instances.insert(instance_id.function_id, spawn_req.code.function_class_type.clone());
+                            function_instances.insert(instance_id.function_id, spawn_req.spec.function_type.clone());
 
                             // Forward the start request to the matching runtime.
                             match runner.start(instance_id, spawn_req).await {
@@ -117,7 +117,7 @@ impl Agent {
                         }
                         None => edgeless_api::common::StartComponentResponse::ResponseError(edgeless_api::common::ResponseError {
                             summary: "Error when creating a function instance".to_string(),
-                            detail: Some(format!("Could not find runner for {}", spawn_req.code.function_class_type)),
+                            detail: Some(format!("Could not find runner for {}", spawn_req.spec.function_type)),
                         }),
                     };
                     responder

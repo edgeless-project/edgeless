@@ -50,14 +50,15 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         _instance_id: &edgeless_api::function_instance::InstanceId,
         _runtime_configuration: std::collections::HashMap<String, String>,
         guest_api_host: &mut Option<crate::base_runtime::guest_api::GuestAPIHost>,
-        code: &[u8],
+        binary: &[u8],
+        _code: &str,
     ) -> Result<Box<Self>, crate::base_runtime::FunctionInstanceError> {
         let mut config = wasmtime::Config::new();
         config.async_support(true);
         config.wasm_bulk_memory(true);
         config.wasm_function_references(true);
         let engine = wasmtime::Engine::new(&config).map_err(|_err| crate::base_runtime::FunctionInstanceError::InternalError)?;
-        let module = wasmtime::Module::from_binary(&engine, code)
+        let module = wasmtime::Module::from_binary(&engine, binary)
             .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("instantiate failed: {}", e)))?;
         let mut linker = wasmtime::Linker::new(&engine);
 
