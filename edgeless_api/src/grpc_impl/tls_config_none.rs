@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2025 Miguel Mesa-Simon <miguelangel.mesasimon@infineon.com>
+// SPDX-License-Identifier: MIT
+
 static DEFAULT_TLS_CONFIG: std::sync::LazyLock<super::tls_config::TlsConfig> = std::sync::LazyLock::new(|| super::tls_config::TlsConfig::default());
 
 impl super::tls_config::TlsConfig {
