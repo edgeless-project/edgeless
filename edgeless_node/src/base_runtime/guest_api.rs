@@ -39,6 +39,7 @@ impl GuestAPIHost {
             self.data_plane.send(target, msg.to_string(), &metadata).await;
             Ok(())
         } else {
+            log::warn!("Unknown alias at {} for cast: {}", self.instance_id, alias);
             Err(GuestAPIError::UnknownAlias)
         }
     }
@@ -58,7 +59,7 @@ impl GuestAPIHost {
             return self.call_raw(target, msg).await;
             // return Ok(self.data_plane.call(target.clone(), msg.to_string()).await);
         } else {
-            log::warn!("Unknown alias.");
+            log::warn!("Unknown alias at {} for call: {}", self.instance_id, alias);
             Err(GuestAPIError::UnknownAlias)
         }
     }
@@ -104,7 +105,7 @@ impl GuestAPIHost {
         } else if let Some(targted_id) = self.callback_table.get_mapping(target_alias).await {
             targted_id
         } else {
-            log::warn!("Unknown alias.");
+            log::warn!("Unknown alias at {} for delayed cast ({} ms): {}", self.instance_id, delay, target_alias);
             return Err(GuestAPIError::UnknownAlias);
         };
 

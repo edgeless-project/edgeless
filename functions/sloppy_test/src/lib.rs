@@ -44,6 +44,8 @@ impl EdgeFunction for SloppyTest {
     }
 
     fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
+        // edgeless_function::init_logger();
+
         let arguments = edgeless_function::init_payload_to_args(payload);
         let delay_ms = arguments.get("delay_ms").unwrap_or(&"1000").parse::<u64>().unwrap_or(1000);
         let _ = CONF.set(Conf { delay_ms });
