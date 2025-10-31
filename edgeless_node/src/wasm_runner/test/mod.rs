@@ -268,11 +268,19 @@ async fn messaging_test_setup() -> (
 
     assert!(res.is_ok());
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    let mut remaining_oks = 3;
+    for _ in 0..100 {
+        if remaining_oks == 0 {
+            break;
+        }
 
-    assert!(telemetry_mock_receiver.try_recv().is_ok());
-    assert!(telemetry_mock_receiver.try_recv().is_ok());
-    assert!(telemetry_mock_receiver.try_recv().is_ok());
+        if telemetry_mock_receiver.try_recv().is_ok() {
+            remaining_oks -= 1;
+        } else {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+    assert!(remaining_oks == 0, "not enough OK messages received");
     assert!(telemetry_mock_receiver.try_recv().is_err());
 
     (
@@ -576,7 +584,22 @@ async fn state_management() {
 
     tokio::time::sleep(Duration::from_millis(50)).await;
 
-    assert!(telemetry_mock_receiver.try_recv().is_ok());
+    let mut ok = false;
+    for _ in 0..100 {
+        let res = telemetry_mock_receiver.try_recv();
+        match res {
+            Err(err) => match err {
+                std::sync::mpsc::TryRecvError::Empty => tokio::time::sleep(Duration::from_millis(10)).await,
+                std::sync::mpsc::TryRecvError::Disconnected => panic!("disconnected unexpectedly"),
+            },
+            Ok(_) => {
+                ok = true;
+                break;
+            }
+        }
+    }
+
+    assert!(ok, "timeout when waiting for an OK message");
 
     let (init_log_event, _init_log_tags) = telemetry_mock_receiver.try_recv().unwrap();
     assert_eq!(
