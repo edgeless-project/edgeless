@@ -9,7 +9,7 @@ under active development within the project
 ## Introduction
 
 EDGELESS is a framework that enables
-[serverless edge computing](documentation/serverless_edge_computing.md) and it
+[stateful FaaS agents](documentation/serverless_edge_computing.md) and
 is intended especially for edge nodes with limited computational capabilities.
 
 An EDGELESS cluster is managed by an ε-CON (controller) and consists of one
@@ -56,7 +56,6 @@ target/debug/edgeless_cli -t cli.toml
 
 which will create:
 
-- `balancer.toml`
 - `controller.toml`
 - `node.toml`
 - `orchestrator.toml`
@@ -97,16 +96,14 @@ Advanced topics:
 - [Docker container runtime](documentation/container-runtime.md)
 - [A multi-domain example](documentation/example_multidomain.md)
 - [Inter-domain workflows](documentation/interdomain_workflows.md)
+- [(m)TLS](edgeless_api/src/grpc_impl/tls_certs/README.md)
 
 ## Known limitations
 
-Currently there are several known limitations, including the following ones:
+⚠️ There currently are no guarantees on stability, this software is not
+(yet) intended for production deployments.
 
-- No workflow-level annotations are supported.
-- The payload of events is not encrypted.
-- There currently are no guarantees on stability and API stability.
-
-The full list of issues is tracked on
+The open issues are tracked on
 [GitHub](https://github.com/edgeless-project/edgeless/issues).
 
 Stay tuned (star & watch
