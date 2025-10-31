@@ -2212,7 +2212,6 @@ dependencies = [
  "rand_pcg",
  "reqwest 0.11.27",
  "rustls 0.23.32",
- "schemars",
  "serde",
  "serde_json",
  "tokio",
