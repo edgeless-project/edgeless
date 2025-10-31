@@ -121,7 +121,7 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let async_runtime = tokio::runtime::Builder::new_multi_thread().worker_threads(8).enable_all().build()?;
+    let async_runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
     let async_tasks = vec![async_runtime.spawn(edgeless_node::edgeless_node_main(conf?))];
 
     async_runtime.block_on(async { futures::future::join_all(async_tasks).await });

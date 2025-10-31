@@ -29,7 +29,9 @@ Improvements:
 - Add a `binary` field to the function specification dedicated to containing
   the bytecode of WASM functions.
 - Release version 0.2 of single_trigger, which now has the option of waiting an
-  initial delay before sending out the trigger
+  initial delay before sending out the trigger.
+- Improve multi-core capabilities in EDGELESS node, by use spawn_blocking
+  to execute tasks (possibly CPU-bound).
 
 API changes:
 
