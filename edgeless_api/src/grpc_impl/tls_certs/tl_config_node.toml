@@ -1,6 +1,6 @@
 [server]
-server_cert_path = "../../edgeless_api/src/grpc_impl/tls_certs/orchestrator.pem"
-server_key_path  = "../../edgeless_api/src/grpc_impl/tls_certs/orchestrator.key"
+server_cert_path = "../../edgeless_api/src/grpc_impl/tls_certs/node.pem"
+server_key_path  = "../../edgeless_api/src/grpc_impl/tls_certs/node.key"
 server_ca_path   = "../../edgeless_api/src/grpc_impl/tls_certs/CA-chain.pem"
 
 [client]
@@ -8,4 +8,4 @@ client_cert_path = "../../edgeless_api/src/grpc_impl/tls_certs/node.pem"
 #client_key_path = ""
 client_ca_path   = "../../edgeless_api/src/grpc_impl/tls_certs/CA-chain.pem"
 domain_name      = "www.example.com"
-tpm_handle       = "0x81010002"
+tpm_handle      = "0x81010002"

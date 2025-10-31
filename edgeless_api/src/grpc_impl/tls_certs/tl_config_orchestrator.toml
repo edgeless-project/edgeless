@@ -1,6 +1,6 @@
 [server]
-server_cert_path = "../../edgeless_api/src/grpc_impl/tls_certs/controller.pem"
-server_key_path  = "../../edgeless_api/src/grpc_impl/tls_certs/controller.key"
+server_cert_path = "../../edgeless_api/src/grpc_impl/tls_certs/orchestrator.pem"
+server_key_path  = "../../edgeless_api/src/grpc_impl/tls_certs/orchestrator.key"
 server_ca_path   = "../../edgeless_api/src/grpc_impl/tls_certs/CA-chain.pem"
 
 [client]

@@ -66,8 +66,8 @@ impl super::tls_config::TlsConfig {
         let cert_path = self.server_cert_path.as_ref().unwrap();
         let key_path = self.server_key_path.as_ref().unwrap();
 
-        let mut tls_config =
-            tonic::transport::ServerTlsConfig::new().identity(tonic::transport::Identity::from_pem(std::fs::read(cert_path)?, std::fs::read(key_path)?));
+        let mut tls_config = tonic::transport::ServerTlsConfig::new()
+            .identity(tonic::transport::Identity::from_pem(std::fs::read(cert_path)?, std::fs::read(key_path)?));
 
         // If Server CA is specified, set up mTLS
         if let Some(ca_path) = &self.server_ca_path {
@@ -135,7 +135,9 @@ impl super::tls_config::TlsConfig {
         // Create basic TLS config for endpoint (this is just for initialization, real TLS is handled by connector)
         let server_root_ca_cert = tonic::transport::Certificate::from_pem(std::fs::read(ca_path)?);
         let domain = self.domain_name.clone().unwrap_or_else(|| "localhost".to_string());
-        let tls = tonic::transport::ClientTlsConfig::new().domain_name(&domain).ca_certificate(server_root_ca_cert);
+        let tls = tonic::transport::ClientTlsConfig::new()
+            .domain_name(&domain)
+            .ca_certificate(server_root_ca_cert);
 
         let endpoint = tonic::transport::Endpoint::from_shared(server_addr.to_string())?.tls_config(tls)?;
 
@@ -220,7 +222,10 @@ pub struct ClientCertResolver {
     client_tpm_key_handle: u32,
 }
 
-fn get_chain(client_cert_path: &std::path::Path, client_tpm_key_handle: u32) -> anyhow::Result<(Vec<tonic::transport::CertificateDer<'static>>, rustls_tpm_signer::signer::TpmSigningKey)> {
+fn get_chain(
+    client_cert_path: &std::path::Path,
+    client_tpm_key_handle: u32,
+) -> anyhow::Result<(Vec<tonic::transport::CertificateDer<'static>>, rustls_tpm_signer::signer::TpmSigningKey)> {
     let certificates = load_certs(client_cert_path);
     let mut client_auth_roots = rustls::RootCertStore::empty();
     for ca in &certificates {
