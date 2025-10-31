@@ -16,6 +16,11 @@ New features:
   `configurations` field using the same syntax as function's annotations.
 - Add function load_balance, which serves incoming messages in a round-robin
   fashion. The number of outputs is configured in the `init-payload` annotation.
+- Improve security and trust by adding (m)TLS and TPM registered
+  authentication to gRPC APIs. The feature is optional and can be enabled by
+  creating a configuration file called `tls_config.toml` in the working
+  directory of the ε-CON, ε-ORC, and node services. Full documentation is
+  included.
 
 Improvements:
 
