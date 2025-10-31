@@ -85,9 +85,11 @@ impl<FunctionInstanceType: FunctionInstance> FunctionInstanceRunner<FunctionInst
             .await,
         );
 
-        let task_handle = tokio::task::spawn(async move {
-            let mut task = task;
-            task.run().await;
+        let task_handle = tokio::task::spawn_blocking(move || {
+            tokio::runtime::Handle::current().block_on(async move {
+                let mut task = task;
+                task.run().await;
+            });
         });
 
         Self {
