@@ -1,0 +1,18 @@
+{
+    "functions": [
+        {
+            "name": "infinite_test",
+            "class_specification": {
+                "id": "infinite_test",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "infinite_test.wasm",
+                "outputs": []
+            },
+            "output_mapping": {},
+            "annotations": {}
+        }
+    ],
+    "resources": [],
+    "annotations": {}
+}
