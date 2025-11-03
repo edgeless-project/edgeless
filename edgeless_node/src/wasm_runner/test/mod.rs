@@ -196,6 +196,29 @@ type TelemetryReceiver = std::sync::mpsc::Receiver<(
     std::collections::BTreeMap<String, String>,
 )>;
 
+async fn wait_for_oks(
+    num_oks: usize,
+    is_last_ok: bool,
+    receiver: &std::sync::mpsc::Receiver<(TelemetryEvent, std::collections::BTreeMap<String, String>)>,
+) {
+    let mut num_oks = num_oks;
+    for _ in 0..100 {
+        if num_oks == 0 {
+            break;
+        }
+
+        if receiver.try_recv().is_ok() {
+            num_oks -= 1;
+        } else {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+    assert!(num_oks == 0, "not enough OK messages received");
+    if is_last_ok {
+        assert!(receiver.try_recv().is_err());
+    }
+}
+
 async fn messaging_test_setup() -> (
     crate::base_runtime::runtime::RuntimeClient,
     InstanceId,
@@ -268,20 +291,7 @@ async fn messaging_test_setup() -> (
 
     assert!(res.is_ok());
 
-    let mut remaining_oks = 3;
-    for _ in 0..100 {
-        if remaining_oks == 0 {
-            break;
-        }
-
-        if telemetry_mock_receiver.try_recv().is_ok() {
-            remaining_oks -= 1;
-        } else {
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-    }
-    assert!(remaining_oks == 0, "not enough OK messages received");
-    assert!(telemetry_mock_receiver.try_recv().is_err());
+    wait_for_oks(3, true, &telemetry_mock_receiver).await;
 
     (
         client,
@@ -582,24 +592,7 @@ async fn state_management() {
     let res = client.start(instance_id, spawn_req.clone()).await;
     assert!(res.is_ok());
 
-    tokio::time::sleep(Duration::from_millis(50)).await;
-
-    let mut ok = false;
-    for _ in 0..100 {
-        let res = telemetry_mock_receiver.try_recv();
-        match res {
-            Err(err) => match err {
-                std::sync::mpsc::TryRecvError::Empty => tokio::time::sleep(Duration::from_millis(10)).await,
-                std::sync::mpsc::TryRecvError::Disconnected => panic!("disconnected unexpectedly"),
-            },
-            Ok(_) => {
-                ok = true;
-                break;
-            }
-        }
-    }
-
-    assert!(ok, "timeout when waiting for an OK message");
+    wait_for_oks(1, false, &telemetry_mock_receiver).await;
 
     let (init_log_event, _init_log_tags) = telemetry_mock_receiver.try_recv().unwrap();
     assert_eq!(
@@ -611,8 +604,7 @@ async fn state_management() {
         )
     );
 
-    assert!(telemetry_mock_receiver.try_recv().is_ok());
-    assert!(telemetry_mock_receiver.try_recv().is_err());
+    wait_for_oks(1, true, &telemetry_mock_receiver).await;
 
     // trigger sync
     test_peer_handle.send(instance_id, "test_cast_raw_output".to_string(), &metad_1).await;
@@ -624,16 +616,12 @@ async fn state_management() {
     assert_eq!(state_set_value, "new_state".to_string());
 
     assert!(is_telemetry_event_transfer(&mut telemetry_mock_receiver).await);
-    assert!(telemetry_mock_receiver.try_recv().is_ok());
-    assert!(telemetry_mock_receiver.try_recv().is_err());
+    wait_for_oks(1, true, &telemetry_mock_receiver).await;
 
     let res = client.stop(instance_id).await;
     assert!(res.is_ok());
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    assert!(telemetry_mock_receiver.try_recv().is_ok());
-    assert!(telemetry_mock_receiver.try_recv().is_ok());
-    assert!(telemetry_mock_receiver.try_recv().is_err());
+    wait_for_oks(2, true, &telemetry_mock_receiver).await;
 
     // now we try starting with state
 
@@ -643,9 +631,7 @@ async fn state_management() {
     let res2 = client.start(instance_id_another, spawn_req).await;
     assert!(res2.is_ok());
 
-    tokio::time::sleep(Duration::from_millis(100)).await;
-
-    assert!(telemetry_mock_receiver.try_recv().is_ok());
+    wait_for_oks(1, false, &telemetry_mock_receiver).await;
 
     let (init_log_event2, _init_log_tags2) = telemetry_mock_receiver.try_recv().unwrap();
     assert_eq!(
@@ -657,6 +643,5 @@ async fn state_management() {
         )
     );
 
-    assert!(telemetry_mock_receiver.try_recv().is_ok());
-    assert!(telemetry_mock_receiver.try_recv().is_err());
+    wait_for_oks(1, true, &telemetry_mock_receiver).await;
 }
