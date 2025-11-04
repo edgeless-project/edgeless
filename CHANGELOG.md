@@ -14,8 +14,6 @@ New features:
   a single component of a workflow to a target domain.
 - Enable resource deployment constraints, which can be specified in the
   `configurations` field using the same syntax as function's annotations.
-- Add function load_balance, which serves incoming messages in a round-robin
-  fashion. The number of outputs is configured in the `init-payload` annotation.
 - Improve security and trust by adding (m)TLS and TPM registered
   authentication to gRPC APIs. The feature is optional and can be enabled by
   creating a configuration file called `tls_config.toml` in the working
@@ -32,6 +30,21 @@ Improvements:
   initial delay before sending out the trigger.
 - Improve multi-core capabilities in EDGELESS node, by use spawn_blocking
   to execute tasks (possibly CPU-bound).
+
+Update of functions and resources:
+
+- Add function load_balance, which serves incoming messages in a round-robin
+  fashion. The number of outputs is configured in the `init-payload` annotation.
+- Update `http-ingress` resource (now v2.0) in many ways: i) refactor code to
+  improve readability and maintainability by removing interests as separated
+  data structure compared to the resource descriptors; ii) enable the use of
+  cast(), instead of call(), to invoke the next element in the workflow
+  through the `new_request` output channel, depending on the resource
+  configuration; iii) enable the option for the client to specify the workflow
+  ID to dispatch the body of the HTTP command to the intended workflow;
+  iv) dispatch randomly the body of the incoming HTTP command to one of the
+  possible resource instances matching the host, method, and workflow identifier
+  (if specified, all are optional).
 
 API changes:
 

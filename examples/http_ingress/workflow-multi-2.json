@@ -1,0 +1,25 @@
+{
+    "functions": [],
+    "resources": [
+        {
+            "name": "http-ingress",
+            "class_type": "http-ingress",
+            "output_mapping": {
+                "new_request": "file-log"
+            },
+            "configurations": {
+                "async": "true"
+            }
+        },
+        {
+            "name": "file-log",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "out-2.log",
+                "add-timestamp": "true"
+            }
+        }
+    ],
+    "annotations": {}
+}
