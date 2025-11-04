@@ -104,7 +104,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
 
             // Find the set of matching resources for this HTTP request.
             let mut matching = vec![];
-            for (_resource_id, desc) in &lck.active_resources {
+            for desc in lck.active_resources.values() {
                 if (desc.host.is_none() || desc.host == Some(host.to_string()))
                     && (desc.allow.is_empty() || desc.allow.contains(&method))
                     && (desc.wf_id.is_none() || desc.wf_id == wf_id)
