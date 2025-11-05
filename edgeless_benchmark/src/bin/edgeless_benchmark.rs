@@ -205,11 +205,10 @@ async fn main() -> anyhow::Result<()> {
                         );
                         events.push(Event::WfEnd(workflow_end_time, uuid));
                     }
-                    if let Some((arrival_time, end_time)) = arrival_model.next(now) {
-                        if arrival_time < utils::to_microseconds(args.duration) {
+                    if let Some((arrival_time, end_time)) = arrival_model.next(now)
+                        && arrival_time < utils::to_microseconds(args.duration) {
                             events.push(Event::WfNew(arrival_time, end_time));
                         }
-                    }
                 }
                 Event::WfEnd(_, uuid) => {
                     log::info!("{} wf terminated  '{}'", utils::to_seconds(now), &uuid);
@@ -232,8 +231,8 @@ async fn main() -> anyhow::Result<()> {
     // terminate all workflows that are still active
     if !args.keep_workflows {
         for event_type in events.iter() {
-            if let Event::WfEnd(_, uuid) = event_type {
-                if !uuid.is_empty() {
+            if let Event::WfEnd(_, uuid) = event_type
+                && !uuid.is_empty() {
                     log::info!("{} wf terminated  '{}'", utils::to_seconds(now), &uuid);
                     match engine.stop_workflow(uuid).await {
                         Ok(_) => {}
@@ -242,7 +241,6 @@ async fn main() -> anyhow::Result<()> {
                         }
                     }
                 }
-            }
         }
     }
 

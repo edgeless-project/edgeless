@@ -780,11 +780,10 @@ impl ControllerTask {
                 // Remove those domains that do not advertise a portal resource.
                 let mut confirmed_domains = std::collections::HashSet::new();
                 for domain in &domains {
-                    if let Some(desc) = self.orchestrators.get(domain) {
-                        if desc.capabilities.resource_classes.contains("portal") {
+                    if let Some(desc) = self.orchestrators.get(domain)
+                        && desc.capabilities.resource_classes.contains("portal") {
                             confirmed_domains.insert(domain.clone());
                         }
-                    }
                 }
 
                 // If there are no confirmed domains in the portal (or if there

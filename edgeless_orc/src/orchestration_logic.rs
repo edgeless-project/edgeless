@@ -85,8 +85,8 @@ impl OrchestrationLogic {
         let mut candidates = vec![];
 
         for candidate in nodes {
-            if let Some(ndx) = self.nodes.iter().position(|&x| x == *candidate) {
-                if OrchestrationLogic::is_node_feasible(
+            if let Some(ndx) = self.nodes.iter().position(|&x| x == *candidate)
+                && OrchestrationLogic::is_node_feasible(
                     &spawn_req.spec.function_type,
                     &crate::deployment_requirements::DeploymentRequirements::from_annotations(&spawn_req.annotations),
                     &self.nodes[ndx],
@@ -95,7 +95,6 @@ impl OrchestrationLogic {
                 ) {
                     candidates.push(self.nodes[ndx]);
                 }
-            }
         }
 
         candidates

@@ -38,8 +38,8 @@ impl crate::telemetry_events::EventProcessor for PerformanceTarget {
     ) -> crate::telemetry_events::TelemetryProcessingResult {
         match event {
             crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(lat) => {
-                if let Some(function_id) = event_tags.get("FUNCTION_ID") {
-                    if let Ok(function_id) = uuid::Uuid::from_str(function_id) {
+                if let Some(function_id) = event_tags.get("FUNCTION_ID")
+                    && let Ok(function_id) = uuid::Uuid::from_str(function_id) {
                         let now = chrono::Utc::now();
                         let res = self.metrics.function_execution_times.entry(function_id).or_default();
                         res.push(edgeless_api::node_registration::Sample {
@@ -48,11 +48,10 @@ impl crate::telemetry_events::EventProcessor for PerformanceTarget {
                             sample: lat.as_secs_f64(),
                         });
                     }
-                }
             }
             crate::telemetry_events::TelemetryEvent::FunctionTransfer(lat) => {
-                if let Some(function_id) = event_tags.get("FUNCTION_ID") {
-                    if let Ok(function_id) = uuid::Uuid::from_str(function_id) {
+                if let Some(function_id) = event_tags.get("FUNCTION_ID")
+                    && let Ok(function_id) = uuid::Uuid::from_str(function_id) {
                         let now = chrono::Utc::now();
                         let res = self.metrics.function_transfer_times.entry(function_id).or_default();
                         res.push(edgeless_api::node_registration::Sample {
@@ -61,11 +60,10 @@ impl crate::telemetry_events::EventProcessor for PerformanceTarget {
                             sample: lat.as_secs_f64(),
                         });
                     }
-                }
             }
             crate::telemetry_events::TelemetryEvent::FunctionLogEntry(_lvl, target, message) => {
-                if let Some(function_id) = event_tags.get("FUNCTION_ID") {
-                    if let Ok(function_id) = uuid::Uuid::from_str(function_id) {
+                if let Some(function_id) = event_tags.get("FUNCTION_ID")
+                    && let Ok(function_id) = uuid::Uuid::from_str(function_id) {
                         let now = chrono::Utc::now();
                         let res = self.metrics.function_log_entries.entry(function_id).or_default();
                         res.push(edgeless_api::node_registration::FunctionLogEntry {
@@ -75,7 +73,6 @@ impl crate::telemetry_events::EventProcessor for PerformanceTarget {
                             message: message.to_string(),
                         });
                     }
-                }
             }
             _ => {
                 return crate::telemetry_events::TelemetryProcessingResult::PASSED;

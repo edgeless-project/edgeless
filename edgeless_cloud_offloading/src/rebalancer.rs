@@ -207,8 +207,8 @@ impl Rebalancer {
 
         // Option 2: Absolute saturation of individual nodes (CPU or memory)
         for (id, node) in &self.nodes {
-            if let Some(cpu_usage) = node.cpu_usage_percent() {
-                if cpu_usage > cpu_threshold {
+            if let Some(cpu_usage) = node.cpu_usage_percent()
+                && cpu_usage > cpu_threshold {
                     log::warn!(
                         "SCALE-UP decision: Absolute CPU saturation on node {} ({}% > {}%)",
                         id,
@@ -217,9 +217,8 @@ impl Rebalancer {
                     );
                     return true;
                 }
-            }
-            if let Some(mem_usage) = node.memory_usage_percent() {
-                if mem_usage > mem_threshold {
+            if let Some(mem_usage) = node.memory_usage_percent()
+                && mem_usage > mem_threshold {
                     log::warn!(
                         "SCALE-UP decision: Absolute Memory saturation on node {} ({}% > {}%)",
                         id,
@@ -228,7 +227,6 @@ impl Rebalancer {
                     );
                     return true;
                 }
-            }
         }
 
         false
