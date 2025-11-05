@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 // Raw WASM-host-provided output interface
-extern "C" {
+unsafe extern "C" {
     pub(crate) fn cast_raw_asm(instance_node_id_ptr: *const u8, instance_component_id_ptr: *const u8, payload_ptr: *const u8, payload_len: usize);
     pub(crate) fn cast_asm(target_ptr: *const u8, target_len: usize, payload_ptr: *const u8, payload_len: usize);
     pub(crate) fn call_raw_asm(

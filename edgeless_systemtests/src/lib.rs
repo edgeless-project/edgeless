@@ -310,7 +310,7 @@ mod system_tests {
     ) -> Vec<edgeless_api::workflow_instance::WorkflowId> {
         let mut ret = vec![];
         for i in 0..n {
-            if let Ok(res) = client
+            match client
                 .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
                     functions: vec![edgeless_api::workflow_instance::WorkflowFunction {
                         name: "f1".to_string(),
@@ -322,16 +322,16 @@ mod system_tests {
                     annotations: std::collections::HashMap::new(),
                 })
                 .await
-            {
+            { Ok(res) => {
                 match res {
                     edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(instance) => {
                         ret.push(instance.workflow_id);
                     }
                     edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(_) => {}
                 }
-            } else {
+            } _ => {
                 panic!("cannot create {}-th workflow out of {}", i + 1, n);
-            }
+            }}
         }
         ret
     }
@@ -342,7 +342,7 @@ mod system_tests {
     ) -> Vec<edgeless_api::workflow_instance::WorkflowId> {
         let mut ret = vec![];
         for i in 0..n {
-            if let Ok(res) = client
+            match client
                 .start(edgeless_api::workflow_instance::SpawnWorkflowRequest {
                     functions: vec![],
                     resources: vec![edgeless_api::workflow_instance::WorkflowResource {
@@ -354,16 +354,16 @@ mod system_tests {
                     annotations: std::collections::HashMap::new(),
                 })
                 .await
-            {
+            { Ok(res) => {
                 match res {
                     edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(instance) => {
                         ret.push(instance.workflow_id);
                     }
                     edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(_) => {}
                 }
-            } else {
+            } _ => {
                 panic!("cannot create {}-th workflow out of {}", i + 1, n);
-            }
+            }}
         }
         ret
     }

@@ -6,7 +6,7 @@
 name = "edgeless_benchmark"
 version = "1.1.0"
 authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it"]
-edition = "2021"
+edition = "2024"
 description = "EDGELESS benchmark suite"
 homepage = "https://edgeless-project.eu/"
 license = "MIT"

@@ -262,11 +262,11 @@ impl OrchestratorTask {
                     }
                     self.active_instances_changed = true;
 
-                    if let Err(err) = self.start_resource_in_node(resource_req, lid, target_node_id).await {
+                    match self.start_resource_in_node(resource_req, lid, target_node_id).await { Err(err) => {
                         anyhow::bail!("Error when migrating resource LID {} to node_id {}: {}", lid, target_node_id, err);
-                    } else {
+                    } _ => {
                         Ok(*target_node_id)
-                    }
+                    }}
                 } else {
                     anyhow::bail!(
                         "Request to migrate resource '{}' to node_id '{}', which does not have matching resource providers",
@@ -892,10 +892,10 @@ impl OrchestratorTask {
         // Remove the node from all the active instances.
         for (_origin_lid, instance) in self.active_instances.iter_mut() {
             match instance {
-                crate::active_instance::ActiveInstance::Function(_start_req, ref mut instances) => {
+                crate::active_instance::ActiveInstance::Function(_start_req, instances) => {
                     instances.retain(|cur_node_id| node_id != cur_node_id.node_id);
                 }
-                crate::active_instance::ActiveInstance::Resource(_start_req, ref mut instance) => {
+                crate::active_instance::ActiveInstance::Resource(_start_req, instance) => {
                     if instance.node_id == node_id {
                         *instance = edgeless_api::function_instance::InstanceId::none();
                     }

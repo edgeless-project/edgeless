@@ -7,7 +7,7 @@ version = "0.1.0"
 authors = [
     "Francisco Vicente <francisco.vicente@worldline.com>",
 ]
-edition = "2021"
+edition = "2024"
 description = "EDGELESS Cloud Offloading"
 homepage = "https://edgeless-project.eu/"
 license = "MIT"

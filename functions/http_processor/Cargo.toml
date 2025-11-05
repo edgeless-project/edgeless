@@ -16,7 +16,7 @@ strip = true
 name = "http_processor"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "http_processor"

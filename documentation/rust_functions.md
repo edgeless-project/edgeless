@@ -125,7 +125,7 @@ opt-level = "s"
 name = "edgeless_sample_function"
 version = "0.1.0"
 authors = ["Raphael Hetzel <hetzel@in.tum.de>"]
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "edgeless_sample_function"

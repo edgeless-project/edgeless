@@ -70,7 +70,7 @@ impl CoapClient {
                         let (res, response_token) = edgeless_api_core::coap_mapping::CoapDecoder::decode(&buffer[..len]).unwrap();
                         match res {
                             edgeless_api_core::coap_mapping::CoapMessage::Response(response_data, ok) => {
-                                if let Some(responder) = inner.lock().await.active_requests.remove(&response_token) {
+                                match inner.lock().await.active_requests.remove(&response_token) { Some(responder) => {
                                     if responder.send(
                                         match ok {
                                             true => Ok(Vec::from(response_data)),
@@ -79,9 +79,9 @@ impl CoapClient {
                                     ).is_err() {
                                         log::warn!("Could not send response");
                                     }
-                                } else {
+                                } _ => {
                                     log::debug!("No interested receiver for message");
-                                }
+                                }}
                             }
                             _ => {
                                 log::info!("Received wrong message");
@@ -143,13 +143,13 @@ impl CoapClient {
 
 impl Drop for CoapClient {
     fn drop(&mut self) {
-        if let Some(abort_handle) = self.network_task_abort_handle.take() {
+        match self.network_task_abort_handle.take() { Some(abort_handle) => {
             if let Some(abort_handle) = std::sync::Arc::into_inner(abort_handle) {
                 log::info!("Network task stopped.");
                 abort_handle.abort();
             }
-        } else {
+        } _ => {
             log::warn!("Network task handle removed before drop.");
-        }
+        }}
     }
 }

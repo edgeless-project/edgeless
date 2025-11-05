@@ -7,7 +7,7 @@
 name = "edgeless-embedded-emu"
 version = "1.1.0"
 authors = [ "Raphael Hetzel <hetzel@in.tum.de>" ]
-edition = "2021"
+edition = "2024"
 resolver = "2"
 description = "EDGELESS embedded devices emulator"
 homepage = "https://edgeless-project.eu/"
