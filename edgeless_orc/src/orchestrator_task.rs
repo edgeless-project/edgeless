@@ -442,11 +442,10 @@ impl OrchestratorTask {
         resource_req: &edgeless_api::resource_configuration::ResourceInstanceSpecification,
         node_id: &edgeless_api::function_instance::NodeId,
     ) -> bool {
-        if let Some(desc) = self.nodes.get(node_id) {
-            if desc.cordoned {
+        if let Some(desc) = self.nodes.get(node_id)
+            && desc.cordoned {
                 return false;
             }
-        }
         let capabilities = &self.nodes.get(node_id).unwrap().capabilities;
         if !crate::deployment_requirements::DeploymentRequirements::from_annotations(&resource_req.configuration).is_feasible(
             node_id,

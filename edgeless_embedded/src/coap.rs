@@ -92,11 +92,10 @@ impl CoapMultiplexer {
                         }
                         edgeless_api_core::coap_mapping::CoapMessage::Response(data, success) => {
                             log::info!("Got Response: {}, {}", data.len(), success);
-                            if let Some((t, channel)) = self.waiting_for_reply.take() {
-                                if t == token {
+                            if let Some((t, channel)) = self.waiting_for_reply.take()
+                                && t == token {
                                     channel.signal(crate::agent::RegistrationReply::Sucess)
                                 }
-                            }
                         }
                         edgeless_api_core::coap_mapping::CoapMessage::KeepAlive => {
                             self.incoming_keepalive(sender, token).await;

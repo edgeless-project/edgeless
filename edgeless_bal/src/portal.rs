@@ -93,16 +93,14 @@ impl PortalPartialResource {
     }
 
     pub fn matching(&self, component_id: &edgeless_api::function_instance::ComponentId) -> bool {
-        if let Some(local_id) = &self.local_id {
-            if local_id.function_id == *component_id {
+        if let Some(local_id) = &self.local_id
+            && local_id.function_id == *component_id {
                 return true;
             }
-        }
-        if let Some(portal_id) = &self.portal_id {
-            if portal_id.function_id == *component_id {
+        if let Some(portal_id) = &self.portal_id
+            && portal_id.function_id == *component_id {
                 return true;
             }
-        }
         false
     }
 
@@ -254,8 +252,8 @@ impl PortalResourceProvider {
     async fn create_instance_if_complete(&mut self, id: u64) -> anyhow::Result<()> {
         let mut lck = self.inner.lock().await;
 
-        if let Some(partial) = lck.partial.get(&id) {
-            if let Some((local_id, portal_id, role, target_id, domain_name)) = partial.complete() {
+        if let Some(partial) = lck.partial.get(&id)
+            && let Some((local_id, portal_id, role, target_id, domain_name)) = partial.complete() {
                 lck.partial.remove(&id);
                 let resource = PortalResource::new(PortalResourceCtor {
                     local_dataplane_handle: lck.local_dataplane_provider.get_handle_for(local_id).await,
@@ -273,7 +271,6 @@ impl PortalResourceProvider {
                 .await?;
                 lck.instances.insert(id, resource);
             }
-        }
 
         Ok(())
     }

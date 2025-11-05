@@ -196,11 +196,10 @@ fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16
     }
 
     // Try to create the directory if it does not exist.
-    if fs::metadata(&config_path).is_err() {
-        if let Err(_err) = fs::create_dir(&config_path) {
+    if fs::metadata(&config_path).is_err()
+        && let Err(_err) = fs::create_dir(&config_path) {
             anyhow::bail!("Failed with creating directory: {}", &config_path);
         }
-    }
 
     // Write files (without overwriting).
     let orc_file = Path::new(&config_path).join("orchestrator.toml");
