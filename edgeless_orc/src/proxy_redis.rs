@@ -242,11 +242,11 @@ impl ProxyRedis {
                                 }
                             }
                             ActiveInstanceClone::Resource(spawn_req, instance_id_str) => {
-                                if let Ok(instance_id) = string_to_instance_id(&instance_id_str) {
+                                match string_to_instance_id(&instance_id_str) { Ok(instance_id) => {
                                     crate::active_instance::ActiveInstance::Resource(spawn_req, instance_id)
-                                } else {
+                                } _ => {
                                     continue;
-                                }
+                                }}
                             }
                         },
                     );

@@ -17,7 +17,7 @@ strip = true
 name = "bench_mapreduce"
 version = "0.2.0"
 authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it>"]
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "bench_mapreduce"

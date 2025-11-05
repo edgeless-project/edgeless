@@ -5,8 +5,8 @@
 name = "edgeless_container_function"
 version = "1.1.0"
 authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>" ]
-edition = "2021"
-rust-version = "1.76"
+edition = "2024"
+rust-version = "1.85"
 description = "Skeleton of a function to be deployed in EDGELESS as a container"
 homepage = "https://edgeless-project.eu/"
 license = "MIT"

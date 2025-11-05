@@ -10,7 +10,7 @@ opt-level = "s"
 name = "move_arm"
 version = "0.1.0"
 authors = ["Lukasz Zalewski <zalewski.lukasz@siemens.com>", "Saurabh Singh <narayan.singh@siemens.com>", "Markus Sauer <markussauer@siemens.com>"]
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "move_arm"

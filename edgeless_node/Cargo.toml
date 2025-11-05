@@ -11,8 +11,8 @@ authors = [
     "Lukasz Zalewski <zalewski.lukasz@siemens.com>",
     "Raphael Hetzel <hetzel@in.tum.de>",
 ]
-edition = "2021"
-rust-version = "1.76"
+edition = "2024"
+rust-version = "1.85"
 description = "Reference implementation of an EDGELESS node"
 homepage = "https://edgeless-project.eu/"
 license = "MIT"

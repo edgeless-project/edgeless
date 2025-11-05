@@ -35,7 +35,7 @@ impl NodeRegisterAPIServer {
         };
         Box::pin(async move {
             let node_registration_api = node_registration_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&node_register_url) {
+            match crate::util::parse_http_host(&node_register_url) { Ok((_proto, host, port)) => {
                 if let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start NodeRegisterAPIServer GRPC Server at {}", node_register_url);
 
@@ -81,9 +81,9 @@ impl NodeRegisterAPIServer {
                 } else {
                     log::error!("NodeRegisterAPIServer parsing error")
                 }
-            } else {
+            } _ => {
                 log::error!("NodeRegisterAPIServer could not parse http host")
-            }
+            }}
 
             log::info!("Stop NodeRegisterAPIServer GRPC Server");
         })

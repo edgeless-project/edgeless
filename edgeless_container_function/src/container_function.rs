@@ -107,19 +107,19 @@ impl ContainerFunction {
                         // event to its output channel called "output".
                         tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
                         if let Some(ref mut host_client_api) = host_client_api {
-                            if let Err(err) = host_client_api
+                            match host_client_api
                                 .cast(edgeless_api::guest_api_host::OutputEventData {
                                     originator: instance_id.unwrap(),
                                     alias: "output".to_string(),
                                     msg: event.msg,
                                 })
                                 .await
-                            {
+                            { Err(err) => {
                                 fsm = FiniteStateMachine::Error;
                                 log::error!("error when casting an event to alias \"output\": {}", err);
-                            } else {
+                            } _ => {
                                 log::info!("event recasted successfully to \"output\"");
-                            }
+                            }}
                         }
                     }
                 }

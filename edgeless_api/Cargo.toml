@@ -10,8 +10,8 @@ authors = [
     "Claudio Cicconetti <c.cicconetti@iit.cnr.it>",
     "Raphael Hetzel <hetzel@in.tum.de>",
 ]
-edition = "2021"
-rust-version = "1.77"
+edition = "2024"
+rust-version = "1.85"
 description = "EDGELESS gRPC API definitions"
 homepage = "https://edgeless-project.eu/"
 license = "MIT"

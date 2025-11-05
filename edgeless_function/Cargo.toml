@@ -7,7 +7,7 @@
 name = "edgeless_function"
 version = "1.1.0"
 authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Raphael Hetzel <hetzel@in.tum.de>" ]
-edition = "2021"
+edition = "2024"
 description = "EDGELESS Rust bindings and APIs for WebAssembly"
 homepage = "https://edgeless-project.eu/"
 license = "MIT"

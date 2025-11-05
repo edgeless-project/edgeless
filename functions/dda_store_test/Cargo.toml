@@ -10,7 +10,7 @@ opt-level = "s"
 name = "dda_store_test"
 version = "0.1.0"
 authors = ["Lukasz Zalewski <zalewski.lukasz@siemens.com>"]
-edition = "2021"
+edition = "2024"
 
 [lib]
 name = "dda_store_test"
