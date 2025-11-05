@@ -55,12 +55,13 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
         _instance_id: &edgeless_api::function_instance::InstanceId,
         _runtime_configuration: std::collections::HashMap<String, String>,
         guest_api_host: &mut Option<crate::base_runtime::guest_api::GuestAPIHost>,
-        code: &[u8],
+        binary: &[u8],
+        _code: &str,
     ) -> Result<Box<Self>, crate::base_runtime::FunctionInstanceError> {
         let _comfig = wasmi::Config::default();
 
         let engine = wasmi::Engine::default();
-        let module = wasmi::Module::new(&engine, code).map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
+        let module = wasmi::Module::new(&engine, binary).map_err(|_| crate::base_runtime::FunctionInstanceError::InternalError)?;
         let mut store = wasmi::Store::new(
             &engine,
             guest_api_binding::GuestAPI {
@@ -128,7 +129,7 @@ impl crate::base_runtime::FunctionInstance for WASMIFunctionInstance {
                 .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("handle_stop_asm not available: {}", e)))?,
             memory: instance
                 .get_memory(&mut store, "memory")
-                .ok_or_else(|| (crate::base_runtime::FunctionInstanceError::BadCode("memory not available".to_string())))?,
+                .ok_or_else(|| crate::base_runtime::FunctionInstanceError::BadCode("memory not available".to_string()))?,
             store,
         }))
     }

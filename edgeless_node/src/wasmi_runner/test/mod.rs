@@ -91,12 +91,13 @@ async fn basic_lifecycle() {
     tokio::spawn(async move { rt_task.run().await });
 
     let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
-        code: edgeless_api::function_instance::FunctionClassSpecification {
-            function_class_id: "EXAMPLE_1".to_string(),
-            function_class_type: "RUST_WASM".to_string(),
-            function_class_version: "0.1".to_string(),
-            function_class_code: include_bytes!("../../../../functions/messaging_test/messaging_test.wasm").to_vec(),
-            function_class_outputs: vec![],
+        spec: edgeless_api::function_instance::FunctionClassSpecification {
+            id: "EXAMPLE_1".to_string(),
+            function_type: "RUST_WASM".to_string(),
+            version: "0.1".to_string(),
+            binary: Some(include_bytes!("../../../../functions/messaging_test/messaging_test.wasm").to_vec()),
+            code: None,
+            outputs: vec![],
         },
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
@@ -221,12 +222,13 @@ async fn messaging_test_setup() -> (InstanceId, DataplaneHandle, InstanceId, Dat
     tokio::spawn(async move { rt_task.run().await });
 
     let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
-        code: edgeless_api::function_instance::FunctionClassSpecification {
-            function_class_id: "EXAMPLE_1".to_string(),
-            function_class_type: "RUST_WASM".to_string(),
-            function_class_version: "0.1".to_string(),
-            function_class_code: include_bytes!("../../../../functions/messaging_test/messaging_test.wasm").to_vec(),
-            function_class_outputs: vec!["test".to_string()],
+        spec: edgeless_api::function_instance::FunctionClassSpecification {
+            id: "EXAMPLE_1".to_string(),
+            function_type: "RUST_WASM".to_string(),
+            version: "0.1".to_string(),
+            binary: Some(include_bytes!("../../../../functions/messaging_test/messaging_test.wasm").to_vec()),
+            code: None,
+            outputs: vec!["test".to_string()],
         },
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
@@ -512,12 +514,13 @@ async fn state_management() {
     tokio::spawn(async move { rt_task.run().await });
 
     let spawn_req = edgeless_api::function_instance::SpawnFunctionRequest {
-        code: edgeless_api::function_instance::FunctionClassSpecification {
-            function_class_id: "EXAMPLE_1".to_string(),
-            function_class_type: "RUST_WASM".to_string(),
-            function_class_version: "0.1".to_string(),
-            function_class_code: include_bytes!("../../../../functions/state_test/state_test.wasm").to_vec(),
-            function_class_outputs: Vec::new(),
+        spec: edgeless_api::function_instance::FunctionClassSpecification {
+            id: "EXAMPLE_1".to_string(),
+            function_type: "RUST_WASM".to_string(),
+            version: "0.1".to_string(),
+            binary: Some(include_bytes!("../../../../functions/state_test/state_test.wasm").to_vec()),
+            code: None,
+            outputs: Vec::new(),
         },
         annotations: std::collections::HashMap::new(),
         state_specification: edgeless_api::function_instance::StateSpecification {
