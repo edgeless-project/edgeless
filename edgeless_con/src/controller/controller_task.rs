@@ -583,7 +583,7 @@ impl ControllerTask {
     ) -> Option<edgeless_api::workflow_instance::SpawnWorkflowRequest> {
         let workflow = match self.active_workflows.get(wf_id) {
             None => {
-                log::error!("trying to tear-down a workflow that does not exist: {}", wf_id.to_string());
+                log::error!("trying to tear-down a workflow that does not exist: {}", wf_id);
                 return None;
             }
             Some(val) => val,
@@ -591,7 +591,7 @@ impl ControllerTask {
 
         // Stop all the functions/resources.
         for component in workflow.domain_mapping.values() {
-            log::debug!("stopping function/resource of workflow {}: {}", wf_id.to_string(), &component);
+            log::debug!("stopping function/resource of workflow {}: {}", wf_id, &component);
             let orc_api = match self.orchestrators.get_mut(&component.domain_id) {
                 None => {
                     log::warn!(
@@ -1226,7 +1226,7 @@ impl ControllerTask {
                     Err(format!("function instance creation rejected: {} ", error))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                    log::info!("workflow {} function {} started with fid {}", wf_id.to_string(), function.name, &id);
+                    log::info!("workflow {} function {} started with fid {}", wf_id, function.name, &id);
                     // id.node_id is unused
                     workflow.domain_mapping.insert(
                         function.name.clone(),
@@ -1268,7 +1268,7 @@ impl ControllerTask {
                     Err(format!("resource start rejected: {} ", error))
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
-                    log::info!("workflow {} resource {} started with fid {}", wf_id.to_string(), resource.name, &id);
+                    log::info!("workflow {} resource {} started with fid {}", wf_id, resource.name, &id);
                     // id.node_id is unused
                     workflow.domain_mapping.insert(
                         resource.name.clone(),
