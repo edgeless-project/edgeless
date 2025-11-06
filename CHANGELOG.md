@@ -45,7 +45,8 @@ Update of functions and resources:
   ID to dispatch the body of the HTTP command to the intended workflow;
   iv) dispatch randomly the body of the incoming HTTP command to one of the
   possible resource instances matching the host, method, and workflow identifier
-  (if specified, all are optional).
+  (if specified, all are optional). With cast(), it is also possible to encode
+  the incoming message using base64.
 - Add the `http-poster` resource provider, which sends a POST command for every
   `cast()` invoked to a web server specified in the resource's configuration.
 
