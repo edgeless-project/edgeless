@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+
+use base64::Engine;
 use edgeless_api::function_instance::ComponentId;
 use http_body_util::BodyExt;
 use rand::{SeedableRng, seq::SliceRandom};
@@ -46,11 +48,15 @@ impl super::resource_provider_specs::ResourceProviderSpecs for HttpIngressResour
                     "Boolean specifying if the target on the output channel should be invoked via an asynchronous cast. One of: true, false. Default: use a synchronous call.",
                 ),
             ),
+            (
+                String::from("encode_base64"),
+                String::from("Encode the input with base64 (only with async=true)."),
+            ),
         ])
     }
 
     fn version(&self) -> String {
-        String::from("2.0")
+        String::from("2.1")
     }
 }
 
@@ -59,6 +65,7 @@ struct ResourceDesc {
     allow: std::collections::HashSet<edgeless_http::EdgelessHTTPMethod>,
     wf_id: Option<String>,
     async_out: bool,
+    encode_base64: bool,
     target: Option<edgeless_api::function_instance::InstanceId>,
 }
 
@@ -126,12 +133,13 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
 
                 if desc.async_out {
                     // Invoke the next component via cast().
+                    let msg = if desc.encode_base64 {
+                        base64::engine::general_purpose::STANDARD.encode(data.to_vec())
+                    } else {
+                        String::from_utf8(data.to_vec())?
+                    };
                     lck.dataplane
-                        .send(
-                            target,
-                            String::from_utf8(data.to_vec())?,
-                            &edgeless_api::function_instance::EventMetadata::empty_new_root(),
-                        )
+                        .send(target, msg, &edgeless_api::function_instance::EventMetadata::empty_new_root())
                         .await;
                     let mut ok_res = hyper::Response::new(http_body_util::Full::new(hyper::body::Bytes::from("OK")));
                     *ok_res.status_mut() = hyper::StatusCode::OK;
@@ -295,6 +303,11 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
             .get("async")
             .unwrap_or(&String::from("false"))
             .eq_ignore_ascii_case("true");
+        let encode_base64 = instance_specification
+            .configuration
+            .get("encode_base64")
+            .unwrap_or(&String::from("false"))
+            .eq_ignore_ascii_case("true");
 
         // Assign a new component identifier to the newly-created  resource.
         log::info!(
@@ -312,6 +325,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                 allow,
                 wf_id,
                 async_out,
+                encode_base64,
                 target: None, // will be set by patch()
             },
         );
