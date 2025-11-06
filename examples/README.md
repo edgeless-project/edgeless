@@ -7,8 +7,9 @@ features provided by the platform.
 - `container`: shows how to deploy a mixed workflow consisting of a function instance running in WASM, another as a container, and a resource
 - `esp32_resources`: shows how to use a `scd30-sensor` resource
 - `file_log`: shows how to use a resource that appends the function arguments to a file local to the node
-- `http_egress`: shows the HTTP egress feature of the e-Balancer by periodically issuing a GET to an external server
-- `http_ingress`: shows the HTTP ingress feature of the e-Balancer by waiting for POST commands, to which the function replies with an OK message with fixed body, see [tutorial](http_ingress/README.md)
+- `http_egress`: shows how to send HTTP commands to an external web servers via a function like `http_requestor`
+- `http_ingress`: shows how to ingest data from external HTTP clients
+- `http_poster`: shows how to forward the event message to a web server via HTTP POST directly 
 - `kafka_egress`: shows host to use a resource that streams messages to an Apache Kafka server
 - `load_balance`: shows how to implement horizontal scalability in a workflow by deploying multiple instances fed by simple round-robin load balancer
 - `matrix_mul`: shows how to create a single function or a chain of three functions performing multiplication of two internal matrices to increase the CPU load

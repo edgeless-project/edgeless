@@ -5,6 +5,7 @@ pub mod dda;
 pub mod file_log;
 pub mod http_egress;
 pub mod http_ingress;
+pub mod http_poster;
 #[cfg(feature = "rdkafka")]
 pub mod kafka_egress;
 pub mod ollama;

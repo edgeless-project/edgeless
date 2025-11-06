@@ -1,0 +1,29 @@
+{
+    "functions": [
+        {
+            "name": "counter",
+            "class_specification": {
+                "id": "counter",
+                "function_type": "RUST_WASM",
+                "version": "0.2",
+                "code": "../../functions/counter/counter.wasm",
+                "outputs": []
+            },
+            "output_mapping": {
+                "output": "http-poster"
+            },
+            "annotations": {}
+        }
+    ],
+    "resources": [
+        {
+            "name": "http-poster",
+            "class_type": "http-poster",
+            "output_mapping": {},
+            "configurations": {
+                "url": "http://localhost:10000/"
+            }
+        }
+    ],
+    "annotations": {}
+}
