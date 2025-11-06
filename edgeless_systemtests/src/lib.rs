@@ -7,6 +7,15 @@
 mod system_tests {
     // use super::*;
 
+    static INIT: std::sync::Once = std::sync::Once::new();
+
+    pub fn initialize() {
+        INIT.call_once(|| {
+            // let _ = env_logger::try_init();
+            edgeless_api::grpc_impl::init_crypto();
+        });
+    }
+
     use edgeless_api::outer::controller::ControllerAPI;
     use edgeless_api::workflow_instance::{MigrateWorkflowRequest, WorkflowInstanceAPI};
     use edgeless_orc::proxy::Proxy;
@@ -27,7 +36,7 @@ mod system_tests {
     }
 
     async fn setup(num_domains: u32, num_nodes_per_domain: u32, redis_url: Option<&str>) -> SetupReturn {
-        edgeless_api::grpc_impl::init_crypto();
+        initialize();
 
         assert!(num_domains > 0);
         assert!(num_nodes_per_domain > 0);
@@ -371,8 +380,6 @@ mod system_tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn system_test_single_domain_single_node() -> anyhow::Result<()> {
-        // let _ = env_logger::try_init();
-
         // Create the EDGELESS system.
         let setup_conf = setup(1, 1, None).await;
         let handles = setup_conf.abort_handles;
@@ -448,8 +455,6 @@ mod system_tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     #[serial_test::serial]
     async fn system_test_single_domain_three_nodes() -> anyhow::Result<()> {
-        // let _ = env_logger::try_init();
-
         // Create the EDGELESS system.
         let setup_conf = setup(1, 3, None).await;
         let handles = setup_conf.abort_handles;
@@ -584,8 +589,6 @@ mod system_tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn system_test_three_domains_simple() -> anyhow::Result<()> {
-        // let _ = env_logger::try_init();
-
         // Create the EDGELESS system.
         let setup_conf = setup(3, 1, None).await;
         let mut handles = setup_conf.abort_handles;
@@ -669,8 +672,6 @@ mod system_tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     #[serial_test::serial]
     async fn system_test_orchestration_intent_migration_redis() -> anyhow::Result<()> {
-        // let _ = env_logger::try_init();
-
         // Skip the test if there is no local Redis listening on default port.
         let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true, None) {
             Ok(redis_proxy) => redis_proxy,
@@ -865,8 +866,6 @@ mod system_tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     #[serial_test::serial]
     async fn system_test_orchestration_node_cordoning_functions_redis() -> anyhow::Result<()> {
-        // let _ = env_logger::try_init();
-
         // Skip the test if there is no local Redis listening on default port.
         let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true, None) {
             Ok(redis_proxy) => redis_proxy,
@@ -1004,8 +1003,6 @@ mod system_tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
     #[serial_test::serial]
     async fn system_test_orchestration_node_cordoning_resources_redis() -> anyhow::Result<()> {
-        // let _ = env_logger::try_init();
-
         // Skip the test if there is no local Redis listening on default port.
         let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true, None) {
             Ok(redis_proxy) => redis_proxy,
@@ -1153,8 +1150,6 @@ mod system_tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn system_test_balancer() -> anyhow::Result<()> {
-        // let _ = env_logger::try_init();
-
         let removeme_filename = "removeme-balancer.log";
 
         let cleanup = || {
