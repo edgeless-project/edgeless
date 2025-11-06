@@ -2124,9 +2124,11 @@ fn test_orc_feasible_nodes() {
     let mut fun1_req = make_spawn_function_request("fun");
 
     assert!(logic.feasible_nodes(&fun1_req, &vec![]).is_empty());
-    assert!(logic
-        .feasible_nodes(&fun1_req, &vec![uuid::Uuid::new_v4(), uuid::Uuid::new_v4(), uuid::Uuid::new_v4()])
-        .is_empty());
+    assert!(
+        logic
+            .feasible_nodes(&fun1_req, &vec![uuid::Uuid::new_v4(), uuid::Uuid::new_v4(), uuid::Uuid::new_v4()])
+            .is_empty()
+    );
 
     // Add nodes
     let (nodes, mut client_descs_resources, _stable_node_id) = create_clients_resources(5, 0);

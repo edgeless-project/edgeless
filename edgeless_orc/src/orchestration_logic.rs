@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
 
-use rand::distributions::Distribution;
 use rand::SeedableRng;
+use rand::distributions::Distribution;
 
 /// Keeps all the necessary state that is needed to make simple orchestration
 /// decisions. Provides convenience methods that can be used by the
@@ -92,9 +92,10 @@ impl OrchestrationLogic {
                     &self.nodes[ndx],
                     &self.capabilities[ndx],
                     &self.resource_providers[ndx],
-                ) {
-                    candidates.push(self.nodes[ndx]);
-                }
+                )
+            {
+                candidates.push(self.nodes[ndx]);
+            }
         }
 
         candidates

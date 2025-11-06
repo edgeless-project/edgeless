@@ -7,7 +7,7 @@
 #[allow(async_fn_in_trait)]
 pub trait InvocationAPI {
     async fn handle(&mut self, event: edgeless_api_core::invocation::Event<&[u8]>)
-        -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()>;
+    -> Result<edgeless_api_core::invocation::LinkProcessingResult, ()>;
 }
 
 // https://rust-lang.github.io/async-fundamentals-initiative/evaluation/case-studies/builder-provider-api.html#dynamic-dispatch-behind-the-api

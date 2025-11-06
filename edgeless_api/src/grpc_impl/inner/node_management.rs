@@ -57,12 +57,13 @@ impl crate::node_management::NodeManagementAPI for NodeManagementClient {
         match self.try_connect().await {
             Ok(_) => {
                 if let Some(client) = &mut self.client {
-                    match client.update_peers(tonic::Request::new(serialize_update_peers_request(&request))).await { Err(err) => {
-                        self.disconnect();
-                        anyhow::bail!("Error when updating peers at {}: {}", self.server_addr, err);
-                    } _ => {
-                        Ok(())
-                    }}
+                    match client.update_peers(tonic::Request::new(serialize_update_peers_request(&request))).await {
+                        Err(err) => {
+                            self.disconnect();
+                            anyhow::bail!("Error when updating peers at {}: {}", self.server_addr, err);
+                        }
+                        _ => Ok(()),
+                    }
                 } else {
                     panic!("The impossible happened");
                 }
@@ -76,12 +77,13 @@ impl crate::node_management::NodeManagementAPI for NodeManagementClient {
         match self.try_connect().await {
             Ok(_) => {
                 if let Some(client) = &mut self.client {
-                    match client.reset(tonic::Request::new(())).await { Err(err) => {
-                        self.disconnect();
-                        anyhow::bail!("Error when resetting at {}: {}", self.server_addr, err);
-                    } _ => {
-                        Ok(())
-                    }}
+                    match client.reset(tonic::Request::new(())).await {
+                        Err(err) => {
+                            self.disconnect();
+                            anyhow::bail!("Error when resetting at {}: {}", self.server_addr, err);
+                        }
+                        _ => Ok(()),
+                    }
                 } else {
                     panic!("The impossible happened");
                 }

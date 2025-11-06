@@ -35,55 +35,58 @@ impl NodeRegisterAPIServer {
         };
         Box::pin(async move {
             let node_registration_api = node_registration_api;
-            match crate::util::parse_http_host(&node_register_url) { Ok((_proto, host, port)) => {
-                if let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start NodeRegisterAPIServer GRPC Server at {}", node_register_url);
+            match crate::util::parse_http_host(&node_register_url) {
+                Ok((_proto, host, port)) => {
+                    if let Ok(host) = format!("{}:{}", host, port).parse() {
+                        log::info!("Start NodeRegisterAPIServer GRPC Server at {}", node_register_url);
 
-                    let mut server_builder = tonic::transport::Server::builder();
+                        let mut server_builder = tonic::transport::Server::builder();
 
-                    if let Some(tls_config) = tls_config {
-                        match tls_config.create_server_tls_config() {
-                            Ok(Some(config)) => {
-                                log::info!("TLS enabled for GRPC server");
-                                match server_builder.tls_config(config) {
-                                    Ok(builder) => server_builder = builder,
-                                    Err(e) => {
-                                        log::error!("Failed to apply TLS config: {}", e);
-                                        return;
+                        if let Some(tls_config) = tls_config {
+                            match tls_config.create_server_tls_config() {
+                                Ok(Some(config)) => {
+                                    log::info!("TLS enabled for GRPC server");
+                                    match server_builder.tls_config(config) {
+                                        Ok(builder) => server_builder = builder,
+                                        Err(e) => {
+                                            log::error!("Failed to apply TLS config: {}", e);
+                                            return;
+                                        }
                                     }
                                 }
-                            }
-                            Ok(None) => {
-                                log::info!("TLS disabled for GRPC server");
-                            }
-                            Err(e) => {
-                                log::error!("Failed to create TLS config: {}", e);
-                                return;
+                                Ok(None) => {
+                                    log::info!("TLS disabled for GRPC server");
+                                }
+                                Err(e) => {
+                                    log::error!("Failed to create TLS config: {}", e);
+                                    return;
+                                }
                             }
                         }
-                    }
 
-                    match server_builder
-                        .add_service(
-                            crate::grpc_impl::api::node_registration_server::NodeRegistrationServer::new(node_registration_api)
-                                .max_decoding_message_size(usize::MAX),
-                        )
-                        .serve(host)
-                        .await
-                    {
-                        Ok(_) => {
-                            log::debug!("Clean Exit");
+                        match server_builder
+                            .add_service(
+                                crate::grpc_impl::api::node_registration_server::NodeRegistrationServer::new(node_registration_api)
+                                    .max_decoding_message_size(usize::MAX),
+                            )
+                            .serve(host)
+                            .await
+                        {
+                            Ok(_) => {
+                                log::debug!("Clean Exit");
+                            }
+                            Err(_) => {
+                                log::error!("GRPC Server Failure");
+                            }
                         }
-                        Err(_) => {
-                            log::error!("GRPC Server Failure");
-                        }
+                    } else {
+                        log::error!("NodeRegisterAPIServer parsing error")
                     }
-                } else {
-                    log::error!("NodeRegisterAPIServer parsing error")
                 }
-            } _ => {
-                log::error!("NodeRegisterAPIServer could not parse http host")
-            }}
+                _ => {
+                    log::error!("NodeRegisterAPIServer could not parse http host")
+                }
+            }
 
             log::info!("Stop NodeRegisterAPIServer GRPC Server");
         })

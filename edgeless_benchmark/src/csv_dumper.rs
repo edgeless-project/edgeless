@@ -40,10 +40,9 @@ impl CsvDumper {
                 additional_header += ",";
                 additional_fields += ",";
             }
-            if header
-                && let Some(outfile) = &mut outfile {
-                    writeln!(outfile, "{}timestamp,metric,target,value", additional_header)?;
-                }
+            if header && let Some(outfile) = &mut outfile {
+                writeln!(outfile, "{}timestamp,metric,target,value", additional_header)?;
+            }
         }
 
         Ok(Self { additional_fields, outfile })

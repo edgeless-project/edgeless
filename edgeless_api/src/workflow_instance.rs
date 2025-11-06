@@ -32,11 +32,7 @@ impl WorkflowId {
         }
     }
     pub fn is_valid(&self) -> Option<&WorkflowId> {
-        if self.workflow_id == WORKFLOW_ID_NONE {
-            None
-        } else {
-            Some(self)
-        }
+        if self.workflow_id == WORKFLOW_ID_NONE { None } else { Some(self) }
     }
 }
 
@@ -174,11 +170,12 @@ impl SpawnWorkflowRequest {
         for resource in &self.resources {
             resource.is_valid()?;
         }
-        anyhow::ensure!(self
-            .mapped_components()
-            .difference(&self.source_components())
-            .collect::<Vec<&String>>()
-            .is_empty());
+        anyhow::ensure!(
+            self.mapped_components()
+                .difference(&self.source_components())
+                .collect::<Vec<&String>>()
+                .is_empty()
+        );
 
         // self.workflow_functions.
         Ok(())

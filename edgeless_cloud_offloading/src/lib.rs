@@ -1,8 +1,8 @@
 use aws_config::Region;
 use aws_sdk_ec2::types::{InstanceType, Tag};
-use base64::{engine::general_purpose::STANDARD, Engine as _};
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use rand::distributions::Alphanumeric;
-use rand::{thread_rng, Rng};
+use rand::{Rng, thread_rng};
 use std::time::Instant;
 use uuid::Uuid;
 

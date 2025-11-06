@@ -5,8 +5,8 @@
 
 use futures::{SinkExt, StreamExt};
 use itertools::Itertools;
-use rand::seq::SliceRandom;
 use rand::SeedableRng;
+use rand::seq::SliceRandom;
 
 use crate::active_instance::ActiveInstance;
 
@@ -262,11 +262,12 @@ impl OrchestratorTask {
                     }
                     self.active_instances_changed = true;
 
-                    match self.start_resource_in_node(resource_req, lid, target_node_id).await { Err(err) => {
-                        anyhow::bail!("Error when migrating resource LID {} to node_id {}: {}", lid, target_node_id, err);
-                    } _ => {
-                        Ok(*target_node_id)
-                    }}
+                    match self.start_resource_in_node(resource_req, lid, target_node_id).await {
+                        Err(err) => {
+                            anyhow::bail!("Error when migrating resource LID {} to node_id {}: {}", lid, target_node_id, err);
+                        }
+                        _ => Ok(*target_node_id),
+                    }
                 } else {
                     anyhow::bail!(
                         "Request to migrate resource '{}' to node_id '{}', which does not have matching resource providers",
@@ -443,9 +444,10 @@ impl OrchestratorTask {
         node_id: &edgeless_api::function_instance::NodeId,
     ) -> bool {
         if let Some(desc) = self.nodes.get(node_id)
-            && desc.cordoned {
-                return false;
-            }
+            && desc.cordoned
+        {
+            return false;
+        }
         let capabilities = &self.nodes.get(node_id).unwrap().capabilities;
         if !crate::deployment_requirements::DeploymentRequirements::from_annotations(&resource_req.configuration).is_feasible(
             node_id,

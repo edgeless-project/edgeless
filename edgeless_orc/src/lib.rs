@@ -165,21 +165,24 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
     );
 
     let node_register_coap_server = if let Some(url) = settings.general.node_register_coap_url {
-        match edgeless_api::util::parse_http_host(&url) { Ok((proto, address, port)) => {
-            if proto != edgeless_api::util::Proto::COAP {
-                log::warn!("Wrong protocol for the CoAP node register ({}): assuming coap://", url);
+        match edgeless_api::util::parse_http_host(&url) {
+            Ok((proto, address, port)) => {
+                if proto != edgeless_api::util::Proto::COAP {
+                    log::warn!("Wrong protocol for the CoAP node register ({}): assuming coap://", url);
+                }
+                if address != "0.0.0.0" {
+                    log::warn!("CoAP node register requested to be bound at {}: ignored, using 0.0.0.0 instead", address);
+                }
+                edgeless_api::coap_impl::node_register::CoapNodeRegisterServer::run(
+                    node_register.get_node_registration_client().node_registration_api(),
+                    std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
+                )
             }
-            if address != "0.0.0.0" {
-                log::warn!("CoAP node register requested to be bound at {}: ignored, using 0.0.0.0 instead", address);
+            _ => {
+                log::error!("Wrong URL for the CoAP node register: {}", url);
+                Box::pin(async {})
             }
-            edgeless_api::coap_impl::node_register::CoapNodeRegisterServer::run(
-                node_register.get_node_registration_client().node_registration_api(),
-                std::net::SocketAddrV4::new("0.0.0.0".parse().unwrap(), port),
-            )
-        } _ => {
-            log::error!("Wrong URL for the CoAP node register: {}", url);
-            Box::pin(async {})
-        }}
+        }
     } else {
         Box::pin(async {})
     };

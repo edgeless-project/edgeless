@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2024 Chen Chen <cc2181@cam.ac.uk>
 // SPDX-License-Identifier: MIT
 use edgeless_dataplane::core::Message;
-use sqlx::{migrate::MigrateDatabase, FromRow, Sqlite, SqlitePool};
+use sqlx::{FromRow, Sqlite, SqlitePool, migrate::MigrateDatabase};
 use tokio;
 
 pub struct SqlxResourceSpec {}

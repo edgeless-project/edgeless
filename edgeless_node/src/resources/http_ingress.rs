@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 use edgeless_api::function_instance::ComponentId;
 use http_body_util::BodyExt;
-use rand::{seq::SliceRandom, SeedableRng};
+use rand::{SeedableRng, seq::SliceRandom};
 use std::str::FromStr;
 
 pub struct HttpIngressResourceSpec {}
@@ -26,7 +26,9 @@ impl super::resource_provider_specs::ResourceProviderSpecs for HttpIngressResour
         std::collections::HashMap::from([
             (
                 String::from("host"),
-                String::from("If not empty, requires the external client to specify the given hostname in the HTTP header. Default: hostname not required"),
+                String::from(
+                    "If not empty, requires the external client to specify the given hostname in the HTTP header. Default: hostname not required",
+                ),
             ),
             (
                 String::from("method"),
@@ -34,11 +36,15 @@ impl super::resource_provider_specs::ResourceProviderSpecs for HttpIngressResour
             ),
             (
                 String::from("wf_id"),
-                String::from("Boolean specifying if the external client is required to specify the workflow ID in the URL query (?wf_id=<ID>). One of: true, false. Default: false."),
+                String::from(
+                    "Boolean specifying if the external client is required to specify the workflow ID in the URL query (?wf_id=<ID>). One of: true, false. Default: false.",
+                ),
             ),
             (
                 String::from("async"),
-                String::from("Boolean specifying if the target on the output channel should be invoked via an asynchronous cast. One of: true, false. Default: use a synchronous call."),
+                String::from(
+                    "Boolean specifying if the target on the output channel should be invoked via an asynchronous cast. One of: true, false. Default: use a synchronous call.",
+                ),
             ),
         ])
     }
@@ -270,7 +276,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                             summary: "Error when creating a resource".to_string(),
                             detail: Some(format!("Invalid method '{method}' specified in http-ingress: {err}")),
                         },
-                    ))
+                    ));
                 }
             };
         }

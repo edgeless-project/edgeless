@@ -4,7 +4,7 @@
 // SPDX-License-Identifier: MIT
 
 use futures::StreamExt;
-use rand::{seq::SliceRandom, SeedableRng};
+use rand::{SeedableRng, seq::SliceRandom};
 use std::{io::Write, str::FromStr};
 
 use crate::controller::deployment_state::ActiveWorkflow;
@@ -781,9 +781,10 @@ impl ControllerTask {
                 let mut confirmed_domains = std::collections::HashSet::new();
                 for domain in &domains {
                     if let Some(desc) = self.orchestrators.get(domain)
-                        && desc.capabilities.resource_classes.contains("portal") {
-                            confirmed_domains.insert(domain.clone());
-                        }
+                        && desc.capabilities.resource_classes.contains("portal")
+                    {
+                        confirmed_domains.insert(domain.clone());
+                    }
                 }
 
                 // If there are no confirmed domains in the portal (or if there

@@ -7,7 +7,7 @@ use std::str::FromStr;
 #[async_trait::async_trait]
 trait NodeRegistrationHelper {
     async fn register(&mut self, update: crate::node_registration::UpdateNodeRequest)
-        -> anyhow::Result<crate::node_registration::UpdateNodeResponse>;
+    -> anyhow::Result<crate::node_registration::UpdateNodeResponse>;
 }
 
 #[async_trait::async_trait]

@@ -60,7 +60,7 @@ impl Docker {
                     "could not create the container, this likely means that the image is not available locally, please run: docker image pull {}: {}",
                     image_name,
                     err
-                ))
+                ));
             }
         };
 
@@ -92,14 +92,14 @@ impl Docker {
                         "could not find a public port to which {} is mapped for the newly-created container with ID {}",
                         port.PrivatePort,
                         id
-                    ))
+                    ));
                 }
             },
             None => {
                 return Err(anyhow::anyhow!(
                     "could not find a published port bound to 0.0.0.0 the newly-created container with ID {}",
                     id
-                ))
+                ));
             }
         };
 

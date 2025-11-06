@@ -169,8 +169,8 @@ mod test {
 
         assert!(receiver_1.try_next().is_err());
 
-        assert!(api
-            .handle(edgeless_api::invocation::Event {
+        assert!(
+            api.handle(edgeless_api::invocation::Event {
                 target: fid_wrong_node_id,
                 source: fid_source,
                 stream_id: 0,
@@ -179,7 +179,8 @@ mod test {
                 metadata: edgeless_api::function_instance::EventMetadata::from_uints(0x42a42bdecaf00013u128, 0x42a42bdecaf00014u64),
             })
             .await
-            .is_err());
+            .is_err()
+        );
 
         assert!(receiver_1.try_next().is_err());
 
