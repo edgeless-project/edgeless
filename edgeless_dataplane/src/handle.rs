@@ -330,6 +330,7 @@ mod test {
 
     #[tokio::test]
     async fn grpc_impl_e2e() {
+        edgeless_api::grpc_impl::init_crypto();
         let node_id = uuid::Uuid::new_v4();
         let node_id_2 = uuid::Uuid::new_v4();
         let fid_1 = edgeless_api::function_instance::InstanceId::new(node_id);

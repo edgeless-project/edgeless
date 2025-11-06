@@ -27,6 +27,8 @@ mod system_tests {
     }
 
     async fn setup(num_domains: u32, num_nodes_per_domain: u32, redis_url: Option<&str>) -> SetupReturn {
+        edgeless_api::grpc_impl::init_crypto();
+
         assert!(num_domains > 0);
         assert!(num_nodes_per_domain > 0);
 
@@ -251,11 +253,7 @@ mod system_tests {
         if res.is_empty() {
             return 0;
         }
-        if let Some(entry) = res.get(domain_id) {
-            entry.num_nodes
-        } else {
-            0
-        }
+        if let Some(entry) = res.get(domain_id) { entry.num_nodes } else { 0 }
     }
 
     async fn nodes_in_bal_domain(client: &mut Box<dyn WorkflowInstanceAPI>) -> (u32, std::collections::HashSet<String>) {
@@ -322,16 +320,17 @@ mod system_tests {
                     annotations: std::collections::HashMap::new(),
                 })
                 .await
-            { Ok(res) => {
-                match res {
+            {
+                Ok(res) => match res {
                     edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(instance) => {
                         ret.push(instance.workflow_id);
                     }
                     edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(_) => {}
+                },
+                _ => {
+                    panic!("cannot create {}-th workflow out of {}", i + 1, n);
                 }
-            } _ => {
-                panic!("cannot create {}-th workflow out of {}", i + 1, n);
-            }}
+            }
         }
         ret
     }
@@ -354,16 +353,17 @@ mod system_tests {
                     annotations: std::collections::HashMap::new(),
                 })
                 .await
-            { Ok(res) => {
-                match res {
+            {
+                Ok(res) => match res {
                     edgeless_api::workflow_instance::SpawnWorkflowResponse::WorkflowInstance(instance) => {
                         ret.push(instance.workflow_id);
                     }
                     edgeless_api::workflow_instance::SpawnWorkflowResponse::ResponseError(_) => {}
+                },
+                _ => {
+                    panic!("cannot create {}-th workflow out of {}", i + 1, n);
                 }
-            } _ => {
-                panic!("cannot create {}-th workflow out of {}", i + 1, n);
-            }}
+            }
         }
         ret
     }

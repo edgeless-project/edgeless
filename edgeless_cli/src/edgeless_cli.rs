@@ -6,11 +6,11 @@
 use cargo::GlobalContext;
 use clap::Parser;
 use edgeless_api::{outer::controller::ControllerAPI, workflow_instance::SpawnWorkflowResponse};
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 use mailparse::{parse_content_disposition, parse_header};
 use reqwest::header::ACCEPT;
-use reqwest::{multipart, Body, Client};
+use reqwest::{Body, Client, multipart};
 use std::collections::HashMap;
 use std::fs::{self};
 use std::io::Cursor;
@@ -183,9 +183,7 @@ async fn workflow_inspect(wf_client: &mut Box<dyn edgeless_api::workflow_instanc
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     env_logger::init();
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install rustls crypto provider");
+    edgeless_api::grpc_impl::init_crypto();
     let args = Args::parse();
     if args.version {
         println!(

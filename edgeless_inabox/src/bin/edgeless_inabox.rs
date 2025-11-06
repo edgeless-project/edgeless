@@ -36,6 +36,7 @@ struct Args {
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
+    edgeless_api::grpc_impl::init_crypto();
     let args = Args::parse();
 
     if args.version {
@@ -92,11 +93,7 @@ fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16
         }
     };
     let announced_url = |url| {
-        if bind_to_nonloopback {
-            String::default()
-        } else {
-            url
-        }
+        if bind_to_nonloopback { String::default() } else { url }
     };
 
     let controller_url = format!("http://{}:{}", ip, reserved_controller_port);
@@ -197,9 +194,10 @@ fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16
 
     // Try to create the directory if it does not exist.
     if fs::metadata(&config_path).is_err()
-        && let Err(_err) = fs::create_dir(&config_path) {
-            anyhow::bail!("Failed with creating directory: {}", &config_path);
-        }
+        && let Err(_err) = fs::create_dir(&config_path)
+    {
+        anyhow::bail!("Failed with creating directory: {}", &config_path);
+    }
 
     // Write files (without overwriting).
     let orc_file = Path::new(&config_path).join("orchestrator.toml");
