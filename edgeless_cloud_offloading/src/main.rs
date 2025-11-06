@@ -3,7 +3,7 @@ mod config;
 use anyhow::anyhow;
 use clap::Parser;
 use cloud_offloading::rebalancer::Rebalancer;
-use cloud_offloading::{create_cloud_node, delete_cloud_node, CloudNodeData, CloudNodeInputData};
+use cloud_offloading::{CloudNodeData, CloudNodeInputData, create_cloud_node, delete_cloud_node};
 use config::Config;
 use std::collections::HashSet;
 use std::fs;

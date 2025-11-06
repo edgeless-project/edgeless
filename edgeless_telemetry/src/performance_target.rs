@@ -39,40 +39,43 @@ impl crate::telemetry_events::EventProcessor for PerformanceTarget {
         match event {
             crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(lat) => {
                 if let Some(function_id) = event_tags.get("FUNCTION_ID")
-                    && let Ok(function_id) = uuid::Uuid::from_str(function_id) {
-                        let now = chrono::Utc::now();
-                        let res = self.metrics.function_execution_times.entry(function_id).or_default();
-                        res.push(edgeless_api::node_registration::Sample {
-                            timestamp_sec: now.timestamp(),
-                            timestamp_ns: now.timestamp_subsec_nanos(),
-                            sample: lat.as_secs_f64(),
-                        });
-                    }
+                    && let Ok(function_id) = uuid::Uuid::from_str(function_id)
+                {
+                    let now = chrono::Utc::now();
+                    let res = self.metrics.function_execution_times.entry(function_id).or_default();
+                    res.push(edgeless_api::node_registration::Sample {
+                        timestamp_sec: now.timestamp(),
+                        timestamp_ns: now.timestamp_subsec_nanos(),
+                        sample: lat.as_secs_f64(),
+                    });
+                }
             }
             crate::telemetry_events::TelemetryEvent::FunctionTransfer(lat) => {
                 if let Some(function_id) = event_tags.get("FUNCTION_ID")
-                    && let Ok(function_id) = uuid::Uuid::from_str(function_id) {
-                        let now = chrono::Utc::now();
-                        let res = self.metrics.function_transfer_times.entry(function_id).or_default();
-                        res.push(edgeless_api::node_registration::Sample {
-                            timestamp_sec: now.timestamp(),
-                            timestamp_ns: now.timestamp_subsec_nanos(),
-                            sample: lat.as_secs_f64(),
-                        });
-                    }
+                    && let Ok(function_id) = uuid::Uuid::from_str(function_id)
+                {
+                    let now = chrono::Utc::now();
+                    let res = self.metrics.function_transfer_times.entry(function_id).or_default();
+                    res.push(edgeless_api::node_registration::Sample {
+                        timestamp_sec: now.timestamp(),
+                        timestamp_ns: now.timestamp_subsec_nanos(),
+                        sample: lat.as_secs_f64(),
+                    });
+                }
             }
             crate::telemetry_events::TelemetryEvent::FunctionLogEntry(_lvl, target, message) => {
                 if let Some(function_id) = event_tags.get("FUNCTION_ID")
-                    && let Ok(function_id) = uuid::Uuid::from_str(function_id) {
-                        let now = chrono::Utc::now();
-                        let res = self.metrics.function_log_entries.entry(function_id).or_default();
-                        res.push(edgeless_api::node_registration::FunctionLogEntry {
-                            timestamp_sec: now.timestamp(),
-                            timestamp_ns: now.timestamp_subsec_nanos(),
-                            target: target.to_string(),
-                            message: message.to_string(),
-                        });
-                    }
+                    && let Ok(function_id) = uuid::Uuid::from_str(function_id)
+                {
+                    let now = chrono::Utc::now();
+                    let res = self.metrics.function_log_entries.entry(function_id).or_default();
+                    res.push(edgeless_api::node_registration::FunctionLogEntry {
+                        timestamp_sec: now.timestamp(),
+                        timestamp_ns: now.timestamp_subsec_nanos(),
+                        target: target.to_string(),
+                        message: message.to_string(),
+                    });
+                }
             }
             _ => {
                 return crate::telemetry_events::TelemetryProcessingResult::PASSED;

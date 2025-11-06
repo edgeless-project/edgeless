@@ -5,8 +5,8 @@ use crate::workflow_type::WorkflowType;
 use anyhow::anyhow;
 use edgeless_api::outer::controller::ControllerAPI;
 use edgeless_api::workflow_instance::{SpawnWorkflowResponse, WorkflowFunction, WorkflowId, WorkflowInstanceAPI};
-use rand::prelude::*;
 use rand::SeedableRng;
+use rand::prelude::*;
 use std::str::FromStr;
 
 /// Engine for the creation/termination of EDGELESS workflows.
@@ -48,19 +48,11 @@ impl Engine {
 
         let mut draw = |lower: u32, higher: u32| {
             assert!(lower <= higher);
-            if lower == higher {
-                lower
-            } else {
-                self.rng.gen_range(lower..=higher)
-            }
+            if lower == higher { lower } else { self.rng.gen_range(lower..=higher) }
         };
 
         let to_true_false = |val: bool| {
-            if val {
-                "true"
-            } else {
-                "false"
-            }
+            if val { "true" } else { "false" }
         };
 
         let function_class_specification = |path_json: &std::path::Path, path_wasm: &std::path::Path| {

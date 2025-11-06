@@ -143,13 +143,16 @@ impl CoapClient {
 
 impl Drop for CoapClient {
     fn drop(&mut self) {
-        match self.network_task_abort_handle.take() { Some(abort_handle) => {
-            if let Some(abort_handle) = std::sync::Arc::into_inner(abort_handle) {
-                log::info!("Network task stopped.");
-                abort_handle.abort();
+        match self.network_task_abort_handle.take() {
+            Some(abort_handle) => {
+                if let Some(abort_handle) = std::sync::Arc::into_inner(abort_handle) {
+                    log::info!("Network task stopped.");
+                    abort_handle.abort();
+                }
             }
-        } _ => {
-            log::warn!("Network task handle removed before drop.");
-        }}
+            _ => {
+                log::warn!("Network task handle removed before drop.");
+            }
+        }
     }
 }

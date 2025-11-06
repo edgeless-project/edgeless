@@ -151,7 +151,7 @@ where
                         detail: Some(err.to_string()),
                     }),
                     instance_id: None,
-                }))
+                }));
             }
         };
         match self.root_api.lock().await.start(parsed_spec).await {
@@ -163,7 +163,7 @@ where
                         detail: Some(err.to_string()),
                     }),
                     instance_id: None,
-                }))
+                }));
             }
         }
     }

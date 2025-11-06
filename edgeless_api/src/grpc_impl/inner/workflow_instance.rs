@@ -143,7 +143,7 @@ impl crate::grpc_impl::api::workflow_instance_server::WorkflowInstance for Workf
                         detail: Some(err.to_string()),
                     }),
                     workflow_status: None,
-                }))
+                }));
             }
         };
         let ret = self.root_api.lock().await.start(req).await;

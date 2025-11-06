@@ -252,7 +252,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                         summary: "Invalid resource configuration".to_string(),
                         detail: Some("Missing model name".to_string()),
                     },
-                ))
+                ));
             }
         };
 

@@ -206,9 +206,10 @@ async fn main() -> anyhow::Result<()> {
                         events.push(Event::WfEnd(workflow_end_time, uuid));
                     }
                     if let Some((arrival_time, end_time)) = arrival_model.next(now)
-                        && arrival_time < utils::to_microseconds(args.duration) {
-                            events.push(Event::WfNew(arrival_time, end_time));
-                        }
+                        && arrival_time < utils::to_microseconds(args.duration)
+                    {
+                        events.push(Event::WfNew(arrival_time, end_time));
+                    }
                 }
                 Event::WfEnd(_, uuid) => {
                     log::info!("{} wf terminated  '{}'", utils::to_seconds(now), &uuid);
@@ -232,15 +233,16 @@ async fn main() -> anyhow::Result<()> {
     if !args.keep_workflows {
         for event_type in events.iter() {
             if let Event::WfEnd(_, uuid) = event_type
-                && !uuid.is_empty() {
-                    log::info!("{} wf terminated  '{}'", utils::to_seconds(now), &uuid);
-                    match engine.stop_workflow(uuid).await {
-                        Ok(_) => {}
-                        Err(err) => {
-                            panic!("error when stopping a workflow: {}", err);
-                        }
+                && !uuid.is_empty()
+            {
+                log::info!("{} wf terminated  '{}'", utils::to_seconds(now), &uuid);
+                match engine.stop_workflow(uuid).await {
+                    Ok(_) => {}
+                    Err(err) => {
+                        panic!("error when stopping a workflow: {}", err);
                     }
                 }
+            }
         }
     }
 

@@ -114,12 +114,15 @@ impl ContainerFunction {
                                     msg: event.msg,
                                 })
                                 .await
-                            { Err(err) => {
-                                fsm = FiniteStateMachine::Error;
-                                log::error!("error when casting an event to alias \"output\": {}", err);
-                            } _ => {
-                                log::info!("event recasted successfully to \"output\"");
-                            }}
+                            {
+                                Err(err) => {
+                                    fsm = FiniteStateMachine::Error;
+                                    log::error!("error when casting an event to alias \"output\": {}", err);
+                                }
+                                _ => {
+                                    log::info!("event recasted successfully to \"output\"");
+                                }
+                            }
                         }
                     }
                 }

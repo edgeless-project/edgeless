@@ -216,40 +216,41 @@ impl ProxyRedis {
         for instance_key in self.connection.keys::<&str, Vec<String>>("instance:*").unwrap_or(vec![]) {
             let tokens: Vec<&str> = instance_key.split(':').collect();
             if tokens.len() == 2
-                && let Ok(uuid) = edgeless_api::function_instance::ComponentId::parse_str(tokens[1]) {
-                    instance_ids.push(uuid);
-                }
+                && let Ok(uuid) = edgeless_api::function_instance::ComponentId::parse_str(tokens[1])
+            {
+                instance_ids.push(uuid);
+            }
         }
         let mut instances = std::collections::HashMap::new();
         for instance_id in instance_ids {
             if let Ok(val) = self.connection.get::<String, String>(format!("instance:{}", instance_id))
-                && let Ok(val) = serde_json::from_str::<ActiveInstanceClone>(&val) {
-                    instances.insert(
-                        instance_id,
-                        match val {
-                            ActiveInstanceClone::Function(spawn_req, instance_ids_str) => {
-                                let mut instance_ids = vec![];
-                                for instance_id_str in instance_ids_str {
-                                    if let Ok(instance_id) = string_to_instance_id(&instance_id_str) {
-                                        instance_ids.push(instance_id);
-                                    }
-                                }
-                                if !instance_ids.is_empty() {
-                                    crate::active_instance::ActiveInstance::Function(spawn_req, instance_ids)
-                                } else {
-                                    continue;
+                && let Ok(val) = serde_json::from_str::<ActiveInstanceClone>(&val)
+            {
+                instances.insert(
+                    instance_id,
+                    match val {
+                        ActiveInstanceClone::Function(spawn_req, instance_ids_str) => {
+                            let mut instance_ids = vec![];
+                            for instance_id_str in instance_ids_str {
+                                if let Ok(instance_id) = string_to_instance_id(&instance_id_str) {
+                                    instance_ids.push(instance_id);
                                 }
                             }
-                            ActiveInstanceClone::Resource(spawn_req, instance_id_str) => {
-                                match string_to_instance_id(&instance_id_str) { Ok(instance_id) => {
-                                    crate::active_instance::ActiveInstance::Resource(spawn_req, instance_id)
-                                } _ => {
-                                    continue;
-                                }}
+                            if !instance_ids.is_empty() {
+                                crate::active_instance::ActiveInstance::Function(spawn_req, instance_ids)
+                            } else {
+                                continue;
+                            }
+                        }
+                        ActiveInstanceClone::Resource(spawn_req, instance_id_str) => match string_to_instance_id(&instance_id_str) {
+                            Ok(instance_id) => crate::active_instance::ActiveInstance::Resource(spawn_req, instance_id),
+                            _ => {
+                                continue;
                             }
                         },
-                    );
-                }
+                    },
+                );
+            }
         }
         instances
     }
@@ -541,9 +542,10 @@ impl super::proxy::Proxy for ProxyRedis {
             assert_eq!(tokens.len(), 3);
             if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2])
                 && let Ok(val) = self.connection.get::<&str, String>(&node_key)
-                    && let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeCapabilities>(&val) {
-                        capabilities.insert(node_id, val);
-                    }
+                && let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeCapabilities>(&val)
+            {
+                capabilities.insert(node_id, val);
+            }
         }
         capabilities
     }
@@ -555,9 +557,10 @@ impl super::proxy::Proxy for ProxyRedis {
             if let Some((provider, provider_id)) = node_key.split_once(':') {
                 assert_eq!("provider", provider);
                 if let Ok(val) = self.connection.get::<&str, String>(&node_key)
-                    && let Ok(val) = serde_json::from_str::<crate::resource_provider::ResourceProvider>(&val) {
-                        resource_providers.insert(provider_id.to_string(), val);
-                    }
+                    && let Ok(val) = serde_json::from_str::<crate::resource_provider::ResourceProvider>(&val)
+                {
+                    resource_providers.insert(provider_id.to_string(), val);
+                }
             } else {
                 panic!("invalid Redis key for a resource provider: {}", node_key);
             }
@@ -575,16 +578,18 @@ impl super::proxy::Proxy for ProxyRedis {
             assert_eq!("node", tokens[0]);
             assert_eq!("health", tokens[1]);
             if let Ok(node_id) = edgeless_api::function_instance::NodeId::parse_str(tokens[2])
-                && let Ok(values) = self.connection.zrange::<&str, Vec<String>>(&node_key, -1, -1) {
-                    assert!(
-                        values.len() <= 1,
-                        "Invalid number of elements for ZRANGE command that should return 0 or 1 elements"
-                    );
-                    if let Some(value) = values.first()
-                        && let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(value) {
-                            health.insert(node_id, val);
-                        }
+                && let Ok(values) = self.connection.zrange::<&str, Vec<String>>(&node_key, -1, -1)
+            {
+                assert!(
+                    values.len() <= 1,
+                    "Invalid number of elements for ZRANGE command that should return 0 or 1 elements"
+                );
+                if let Some(value) = values.first()
+                    && let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(value)
+                {
+                    health.insert(node_id, val);
                 }
+            }
         }
         health
     }
@@ -604,9 +609,10 @@ impl super::proxy::Proxy for ProxyRedis {
                 {
                     for (value, timestamp) in values {
                         if let Some(timestamp) = chrono::DateTime::from_timestamp(timestamp as i64, (timestamp.fract() * 1e9) as u32)
-                            && let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(&value) {
-                                health_history.push((timestamp, val));
-                            }
+                            && let Ok(val) = serde_json::from_str::<edgeless_api::node_registration::NodeHealthStatus>(&value)
+                        {
+                            health_history.push((timestamp, val));
+                        }
                     }
                 }
                 healths.insert(node_id, health_history);
@@ -744,9 +750,10 @@ impl super::proxy::Proxy for ProxyRedis {
             assert_eq!("dependency", tokens[0]);
             if let Ok(lid) = uuid::Uuid::parse_str(tokens[1])
                 && let Ok(val) = self.connection.get::<&str, String>(&node_key)
-                    && let Ok(val) = serde_json::from_str::<std::collections::HashMap<String, uuid::Uuid>>(&val) {
-                        dependency_graph.insert(lid, val);
-                    }
+                && let Ok(val) = serde_json::from_str::<std::collections::HashMap<String, uuid::Uuid>>(&val)
+            {
+                dependency_graph.insert(lid, val);
+            }
         }
         dependency_graph
     }

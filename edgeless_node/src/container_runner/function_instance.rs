@@ -91,7 +91,7 @@ impl crate::base_runtime::FunctionInstance for ContainerFunctionInstance {
                                             _function_client,
                                             function_client_api,
                                             id,
-                                        }))
+                                        }));
                                     }
                                     Err(err) => {
                                         if ts.elapsed() >= std::time::Duration::from_secs(30) {
