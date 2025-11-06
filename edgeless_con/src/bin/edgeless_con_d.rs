@@ -20,9 +20,7 @@ struct Args {
 
 fn main() -> anyhow::Result<()> {
     env_logger::init();
-    rustls::crypto::ring::default_provider()
-        .install_default()
-        .expect("Failed to install rustls crypto provider");
+    edgeless_api::grpc_impl::init_crypto();
     let args = Args::parse();
     if args.version {
         println!(

@@ -89,7 +89,6 @@ sqlx = { version = "0.8.0", features = [
 edgeless_function = { path = "../edgeless_function" }
 tokio-modbus = "0.16.1"
 opentelemetry = { workspace = true }
-rustls = { version = "0.23.29", features = ["ring"] }
 
 [build-dependencies]
 tonic-build = {version = "0.13.1", features = ["prost"]}
