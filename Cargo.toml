@@ -21,6 +21,7 @@ members = [
     "edgeless_telemetry",
     "edgeless_cloud_offloading",
 ]
+resolver = "2"
 
 [workspace.dependencies]
 opentelemetry = { version = "0.30.0", default-features = false, features = ["trace"] }
