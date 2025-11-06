@@ -30,6 +30,7 @@ Improvements:
   initial delay before sending out the trigger.
 - Improve multi-core capabilities in EDGELESS node, by use spawn_blocking
   to execute tasks (possibly CPU-bound).
+- Migrate codebase from Rust edition 2021 to edition 2024.
 
 Update of functions and resources:
 
@@ -45,6 +46,8 @@ Update of functions and resources:
   iv) dispatch randomly the body of the incoming HTTP command to one of the
   possible resource instances matching the host, method, and workflow identifier
   (if specified, all are optional).
+- Add the `http-poster` resource provider, which sends a POST command for every
+  `cast()` invoked to a web server specified in the resource's configuration.
 
 API changes:
 
