@@ -11,7 +11,7 @@ authors = [
     "Raphael Hetzel <hetzel@in.tum.de>",
 ]
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.89"
 description = "EDGELESS gRPC API definitions"
 homepage = "https://edgeless-project.eu/"
 license = "MIT"
