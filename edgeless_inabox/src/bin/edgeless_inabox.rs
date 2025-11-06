@@ -155,37 +155,17 @@ fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16
             container_runtime: Some(EdgelessNodeContainerRuntimeSettings::default()),
             resources: Some(EdgelessNodeResourceSettings {
                 prepend_hostname: true,
-                http_ingress_url: match counter == 0 {
-                    true => Some(next_url(false)),
-                    false => None,
-                },
-                http_ingress_provider: match counter == 0 {
-                    true => Some("http-ingress-1".to_string()),
-                    false => None,
-                },
-                http_egress_provider: match counter == 0 {
-                    true => Some("http-egress-1".to_string()),
-                    false => None,
-                },
-                file_log_provider: match counter == 0 {
-                    true => Some("file-log-1".to_string()),
-                    false => None,
-                },
-                redis_provider: match counter == 0 {
-                    true => Some("redis-1".to_string()),
-                    false => None,
-                },
-                dda_provider: match counter == 0 {
-                    true => Some("dda-1".to_string()),
-                    false => None,
-                },
+                http_ingress_url: Some(next_url(false)),
+                http_ingress_provider: Some(format!("http-ingress-{}", counter + 1)),
+                http_egress_provider: Some(format!("http-egress-{}", counter + 1)),
+                http_poster_provider: Some(format!("http-poster-{}", counter + 1)),
+                file_log_provider: Some(format!("file-log-{}", counter + 1)),
+                redis_provider: Some(format!("redis-{}", counter + 1)),
+                dda_provider: Some(format!("dda-{}", counter + 1)),
                 ollama_provider: Some(OllamaProviderSettings::default()),
                 serverless_provider: Some(vec![ServerlessProviderSettings::default()]),
                 kafka_egress_provider: Some(String::default()),
-                sqlx_provider: match counter == 0 {
-                    true => Some("sqlx-1".to_string()),
-                    false => None,
-                },
+                sqlx_provider: Some(format!("sqlx-{}", counter + 1)),
             }),
             user_node_capabilities: Some(edgeless_node::NodeCapabilitiesUser::default()),
             power_info: None,

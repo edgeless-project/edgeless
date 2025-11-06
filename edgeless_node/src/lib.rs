@@ -129,6 +129,8 @@ pub struct EdgelessNodeResourceSettings {
     pub http_ingress_provider: Option<String>,
     /// If not empty, a http-egress resource provider with that name is created.
     pub http_egress_provider: Option<String>,
+    /// If not empty, a http-poster resource provider with that name is created.
+    pub http_poster_provider: Option<String>,
     /// If not empty, a file-log resource provider with that name is created.
     /// The resource will write on the local filesystem.
     pub file_log_provider: Option<String>,
@@ -383,6 +385,37 @@ async fn fill_resources(
                     provider_id,
                     class_type,
                     outputs: resources::http_egress::HttpEgressResourceSpec {}.outputs(),
+                });
+            }
+        }
+
+        if let Some(provider_id) = &settings.http_poster_provider {
+            if !provider_id.is_empty() {
+                let class_type = resources::http_poster::HttpPosterResourceSpec {}.class_type();
+                log::info!("Creating {} resource provider '{}'", class_type, provider_id);
+                let provider_id = make_provider_id(provider_id);
+                ret.insert(
+                    provider_id.clone(),
+                    agent::ResourceDesc {
+                        class_type: class_type.clone(),
+                        client: Box::new(
+                            resources::http_poster::HttpPosterResourceProvider::new(
+                                data_plane.clone(),
+                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                    ("NODE_ID".to_string(), node_id.to_string()),
+                                ]))),
+                                edgeless_api::function_instance::InstanceId::new(node_id),
+                            )
+                            .await,
+                        ),
+                    },
+                );
+                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                    provider_id,
+                    class_type,
+                    outputs: resources::http_poster::HttpPosterResourceSpec {}.outputs(),
                 });
             }
         }
@@ -818,6 +851,7 @@ pub fn edgeless_node_default_conf() -> String {
             http_ingress_url: Some(String::from("http://127.0.0.1:7008")),
             http_ingress_provider: Some("http-ingress-1".to_string()),
             http_egress_provider: Some("http-egress-1".to_string()),
+            http_poster_provider: Some("http_poster-1".to_string()),
             file_log_provider: Some("file-log-1".to_string()),
             redis_provider: Some("redis-1".to_string()),
             dda_provider: Some("dda-1".to_string()),
