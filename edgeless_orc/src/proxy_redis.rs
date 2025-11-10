@@ -41,6 +41,7 @@ pub struct ProxyRedis {
     capabilities_file: Option<std::fs::File>,
     mapping_to_instance_id_file: Option<std::fs::File>,
     performance_samples_file: Option<std::fs::File>,
+    application_logs_file: Option<std::fs::File>,
 }
 
 impl ProxyRedis {
@@ -73,15 +74,17 @@ impl ProxyRedis {
             None => "".to_string(),
         };
 
-        let (health_status_file, capabilities_file, mapping_to_instance_id_file, performance_samples_file) =
+        let (application_logs_file, health_status_file, capabilities_file, mapping_to_instance_id_file, performance_metrics_file) =
             if let Some(dataset_settings) = dataset_settings {
                 if !dataset_settings.dataset_path.is_empty() {
                     ProxyRedis::open_files(dataset_settings.dataset_path, dataset_settings.append, dataset_settings.additional_header)
                 } else {
-                    (None, None, None, None)
+                    log::warn!("dataset path is empty, not dumping dataset to files");
+                    (None, None, None, None, None)
                 }
             } else {
-                (None, None, None, None)
+                log::warn!("dataset settings not provided, not dumping dataset to files");
+                (None, None, None, None, None)
             };
 
         Ok(Self {
@@ -98,7 +101,8 @@ impl ProxyRedis {
             health_status_file,
             capabilities_file,
             mapping_to_instance_id_file,
-            performance_samples_file,
+            performance_samples_file: performance_metrics_file,
+            application_logs_file,
         })
     }
 
@@ -106,13 +110,14 @@ impl ProxyRedis {
         dataset_path: String,
         append: bool,
         additional_header: String,
-    ) -> (Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>) {
-        let filenames = ["performance_samples", "mapping_to_instance_id", "capabilities", "health_status"];
+    ) -> (Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>) {
+        let filenames = ["performance_samples", "mapping_to_instance_id", "capabilities", "health_status", "application_logs"];
         let headers = [
             "identifier,metric,timestamp,value".to_string(),
             "timestamp,logical_id,workflow_id,node_id,physical_id".to_string(),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeCapabilities::csv_header()),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeHealthStatus::csv_header()),
+            "identifier,target,timestamp,value".to_string(), // named target after the argument name in telemetry_log call
         ];
 
         let mut outfiles = vec![];
@@ -138,13 +143,14 @@ impl ProxyRedis {
             };
             outfiles.push(res);
         }
-        assert_eq!(4, outfiles.len());
+        assert_eq!(5, outfiles.len());
 
         (
             outfiles.pop().unwrap(),
             outfiles.pop().unwrap(),
             outfiles.pop().unwrap(),
             outfiles.pop().unwrap(),
+            outfiles.pop().unwrap()
         )
     }
 
@@ -446,9 +452,9 @@ impl super::proxy::Proxy for ProxyRedis {
                     let _ = redis::Cmd::zadd(&key, value.to_string(), value.score()).exec(&mut self.connection);
 
                     // Save to dataset output.
-                    if let Some(outfile) = &mut self.performance_samples_file {
+                    if let Some(performance_samples_outfile) = &mut self.performance_samples_file {
                         let _ = writeln!(
-                            outfile,
+                            performance_samples_outfile,
                             "{},{},{},{}",
                             self.additional_fields,
                             function_id,
@@ -467,10 +473,10 @@ impl super::proxy::Proxy for ProxyRedis {
                 // Save to Redis.
                 let _ = redis::Cmd::zadd(&key, log_entry.to_string(), log_entry.score()).exec(&mut self.connection);
 
-                // Save to dataset output.
-                if let Some(outfile) = &mut self.performance_samples_file {
+                // Save to dataset output to a separate file.
+                if let Some(application_logs_outfile) = &mut self.application_logs_file {
                     let _ = writeln!(
-                        outfile,
+                        application_logs_outfile,
                         "{},{},{},{}",
                         self.additional_fields,
                         function_id,
