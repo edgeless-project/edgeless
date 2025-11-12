@@ -89,22 +89,20 @@ impl ProxyRedis {
         // Open dataset files
         let dataset_dumping = if do_not_dump {
             None
-        } else {
-            if let Some(dataset_settings) = dataset_settings {
-                match ProxyRedis::open_files(dataset_settings.dataset_path, dataset_settings.append, dataset_settings.additional_header) {
-                    Ok(mut dataset_dumping) => {
-                        dataset_dumping.additional_fields = dataset_settings.additional_fields.clone();
-                        Some(dataset_dumping)
-                    }
-                    Err(err) => {
-                        log::warn!("the proxy will not dump datasets: {}", err);
-                        None
-                    }
+        } else if let Some(dataset_settings) = dataset_settings {
+            match ProxyRedis::open_files(dataset_settings.dataset_path, dataset_settings.append, dataset_settings.additional_header) {
+                Ok(mut dataset_dumping) => {
+                    dataset_dumping.additional_fields = dataset_settings.additional_fields.clone();
+                    Some(dataset_dumping)
                 }
-            } else {
-                log::info!("the proxy will not dump datasets");
-                None
+                Err(err) => {
+                    log::warn!("the proxy will not dump datasets: {}", err);
+                    None
+                }
             }
+        } else {
+            log::info!("the proxy will not dump datasets");
+            None
         };
 
         Ok(Self {
