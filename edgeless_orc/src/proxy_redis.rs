@@ -6,6 +6,15 @@ use redis::Commands;
 use std::io::Write;
 use std::str::FromStr;
 
+struct DatasetDumping {
+    additional_fields: String,
+    health_status_file: std::fs::File,
+    capabilities_file: std::fs::File,
+    mapping_to_instance_id_file: std::fs::File,
+    performance_samples_file: std::fs::File,
+    application_logs_file: std::fs::File,
+}
+
 /// An orchestrator proxy that uses a Redis in-memory database to mirror
 /// internal data structures and read orchestration intents.
 ///
@@ -36,15 +45,15 @@ pub struct ProxyRedis {
     node_health_status: std::collections::HashMap<uuid::Uuid, String>,
 
     // dataset dumping stuff
-    additional_fields: String,
-    health_status_file: Option<std::fs::File>,
-    capabilities_file: Option<std::fs::File>,
-    mapping_to_instance_id_file: Option<std::fs::File>,
-    performance_samples_file: Option<std::fs::File>,
-    application_logs_file: Option<std::fs::File>,
+    dataset_dumping: Option<DatasetDumping>,
 }
 
 impl ProxyRedis {
+    /// Create a Redis EDGELESS orchestrator proxy client.
+    pub fn new_client(redis_url: &str) -> anyhow::Result<Self> {
+        Self::new_private(redis_url, false, None, true)
+    }
+
     ///
     /// Create a Redis EDGELESS orchestrator proxy.
     ///
@@ -54,6 +63,15 @@ impl ProxyRedis {
     /// - `dataset_settings`: the settings to save samples to output files.
     ///
     pub fn new(redis_url: &str, flushdb: bool, dataset_settings: Option<crate::EdgelessOrcProxyDatasetSettings>) -> anyhow::Result<Self> {
+        Self::new_private(redis_url, flushdb, dataset_settings, false)
+    }
+
+    fn new_private(
+        redis_url: &str,
+        flushdb: bool,
+        dataset_settings: Option<crate::EdgelessOrcProxyDatasetSettings>,
+        do_not_dump: bool,
+    ) -> anyhow::Result<Self> {
         log::info!(
             "creating Redis orchestrator proxy at URL {} ({})",
             redis_url,
@@ -69,23 +87,25 @@ impl ProxyRedis {
         }
 
         // Open dataset files
-        let additional_fields = match &dataset_settings {
-            Some(dataset_settings) => dataset_settings.additional_fields.clone(),
-            None => "".to_string(),
-        };
-
-        let (application_logs_file, health_status_file, capabilities_file, mapping_to_instance_id_file, performance_metrics_file) =
+        let dataset_dumping = if do_not_dump {
+            None
+        } else {
             if let Some(dataset_settings) = dataset_settings {
-                if !dataset_settings.dataset_path.is_empty() {
-                    ProxyRedis::open_files(dataset_settings.dataset_path, dataset_settings.append, dataset_settings.additional_header)
-                } else {
-                    log::warn!("dataset path is empty, not dumping dataset to files");
-                    (None, None, None, None, None)
+                match ProxyRedis::open_files(dataset_settings.dataset_path, dataset_settings.append, dataset_settings.additional_header) {
+                    Ok(mut dataset_dumping) => {
+                        dataset_dumping.additional_fields = dataset_settings.additional_fields.clone();
+                        Some(dataset_dumping)
+                    }
+                    Err(err) => {
+                        log::warn!("the proxy will not dump datasets: {}", err);
+                        None
+                    }
                 }
             } else {
-                log::warn!("dataset settings not provided, not dumping dataset to files");
-                (None, None, None, None, None)
-            };
+                log::info!("the proxy will not dump datasets");
+                None
+            }
+        };
 
         Ok(Self {
             connection,
@@ -97,26 +117,11 @@ impl ProxyRedis {
             mapping_to_instance_id: std::collections::HashMap::new(),
             node_capabilities: std::collections::HashMap::new(),
             node_health_status: std::collections::HashMap::new(),
-            additional_fields,
-            health_status_file,
-            capabilities_file,
-            mapping_to_instance_id_file,
-            performance_samples_file: performance_metrics_file,
-            application_logs_file,
+            dataset_dumping,
         })
     }
 
-    fn open_files(
-        dataset_path: String,
-        append: bool,
-        additional_header: String,
-    ) -> (
-        Option<std::fs::File>,
-        Option<std::fs::File>,
-        Option<std::fs::File>,
-        Option<std::fs::File>,
-        Option<std::fs::File>,
-    ) {
+    fn open_files(dataset_path: String, append: bool, additional_header: String) -> anyhow::Result<DatasetDumping> {
         let filenames = [
             "performance_samples",
             "mapping_to_instance_id",
@@ -140,30 +145,24 @@ impl ProxyRedis {
             let path = std::path::Path::new(&filename);
             let mut ancestors = path.ancestors();
             ancestors.next();
-            let base_dir = ancestors.next().unwrap();
-            let res = if let Err(err) = std::fs::create_dir_all(base_dir) {
-                log::warn!("could not create the directory where to dump the dataset '{}': {}", filename, err);
-                None
-            } else {
-                match ProxyRedis::open_file(filename.as_str(), append, header, &additional_header) {
-                    Ok(outfile) => Some(outfile),
-                    Err(err) => {
-                        log::error!("could not open '{}' for writing: {}", filename, err);
-                        None
-                    }
-                }
-            };
-            outfiles.push(res);
+            let base_dir = ancestors.next().ok_or(anyhow::anyhow!("could not find ancestor of {:?}", path))?;
+            std::fs::create_dir_all(base_dir)?;
+            outfiles.push(ProxyRedis::open_file(filename.as_str(), append, header, &additional_header)?);
         }
         assert_eq!(5, outfiles.len());
 
-        (
-            outfiles.pop().unwrap(),
-            outfiles.pop().unwrap(),
-            outfiles.pop().unwrap(),
-            outfiles.pop().unwrap(),
-            outfiles.pop().unwrap(),
-        )
+        let dataset_dumping = DatasetDumping {
+            additional_fields: String::default(),
+            health_status_file: outfiles.pop().unwrap(),
+            capabilities_file: outfiles.pop().unwrap(),
+            mapping_to_instance_id_file: outfiles.pop().unwrap(),
+            performance_samples_file: outfiles.pop().unwrap(),
+            application_logs_file: outfiles.pop().unwrap(),
+        };
+
+        assert!(outfiles.is_empty());
+
+        Ok(dataset_dumping)
     }
 
     fn open_file(filename: &str, append: bool, header: &str, additional_header: &str) -> anyhow::Result<std::fs::File> {
@@ -301,14 +300,14 @@ impl super::proxy::Proxy for ProxyRedis {
             )
             .exec(&mut self.connection);
             let new_caps = client_desc.capabilities.to_csv();
-            if let Some(outfile) = &mut self.capabilities_file {
+            if let Some(dd) = &mut self.dataset_dumping {
                 let write: bool = if let Some(old_caps) = self.node_capabilities.get(uuid) {
                     *old_caps != new_caps
                 } else {
                     true
                 };
                 if write {
-                    let _ = writeln!(outfile, "{},{},{},{}", self.additional_fields, timestamp, uuid, new_caps);
+                    let _ = writeln!(dd.capabilities_file, "{},{},{},{}", dd.additional_fields, timestamp, uuid, new_caps);
                 }
             }
             new_node_capabilities.insert(*uuid, new_caps);
@@ -365,7 +364,7 @@ impl super::proxy::Proxy for ProxyRedis {
                 serde_json::to_string(&active_instance.strip()).unwrap_or_default().as_str(),
             );
             let new_instance_ids = active_instance.instance_ids();
-            if let Some(outfile) = &mut self.mapping_to_instance_id_file {
+            if let Some(dd) = &mut self.dataset_dumping {
                 let write = if let Some(old_instance_ids) = self.mapping_to_instance_id.get(lid) {
                     *old_instance_ids != new_instance_ids
                 } else {
@@ -373,9 +372,9 @@ impl super::proxy::Proxy for ProxyRedis {
                 };
                 if write {
                     let _ = writeln!(
-                        outfile,
+                        dd.mapping_to_instance_id_file,
                         "{},{},{},{},{}",
-                        self.additional_fields,
+                        dd.additional_fields,
                         timestamp,
                         lid,
                         active_instance.workflow_id(),
@@ -438,14 +437,18 @@ impl super::proxy::Proxy for ProxyRedis {
         let new_health_status = node_health.to_csv();
 
         // Save to dataset output.
-        if let Some(outfile) = &mut self.health_status_file {
+        if let Some(dd) = &mut self.dataset_dumping {
             let write = if let Some(old_health_status) = self.node_health_status.get(node_id) {
                 *old_health_status != new_health_status
             } else {
                 true
             };
             if write {
-                let _ = writeln!(outfile, "{},{},{},{}", self.additional_fields, timestamp, node_id, new_health_status);
+                let _ = writeln!(
+                    dd.health_status_file,
+                    "{},{},{},{}",
+                    dd.additional_fields, timestamp, node_id, new_health_status
+                );
             }
         }
     }
@@ -463,11 +466,11 @@ impl super::proxy::Proxy for ProxyRedis {
                     let _ = redis::Cmd::zadd(&key, value.to_string(), value.score()).exec(&mut self.connection);
 
                     // Save to dataset output.
-                    if let Some(performance_samples_outfile) = &mut self.performance_samples_file {
+                    if let Some(dd) = &mut self.dataset_dumping {
                         let _ = writeln!(
-                            performance_samples_outfile,
+                            dd.performance_samples_file,
                             "{},{},{},{}",
-                            self.additional_fields,
+                            dd.additional_fields,
                             function_id,
                             name,
                             value.to_string().replacen(":", ",", 1)
@@ -485,11 +488,11 @@ impl super::proxy::Proxy for ProxyRedis {
                 let _ = redis::Cmd::zadd(&key, log_entry.to_string(), log_entry.score()).exec(&mut self.connection);
 
                 // Save to dataset output to a separate file.
-                if let Some(application_logs_outfile) = &mut self.application_logs_file {
+                if let Some(dd) = &mut self.dataset_dumping {
                     let _ = writeln!(
-                        application_logs_outfile,
+                        dd.application_logs_file,
                         "{},{},{},{}",
-                        self.additional_fields,
+                        dd.additional_fields,
                         function_id,
                         log_entry.target,
                         log_entry.to_string().replacen(":", ",", 1)
@@ -808,7 +811,7 @@ mod test {
 
     fn get_proxy() -> Option<ProxyRedis> {
         // Skip the test if there is no local Redis listening on default port.
-        match ProxyRedis::new("redis://localhost:6379", true, None) {
+        match ProxyRedis::new_client("redis://localhost:6379") {
             Ok(redis_proxy) => return Some(redis_proxy),
             Err(_) => {
                 println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
@@ -1211,7 +1214,7 @@ mod test {
     #[test]
     fn test_redis_proxy_intents() {
         // Skip the test if there is no local Redis listening on default port.
-        let mut redis_proxy = match ProxyRedis::new("redis://localhost:6379", true, None) {
+        let mut redis_proxy = match ProxyRedis::new_client("redis://localhost:6379") {
             Ok(redis_proxy) => redis_proxy,
             Err(_) => {
                 println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
