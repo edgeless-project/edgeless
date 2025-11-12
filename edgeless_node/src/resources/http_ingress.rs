@@ -106,10 +106,11 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
             let mut wf_id = None;
             for param in query.split("&") {
                 if let Some((k, v)) = param.split_once("=")
-                    && k == "wf_id" {
-                        wf_id = Some(v.to_string());
-                        break;
-                    }
+                    && k == "wf_id"
+                {
+                    wf_id = Some(v.to_string());
+                    break;
+                }
             }
 
             let data = body.collect().await?.to_bytes();

@@ -56,53 +56,54 @@ impl OrchestratorAPIServer {
         Box::pin(async move {
             let function_api = function_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&orchestrator_url)
-                && let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start OrchestratorAPIServer GRPC Server at {}", orchestrator_url);
+                && let Ok(host) = format!("{}:{}", host, port).parse()
+            {
+                log::info!("Start OrchestratorAPIServer GRPC Server at {}", orchestrator_url);
 
-                    let mut server_builder = tonic::transport::Server::builder();
+                let mut server_builder = tonic::transport::Server::builder();
 
-                    if let Some(tls_config) = tls_config {
-                        match tls_config.create_server_tls_config() {
-                            Ok(Some(config)) => {
-                                log::info!("TLS enabled for GRPC server");
-                                match server_builder.tls_config(config) {
-                                    Ok(builder) => server_builder = builder,
-                                    Err(e) => {
-                                        log::error!("Failed to apply TLS config: {}", e);
-                                        return;
-                                    }
+                if let Some(tls_config) = tls_config {
+                    match tls_config.create_server_tls_config() {
+                        Ok(Some(config)) => {
+                            log::info!("TLS enabled for GRPC server");
+                            match server_builder.tls_config(config) {
+                                Ok(builder) => server_builder = builder,
+                                Err(e) => {
+                                    log::error!("Failed to apply TLS config: {}", e);
+                                    return;
                                 }
                             }
-                            Ok(None) => {
-                                log::info!("TLS disabled for GRPC server");
-                            }
-                            Err(e) => {
-                                log::error!("Failed to create TLS config: {}", e);
-                                return;
-                            }
                         }
-                    }
-
-                    match server_builder
-                        .add_service(
-                            crate::grpc_impl::api::function_instance_server::FunctionInstanceServer::new(function_api)
-                                .max_decoding_message_size(usize::MAX),
-                        )
-                        .add_service(
-                            crate::grpc_impl::api::resource_configuration_server::ResourceConfigurationServer::new(resource_configuration_api)
-                                .max_decoding_message_size(usize::MAX),
-                        )
-                        .serve(host)
-                        .await
-                    {
-                        Ok(_) => {
-                            log::debug!("Clean Exit");
+                        Ok(None) => {
+                            log::info!("TLS disabled for GRPC server");
                         }
-                        Err(_) => {
-                            log::error!("GRPC Server Failure");
+                        Err(e) => {
+                            log::error!("Failed to create TLS config: {}", e);
+                            return;
                         }
                     }
                 }
+
+                match server_builder
+                    .add_service(
+                        crate::grpc_impl::api::function_instance_server::FunctionInstanceServer::new(function_api)
+                            .max_decoding_message_size(usize::MAX),
+                    )
+                    .add_service(
+                        crate::grpc_impl::api::resource_configuration_server::ResourceConfigurationServer::new(resource_configuration_api)
+                            .max_decoding_message_size(usize::MAX),
+                    )
+                    .serve(host)
+                    .await
+                {
+                    Ok(_) => {
+                        log::debug!("Clean Exit");
+                    }
+                    Err(_) => {
+                        log::error!("GRPC Server Failure");
+                    }
+                }
+            }
 
             log::info!("Stop OrchestratorAPI GRPC Server");
         })

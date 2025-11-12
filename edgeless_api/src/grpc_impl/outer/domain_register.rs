@@ -37,49 +37,50 @@ impl DomainRegistrationAPIServer {
         Box::pin(async move {
             let domain_registration_api = domain_registration_api;
             if let Ok((_proto, host, port)) = crate::util::parse_http_host(&domain_registration_url)
-                && let Ok(host) = format!("{}:{}", host, port).parse() {
-                    log::info!("Start DomainRegisterAPI GRPC Server at {}", domain_registration_url);
+                && let Ok(host) = format!("{}:{}", host, port).parse()
+            {
+                log::info!("Start DomainRegisterAPI GRPC Server at {}", domain_registration_url);
 
-                    let mut server_builder = tonic::transport::Server::builder();
+                let mut server_builder = tonic::transport::Server::builder();
 
-                    if let Some(tls_config) = tls_config {
-                        match tls_config.create_server_tls_config() {
-                            Ok(Some(config)) => {
-                                log::info!("TLS enabled for GRPC server");
-                                match server_builder.tls_config(config) {
-                                    Ok(builder) => server_builder = builder,
-                                    Err(e) => {
-                                        log::error!("Failed to apply TLS config: {}", e);
-                                        return;
-                                    }
+                if let Some(tls_config) = tls_config {
+                    match tls_config.create_server_tls_config() {
+                        Ok(Some(config)) => {
+                            log::info!("TLS enabled for GRPC server");
+                            match server_builder.tls_config(config) {
+                                Ok(builder) => server_builder = builder,
+                                Err(e) => {
+                                    log::error!("Failed to apply TLS config: {}", e);
+                                    return;
                                 }
                             }
-                            Ok(None) => {
-                                log::info!("TLS disabled for GRPC server");
-                            }
-                            Err(e) => {
-                                log::error!("Failed to create TLS config: {}", e);
-                                return;
-                            }
                         }
-                    }
-
-                    match server_builder
-                        .add_service(
-                            crate::grpc_impl::api::domain_registration_server::DomainRegistrationServer::new(domain_registration_api)
-                                .max_decoding_message_size(usize::MAX),
-                        )
-                        .serve(host)
-                        .await
-                    {
-                        Ok(_) => {
-                            log::debug!("Clean Exit");
+                        Ok(None) => {
+                            log::info!("TLS disabled for GRPC server");
                         }
-                        Err(_) => {
-                            log::error!("GRPC Server Failure");
+                        Err(e) => {
+                            log::error!("Failed to create TLS config: {}", e);
+                            return;
                         }
                     }
                 }
+
+                match server_builder
+                    .add_service(
+                        crate::grpc_impl::api::domain_registration_server::DomainRegistrationServer::new(domain_registration_api)
+                            .max_decoding_message_size(usize::MAX),
+                    )
+                    .serve(host)
+                    .await
+                {
+                    Ok(_) => {
+                        log::debug!("Clean Exit");
+                    }
+                    Err(_) => {
+                        log::error!("GRPC Server Failure");
+                    }
+                }
+            }
 
             log::info!("Stop DomainRegisterAPI GRPC Server");
         })

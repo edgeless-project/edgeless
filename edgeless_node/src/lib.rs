@@ -334,227 +334,237 @@ async fn fill_resources(
         };
 
         if let (Some(http_ingress_url), Some(provider_id)) = (&settings.http_ingress_url, &settings.http_ingress_provider)
-            && !http_ingress_url.is_empty() && !provider_id.is_empty() {
-                let class_type = resources::http_ingress::HttpIngressResourceSpec {}.class_type();
-                let provider_id = make_provider_id(provider_id);
-                log::info!("Creating http-ingress resource provider '{}' at {}", provider_id, http_ingress_url);
-                ret.insert(
-                    provider_id.clone(),
-                    agent::ResourceDesc {
-                        class_type: class_type.clone(),
-                        client: resources::http_ingress::ingress_task(
-                            data_plane.clone(),
-                            edgeless_api::function_instance::InstanceId::new(node_id),
-                            http_ingress_url.clone(),
-                        )
-                        .await,
-                    },
-                );
-                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                    provider_id,
-                    class_type,
-                    outputs: resources::http_ingress::HttpIngressResourceSpec {}.outputs(),
-                });
-            }
+            && !http_ingress_url.is_empty()
+            && !provider_id.is_empty()
+        {
+            let class_type = resources::http_ingress::HttpIngressResourceSpec {}.class_type();
+            let provider_id = make_provider_id(provider_id);
+            log::info!("Creating http-ingress resource provider '{}' at {}", provider_id, http_ingress_url);
+            ret.insert(
+                provider_id.clone(),
+                agent::ResourceDesc {
+                    class_type: class_type.clone(),
+                    client: resources::http_ingress::ingress_task(
+                        data_plane.clone(),
+                        edgeless_api::function_instance::InstanceId::new(node_id),
+                        http_ingress_url.clone(),
+                    )
+                    .await,
+                },
+            );
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id,
+                class_type,
+                outputs: resources::http_ingress::HttpIngressResourceSpec {}.outputs(),
+            });
+        }
 
         if let Some(provider_id) = &settings.http_egress_provider
-            && !provider_id.is_empty() {
-                log::info!("Creating http-egress resource provider '{}'", provider_id);
-                let class_type = resources::http_egress::HttpEgressResourceSpec {}.class_type();
-                let provider_id = make_provider_id(provider_id);
-                ret.insert(
-                    provider_id.clone(),
-                    agent::ResourceDesc {
-                        class_type: class_type.clone(),
-                        client: Box::new(
-                            resources::http_egress::EgressResourceProvider::new(
-                                data_plane.clone(),
-                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
-                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
-                                    ("NODE_ID".to_string(), node_id.to_string()),
-                                ]))),
-                                edgeless_api::function_instance::InstanceId::new(node_id),
-                            )
-                            .await,
-                        ),
-                    },
-                );
-                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                    provider_id,
-                    class_type,
-                    outputs: resources::http_egress::HttpEgressResourceSpec {}.outputs(),
-                });
-            }
+            && !provider_id.is_empty()
+        {
+            log::info!("Creating http-egress resource provider '{}'", provider_id);
+            let class_type = resources::http_egress::HttpEgressResourceSpec {}.class_type();
+            let provider_id = make_provider_id(provider_id);
+            ret.insert(
+                provider_id.clone(),
+                agent::ResourceDesc {
+                    class_type: class_type.clone(),
+                    client: Box::new(
+                        resources::http_egress::EgressResourceProvider::new(
+                            data_plane.clone(),
+                            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                ("NODE_ID".to_string(), node_id.to_string()),
+                            ]))),
+                            edgeless_api::function_instance::InstanceId::new(node_id),
+                        )
+                        .await,
+                    ),
+                },
+            );
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id,
+                class_type,
+                outputs: resources::http_egress::HttpEgressResourceSpec {}.outputs(),
+            });
+        }
 
         if let Some(provider_id) = &settings.http_poster_provider
-            && !provider_id.is_empty() {
-                let class_type = resources::http_poster::HttpPosterResourceSpec {}.class_type();
-                log::info!("Creating {} resource provider '{}'", class_type, provider_id);
-                let provider_id = make_provider_id(provider_id);
-                ret.insert(
-                    provider_id.clone(),
-                    agent::ResourceDesc {
-                        class_type: class_type.clone(),
-                        client: Box::new(
-                            resources::http_poster::HttpPosterResourceProvider::new(
-                                data_plane.clone(),
-                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
-                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
-                                    ("NODE_ID".to_string(), node_id.to_string()),
-                                ]))),
-                                edgeless_api::function_instance::InstanceId::new(node_id),
-                            )
-                            .await,
-                        ),
-                    },
-                );
-                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                    provider_id,
-                    class_type,
-                    outputs: resources::http_poster::HttpPosterResourceSpec {}.outputs(),
-                });
-            }
+            && !provider_id.is_empty()
+        {
+            let class_type = resources::http_poster::HttpPosterResourceSpec {}.class_type();
+            log::info!("Creating {} resource provider '{}'", class_type, provider_id);
+            let provider_id = make_provider_id(provider_id);
+            ret.insert(
+                provider_id.clone(),
+                agent::ResourceDesc {
+                    class_type: class_type.clone(),
+                    client: Box::new(
+                        resources::http_poster::HttpPosterResourceProvider::new(
+                            data_plane.clone(),
+                            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                ("NODE_ID".to_string(), node_id.to_string()),
+                            ]))),
+                            edgeless_api::function_instance::InstanceId::new(node_id),
+                        )
+                        .await,
+                    ),
+                },
+            );
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id,
+                class_type,
+                outputs: resources::http_poster::HttpPosterResourceSpec {}.outputs(),
+            });
+        }
 
         if let Some(provider_id) = &settings.file_log_provider
-            && !provider_id.is_empty() {
-                log::info!("Creating file-log resource provider '{}'", provider_id);
-                let class_type = resources::file_log::FileLogResourceSpec {}.class_type();
-                let provider_id = make_provider_id(provider_id);
-                ret.insert(
-                    provider_id.clone(),
-                    agent::ResourceDesc {
-                        class_type: class_type.clone(),
-                        client: Box::new(
-                            resources::file_log::FileLogResourceProvider::new(
-                                data_plane.clone(),
-                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
-                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
-                                    ("NODE_ID".to_string(), node_id.to_string()),
-                                ]))),
-                                edgeless_api::function_instance::InstanceId::new(node_id),
-                            )
-                            .await,
-                        ),
-                    },
-                );
-                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                    provider_id,
-                    class_type,
-                    outputs: resources::file_log::FileLogResourceSpec {}.outputs(),
-                });
-            }
+            && !provider_id.is_empty()
+        {
+            log::info!("Creating file-log resource provider '{}'", provider_id);
+            let class_type = resources::file_log::FileLogResourceSpec {}.class_type();
+            let provider_id = make_provider_id(provider_id);
+            ret.insert(
+                provider_id.clone(),
+                agent::ResourceDesc {
+                    class_type: class_type.clone(),
+                    client: Box::new(
+                        resources::file_log::FileLogResourceProvider::new(
+                            data_plane.clone(),
+                            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                ("NODE_ID".to_string(), node_id.to_string()),
+                            ]))),
+                            edgeless_api::function_instance::InstanceId::new(node_id),
+                        )
+                        .await,
+                    ),
+                },
+            );
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id,
+                class_type,
+                outputs: resources::file_log::FileLogResourceSpec {}.outputs(),
+            });
+        }
 
         if let Some(provider_id) = &settings.redis_provider
-            && !provider_id.is_empty() {
-                log::info!("Creating redis resource provider '{}'", provider_id);
-                let class_type = resources::redis::RedisResourceSpec {}.class_type();
-                let provider_id = make_provider_id(provider_id);
-                ret.insert(
-                    provider_id.clone(),
-                    agent::ResourceDesc {
-                        class_type: class_type.clone(),
-                        client: Box::new(
-                            resources::redis::RedisResourceProvider::new(
-                                data_plane.clone(),
-                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
-                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
-                                    ("NODE_ID".to_string(), node_id.to_string()),
-                                ]))),
-                                edgeless_api::function_instance::InstanceId::new(node_id),
-                            )
-                            .await,
-                        ),
-                    },
-                );
-                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                    provider_id,
-                    class_type,
-                    outputs: resources::redis::RedisResourceSpec {}.outputs(),
-                });
-            }
+            && !provider_id.is_empty()
+        {
+            log::info!("Creating redis resource provider '{}'", provider_id);
+            let class_type = resources::redis::RedisResourceSpec {}.class_type();
+            let provider_id = make_provider_id(provider_id);
+            ret.insert(
+                provider_id.clone(),
+                agent::ResourceDesc {
+                    class_type: class_type.clone(),
+                    client: Box::new(
+                        resources::redis::RedisResourceProvider::new(
+                            data_plane.clone(),
+                            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                ("NODE_ID".to_string(), node_id.to_string()),
+                            ]))),
+                            edgeless_api::function_instance::InstanceId::new(node_id),
+                        )
+                        .await,
+                    ),
+                },
+            );
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id,
+                class_type,
+                outputs: resources::redis::RedisResourceSpec {}.outputs(),
+            });
+        }
 
         if let Some(provider_id) = &settings.dda_provider
-            && !provider_id.is_empty() {
-                log::info!("Creating dda resource provider '{}'", provider_id);
-                let class_type = resources::dda::DdaResourceSpec {}.class_type();
-                let provider_id = make_provider_id(provider_id);
-                ret.insert(
-                    provider_id.clone(),
-                    agent::ResourceDesc {
-                        class_type: class_type.clone(),
-                        client: Box::new(
-                            resources::dda::DDAResourceProvider::new(
-                                data_plane.clone(),
-                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
-                                    ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
-                                    ("NODE_ID".to_string(), node_id.to_string()),
-                                ]))),
-                                edgeless_api::function_instance::InstanceId::new(node_id),
-                            )
-                            .await,
-                        ),
-                    },
-                );
+            && !provider_id.is_empty()
+        {
+            log::info!("Creating dda resource provider '{}'", provider_id);
+            let class_type = resources::dda::DdaResourceSpec {}.class_type();
+            let provider_id = make_provider_id(provider_id);
+            ret.insert(
+                provider_id.clone(),
+                agent::ResourceDesc {
+                    class_type: class_type.clone(),
+                    client: Box::new(
+                        resources::dda::DDAResourceProvider::new(
+                            data_plane.clone(),
+                            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                ("NODE_ID".to_string(), node_id.to_string()),
+                            ]))),
+                            edgeless_api::function_instance::InstanceId::new(node_id),
+                        )
+                        .await,
+                    ),
+                },
+            );
 
-                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                    provider_id,
-                    class_type,
-                    outputs: resources::dda::DdaResourceSpec {}.outputs(),
-                });
-            }
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id,
+                class_type,
+                outputs: resources::dda::DdaResourceSpec {}.outputs(),
+            });
+        }
 
         if let Some(settings) = &settings.ollama_provider
-            && !settings.host.is_empty() && !settings.provider.is_empty() {
-                log::info!(
-                    "Creating ollama resource provider '{}' towards {}:{} (limit to {} messages per chat)",
-                    settings.provider,
-                    settings.host,
-                    settings.port,
-                    settings.messages_number_limit
-                );
-                let class_type = resources::ollama::OllamaResourceSpec {}.class_type();
-                let provider_id = make_provider_id(&settings.provider);
-                ret.insert(
-                    provider_id.clone(),
-                    agent::ResourceDesc {
-                        class_type: class_type.clone(),
-                        client: Box::new(
-                            resources::ollama::OllamaResourceProvider::new(
-                                data_plane.clone(),
-                                Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                    ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
-                                    ("RESOURCE_PROVIDER_ID".to_string(), settings.provider.clone()),
-                                    ("NODE_ID".to_string(), node_id.to_string()),
-                                ]))),
-                                edgeless_api::function_instance::InstanceId::new(node_id),
-                                &settings.host,
-                                settings.port,
-                                settings.messages_number_limit,
-                            )
-                            .await,
-                        ),
-                    },
-                );
+            && !settings.host.is_empty()
+            && !settings.provider.is_empty()
+        {
+            log::info!(
+                "Creating ollama resource provider '{}' towards {}:{} (limit to {} messages per chat)",
+                settings.provider,
+                settings.host,
+                settings.port,
+                settings.messages_number_limit
+            );
+            let class_type = resources::ollama::OllamaResourceSpec {}.class_type();
+            let provider_id = make_provider_id(&settings.provider);
+            ret.insert(
+                provider_id.clone(),
+                agent::ResourceDesc {
+                    class_type: class_type.clone(),
+                    client: Box::new(
+                        resources::ollama::OllamaResourceProvider::new(
+                            data_plane.clone(),
+                            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                ("RESOURCE_PROVIDER_ID".to_string(), settings.provider.clone()),
+                                ("NODE_ID".to_string(), node_id.to_string()),
+                            ]))),
+                            edgeless_api::function_instance::InstanceId::new(node_id),
+                            &settings.host,
+                            settings.port,
+                            settings.messages_number_limit,
+                        )
+                        .await,
+                    ),
+                },
+            );
 
-                provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                    provider_id,
-                    class_type,
-                    outputs: resources::ollama::OllamaResourceSpec {}.outputs(),
-                });
-            }
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id,
+                class_type,
+                outputs: resources::ollama::OllamaResourceSpec {}.outputs(),
+            });
+        }
 
         if let Some(serverless_providers) = &settings.serverless_provider {
             for settings in serverless_providers {
                 let mut is_function_url_valid = false;
                 if let Ok((proto, address, _port)) = edgeless_api::util::parse_http_host(&settings.function_url)
-                    && (!address.is_empty() && proto == edgeless_api::util::Proto::HTTP || proto == edgeless_api::util::Proto::HTTPS) {
-                        is_function_url_valid = true;
-                    }
+                    && (!address.is_empty() && proto == edgeless_api::util::Proto::HTTP || proto == edgeless_api::util::Proto::HTTPS)
+                {
+                    is_function_url_valid = true;
+                }
                 if is_function_url_valid && !settings.provider.is_empty() {
                     let provider_spec = resources::serverless::ServerlessResourceProviderSpec::new(&settings.class_type, &settings.version);
                     let provider_id = make_provider_id(&settings.provider);
@@ -595,54 +605,19 @@ async fn fill_resources(
         }
 
         if let Some(provider_id) = &settings.kafka_egress_provider
-            && !provider_id.is_empty() {
-                #[cfg(feature = "rdkafka")]
-                {
-                    log::info!("Creating kakfa-egress resource provider '{}'", provider_id);
-                    let class_type = resources::kafka_egress::KafkaEgressResourceSpec {}.class_type();
-                    let provider_id = make_provider_id(provider_id);
-                    ret.insert(
-                        provider_id.clone(),
-                        agent::ResourceDesc {
-                            class_type: class_type.clone(),
-                            client: Box::new(
-                                resources::kafka_egress::KafkaEgressResourceProvider::new(
-                                    data_plane.clone(),
-                                    Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
-                                        ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
-                                        ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
-                                        ("NODE_ID".to_string(), node_id.to_string()),
-                                    ]))),
-                                    edgeless_api::function_instance::InstanceId::new(node_id),
-                                )
-                                .await,
-                            ),
-                        },
-                    );
-                    provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
-                        provider_id,
-                        class_type,
-                        outputs: resources::kafka_egress::KafkaEgressResourceSpec {}.outputs(),
-                    });
-                }
-                #[cfg(not(feature = "rdkafka"))]
-                log::error!(
-                    "Could not create resource provider '{}' because rdkafka was disabled at compile time",
-                    provider_id
-                );
-            }
-
-        if let Some(provider_id) = &settings.sqlx_provider
-            && !provider_id.is_empty() {
-                log::info!("Creating resource '{}'", provider_id);
-                let class_type = "sqlx".to_string();
+            && !provider_id.is_empty()
+        {
+            #[cfg(feature = "rdkafka")]
+            {
+                log::info!("Creating kakfa-egress resource provider '{}'", provider_id);
+                let class_type = resources::kafka_egress::KafkaEgressResourceSpec {}.class_type();
                 let provider_id = make_provider_id(provider_id);
                 ret.insert(
                     provider_id.clone(),
                     agent::ResourceDesc {
                         class_type: class_type.clone(),
                         client: Box::new(
-                            resources::sqlx::SqlxResourceProvider::new(
+                            resources::kafka_egress::KafkaEgressResourceProvider::new(
                                 data_plane.clone(),
                                 Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
                                     ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
@@ -658,9 +633,46 @@ async fn fill_resources(
                 provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
                     provider_id,
                     class_type,
-                    outputs: vec![],
+                    outputs: resources::kafka_egress::KafkaEgressResourceSpec {}.outputs(),
                 });
             }
+            #[cfg(not(feature = "rdkafka"))]
+            log::error!(
+                "Could not create resource provider '{}' because rdkafka was disabled at compile time",
+                provider_id
+            );
+        }
+
+        if let Some(provider_id) = &settings.sqlx_provider
+            && !provider_id.is_empty()
+        {
+            log::info!("Creating resource '{}'", provider_id);
+            let class_type = "sqlx".to_string();
+            let provider_id = make_provider_id(provider_id);
+            ret.insert(
+                provider_id.clone(),
+                agent::ResourceDesc {
+                    class_type: class_type.clone(),
+                    client: Box::new(
+                        resources::sqlx::SqlxResourceProvider::new(
+                            data_plane.clone(),
+                            Box::new(telemetry_provider.get_handle(std::collections::BTreeMap::from([
+                                ("RESOURCE_CLASS_TYPE".to_string(), class_type.clone()),
+                                ("RESOURCE_PROVIDER_ID".to_string(), provider_id.clone()),
+                                ("NODE_ID".to_string(), node_id.to_string()),
+                            ]))),
+                            edgeless_api::function_instance::InstanceId::new(node_id),
+                        )
+                        .await,
+                    ),
+                },
+            );
+            provider_specifications.push(edgeless_api::node_registration::ResourceProviderSpecification {
+                provider_id,
+                class_type,
+                outputs: vec![],
+            });
+        }
     }
 
     ret
