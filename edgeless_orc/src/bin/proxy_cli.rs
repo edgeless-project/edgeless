@@ -138,7 +138,7 @@ fn top_nodes(
     let all_caps = proxy.fetch_node_capabilities();
     let all_health = proxy.fetch_node_health();
 
-    let mut nodes: Vec<(String, uuid::Uuid)> = all_caps.keys().map(|x| (map_node(x), x.clone())).collect();
+    let mut nodes: Vec<(String, uuid::Uuid)> = all_caps.keys().map(|x| (map_node(x), *x)).collect();
     nodes.sort_by(|(name_a, _uuid_a), (name_b, _uuid_b)| name_a.cmp(name_b));
 
     let mut runtimes = vec![];
@@ -205,7 +205,7 @@ async fn top_workflow(
         proxy
             .fetch_function_instances_to_nodes()
             .into_iter()
-            .map(|(lid, node_id_vec)| (lid, node_id_vec.first().unwrap().clone()))
+            .map(|(lid, node_id_vec)| (lid, *node_id_vec.first().unwrap()))
             .collect();
     let mut lid_to_node_id = proxy.fetch_resource_instances_to_nodes();
     lid_to_node_id.extend(fun_lid_to_node_id);
@@ -219,9 +219,9 @@ async fn top_workflow(
             domain_id,
         } in &workflow_info.status.domain_mapping
         {
-            if let Some(pid) = lid_to_pid.get(&lid) {
+            if let Some(pid) = lid_to_pid.get(lid) {
                 let pid = pid.first().unwrap_or(&node_id_none);
-                let node_id = lid_to_node_id.get(&lid).unwrap_or(&node_id_none);
+                let node_id = lid_to_node_id.get(lid).unwrap_or(&node_id_none);
                 let exec_times = proxy.fetch_performance_series(&pid.to_string(), "function_execution_time");
                 let tran_times = proxy.fetch_performance_series(&pid.to_string(), "function_transfer_time");
 

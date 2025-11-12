@@ -677,15 +677,14 @@ impl super::proxy::Proxy for ProxyRedis {
                 .zrangebyscore::<String, f64, f64, Vec<String>>(format!("performance:{node}:{series}"), f64::NEG_INFINITY, f64::INFINITY)
         {
             for value in values {
-                if let Some((timestamp, value)) = value.split_once(":") {
-                    if let Ok(timestamp) = timestamp.parse::<f64>() {
+                if let Some((timestamp, value)) = value.split_once(":")
+                    && let Ok(timestamp) = timestamp.parse::<f64>() {
                         let secs = timestamp as i64;
                         let nsecs = (timestamp.fract() * 1e9) as u32;
                         if let Some(date_time) = chrono::DateTime::from_timestamp(secs, nsecs) {
                             ret.push((date_time, value.to_string()));
                         }
                     }
-                }
             }
         }
 
