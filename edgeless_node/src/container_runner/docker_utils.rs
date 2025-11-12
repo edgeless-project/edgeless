@@ -79,9 +79,10 @@ impl Docker {
         };
         let public_port = match container.Ports.iter().find(|x| {
             if let Some(ip) = &x.IP
-                && ip == "0.0.0.0" {
-                    return true;
-                }
+                && ip == "0.0.0.0"
+            {
+                return true;
+            }
             false
         }) {
             Some(port) => match port.PublicPort {

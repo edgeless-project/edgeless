@@ -81,11 +81,12 @@ fn main() -> anyhow::Result<()> {
         specs.push(Box::new(KafkaEgressResourceSpec {}));
         if let Ok(conf) = &conf
             && let Some(resources) = &conf.resources
-                && let Some(serverless_providers) = &resources.serverless_provider {
-                    for settings in serverless_providers {
-                        specs.push(Box::new(ServerlessResourceProviderSpec::new(&settings.class_type, &settings.version)))
-                    }
-                }
+            && let Some(serverless_providers) = &resources.serverless_provider
+        {
+            for settings in serverless_providers {
+                specs.push(Box::new(ServerlessResourceProviderSpec::new(&settings.class_type, &settings.version)))
+            }
+        }
 
         if args.output_json {
             println!(
