@@ -19,7 +19,7 @@ struct Args {
     #[arg(short, long, default_value_t = String::from("redis://localhost:6379"))]
     redis_url: String,
     /// How to print the node identifiers. One of: uuid, labels
-    #[arg(long, default_value_t = String::from("uuid"))]
+    #[arg(long, default_value_t = String::from("hostname"))]
     node_print_format: String,
     /// Print the version number and quit.
     #[arg(long, default_value_t = false)]
@@ -29,6 +29,7 @@ struct Args {
 enum NodePrintFormat {
     Uuid,
     Labels,
+    Hostname,
 }
 
 impl NodePrintFormat {
@@ -37,6 +38,8 @@ impl NodePrintFormat {
             Ok(Self::Uuid)
         } else if str == "labels" {
             Ok(Self::Labels)
+        } else if str == "hostname" {
+            Ok(Self::Hostname)
         } else {
             anyhow::bail!("invalid node-print-format value: {}", str)
         }
@@ -126,12 +129,23 @@ fn main() -> anyhow::Result<()> {
 
     let node_print_format = NodePrintFormat::from(&args.node_print_format)?;
     let mut node_to_names = std::collections::HashMap::new();
-    if matches!(node_print_format, NodePrintFormat::Labels) {
-        for (node_id, caps) in proxy.fetch_node_capabilities() {
-            let labels = caps.labels.join(",");
-            let name = if labels.is_empty() { node_id.to_string() } else { labels };
-            node_to_names.insert(node_id, name);
+    match node_print_format {
+        NodePrintFormat::Labels => {
+            for (node_id, caps) in proxy.fetch_node_capabilities() {
+                let labels = caps.labels.join(",");
+                if !labels.is_empty() {
+                    node_to_names.insert(node_id, labels);
+                }
+            }
         }
+        NodePrintFormat::Hostname => {
+            for (node_id, caps) in proxy.fetch_node_capabilities() {
+                if let Some(hostname) = caps.labels.iter().find(|x| x.starts_with("hostname=")) {
+                    node_to_names.insert(node_id, hostname.strip_prefix("hostname=").unwrap().to_string());
+                }
+            }
+        }
+        NodePrintFormat::Uuid => {}
     }
     let map_node = |node_id: &uuid::Uuid| node_to_names.get(node_id).unwrap_or(&node_id.to_string()).to_string();
 
