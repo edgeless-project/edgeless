@@ -673,7 +673,7 @@ mod system_tests {
     #[serial_test::serial]
     async fn system_test_orchestration_intent_migration_redis() -> anyhow::Result<()> {
         // Skip the test if there is no local Redis listening on default port.
-        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true, None) {
+        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new_client("redis://localhost:6379") {
             Ok(redis_proxy) => redis_proxy,
             Err(_) => {
                 println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
@@ -867,7 +867,7 @@ mod system_tests {
     #[serial_test::serial]
     async fn system_test_orchestration_node_cordoning_functions_redis() -> anyhow::Result<()> {
         // Skip the test if there is no local Redis listening on default port.
-        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true, None) {
+        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new_client("redis://localhost:6379") {
             Ok(redis_proxy) => redis_proxy,
             Err(_) => {
                 println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
@@ -1004,7 +1004,7 @@ mod system_tests {
     #[serial_test::serial]
     async fn system_test_orchestration_node_cordoning_resources_redis() -> anyhow::Result<()> {
         // Skip the test if there is no local Redis listening on default port.
-        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new("redis://localhost:6379", true, None) {
+        let mut redis_proxy = match edgeless_orc::proxy_redis::ProxyRedis::new_client("redis://localhost:6379") {
             Ok(redis_proxy) => redis_proxy,
             Err(_) => {
                 println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");

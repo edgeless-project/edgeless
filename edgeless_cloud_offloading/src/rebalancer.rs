@@ -48,7 +48,7 @@ pub struct Rebalancer {
 
 impl Rebalancer {
     pub fn new(redis_url: &str) -> anyhow::Result<Self> {
-        let proxy = match edgeless_orc::proxy_redis::ProxyRedis::new(redis_url, false, None) {
+        let proxy = match edgeless_orc::proxy_redis::ProxyRedis::new_client(redis_url) {
             Ok(proxy) => proxy,
             Err(err) => anyhow::bail!("Could not connect to Redis at {}: {}", redis_url, err),
         };
