@@ -63,6 +63,12 @@ impl ProxyRedis {
     /// - `dataset_settings`: the settings to save samples to output files.
     ///
     pub fn new(redis_url: &str, flushdb: bool, dataset_settings: Option<crate::EdgelessOrcProxyDatasetSettings>) -> anyhow::Result<Self> {
+        log::info!(
+            "creating Redis orchestrator proxy at URL {} ({})",
+            redis_url,
+            if flushdb { "flush DB" } else { "do not flush DB" }
+        );
+
         Self::new_private(redis_url, flushdb, dataset_settings, false)
     }
 
@@ -72,12 +78,6 @@ impl ProxyRedis {
         dataset_settings: Option<crate::EdgelessOrcProxyDatasetSettings>,
         do_not_dump: bool,
     ) -> anyhow::Result<Self> {
-        log::info!(
-            "creating Redis orchestrator proxy at URL {} ({})",
-            redis_url,
-            if flushdb { "flush DB" } else { "do not flush DB" }
-        );
-
         // Create the connection with the Redis server
         let mut connection = redis::Client::open(redis_url)?.get_connection()?;
 
@@ -809,7 +809,7 @@ mod test {
 
     fn get_proxy() -> Option<ProxyRedis> {
         // Skip the test if there is no local Redis listening on default port.
-        match ProxyRedis::new_client("redis://localhost:6379") {
+        match ProxyRedis::new("redis://localhost:6379", true, None) {
             Ok(redis_proxy) => return Some(redis_proxy),
             Err(_) => {
                 println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
@@ -1212,7 +1212,7 @@ mod test {
     #[test]
     fn test_redis_proxy_intents() {
         // Skip the test if there is no local Redis listening on default port.
-        let mut redis_proxy = match ProxyRedis::new_client("redis://localhost:6379") {
+        let mut redis_proxy = match ProxyRedis::new("redis://localhost:6379", true, None) {
             Ok(redis_proxy) => redis_proxy,
             Err(_) => {
                 println!("the test cannot be run because there is no Redis reachable on localhost at port 6379");
