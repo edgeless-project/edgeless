@@ -105,12 +105,11 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
 
             let mut wf_id = None;
             for param in query.split("&") {
-                if let Some((k, v)) = param.split_once("=") {
-                    if k == "wf_id" {
+                if let Some((k, v)) = param.split_once("=")
+                    && k == "wf_id" {
                         wf_id = Some(v.to_string());
                         break;
                     }
-                }
             }
 
             let data = body.collect().await?.to_bytes();
@@ -134,7 +133,7 @@ impl hyper::service::Service<hyper::Request<hyper::body::Incoming>> for IngressS
                 if desc.async_out {
                     // Invoke the next component via cast().
                     let msg = if desc.encode_base64 {
-                        base64::engine::general_purpose::STANDARD.encode(data.to_vec())
+                        base64::engine::general_purpose::STANDARD.encode(&data)
                     } else {
                         String::from_utf8(data.to_vec())?
                     };

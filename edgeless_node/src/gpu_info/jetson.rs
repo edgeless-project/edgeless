@@ -60,12 +60,11 @@ pub fn jetson_get_gpu_temp() -> f32 {
         // Get only the thermal_zone files
         if file_name.contains("thermal_zone") {
             // If /sys/class/thermal/${thermal_zone}/type contains "GPU-thermal" then this thermal_zoneX dir contains the GPU temp
-            if let Ok(content) = fs::read_to_string(format!("{}{}/type", thermal_path, file_name)) {
-                if content.trim() == "GPU-therm" {
+            if let Ok(content) = fs::read_to_string(format!("{}{}/type", thermal_path, file_name))
+                && content.trim() == "GPU-therm" {
                     // Check if the contents contain "GPU-thermal"
                     thermal_zone = file_name; // Set the thermal_zoneX to the current dir since this contains GPU info
                 }
-            }
         }
     }
 

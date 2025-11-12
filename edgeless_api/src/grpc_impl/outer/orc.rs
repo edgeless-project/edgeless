@@ -55,8 +55,8 @@ impl OrchestratorAPIServer {
         };
         Box::pin(async move {
             let function_api = function_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&orchestrator_url) {
-                if let Ok(host) = format!("{}:{}", host, port).parse() {
+            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&orchestrator_url)
+                && let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start OrchestratorAPIServer GRPC Server at {}", orchestrator_url);
 
                     let mut server_builder = tonic::transport::Server::builder();
@@ -103,7 +103,6 @@ impl OrchestratorAPIServer {
                         }
                     }
                 }
-            }
 
             log::info!("Stop OrchestratorAPI GRPC Server");
         })

@@ -190,8 +190,8 @@ impl InvocationAPIServer {
         };
         Box::pin(async move {
             let function_api = function_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&invocation_url) {
-                if let Ok(host) = format!("{}:{}", host, port).parse() {
+            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&invocation_url)
+                && let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start InvocationAPI GRPC Server at {}", invocation_url);
 
                     let mut server_builder = tonic::transport::Server::builder();
@@ -234,7 +234,6 @@ impl InvocationAPIServer {
                         }
                     }
                 }
-            }
 
             log::info!("Stop Invocation GRPC Server");
         })

@@ -78,11 +78,10 @@ impl Docker {
             None => return Err(anyhow::anyhow!("could not find the newly-created container with ID {}", id)),
         };
         let public_port = match container.Ports.iter().find(|x| {
-            if let Some(ip) = &x.IP {
-                if ip == "0.0.0.0" {
+            if let Some(ip) = &x.IP
+                && ip == "0.0.0.0" {
                     return true;
                 }
-            }
             false
         }) {
             Some(port) => match port.PublicPort {

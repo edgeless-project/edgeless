@@ -36,8 +36,8 @@ impl DomainRegistrationAPIServer {
         };
         Box::pin(async move {
             let domain_registration_api = domain_registration_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&domain_registration_url) {
-                if let Ok(host) = format!("{}:{}", host, port).parse() {
+            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&domain_registration_url)
+                && let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start DomainRegisterAPI GRPC Server at {}", domain_registration_url);
 
                     let mut server_builder = tonic::transport::Server::builder();
@@ -80,7 +80,6 @@ impl DomainRegistrationAPIServer {
                         }
                     }
                 }
-            }
 
             log::info!("Stop DomainRegisterAPI GRPC Server");
         })

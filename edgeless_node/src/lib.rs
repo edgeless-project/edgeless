@@ -333,8 +333,8 @@ async fn fill_resources(
             }
         };
 
-        if let (Some(http_ingress_url), Some(provider_id)) = (&settings.http_ingress_url, &settings.http_ingress_provider) {
-            if !http_ingress_url.is_empty() && !provider_id.is_empty() {
+        if let (Some(http_ingress_url), Some(provider_id)) = (&settings.http_ingress_url, &settings.http_ingress_provider)
+            && !http_ingress_url.is_empty() && !provider_id.is_empty() {
                 let class_type = resources::http_ingress::HttpIngressResourceSpec {}.class_type();
                 let provider_id = make_provider_id(provider_id);
                 log::info!("Creating http-ingress resource provider '{}' at {}", provider_id, http_ingress_url);
@@ -356,10 +356,9 @@ async fn fill_resources(
                     outputs: resources::http_ingress::HttpIngressResourceSpec {}.outputs(),
                 });
             }
-        }
 
-        if let Some(provider_id) = &settings.http_egress_provider {
-            if !provider_id.is_empty() {
+        if let Some(provider_id) = &settings.http_egress_provider
+            && !provider_id.is_empty() {
                 log::info!("Creating http-egress resource provider '{}'", provider_id);
                 let class_type = resources::http_egress::HttpEgressResourceSpec {}.class_type();
                 let provider_id = make_provider_id(provider_id);
@@ -387,10 +386,9 @@ async fn fill_resources(
                     outputs: resources::http_egress::HttpEgressResourceSpec {}.outputs(),
                 });
             }
-        }
 
-        if let Some(provider_id) = &settings.http_poster_provider {
-            if !provider_id.is_empty() {
+        if let Some(provider_id) = &settings.http_poster_provider
+            && !provider_id.is_empty() {
                 let class_type = resources::http_poster::HttpPosterResourceSpec {}.class_type();
                 log::info!("Creating {} resource provider '{}'", class_type, provider_id);
                 let provider_id = make_provider_id(provider_id);
@@ -418,10 +416,9 @@ async fn fill_resources(
                     outputs: resources::http_poster::HttpPosterResourceSpec {}.outputs(),
                 });
             }
-        }
 
-        if let Some(provider_id) = &settings.file_log_provider {
-            if !provider_id.is_empty() {
+        if let Some(provider_id) = &settings.file_log_provider
+            && !provider_id.is_empty() {
                 log::info!("Creating file-log resource provider '{}'", provider_id);
                 let class_type = resources::file_log::FileLogResourceSpec {}.class_type();
                 let provider_id = make_provider_id(provider_id);
@@ -449,10 +446,9 @@ async fn fill_resources(
                     outputs: resources::file_log::FileLogResourceSpec {}.outputs(),
                 });
             }
-        }
 
-        if let Some(provider_id) = &settings.redis_provider {
-            if !provider_id.is_empty() {
+        if let Some(provider_id) = &settings.redis_provider
+            && !provider_id.is_empty() {
                 log::info!("Creating redis resource provider '{}'", provider_id);
                 let class_type = resources::redis::RedisResourceSpec {}.class_type();
                 let provider_id = make_provider_id(provider_id);
@@ -480,10 +476,9 @@ async fn fill_resources(
                     outputs: resources::redis::RedisResourceSpec {}.outputs(),
                 });
             }
-        }
 
-        if let Some(provider_id) = &settings.dda_provider {
-            if !provider_id.is_empty() {
+        if let Some(provider_id) = &settings.dda_provider
+            && !provider_id.is_empty() {
                 log::info!("Creating dda resource provider '{}'", provider_id);
                 let class_type = resources::dda::DdaResourceSpec {}.class_type();
                 let provider_id = make_provider_id(provider_id);
@@ -512,10 +507,9 @@ async fn fill_resources(
                     outputs: resources::dda::DdaResourceSpec {}.outputs(),
                 });
             }
-        }
 
-        if let Some(settings) = &settings.ollama_provider {
-            if !settings.host.is_empty() && !settings.provider.is_empty() {
+        if let Some(settings) = &settings.ollama_provider
+            && !settings.host.is_empty() && !settings.provider.is_empty() {
                 log::info!(
                     "Creating ollama resource provider '{}' towards {}:{} (limit to {} messages per chat)",
                     settings.provider,
@@ -553,16 +547,14 @@ async fn fill_resources(
                     outputs: resources::ollama::OllamaResourceSpec {}.outputs(),
                 });
             }
-        }
 
         if let Some(serverless_providers) = &settings.serverless_provider {
             for settings in serverless_providers {
                 let mut is_function_url_valid = false;
-                if let Ok((proto, address, _port)) = edgeless_api::util::parse_http_host(&settings.function_url) {
-                    if !address.is_empty() && proto == edgeless_api::util::Proto::HTTP || proto == edgeless_api::util::Proto::HTTPS {
+                if let Ok((proto, address, _port)) = edgeless_api::util::parse_http_host(&settings.function_url)
+                    && (!address.is_empty() && proto == edgeless_api::util::Proto::HTTP || proto == edgeless_api::util::Proto::HTTPS) {
                         is_function_url_valid = true;
                     }
-                }
                 if is_function_url_valid && !settings.provider.is_empty() {
                     let provider_spec = resources::serverless::ServerlessResourceProviderSpec::new(&settings.class_type, &settings.version);
                     let provider_id = make_provider_id(&settings.provider);
@@ -602,8 +594,8 @@ async fn fill_resources(
             }
         }
 
-        if let Some(provider_id) = &settings.kafka_egress_provider {
-            if !provider_id.is_empty() {
+        if let Some(provider_id) = &settings.kafka_egress_provider
+            && !provider_id.is_empty() {
                 #[cfg(feature = "rdkafka")]
                 {
                     log::info!("Creating kakfa-egress resource provider '{}'", provider_id);
@@ -639,10 +631,9 @@ async fn fill_resources(
                     provider_id
                 );
             }
-        }
 
-        if let Some(provider_id) = &settings.sqlx_provider {
-            if !provider_id.is_empty() {
+        if let Some(provider_id) = &settings.sqlx_provider
+            && !provider_id.is_empty() {
                 log::info!("Creating resource '{}'", provider_id);
                 let class_type = "sqlx".to_string();
                 let provider_id = make_provider_id(provider_id);
@@ -670,7 +661,6 @@ async fn fill_resources(
                     outputs: vec![],
                 });
             }
-        }
     }
 
     ret
