@@ -138,11 +138,10 @@ impl SpawnWorkflowRequest {
             if let Some(mapping) = function.output_mapping.get_mut(channel) {
                 *mapping = new_target;
             }
-        } else if let Some(resource) = self.resources.iter_mut().find(|x| x.name == *name) {
-            if let Some(mapping) = resource.output_mapping.get_mut(channel) {
+        } else if let Some(resource) = self.resources.iter_mut().find(|x| x.name == *name)
+            && let Some(mapping) = resource.output_mapping.get_mut(channel) {
                 *mapping = new_target;
             }
-        }
     }
 
     /// Return the output mappings of all the components, both functions and

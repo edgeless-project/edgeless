@@ -34,8 +34,8 @@ impl WorkflowInstanceAPIServer {
         };
         Box::pin(async move {
             let workflow_api = workflow_api;
-            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&controller_url) {
-                if let Ok(host) = format!("{}:{}", host, port).parse() {
+            if let Ok((_proto, host, port)) = crate::util::parse_http_host(&controller_url)
+                && let Ok(host) = format!("{}:{}", host, port).parse() {
                     log::info!("Start ControllerAPI GRPC Server at {}", controller_url);
 
                     let mut server_builder = tonic::transport::Server::builder();
@@ -78,7 +78,6 @@ impl WorkflowInstanceAPIServer {
                         }
                     }
                 }
-            }
 
             log::info!("Stop ControllerAPI GRPC Server");
         })
