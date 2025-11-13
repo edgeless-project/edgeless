@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
+use core::f64;
 use edgeless_api::outer::controller::ControllerAPI;
 use itertools::Itertools;
 use std::{io::Write, str::FromStr};
@@ -177,19 +178,24 @@ async fn top_workflow(
     map_node: &dyn Fn(&uuid::Uuid) -> String,
 ) -> anyhow::Result<()> {
     let now = chrono::Utc::now();
-    let avg = |series: &edgeless_orc::proxy::PerformanceSeries| {
+    let avg_min_max = |series: &edgeless_orc::proxy::PerformanceSeries| {
         let mut tot = 0.0_f64;
         let mut num = 0_usize;
+        let mut min = f64::INFINITY;
+        let mut max = f64::NEG_INFINITY;
         for (timestamp, value) in series {
             if (now - timestamp) > chrono::Duration::seconds(60) {
                 continue;
             }
-            if let Ok(value) = value.parse::<f64>() {
+            if let Ok(mut value) = value.parse::<f64>() {
+                value *= 1000.0;
                 tot += value;
                 num += 1;
+                min = min.min(value);
+                max = max.max(value);
             }
         }
-        1000.0 * tot / num as f64
+        (tot / num as f64, min, max)
     };
 
     let mut ascii_table = ascii_table::AsciiTable::default();
@@ -197,8 +203,12 @@ async fn top_workflow(
     ascii_table.column(0).set_header("Name").set_align(ascii_table::Align::Left);
     ascii_table.column(1).set_header("Domain").set_align(ascii_table::Align::Left);
     ascii_table.column(2).set_header("Node").set_align(ascii_table::Align::Left);
-    ascii_table.column(3).set_header("Exec (ms)").set_align(ascii_table::Align::Left);
-    ascii_table.column(4).set_header("Transfer (ms)").set_align(ascii_table::Align::Left);
+    ascii_table.column(3).set_header("Exec (ms) Avg").set_align(ascii_table::Align::Left);
+    ascii_table.column(4).set_header("Min").set_align(ascii_table::Align::Left);
+    ascii_table.column(5).set_header("Max").set_align(ascii_table::Align::Left);
+    ascii_table.column(6).set_header("Transfer (ms) Avg").set_align(ascii_table::Align::Left);
+    ascii_table.column(7).set_header("Min").set_align(ascii_table::Align::Left);
+    ascii_table.column(8).set_header("Max").set_align(ascii_table::Align::Left);
 
     let lid_to_pid = proxy.fetch_instances_to_physical_ids();
     let fun_lid_to_node_id: std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::function_instance::ComponentId> =
@@ -225,17 +235,27 @@ async fn top_workflow(
                 let exec_times = proxy.fetch_performance_series(&pid.to_string(), "function_execution_time");
                 let tran_times = proxy.fetch_performance_series(&pid.to_string(), "function_transfer_time");
 
+                let (exec_avg, exec_min, exec_max) = avg_min_max(&exec_times);
+                let (tran_avg, tran_min, tran_max) = avg_min_max(&tran_times);
                 data.push(vec![
                     name.clone(),
                     domain_id.clone(),
                     map_node(node_id).to_string(),
-                    format!("{:.1}", avg(&exec_times)),
-                    format!("{:.1}", avg(&tran_times)),
+                    format!("{:.1}", exec_avg),
+                    format!("{:.1}", exec_min),
+                    format!("{:.1}", exec_max),
+                    format!("{:.1}", tran_avg),
+                    format!("{:.1}", tran_min),
+                    format!("{:.1}", tran_max),
                 ]);
             } else {
                 data.push(vec![
                     name.clone(),
                     domain_id.clone(),
+                    String::default(),
+                    String::default(),
+                    String::default(),
+                    String::default(),
                     String::default(),
                     String::default(),
                     String::default(),
