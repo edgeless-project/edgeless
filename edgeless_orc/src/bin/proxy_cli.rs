@@ -410,7 +410,13 @@ async fn main() -> anyhow::Result<()> {
                 };
                 let node_id = match uuid::Uuid::from_str(&node_id) {
                     Ok(node_id) => node_id,
-                    Err(err) => anyhow::bail!("invalid node id {}: {}", node_id, err),
+                    Err(err) => {
+                        if let Some((uuid, _name)) = node_to_names.iter().find(|(_uuid, name)| **name == node_id) {
+                            *uuid
+                        } else {
+                            anyhow::bail!("invalid node id {}: {}", node_id, err);
+                        }
+                    }
                 };
                 proxy.add_deploy_intents(vec![edgeless_orc::deploy_intent::DeployIntent::Migrate(instance_id, vec![node_id])]);
             }
