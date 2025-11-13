@@ -27,6 +27,6 @@ impl super::tls_config::TlsConfig {
     }
 
     pub async fn create_channel_with_tpm(&self, _server_addr: &str) -> anyhow::Result<tonic::transport::Channel> {
-        anyhow::bail!("cannot create channel with TPM on OS = macos")
+        anyhow::bail!("cannot create channel with TPM on non-x86_64 native arch")
     }
 }
