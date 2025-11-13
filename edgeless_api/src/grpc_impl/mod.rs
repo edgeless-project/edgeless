@@ -10,9 +10,9 @@ mod common;
 mod inner;
 pub mod outer;
 pub mod tls_config;
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_arch = "x86_64")]
 pub mod tls_config_mtls;
-#[cfg(target_os = "macos")]
+#[cfg(not(target_arch = "x86_64"))]
 pub mod tls_config_none;
 
 pub fn init_crypto() {
