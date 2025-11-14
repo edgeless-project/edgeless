@@ -100,7 +100,7 @@ fn call_through_dda<T>(event_name: &str, event: DDA, transform: Option<fn(DDA) -
 where
     T: Default,
 {
-    log::info!("{:?}: calling through dda", event_name);
+    // log::info!("{:?}: calling through dda", event_name);
     // NOTE: instead of calling through dda, we need an async version of that -
     // otherwise functions would end up blocking the dda resource. Easy
     // solution: pause function execution, until a return value has been made
@@ -122,7 +122,7 @@ where
 /// like above once the async call is available
 pub fn publish_event(pub_alias: &str, data: Vec<u8>) -> Result<(), &'static str> {
     let message = DDA::ComPublishEvent(String::from(pub_alias), data);
-    log::info!("publish_event on {:?}", pub_alias);
+    // log::info!("publish_event on {:?}", pub_alias);
     match call("dda", encode(message).as_slice()) {
         CallRet::Err => Err("publish_event: did not succeed"),
         CallRet::NoReply => Err("publish_event: TODO timeout"),
@@ -132,7 +132,7 @@ pub fn publish_event(pub_alias: &str, data: Vec<u8>) -> Result<(), &'static str>
 
 pub fn publish_action(pub_alias: &str, data: Vec<u8>) -> Result<Vec<u8>, &'static str> {
     let msg = DDA::ComPublishAction(String::from(pub_alias), data);
-    log::info!("publish_action on {:?}", pub_alias);
+    // log::info!("publish_action on {:?}", pub_alias);
     match call("dda", encode(msg).as_slice()) {
         CallRet::Err => Err("publish_action: did not succeed"),
         CallRet::NoReply => Err("publish_action: TODO timeout"),

@@ -71,6 +71,17 @@ impl FileLogResource {
         let mut outfile = std::fs::OpenOptions::new().create(true).append(true).open(filename)?;
 
         log::info!("FileLogResource created, writing to file: {}", filename);
+        // Write CSV header if the file is empty
+        if outfile.metadata()?.len() == 0 {
+            let mut header = "message".to_string();
+            if add_timestamp {
+                header = format!("timestamp,{}", header);
+            }
+            if add_source_id {
+                header = format!("source_id,{}", header);
+            }
+            writeln!(outfile, "{}", header)?;
+        }
 
         let handle = tokio::spawn(async move {
             loop {
@@ -96,14 +107,19 @@ impl FileLogResource {
                 };
 
                 // Compose the line piece by piece.
-                let mut line = "".to_string();
+                let mut line_parts = Vec::new();
+                
                 if add_timestamp {
-                    line.push_str(format!("{} ", chrono::Utc::now().to_rfc3339()).as_str());
+                    line_parts.push(chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0).to_string());
                 }
                 if add_source_id {
-                    line.push_str(format!("{} ", source_id).as_str());
+                    line_parts.push(source_id.function_id.to_string());
                 }
-                line.push_str(&message_data);
+
+                line_parts.push(message_data.clone());
+                
+                // join with commas
+                let line = line_parts.join(",");
 
                 // Dump the line to the output file.
                 log::debug!("{}", line);
@@ -174,7 +190,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
                 Err(err) => {
                     return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                         edgeless_api::common::ResponseError {
-                            summary: "Invalid resource configuration".to_string(),
+                            summary: "File log: Invalid resource configuration".to_string(),
                             detail: Some(err.to_string()),
                         },
                     ));
@@ -183,7 +199,7 @@ impl edgeless_api::resource_configuration::ResourceConfigurationAPI<edgeless_api
         }
         Ok(edgeless_api::common::StartComponentResponse::ResponseError(
             edgeless_api::common::ResponseError {
-                summary: "Invalid resource configuration".to_string(),
+                summary: "File log: Invalid resource configuration".to_string(),
                 detail: Some("Field 'filename' missing".to_string()),
             },
         ))

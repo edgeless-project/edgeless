@@ -175,9 +175,9 @@ impl super::tls_config::TlsConfig {
             }
             Err(e) => {
                 if e.to_string().contains("not found") {
-                    log::warn!("TLS configuration file 'tls_config.toml' not found. Continuing with plaintext connection (no TLS).");
+                    // log::warn!("TLS configuration file 'tls_config.toml' not found. Continuing with plaintext connection (no TLS).");
                 } else {
-                    log::warn!("Failed to load TLS configuration: {}. Continuing with plaintext connection (no TLS).", e);
+                    // log::warn!("Failed to load TLS configuration: {}. Continuing with plaintext connection (no TLS).", e);
                 }
                 let endpoint = tonic::transport::Endpoint::from_shared(server_addr.to_string())?;
                 Ok(endpoint.connect().await?)
