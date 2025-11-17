@@ -9,7 +9,9 @@ use edgeless_api::resource_configuration::ResourceInstanceSpecification;
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct DDAChainData {
     pub chain_length: u32,
-    pub function_wasm_path: String,
+    pub function_first_wasm_path: String,
+    pub function_mid_wasm_path: String,
+    pub function_last_wasm_path: String,
     pub dda_resource_config: ResourceInstanceSpecification,
 }
 
@@ -17,7 +19,9 @@ impl Default for DDAChainData {
     fn default() -> Self {
         Self {
             chain_length: 5,
-            function_wasm_path: "../functions/dda_chain/dda_chain.wasm".to_string(),
+            function_first_wasm_path: "./functions/dda_chain_first/dda_chain_first.wasm".to_string(),
+            function_mid_wasm_path: "./functions/dda_chain_mid/dda_chain_mid.wasm".to_string(),
+            function_last_wasm_path: "./functions/dda_chain_last/dda_chain_last.wasm".to_string(),
             dda_resource_config: ResourceInstanceSpecification {
                 class_type: "dda".to_string(),
                 configuration: {
@@ -254,7 +258,10 @@ impl WorkflowType {
             }
             WorkflowType::DDAChain(data) => {
                 anyhow::ensure!(data.chain_length > 0, "vanishing chain length");
-                anyhow::ensure!(!data.function_wasm_path.is_empty(), "empty WASM file path");
+                anyhow::ensure!(data.chain_length <= 10, "chain length exceeds maximum of 10 blocks - got {}", data.chain_length);
+                anyhow::ensure!(!data.function_first_wasm_path.is_empty(), "empty first function WASM file path");
+                anyhow::ensure!(!data.function_mid_wasm_path.is_empty(), "empty mid function WASM file path");
+                anyhow::ensure!(!data.function_last_wasm_path.is_empty(), "empty last function WASM file path");
                 // Check if required fields exist in the configuration HashMap
                 anyhow::ensure!(
                     data.dda_resource_config.configuration.contains_key("dda_url"),

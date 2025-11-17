@@ -174,11 +174,14 @@ impl SpawnWorkflowRequest {
         for resource in &self.resources {
             resource.is_valid()?;
         }
-        anyhow::ensure!(self
-            .mapped_components()
-            .difference(&self.source_components())
-            .collect::<Vec<&String>>()
-            .is_empty());
+        let mapped = self.mapped_components();
+        let source = self.source_components();
+        let difference: Vec<&String> = mapped.difference(&source).collect();
+        anyhow::ensure!(
+            difference.is_empty(),
+            "Components referenced but not defined: {:?}",
+            difference
+        );
 
         // self.workflow_functions.
         Ok(())

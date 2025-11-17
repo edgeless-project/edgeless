@@ -347,61 +347,79 @@ impl Engine {
             // Used to test DDA chains and the blocking behavior. 
             WorkflowType::DDAChain(ddachain_data) => {
                 // add the first function
+                let mut first_output_mapping = std::collections::HashMap::new();
+                // Map active functions to actual middle functions
+                for i in 0..ddachain_data.chain_length {
+                    first_output_mapping.insert(format!("func{}", i), format!("f{}", i));
+                }
+                // Map remaining outputs to dda resource
+                for i in ddachain_data.chain_length..10 {
+                    first_output_mapping.insert(format!("func{}", i), "dda-1".to_string());
+                }
+                // Map dda output to dda resource
+                first_output_mapping.insert("dda".to_string(), "dda-1".to_string());
+
                 functions.push(WorkflowFunction {
                     name: "first".to_string(),
                     class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                        id: "dda_chain".to_string(),
+                        id: "dda_chain_first".to_string(),
                         function_type: "RUST_WASM".to_string(),
                         version: "0.1".to_string(),
-                        binary: Some(std::fs::read(&ddachain_data.function_wasm_path).expect("could not read wasm file for dda_chain")),
-                        code: Some(ddachain_data.function_wasm_path.clone()),
-                        outputs: vec!["out".to_string()],
+                        binary: Some(std::fs::read(&ddachain_data.function_first_wasm_path).expect("could not read wasm file for dda_chain_first")),
+                        code: Some(ddachain_data.function_first_wasm_path.clone()),
+                        outputs: {
+                            let mut outputs: Vec<String> = (0..10).map(|i| format!("func{}", i)).collect();
+                            outputs.push("dda".to_string());
+                            outputs
+                        },
                     },
-                    output_mapping: std::collections::HashMap::from([("out".to_string(), "f0".to_string())]),
-                    annotations: std::collections::HashMap::from([("init-payload".to_string(), format!("is_first=true,is_last=false,num_middle_blocks={}", ddachain_data.chain_length))]),
+                    output_mapping: first_output_mapping,
+                    annotations: std::collections::HashMap::from([("init-payload".to_string(), format!("chain_length={}", ddachain_data.chain_length))]),
                 });
 
                 // add the middle (fanned-out) functions
                 for i in 0..ddachain_data.chain_length {
-                    let mut output_mapping = std::collections::HashMap::from([("out".to_string(), format!("f{}", i + 1))]);
-
-                    let annotations = std::collections::HashMap::from([(
-                        "init-payload".to_string(),
-                        format!(
-                            "is_first=false,is_last=false,num_middle_blocks={}",
-                            ddachain_data.chain_length
-                        )
-                        .to_string(),
-                    )]);
+                    let output_mapping = std::collections::HashMap::from([
+                        ("out".to_string(), "last".to_string()),
+                        ("dda".to_string(), "dda-1".to_string())
+                    ]);
 
                     functions.push(WorkflowFunction {
                         name: format!("f{}", i),
                         class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                            id: "dda_chain".to_string(),
+                            id: "dda_chain_mid".to_string(),
                             function_type: "RUST_WASM".to_string(),
                             version: "0.1".to_string(),
-                            binary: Some(std::fs::read(&ddachain_data.function_wasm_path).expect("could not read wasm file for dda_chain")),
-                            code: Some(ddachain_data.function_wasm_path.clone()),
-                            outputs: output_mapping.keys().cloned().collect(),
+                            binary: Some(std::fs::read(&ddachain_data.function_mid_wasm_path).expect("could not read wasm file for dda_chain_mid")),
+                            code: Some(ddachain_data.function_mid_wasm_path.clone()),
+                            outputs: vec!["dda".to_string(), "out".to_string()],
                         },
                         output_mapping,
-                        annotations,
+                        annotations: std::collections::HashMap::new(),
                     });
                 }
 
                 // add the last function 
                 functions.push(WorkflowFunction {
-                    name: format!("last"),
+                    name: "last".to_string(),
                     class_specification: edgeless_api::function_instance::FunctionClassSpecification {
-                        id: "dda_chain".to_string(),
+                        id: "dda_chain_last".to_string(),
                         function_type: "RUST_WASM".to_string(),
                         version: "0.1".to_string(),
-                        binary: Some(std::fs::read(&ddachain_data.function_wasm_path).expect("could not read wasm file for dda_chain")),
-                        code: Some(ddachain_data.function_wasm_path.clone()),
-                        outputs: vec!["out".to_string()],
+                        binary: Some(std::fs::read(&ddachain_data.function_last_wasm_path).expect("could not read wasm file for dda_chain_last")),
+                        code: Some(ddachain_data.function_last_wasm_path.clone()),
+                        outputs: vec!["first".to_string()],
                     },
-                    output_mapping: std::collections::HashMap::from([("out".to_string(), "first".to_string())]),
-                    annotations: std::collections::HashMap::from([("init-payload".to_string(), format!("is_first=false,is_last=true,num_middle_blocks={}", ddachain_data.chain_length))]),
+                    output_mapping: std::collections::HashMap::from([("first".to_string(), "first".to_string())]),
+                    annotations: std::collections::HashMap::from([("init-payload".to_string(), format!("num_middle_blocks={}", ddachain_data.chain_length))]),
+                });
+
+                // add DDA resource
+                resources.push(edgeless_api::workflow_instance::WorkflowResource {
+                    name: "dda-1".to_string(),
+                    class_type: ddachain_data.dda_resource_config.class_type.clone(),
+                    output_mapping: std::collections::HashMap::new(),
+                    configurations: ddachain_data.dda_resource_config.configuration.clone(),
                 });
 
                 log::info!("wf{}, dda chain length {}", self.wf_id, ddachain_data.chain_length);
