@@ -11,6 +11,7 @@ use serde_json::Error;
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 use uuid::Uuid;
+use std::sync::atomic::AtomicI64;
 
 pub struct DdaResourceSpec {}
 
@@ -80,12 +81,9 @@ impl DDAResourceProvider {
                 dataplane_provider,
                 telemetry_handle,
                 instances: HashMap::<Uuid, DDAResource>::new(),
-                // TODO: inner hashmap should be mapped to a vector of
-                // InstanceIDs -> in case we decide that multiple functions can
-                // listen to the same dda event
-                // NOTE: For now, we assume that each subscription has only one
-                // target per workflow to avoid duplicating incoming events -
-                // this is up to discussion later on.
+
+                // We assume that each subscription has only one
+                // target per workflow to avoid duplicating incoming events.
                 mappings: HashMap::<Uuid, HashMap<String, InstanceId>>::new(),
             })),
         }
@@ -271,20 +269,20 @@ impl DDAResource {
             }
         }
         let dda_pub_map: HashMap<String, DDAComPublication> = dda_pub_array.into_iter().map(|p| (p.alias.clone(), p)).collect();
+        // reuse a single http/2 connection and enable keep alive
+        let channel = tonic::transport::Channel::from_shared(dda_url.clone())
+            .expect("could not connect to dda sidecar")
+            // .keep_alive_while_idle(true)
+            // .http2_keep_alive_interval(std::time::Duration::from_secs(5))
+            // .keep_alive_timeout(std::time::Duration::from_secs(10))
+            .connect()
+            .await?;
 
         // always connect all clients to the sidecar, because the function can
         // use any of the subsystems
-        let mut dda_com_client = dda_com::com_service_client::ComServiceClient::connect(dda_url.clone())
-            .await
-            .expect("dda sidecar: com connection failed");
-
-        let mut dda_state_client = dda_state::state_service_client::StateServiceClient::connect(dda_url.clone())
-            .await
-            .expect("dda sidecar: state connection failed");
-
-        let mut dda_store_client = dda_store::store_service_client::StoreServiceClient::connect(dda_url.clone())
-            .await
-            .expect("dda sidecar: store connection failed");
+        let mut dda_com_client = dda_com::com_service_client::ComServiceClient::new(channel.clone());
+        let mut dda_state_client = dda_state::state_service_client::StateServiceClient::new(channel.clone());
+        let mut dda_store_client = dda_store::store_service_client::StoreServiceClient::new(channel);
 
         // subscribe to configured dda topics
         let mut sub_tasks: Vec<tokio::task::JoinHandle<()>> = vec![];
@@ -296,11 +294,6 @@ impl DDAResource {
         let mut handle = dataplane_handle.clone();
         let passer_task = tokio::spawn(async move {
             while let Some((event, dda_sub)) = receiver.recv().await {
-                // if receiver.len() > 10 {
-                //     log::warn!("a lot of messages are waiting to be processed");
-                // }
-                // mapping has to be looked up each time, since the dataplane
-                // can change
                 let mapping = provider
                     .inner
                     .lock()
@@ -325,7 +318,6 @@ impl DDAResource {
                         }
                         "call" => {
                             panic!("do not use calls - they will probably be removed later on");
-                            // let _ = handle.call(target_function_id, encoded_event).await;
                         }
                         _ => {
                             panic!("Unexpected method used in DDA mapping");
@@ -491,7 +483,6 @@ impl DDAResource {
         // Spawn asynchrounous task to handle edgeless dataplane events -
         // these are incoming events from e.g. edgeless functions that need to
         // be sent out etc.
-        let id: u128 = 0;
         let mut dataplane_handle = dataplane_handle.clone();
         let _dda_task = tokio::spawn(async move {
             loop {
@@ -516,8 +507,12 @@ impl DDAResource {
                 };
 
                 let mut handle = dataplane_handle.clone();
+                let start = tokio::time::Instant::now();
+                let id = uuid::Uuid::new_v4();
                 let respond = {
                     move |msg: edgeless_dataplane::core::CallRet| async move {
+                        let duration = start.elapsed();
+                        log::warn!("{} total {} ms", id.clone(), duration.as_millis());
                         let _ = handle.reply(source_id, channel_id, msg, &metadata).await;
                     }
                 };
@@ -569,30 +564,38 @@ impl DDAResource {
                             params: data,
                             ..Default::default()
                         };
+                        let duration = start.elapsed();
+                        log::warn!("{} creation {} ms", id.clone(), duration.as_millis());
 
-                        // wait for an action response (currently 1)
-                        match dda_com_client.publish_action(action).await {
-                            Ok(res) => {
-                                let mut stream = res.into_inner();
-                                match stream.message().await {
-                                    Ok(response) => {
-                                        let action_result = response.expect("expected an action result!").data;
-                                        let res = dda::DDA::ComSubscribeActionResult(action_result);
-                                        let r = serde_json::to_string(&res).expect("wrong");
-                                        respond(edgeless_dataplane::core::CallRet::Reply(r)).await;
-                                    }
-                                    Err(status) => {
-                                        log::error!("could not retrieve an action result {:?}", status);
-                                        respond(edgeless_dataplane::core::CallRet::Err).await;
+                        // spawn background task to handle action response - this prevents dataplane blocking issue
+                        let mut action_client = dda_com_client.clone();
+                        let respond_task = respond;
+                        tokio::spawn(async move {
+                            let start = tokio::time::Instant::now();
+                            match action_client.publish_action(action).await {
+                                Ok(res) => {
+                                    let mut stream = res.into_inner();
+                                    match stream.message().await {
+                                        Ok(response) => {
+                                            let action_result = response.expect("expected an action result!").data;
+                                            let res = dda::DDA::ComSubscribeActionResult(action_result);
+                                            let r = serde_json::to_string(&res).expect("wrong");
+                                            let duration = start.elapsed();
+                                            log::warn!("{} total action publish {} ms", id.clone(), duration.as_millis());
+                                            respond_task(edgeless_dataplane::core::CallRet::Reply(r)).await;
+                                        }
+                                        Err(status) => {
+                                            log::error!("could not retrieve an action result {:?}", status);
+                                            respond_task(edgeless_dataplane::core::CallRet::Err).await;
+                                        }
                                     }
                                 }
+                                Err(status) => {
+                                    log::error!("gRPC call to sidecar failed {:?}", status);
+                                    respond_task(edgeless_dataplane::core::CallRet::Err).await;
+                                }
                             }
-                            Err(status) => {
-                                log::error!("gRPC call to sidecar failed {:?}", status);
-                                respond(edgeless_dataplane::core::CallRet::Err).await;
-                                continue;
-                            }
-                        };
+                        });
                     }
                     dda::DDA::ComPublishQuery(alias, data) => {
                         let p = match dda_pub_map.get(&alias) {
@@ -787,8 +790,8 @@ impl DDAResource {
                             }
                         }
                     }
-                    // NOTE: returns only the first KeyValue that matches the
-                    // Prefix - can be adapted arbitrarily when demend arises
+                    // returns only the first KeyValue that matches the
+                    // Prefix.
                     dda::DDA::StoreScanPrefix(key) => {
                         let scan_prefix = dda_store::Key { key };
                         match dda_store_client.scan_prefix(scan_prefix).await {

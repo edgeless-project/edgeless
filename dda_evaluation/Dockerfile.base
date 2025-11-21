@@ -1,0 +1,5 @@
+FROM debian:12
+
+RUN apt-get update && \
+    apt-get install -y libtss2-dev && \
+    rm -rf /var/lib/apt/lists/*

@@ -1,0 +1,13 @@
+FROM edgeless-base:latest
+ARG BIN
+
+WORKDIR /usr/src/myapp
+
+EXPOSE 7001
+
+ADD ${BIN}/edgeless_inabox .
+ADD docker_cfg/controller.toml .
+ADD docker_cfg/orchestrator.toml .
+ADD docker_cfg/node.toml .
+
+CMD ["sh", "-c", "RUST_LOG=info ./edgeless_inabox"]

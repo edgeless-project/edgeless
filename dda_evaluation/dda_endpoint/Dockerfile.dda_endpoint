@@ -1,0 +1,17 @@
+FROM golang:latest AS builder
+
+WORKDIR /usr/src/app
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY main.go .
+RUN go build -o dda_endpoint .
+
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY --from=builder /usr/src/app/dda_endpoint .
+
+CMD ["./dda_endpoint", "--docker"]

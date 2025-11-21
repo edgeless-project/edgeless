@@ -82,7 +82,6 @@ impl EdgeFunction for VectorMulFunction {
     // example of payload:
     // seed=42,is_client=true,is_last=false,input_size=1000
     fn handle_init(payload: Option<&[u8]>, _serialized_state: Option<&[u8]>) {
-        // edgeless_function::init_logger();
         let arguments = if let Some(payload) = payload {
             let str_payload = core::str::from_utf8(payload).unwrap();
             edgeless_function::parse_init_payload(str_payload)

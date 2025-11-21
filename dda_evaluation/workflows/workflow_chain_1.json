@@ -1,0 +1,109 @@
+{
+    "functions": [
+        {
+            "name": "first",
+            "class_specification": {
+                "id": "dda_chain_first",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../functions/dda_chain_first/dda_chain_first.wasm",
+                "outputs": [
+                    "func0",
+                    "func1",
+                    "func2",
+                    "func3",
+                    "func4",
+                    "func5",
+                    "func6",
+                    "func7",
+                    "func8",
+                    "func9",
+                    "dda"
+                ]
+            },
+            "output_mapping": {
+                "dda": "dda-1",
+                "func0": "f0",
+                "func1": "dda-1",
+                "func2": "dda-1",
+                "func3": "dda-1",
+                "func4": "dda-1",
+                "func5": "dda-1",
+                "func6": "dda-1",
+                "func7": "dda-1",
+                "func8": "dda-1",
+                "func9": "dda-1"
+            },
+            "annotations": {
+                "init-payload": "chain_length=1"
+            }
+        },
+        {
+            "name": "f0",
+            "class_specification": {
+                "id": "dda_chain_mid",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../functions/dda_chain_mid/dda_chain_mid.wasm",
+                "outputs": [
+                    "dda",
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "last",
+                "dda": "dda-1"
+            },
+            "annotations": {}
+        },
+        {
+            "name": "f4",
+            "class_specification": {
+                "id": "dda_chain_mid",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../functions/dda_chain_mid/dda_chain_mid.wasm",
+                "outputs": [
+                    "dda",
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "dda": "dda-1",
+                "out": "last"
+            },
+            "annotations": {}
+        },
+        {
+            "name": "last",
+            "class_specification": {
+                "id": "dda_chain_last",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "../functions/dda_chain_last/dda_chain_last.wasm",
+                "outputs": [
+                    "first"
+                ]
+            },
+            "output_mapping": {
+                "first": "first"
+            },
+            "annotations": {
+                "init-payload": "num_middle_blocks=1"
+            }
+        }
+    ],
+    "resources": [
+        {
+            "name": "dda-1",
+            "class_type": "dda",
+            "output_mapping": {},
+            "configurations": {
+                "dda_url": "http://localhost:12000",
+                "dda_com_subscription_mapping": "[]",
+                "dda_com_publication_mapping": "[{\"topic\": \"com.actor\", \"pattern\": \"action\", \"alias\": \"actor\"}]"
+            }
+        }
+    ],
+    "annotations": {}
+}

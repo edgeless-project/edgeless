@@ -4,6 +4,38 @@
 use std::io::Read;
 
 use anyhow::anyhow;
+use edgeless_api::resource_configuration::ResourceInstanceSpecification;
+
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct DDAChainData {
+    pub chain_length: u32,
+    pub function_first_wasm_path: String,
+    pub function_mid_wasm_path: String,
+    pub function_last_wasm_path: String,
+    pub dda_resource_config: ResourceInstanceSpecification,
+}
+
+impl Default for DDAChainData {
+    fn default() -> Self {
+        Self {
+            chain_length: 5,
+            function_first_wasm_path: "./functions/dda_chain_first/dda_chain_first.wasm".to_string(),
+            function_mid_wasm_path: "./functions/dda_chain_mid/dda_chain_mid.wasm".to_string(),
+            function_last_wasm_path: "./functions/dda_chain_last/dda_chain_last.wasm".to_string(),
+            dda_resource_config: ResourceInstanceSpecification {
+                class_type: "dda".to_string(),
+                configuration: {
+                    let mut config = std::collections::HashMap::new();
+                    config.insert("dda_url".to_string(), "http://localhost:12000".to_string());
+                    config.insert("dda_com_subscription_mapping".to_string(), "[]".to_string());
+                    config.insert("dda_com_publication_mapping".to_string(), "[{\"topic\": \"com.actor\", \"pattern\": \"action\", \"alias\": \"actor\"}]".to_string());
+                    config
+                },
+                workflow_id: "UNDEFINED".to_string(),
+            },
+        }
+    }
+}
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 
@@ -125,6 +157,9 @@ pub enum WorkflowType {
     // A workflow provided in a JSON spec file in the path given.
     // The string @WFID is substituted with the workflow counter.
     JsonSpec(JsonSpecData),
+
+    // workflow used to evaluate DDA performance on a single node w.r.t. dataplane blocking
+    DDAChain(DDAChainData),
 }
 
 impl WorkflowType {
@@ -171,6 +206,15 @@ impl WorkflowType {
                 .expect("cannot find the workflow spec's parent path")
                 .into();
             return WorkflowType::JsonSpec(JsonSpecData { spec_string, parent_path }).check();
+        } else if !tokens.is_empty() && tokens[0] == "dda-chain" && tokens.len() == 2 {
+            if tokens[1] == "template" {
+                println!("{}\n", serde_json::to_string_pretty(&DDAChainData::default()).unwrap());
+                anyhow::bail!("enjoy your template file, which you can save by redirecting stdout to file");
+            }
+            let file = std::fs::File::open(tokens[1])?;
+            let reader = std::io::BufReader::new(file);
+            let data: DDAChainData = serde_json::from_reader(reader)?;
+            return WorkflowType::DDAChain(data).check();
         }
         Err(anyhow!("unknown workflow type: {}", wf_type))
     }
@@ -212,11 +256,50 @@ impl WorkflowType {
             WorkflowType::JsonSpec(data) => {
                 anyhow::ensure!(!data.spec_string.is_empty(), "empty workflow specification file");
             }
+            WorkflowType::DDAChain(data) => {
+                anyhow::ensure!(data.chain_length > 0, "vanishing chain length");
+                anyhow::ensure!(data.chain_length <= 10, "chain length exceeds maximum of 10 blocks - got {}", data.chain_length);
+                anyhow::ensure!(!data.function_first_wasm_path.is_empty(), "empty first function WASM file path");
+                anyhow::ensure!(!data.function_mid_wasm_path.is_empty(), "empty mid function WASM file path");
+                anyhow::ensure!(!data.function_last_wasm_path.is_empty(), "empty last function WASM file path");
+                // Check if required fields exist in the configuration HashMap
+                anyhow::ensure!(
+                    data.dda_resource_config.configuration.contains_key("dda_url"),
+                    "missing 'dda_url' in DDA resource configuration"
+                );
+                anyhow::ensure!(
+                    data.dda_resource_config.configuration.contains_key("dda_com_subscription_mapping"),
+                    "missing 'dda_com_subscription_mapping' in DDA resource configuration"
+                );
+                anyhow::ensure!(
+                    data.dda_resource_config.configuration.contains_key("dda_com_publication_mapping"),
+                    "missing 'dda_com_publication_mapping' in DDA resource configuration"
+                );
+
+                // Check if the values are non-empty and well-formatted
+                let dda_url = &data.dda_resource_config.configuration["dda_url"];
+                anyhow::ensure!(!dda_url.is_empty(), "empty DDA URL");
+
+                let subscription_mapping = &data.dda_resource_config.configuration["dda_com_subscription_mapping"];
+                anyhow::ensure!(!subscription_mapping.is_empty(), "empty DDA COM subscription mapping");
+                anyhow::ensure!(
+                    serde_json::from_str::<serde_json::Value>(subscription_mapping).is_ok(),
+                    "invalid JSON format for DDA COM subscription mapping"
+                );
+
+                let publication_mapping = &data.dda_resource_config.configuration["dda_com_publication_mapping"];
+                anyhow::ensure!(!publication_mapping.is_empty(), "empty DDA COM publication mapping");
+                anyhow::ensure!(
+                    serde_json::from_str::<serde_json::Value>(publication_mapping).is_ok(),
+                    "invalid JSON format for DDA COM publication mapping"
+                );
+                anyhow::ensure!(!data.dda_resource_config.workflow_id.is_empty(), "empty workflow ID");
+            }
         }
         Ok(self)
     }
 
-    pub fn all() -> [String; 6] {
+    pub fn all() -> [String; 7] {
         [
             "none".to_string(),
             "single".to_string(),
@@ -224,6 +307,7 @@ impl WorkflowType {
             "vector-mul-chain (*)".to_string(),
             "map-reduce (*)".to_string(),
             "json-spec".to_string(),
+            "dda-chain".to_string()
         ]
     }
 }

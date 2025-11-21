@@ -1,0 +1,39 @@
+services:
+  redis:
+    container_name: redis
+    image: redis:latest
+
+  mqtt:
+    container_name: mqtt
+    image: eclipse-mosquitto:latest
+    command: mosquitto -c /mosquitto-no-auth.conf
+
+  dda:
+    container_name: dda
+    image: ghcr.io/coatyio/dda:latest
+    volumes:
+      - ./dda_cfg/:/dda:rw
+    depends_on:
+      - mqtt
+
+  dda_endpoint:
+    container_name: dda_endpoint
+    build:
+      context: dda_endpoint/
+      dockerfile: Dockerfile.dda_endpoint
+    depends_on:
+      - mqtt
+  
+  box:
+    container_name: edgeless_inabox
+    build:
+      context: binaries
+      dockerfile: Dockerfile.box
+    volumes:
+      - ./data/:/data # for application logs
+    depends_on:
+      - dda
+      - redis
+    ports:
+      - 7001:7001 # expose the controller's api for the CLI / bench tool
+

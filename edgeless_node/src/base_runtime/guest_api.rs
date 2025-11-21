@@ -64,6 +64,19 @@ impl GuestAPIHost {
         }
     }
 
+    pub async fn call_async(&mut self, target: edgeless_api::function_instance::InstanceId, msg: &str) -> tokio::task::JoinHandle<Result<edgeless_dataplane::core::CallRet, GuestAPIError>> {
+        let mut cloned_plane = self.data_plane.clone();
+        let cloned_msg = msg.to_string();
+
+        let shared_metadata = { self.event_metadata.lock().await.clone() };
+        let metadata = shared_metadata.unwrap_or(edgeless_api::function_instance::EventMetadata::empty_dangling_root(0x42a42bdecaf00026u64));
+
+        tokio::spawn(async move {
+            let call_res = cloned_plane.call(target, cloned_msg, &metadata).await;
+            Ok(call_res)
+        })
+    }
+
     pub async fn call_raw(
         &mut self,
         target: edgeless_api::function_instance::InstanceId,

@@ -139,17 +139,23 @@ impl DataplaneHandle {
         let (sender, receiver) = futures::channel::oneshot::channel::<(edgeless_api::function_instance::InstanceId, Message)>();
         let channel_id = self.next_id;
         self.next_id += 1;
-        // Potential Leak: This is only received if a message is received (or the handle is dropped)
-        self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
+        // Potential Leak: This is only received if a message is received (or
+        // the handle is dropped)
+        // let dataplane_size = self.current_size.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        // log::error!("dataplane instance: {}, queue size: {}", self.slf, dataplane_size);
+        {
+            self.receiver_overwrites.lock().await.temporary_receivers.insert(channel_id, sender);
+        }
         self.send_inner(target, Message::Call(msg), timestamp_utc(), channel_id, metadata).await;
-        match receiver.await {
+        let ret = match receiver.await {
             Ok((_src, msg)) => match msg {
                 Message::CallRet(ret) => CallRet::Reply(ret),
                 Message::CallNoRet => CallRet::NoReply,
                 _ => CallRet::Err,
             },
             Err(_) => CallRet::Err,
-        }
+        };
+        ret
     }
 
     // Reply to a `call` event using the `channel_id` used to send the request.

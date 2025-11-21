@@ -1,0 +1,47 @@
+{
+    "functions": [
+        {
+            "name": "dda_single",
+            "class_specification": {
+                "id": "dda_single",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "./functions/dda_single/func.wasm",
+                "outputs": [
+                    "dda",
+                    "metric"
+                ]
+            },
+            "output_mapping": {
+                "dda": "dda-1",
+                "metric": "file-log-1"
+            },
+            "annotations": {
+                "init_payload": "inter_arrival=100,random_number=@RNG"
+            }
+        }
+    ],
+    "resources": [
+        {
+            "name": "dda-1",
+            "class_type": "dda",
+            "output_mapping": {},
+            "configurations": {
+                "dda_url": "http://localhost:12000",
+                "dda_com_subscription_mapping": "[]",
+                "dda_com_publication_mapping": "[{\"topic\": \"com.actor\", \"pattern\": \"action\", \"alias\": \"actor\"}]"
+            }
+        },
+        {
+            "name": "file-log-1",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "file-logger-output.csv",
+                "add-source-id": "true",
+                "add-timestamp": "true"
+            }
+        }
+    ],
+    "annotations": {}
+}

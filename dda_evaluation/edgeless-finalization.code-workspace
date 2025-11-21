@@ -1,0 +1,24 @@
+{
+	"folders": [
+		{
+			"name": "edgeless-finalization",
+			"path": ".."
+		},
+		{
+			"name": "dda_chain_first",
+			"path": "functions/dda_chain_first"
+		},
+		{
+			"name": "dda_chain_last",
+			"path": "functions/dda_chain_last"
+		},
+		{
+			"name": "dda_chain_mid",
+			"path": "functions/dda_chain_mid"
+		},
+		{
+			"path": "functions/dda_single"
+		}
+	],
+	"settings": {}
+}
