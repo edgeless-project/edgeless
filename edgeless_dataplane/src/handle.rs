@@ -7,7 +7,6 @@ use futures::{SinkExt, StreamExt};
 use crate::core::*;
 use crate::node_local::*;
 use crate::remote_node::*;
-use std::sync::atomic::AtomicI64;
 
 fn timestamp_utc() -> edgeless_api::function_instance::EventTimestamp {
     let now = chrono::Utc::now();
@@ -26,7 +25,6 @@ pub struct DataplaneHandle {
     output_chain: std::sync::Arc<tokio::sync::Mutex<Vec<Box<dyn DataPlaneLink>>>>,
     receiver_overwrites: std::sync::Arc<tokio::sync::Mutex<TemporaryReceivers>>,
     next_id: u64,
-    current_size: std::sync::Arc<AtomicI64>,
 }
 
 impl DataplaneHandle {
@@ -89,7 +87,6 @@ impl DataplaneHandle {
             output_chain: std::sync::Arc::new(tokio::sync::Mutex::new(output_chain)),
             receiver_overwrites,
             next_id: 1,
-            current_size: std::sync::Arc::new(AtomicI64::new(0)),
         }
     }
 
@@ -158,7 +155,6 @@ impl DataplaneHandle {
             },
             Err(_) => CallRet::Err,
         };
-        self.current_size.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
         ret
     }
 
