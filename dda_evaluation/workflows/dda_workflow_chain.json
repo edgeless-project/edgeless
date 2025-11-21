@@ -1,0 +1,15 @@
+{
+    "chain_length": 1,
+    "function_first_wasm_path": "./functions/dda_chain_first/dda_chain_first.wasm",
+    "function_mid_wasm_path": "./functions/dda_chain_mid/dda_chain_mid.wasm",
+    "function_last_wasm_path": "./functions/dda_chain_last/dda_chain_last.wasm",
+    "dda_resource_config": {
+        "class_type": "dda",
+        "configuration": {
+            "dda_url": "http://localhost:12000",
+            "dda_com_subscription_mapping": "[]",
+            "dda_com_publication_mapping": "[{\"topic\": \"com.actor\", \"pattern\": \"action\", \"alias\": \"actor\"}]"
+        },
+        "workflow_id": "@WF_ID"
+    }
+}

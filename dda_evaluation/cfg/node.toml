@@ -1,0 +1,50 @@
+[general]
+node_id = "72e11cb1-99a5-4aff-b044-32dc696f2d25"
+agent_url = "http://0.0.0.0:7005"
+agent_url_announced = "http://node:7005"
+invocation_url = "http://0.0.0.0:7006"
+invocation_url_announced = "http://node:7006"
+node_register_url = "http://orc:7004"
+subscription_refresh_interval_sec = 2
+
+[telemetry]
+metrics_url = "http://0.0.0.0:7007"
+log_level = "Debug"
+performance_samples = false
+
+[wasm_runtime]
+enabled = true
+
+[container_runtime]
+enabled = false
+guest_api_host_url = "http://127.0.0.1:7100"
+
+[resources]
+prepend_hostname = false
+http_ingress_url = "http://0.0.0.0:7008"
+http_ingress_provider = "http-ingress-1"
+http_egress_provider = "http-egress-1"
+file_log_provider = "file-log-1"
+redis_provider = "redis-1"
+dda_provider = "dda-1"
+kafka_egress_provider = ""
+sqlx_provider = "sqlx-1"
+
+[resources.metrics_collector_provider]
+collector_type = "Redis"
+redis_url = "redis://redis:6379"
+provider = "metrics-collector-1"
+
+[user_node_capabilities]
+num_cpus = 10
+model_name_cpu = "Apple M1 Max"
+clock_freq_cpu = 3228.0
+num_cores = 10
+mem_size = 32768
+labels = []
+is_tee_running = false
+has_tpm = false
+disk_tot_space = 471482
+num_gpus = 0
+model_name_gpu = ""
+mem_size_gpu = 0

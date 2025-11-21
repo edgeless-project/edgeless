@@ -1,0 +1,51 @@
+[general]
+node_id = "fabb7cd6-9a8c-4d25-a263-c7f70cec5e8e"
+agent_url = "http://127.0.0.1:7004"
+agent_url_announced = "http://127.0.0.1:7004"
+invocation_url = "http://127.0.0.1:7005"
+invocation_url_announced = "http://127.0.0.1:7005"
+node_register_url = "http://127.0.0.1:7003"
+subscription_refresh_interval_sec = 2
+
+[telemetry]
+metrics_url = "http://127.0.0.1:7006"
+performance_samples = true
+
+[wasm_runtime]
+enabled = true
+
+[container_runtime]
+enabled = false
+guest_api_host_url = "http://127.0.0.1:7100"
+
+[resources]
+prepend_hostname = false
+file_log_provider = "file-log-1"
+redis_provider = "redis-1"
+dda_provider = "dda-1"
+
+[resources.ollama_provider]
+host = "localhost"
+port = 11434
+messages_number_limit = 30
+provider = ""
+
+[[resources.serverless_provider]]
+class_type = ""
+version = ""
+function_url = ""
+provider = ""
+
+[user_node_capabilities]
+num_cpus = 16
+model_name_cpu = "AMD EPYC 7601 32-Core Processor"
+clock_freq_cpu = 2199.0
+num_cores = 16
+mem_size = 62789
+labels = ["hostname=deb-lukasz"]
+is_tee_running = false
+has_tpm = false
+disk_tot_space = 199538
+num_gpus = 0
+model_name_gpu = ""
+mem_size_gpu = 0

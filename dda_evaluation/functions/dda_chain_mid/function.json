@@ -1,0 +1,9 @@
+{
+    "id": "dda_chain_mid",
+    "function_type": "RUST_WASM",
+    "version": "0.1",
+    "outputs": [
+        "dda",
+        "out"
+    ]
+}
