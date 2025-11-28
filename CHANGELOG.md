@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [1.2.0] - 2025-11-28
+
 New features:
 
 - Add intent to cordon/uncordon nodes at an ε-ORC. When a node is cordoned, new

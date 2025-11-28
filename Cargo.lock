@@ -1912,7 +1912,7 @@ dependencies = [
 
 [[package]]
 name = "dda"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "base64 0.22.1",
  "edgeless_function",
@@ -2081,7 +2081,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless-embedded-emu"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "edgeless_api_core",
  "edgeless_embedded",
@@ -2103,7 +2103,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_api"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2133,7 +2133,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_api_core"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "coap-lite",
  "heapless",
@@ -2145,7 +2145,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_bal"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2165,7 +2165,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_benchmark"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2182,7 +2182,7 @@ dependencies = [
  "rand 0.8.5",
  "rand_distr",
  "rand_pcg",
- "redis 0.32.7",
+ "redis",
  "serde",
  "serde_json",
  "tokio",
@@ -2192,7 +2192,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_cli"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2218,7 +2218,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_con"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2237,7 +2237,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_container_function"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2255,7 +2255,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_dataplane"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2274,7 +2274,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_embedded"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "coap-lite",
  "edgeless_api_core",
@@ -2295,14 +2295,14 @@ dependencies = [
 
 [[package]]
 name = "edgeless_function"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "log",
 ]
 
 [[package]]
 name = "edgeless_http"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2313,7 +2313,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_inabox"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2337,7 +2337,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_node"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2363,7 +2363,7 @@ dependencies = [
  "prost 0.13.5",
  "rand 0.8.5",
  "rdkafka",
- "redis 0.32.7",
+ "redis",
  "reqwest 0.11.27",
  "rs-docker",
  "serde",
@@ -2383,7 +2383,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_orc"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "ascii_table",
@@ -2397,7 +2397,7 @@ dependencies = [
  "itertools 0.13.0",
  "log",
  "rand 0.8.5",
- "redis 0.27.6",
+ "redis",
  "serde",
  "serde_json",
  "serial_test",
@@ -2409,7 +2409,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_systemtests"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2423,7 +2423,7 @@ dependencies = [
  "env_logger 0.10.2",
  "futures 0.3.31",
  "log",
- "redis 0.32.7",
+ "redis",
  "serial_test",
  "tokio",
  "toml 0.7.8",
@@ -2434,7 +2434,7 @@ dependencies = [
 
 [[package]]
 name = "edgeless_telemetry"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6384,22 +6384,6 @@ dependencies = [
  "ryu",
  "sha1_smol",
  "socket2 0.5.10",
- "url",
-]
-
-[[package]]
-name = "redis"
-version = "0.32.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "014cc767fefab6a3e798ca45112bccad9c6e0e218fbd49720042716c73cfef44"
-dependencies = [
- "combine",
- "itoa",
- "num-bigint",
- "percent-encoding",
- "ryu",
- "sha1_smol",
- "socket2 0.6.1",
  "url",
 ]
 

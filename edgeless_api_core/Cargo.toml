@@ -5,7 +5,7 @@
 
 [package]
 name = "edgeless_api_core"
-version = "1.1.0"
+version = "1.2.0"
 authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2024"
 rust-version = "1.89"

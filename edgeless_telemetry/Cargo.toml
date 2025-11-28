@@ -5,7 +5,7 @@
 
 [package]
 name = "edgeless_telemetry"
-version = "1.1.0"
+version = "1.2.0"
 authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Lukasz Zalewski <zalewski.lukasz@siemens.com>", "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2024"
 description = "Node telemetry support in EDGELESS"

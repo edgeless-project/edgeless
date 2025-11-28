@@ -3,7 +3,7 @@
 
 [package]
 name = "edgeless_bal"
-version = "1.1.0"
+version = "1.2.0"
 authors = [ "Claudio Cicconetti <c.cicconetti@iit.cnr.it>", "Lukasz Zalewski <zalewski.lukasz@siemens.com>", "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2024"
 description = "Reference implementation of EDGELESS ε-BAL"

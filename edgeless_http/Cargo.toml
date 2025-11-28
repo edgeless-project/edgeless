@@ -5,7 +5,7 @@
 
 [package]
 name = "edgeless_http"
-version = "1.1.0"
+version = "1.2.0"
 authors = [ "Raphael Hetzel <hetzel@in.tum.de>" ]
 edition = "2024"
 description = "Utility structures and methods for HTTP bindings"

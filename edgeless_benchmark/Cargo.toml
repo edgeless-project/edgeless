@@ -4,7 +4,7 @@
 
 [package]
 name = "edgeless_benchmark"
-version = "1.1.0"
+version = "1.2.0"
 authors = ["Claudio Cicconetti <c.cicconetti@iit.cnr.it"]
 edition = "2024"
 description = "EDGELESS benchmark suite"
