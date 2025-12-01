@@ -10,7 +10,7 @@ instance, which takes 1 second to complete a single function invocation.
 Therefore, the maximum throughput that can be achieved with a single instance
 of `sloppy_test` is 1 call/second.
 
-With the `load_balancer` function, we can overcome that limitation by creating
+With the `load_balance` function, we can overcome that limitation by creating
 multiple instances of the `sloppy_test` function, which are invoked in round
 robin.
 
@@ -20,7 +20,7 @@ EDGELESS cluster (e.g., with `edgeless_inabox`), you can start the example
 workflow with:
 
 ```shell
-ID=$(target/debug/edgeless_cli workflow start examples/load_balancer/workflow.json)
+ID=$(target/debug/edgeless_cli workflow start examples/load_balance/workflow.json)
 ```
 
 You can visually monitor the message throughput by checking the file `out.log`
