@@ -16,8 +16,8 @@ impl super::resource_provider_specs::ResourceProviderSpecs for RedisResourceSpec
     fn description(&self) -> String {
         r"Perform SET and GET operations on a Redis server -- https://redis.io/
 
-A SET operation is performed with a cast() on the key specified in the 'key' configuration parameter of the resource.
-A GET operation is performed with a call(), with the key specified in the message body."
+        A SET operation is performed with a cast() on the key specified in the 'key' configuration parameter of the resource.
+        A GET operation is performed with a call(), with the key specified in the message body."
             .to_string()
     }
 
@@ -71,11 +71,15 @@ impl Drop for RedisResource {
 /// The GET operation is done on an arbitrary key that is specified as the
 /// message of the call() operation.
 ///
-/// The SET operation is done via a cast() on the key, if specified in the
-/// resource configuration.
+/// The SET operation is done via a cast() on the key. There are two options:
 ///
-/// Optionally, the key can be prepended by the workflow identifier and a
-/// semicolon.
+/// 1. The key can be specified in the resource configuration.
+/// 2. The key can be specified in the message data as "key:value"
+///   (i.e., the message contains a colon). In this case, the part before the colon
+///   is used as the key.
+/// 
+/// If the resource configuration contains the "add-workflow-id" parameter,
+/// the workflow ID is prepended to the key used in both GET and SET operations.
 impl RedisResource {
     async fn new(
         dataplane_handle: edgeless_dataplane::handle::DataplaneHandle,
@@ -139,18 +143,33 @@ impl RedisResource {
                         }
                     };
                 } else {
-                    // SET
-                    if let Some(redis_key) = &redis_key {
-                        if let Err(err) = connection.set::<&str, &str, std::string::String>(redis_key, &message_data) {
+                    // SET on dynamic key if the message contains colon
+                    if let Some(colon_pos) = message_data.find(':') {
+                        let (k_str, v_str) = message_data.split_at(colon_pos);
+                        let v_str = &v_str[1..]; // skip the colon
+                        let redis_key = format!("{}{}", workflow_id_header, k_str);
+                        if let Err(err) = connection.set::<&str, &str, std::string::String>(&redis_key, v_str) {
                             log::error!(
-                                "Could not set key '{}' to value '{}' via redis resource: {}",
+                                "Could not set to dynamic key '{}' to value '{}' via redis resource: {}",
                                 redis_key,
-                                &message_data,
+                                v_str,
                                 err
                             );
                         }
                     } else {
-                        log::warn!("Invalid SET operation requested on a redis resource without a 'key' specified in the configuration");
+                        // SET on the fixed key specified in the resource configuration
+                        if let Some(redis_key) = &redis_key {
+                            if let Err(err) = connection.set::<&str, &str, std::string::String>(redis_key, &message_data) {
+                                log::error!(
+                                    "Could not set to fixed key '{}' to value '{}' via redis resource: {}",
+                                    redis_key,
+                                    &message_data,
+                                    err
+                                );
+                            }
+                        } else {
+                            log::warn!("Invalid SET operation requested on a redis resource without a 'key' specified in the configuration");
+                        }
                     }
                 }
 
