@@ -271,6 +271,7 @@ impl ControllerTask {
 
         match candidate_domains.choose(&mut self.rng) {
             Some(target_domain) => {
+                // We found a domain to host the workflow.
                 let domain_assignments = Self::fill_domains(&spawn_workflow_request, target_domain);
                 self.relocate_workflow(&wf_id, spawn_workflow_request, domain_assignments).await
             }
@@ -1217,6 +1218,7 @@ impl ControllerTask {
                     state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
                 },
                 workflow_id: wf_id.workflow_id.to_string(),
+                replication_factor: function.replication_factor,
             })
             .await;
 

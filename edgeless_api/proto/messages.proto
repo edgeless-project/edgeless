@@ -61,6 +61,8 @@ message SpawnFunctionRequest {
     StateSpecification state_specification = 4;
     // The workflow id to which this function belongs
     string workflow_id = 5;
+    // How many instances of this function should be spawned at minimum
+    optional uint32 replication_factor = 6;
 }
 
 // Some APIs provide the same inteface for logical vs physical identifiers.
