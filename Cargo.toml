@@ -9,17 +9,17 @@ members = [
     "edgeless_benchmark",
     "edgeless_cli",
     "edgeless_con",
-    "edgeless_container_function",
+    # "edgeless_container_function",
     "edgeless_dda",
-    "edgeless_embedded",
-    "edgeless_embedded_emu",
+    # "edgeless_embedded",
+    # "edgeless_embedded_emu",
     "edgeless_function",
     "edgeless_inabox",
     "edgeless_node",
     "edgeless_orc",
-    "edgeless_systemtests",
+    # "edgeless_systemtests",
     "edgeless_telemetry",
-    "edgeless_cloud_offloading",
+    # "edgeless_cloud_offloading",
 ]
 
 [workspace.dependencies]

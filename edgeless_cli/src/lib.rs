@@ -39,6 +39,7 @@ pub fn workflow_spec_to_request(
                 },
                 output_mapping: func_spec.output_mapping,
                 annotations: func_spec.annotations,
+                replication_factor: func_spec.replication_factor,
             })
             .collect(),
         resources: workflow_spec

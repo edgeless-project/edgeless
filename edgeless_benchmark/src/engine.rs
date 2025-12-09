@@ -84,6 +84,7 @@ impl Engine {
                     class_specification: function_class_specification(std::path::Path::new(path_json), std::path::Path::new(path_wasm)),
                     output_mapping: std::collections::HashMap::new(),
                     annotations: std::collections::HashMap::new(),
+                    replication_factor: None,
                 });
             }
             WorkflowType::MatrixMulChain(data) => {
@@ -142,6 +143,7 @@ impl Engine {
                         },
                         output_mapping,
                         annotations,
+                        replication_factor: None,
                     });
                 }
 
@@ -194,6 +196,7 @@ impl Engine {
                         },
                         output_mapping,
                         annotations,
+                        replication_factor: None,
                     });
                 }
 
@@ -237,6 +240,7 @@ impl Engine {
                         "init-payload".to_string(),
                         format!("out_type=rand_vec,use_base64=true,size={},arrival=c({})", size, interval),
                     )]),
+                    replication_factor: None,
                 });
 
                 let mut inputs: Vec<u32> = vec![];
@@ -274,6 +278,7 @@ impl Engine {
                                 outputs.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(":")
                             ),
                         )]),
+                        replication_factor: None,
                     });
 
                     fibonacci_values.push(vec![]);
@@ -294,6 +299,7 @@ impl Engine {
                                 "init-payload".to_string(),
                                 format!("forward=true,fibonacci={},allocate={}", fibonacci, allocate),
                             )]),
+                            replication_factor: None,
                         });
                     }
 

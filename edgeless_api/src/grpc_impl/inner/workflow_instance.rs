@@ -255,6 +255,7 @@ fn parse_workflow_function(api_function: &crate::grpc_impl::api::WorkflowFunctio
         })?,
         output_mapping: api_function.output_mapping.clone(),
         annotations: api_function.annotations.clone(),
+        replication_factor: api_function.replication_factor,
     })
 }
 
@@ -378,6 +379,7 @@ fn serialize_workflow_function(crate_function: &crate::workflow_instance::Workfl
             &crate_function.class_specification,
         )),
         output_mapping: crate_function.output_mapping.clone(),
+        replication_factor: crate_function.replication_factor,
     }
 }
 
@@ -498,6 +500,7 @@ mod tests {
             },
             output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),
             annotations: HashMap::from([("ann1".to_string(), "val1".to_string()), ("ann2".to_string(), "val2".to_string())]),
+            replication_factor: None,
         }];
 
         for msg in messages {
@@ -540,6 +543,7 @@ mod tests {
                 },
                 output_mapping: HashMap::from([("out1".to_string(), "out3".to_string()), ("out2".to_string(), "out4".to_string())]),
                 annotations: HashMap::from([("ann1".to_string(), "val1".to_string()), ("ann2".to_string(), "val2".to_string())]),
+                replication_factor: None,
             }],
             annotations: HashMap::from([("ann1".to_string(), "val1".to_string()), ("ann2".to_string(), "val2".to_string())]),
             resources: vec![WorkflowResource {

@@ -312,6 +312,8 @@ message WorkflowFunction {
     map<string, string> output_mapping = 3;
     // Annotations associated with this function, if any.
     map<string, string> annotations = 4;
+    // Replication factor associated with this function
+    optional uint32 replication_factor = 5;
 }
 
 // Message defining a request to create a new workflow.

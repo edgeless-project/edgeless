@@ -1363,6 +1363,7 @@ mod tests {
                 },
                 output_mapping: std::collections::HashMap::new(),
                 annotations: std::collections::HashMap::new(),
+                replication_factor: None,
             }];
             let resources = vec![edgeless_api::workflow_instance::WorkflowResource {
                 name: "log".to_string(),
