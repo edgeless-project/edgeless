@@ -275,6 +275,7 @@ mod test {
                         (String::from("out2"), String::from("f2")),
                     ]),
                     annotations: std::collections::HashMap::new(),
+                    replication_factor: None,
                 },
                 WorkflowFunction {
                     name: String::from("f2"),
@@ -291,6 +292,7 @@ mod test {
                         (String::from("out2"), String::from("r1")),
                     ]),
                     annotations: std::collections::HashMap::new(),
+                    replication_factor: None,
                 },
                 WorkflowFunction {
                     name: String::from("f3"),
@@ -304,6 +306,7 @@ mod test {
                     },
                     output_mapping: std::collections::HashMap::new(),
                     annotations: std::collections::HashMap::new(),
+                    replication_factor: None,
                 },
             ],
             resources: vec![WorkflowResource {

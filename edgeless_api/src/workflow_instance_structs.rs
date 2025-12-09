@@ -15,6 +15,8 @@ pub struct WorkflowFunction {
     pub output_mapping: std::collections::HashMap<String, String>,
     /// Key-value pairs of annotations for the function.
     pub annotations: std::collections::HashMap<String, String>,
+    /// Replication factor for this function. If not specified, defaults to 1. If specified, this function will be replicated the given number of times across the cluster.
+    pub replication_factor: Option<u32>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, schemars::JsonSchema)]

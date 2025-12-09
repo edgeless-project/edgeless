@@ -167,6 +167,7 @@ async fn single_function_start_stop() {
             class_specification: function_class_specification.clone(),
             output_mapping: std::collections::HashMap::new(),
             annotations: std::collections::HashMap::new(),
+            replication_factor: None,
         }],
         resources: vec![],
         annotations: std::collections::HashMap::new(),
@@ -229,6 +230,7 @@ async fn resource_to_function_start_stop() {
                 },
                 output_mapping: std::collections::HashMap::new(),
                 annotations: std::collections::HashMap::new(),
+                replication_factor: None,
             }],
             resources: vec![edgeless_api::workflow_instance::WorkflowResource {
                 name: "r1".to_string(),
@@ -333,6 +335,7 @@ async fn function_link_loop_start_stop() {
                     },
                     output_mapping: std::collections::HashMap::from([("output-1".to_string(), "f2".to_string())]),
                     annotations: std::collections::HashMap::new(),
+                    replication_factor: None,
                 },
                 edgeless_api::workflow_instance::WorkflowFunction {
                     name: "f2".to_string(),
@@ -346,6 +349,7 @@ async fn function_link_loop_start_stop() {
                     },
                     output_mapping: std::collections::HashMap::from([("output-2".to_string(), "f1".to_string())]),
                     annotations: std::collections::HashMap::new(),
+                    replication_factor: None,
                 },
             ],
             resources: vec![],
