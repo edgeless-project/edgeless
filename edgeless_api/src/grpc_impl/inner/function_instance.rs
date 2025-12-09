@@ -242,6 +242,7 @@ pub fn parse_spawn_function_request(
             }
         })?,
         workflow_id: api_request.workflow_id.clone(),
+        replication_factor: api_request.replication_factor,
     })
 }
 
@@ -277,6 +278,7 @@ pub fn serialize_spawn_function_request(req: &crate::function_instance::SpawnFun
         annotations: req.annotations.clone(),
         state_specification: Some(serialize_state_specification(&req.state_specification)),
         workflow_id: req.workflow_id.clone(),
+        replication_factor: req.replication_factor, 
     }
 }
 
@@ -318,6 +320,7 @@ mod tests {
                 state_policy: StatePolicy::NodeLocal,
             },
             workflow_id: "workflow_1".to_string(),
+            replication_factor: None
         }];
         for msg in messages {
             match parse_spawn_function_request(&serialize_spawn_function_request(&msg)) {

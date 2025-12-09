@@ -348,6 +348,7 @@ fn make_spawn_function_request(class_id: &str) -> edgeless_api::function_instanc
             state_policy: StatePolicy::NodeLocal,
         },
         workflow_id: "workflow_1".to_string(),
+        replication_factor: Some(1)
     }
 }
 
