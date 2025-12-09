@@ -1,0 +1,14 @@
+[general]
+domain_register_url = "http://127.0.0.1:7002"
+subscription_refresh_interval_sec = 2
+domain_id = "domain-7000"
+orchestrator_url = "http://127.0.0.1:7003"
+orchestrator_url_announced = "http://127.0.0.1:7003"
+node_register_url = "http://127.0.0.1:7004"
+
+[baseline]
+orchestration_strategy = "Random"
+
+[proxy]
+proxy_type = "None"
+proxy_gc_period_seconds = 0

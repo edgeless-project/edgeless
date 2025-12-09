@@ -1,0 +1,56 @@
+[general]
+node_id = "c5547f5c-a21b-4432-8559-f2ba719be004"
+agent_url = "http://127.0.0.1:7005"
+agent_url_announced = "http://127.0.0.1:7005"
+invocation_url = "http://127.0.0.1:7006"
+invocation_url_announced = "http://127.0.0.1:7006"
+node_register_url = "http://127.0.0.1:7004"
+subscription_refresh_interval_sec = 2
+
+[telemetry]
+metrics_url = "http://127.0.0.1:7007"
+performance_samples = false
+
+[wasm_runtime]
+enabled = true
+
+[container_runtime]
+enabled = false
+guest_api_host_url = "http://127.0.0.1:7100"
+
+[resources]
+prepend_hostname = true
+http_ingress_url = "http://127.0.0.1:7008"
+http_ingress_provider = "http-ingress-1"
+http_egress_provider = "http-egress-1"
+file_log_provider = "file-log-1"
+redis_provider = "redis-1"
+dda_provider = "dda-1"
+kafka_egress_provider = ""
+sqlx_provider = "sqlx-1"
+
+[resources.ollama_provider]
+host = "localhost"
+port = 11434
+messages_number_limit = 30
+provider = ""
+
+[[resources.serverless_provider]]
+class_type = ""
+version = ""
+function_url = ""
+provider = ""
+
+[user_node_capabilities]
+num_cpus = 12
+model_name_cpu = "Apple M2 Max"
+clock_freq_cpu = 3504.0
+num_cores = 12
+mem_size = 32768
+labels = ["hostname=MACMC65HVHKG9"]
+is_tee_running = false
+has_tpm = false
+disk_tot_space = 471482
+num_gpus = 0
+model_name_gpu = ""
+mem_size_gpu = 0

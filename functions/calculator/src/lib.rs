@@ -17,66 +17,78 @@ impl EdgeFunction for CalculatorFun {
     fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
         let str_message = core::str::from_utf8(encoded_message).unwrap();
         log::info!("calculator: called with '{}'", str_message);
-
         let tokens: Vec<&str> = str_message.split(",").collect();
-        if tokens.len() == 6 {
-            if let Ok(width) = tokens[0].parse::<usize>() {
-                if let Ok(height) = tokens[1].parse::<usize>() {
-                    if let Ok(top_left_x) = tokens[2].parse::<f64>() {
-                        if let Ok(top_left_y) = tokens[3].parse::<f64>() {
-                            if let Ok(lower_right_x) = tokens[4].parse::<f64>() {
-                                if let Ok(lower_right_y) = tokens[5].parse::<f64>() {
-                                    // TODO: work on a simple chunk of pixel data, not on the entire image
 
-                                    let bounds: (usize, usize) = (width, height);
-                                    let upper_left = num::complex::Complex::new(top_left_x, top_left_y);
-                                    let lower_right = num::complex::Complex::new(lower_right_x, lower_right_y);
-                                    let gradient = colorgrad::rainbow();
-                                    let colors = gradient.colors(255);
-                                    let bytes_per_pixel = image::ColorType::Rgb8.bytes_per_pixel() as usize;
-                                    let mut pixels = vec![0; bounds.0 * bounds.1 * bytes_per_pixel];
-
-                                    // Scope of slicing up `pixels` into horizontal bands.
-                                    {
-                                        log::info!("calculator: preparing");
-                                        let bands: Vec<(usize, &mut [u8])> = pixels.chunks_mut(bounds.0 * bytes_per_pixel).enumerate().collect();
-
-                                        log::info!("calculator: calculating");
-                                        bands.into_iter().for_each(|(i, band)| {
-                                            let top = i;
-                                            let band_bounds = (bounds.0, 1);
-                                            let band_upper_left = pixel_to_point(bounds, (0, top), upper_left, lower_right);
-                                            let band_lower_right = pixel_to_point(bounds, (bounds.0, top + 1), upper_left, lower_right);
-                                            render(band, bytes_per_pixel, band_bounds, band_upper_left, band_lower_right, &colors);
-                                        });
-                                    }
-
-                                    let mut png_data = std::io::Cursor::new(Vec::new());
-                                    if image::write_buffer_with_format(
-                                        &mut png_data,
-                                        &pixels,
-                                        bounds.0 as u32,
-                                        bounds.1 as u32,
-                                        image::ColorType::Rgb8,
-                                        image::ImageFormat::Png,
-                                    )
-                                    .is_ok()
-                                    {
-                                        log::info!("calculator: saving result as PNG to data buffer suceeded");
-                                        let encoded_png_data = hex::encode(png_data.into_inner());
-                                        cast("chunk-0-data", &encoded_png_data.as_bytes());
-                                    } else {
-                                        log::info!("calculator: saving result as PNG to data buffer failed!");
-                                    }
-                                    return;
-                                }
-                            }
-                        }
-                    }
+        // Expecting input of the form: "i={},top_left_x={:.6},top_left_y={:.6},bottom_right_x={:.6},bottom_right_y={:.6}"
+        if tokens.len() == 5 {
+            let index = tokens[0];
+            let parse = |s: &str| s.split('=').nth(1).and_then(|v| v.parse::<f64>().ok());
+            if let (Some(top_left_x), Some(top_left_y), Some(bottom_right_x), Some(bottom_right_y)) =
+                (parse(tokens[1]), parse(tokens[2]), parse(tokens[3]), parse(tokens[4]))
+            {
+                log::info!("calculator: processing segment {} with bounds: top_left=({}, {}), bottom_right=({}, {})", 
+                          index, top_left_x, top_left_y, bottom_right_x, bottom_right_y);
+                log::info!("calculator: processing segment {} with bounds: top_left=({}, {}), bottom_right=({}, {})", 
+                          index, top_left_x, top_left_y, bottom_right_x, bottom_right_y);
+                
+                // Set default image size
+                let width = 200;
+                let height = 200;
+                let bounds: (usize, usize) = (width, height);
+                
+                // Create complex plane coordinates
+                // Note: In complex plane, y increases upward, but in image coordinates y increases downward
+                let upper_left = num::complex::Complex::new(top_left_x, top_left_y);
+                let lower_right = num::complex::Complex::new(bottom_right_x, bottom_right_y);
+                
+                // Validate coordinates make sense
+                if bottom_right_x <= top_left_x || bottom_right_y >= top_left_y {
+                    log::error!("calculator: invalid coordinates - bottom_right must be southeast of top_left");
+                    return;
                 }
+                let gradient = colorgrad::rainbow();
+                let colors = gradient.colors(255);
+                let bytes_per_pixel = image::ColorType::Rgb8.bytes_per_pixel() as usize;
+                let mut pixels = vec![0; bounds.0 * bounds.1 * bytes_per_pixel];
+
+                {
+                    log::info!("calculator: preparing to render {}x{} image for complex plane region", width, height);
+                    let bands: Vec<(usize, &mut [u8])> = pixels.chunks_mut(bounds.0 * bytes_per_pixel).enumerate().collect();
+
+                    log::info!("calculator: calculating Mandelbrot set for segment");
+                    bands.into_iter().for_each(|(i, band)| {
+                        let top = i;
+                        let band_bounds = (bounds.0, 1);
+                        let band_upper_left = pixel_to_point(bounds, (0, top), upper_left, lower_right);
+                        let band_lower_right = pixel_to_point(bounds, (bounds.0, top + 1), upper_left, lower_right);
+                        render(band, bytes_per_pixel, band_bounds, band_upper_left, band_lower_right, &colors);
+                    });
+                }
+
+                let mut png_data = std::io::Cursor::new(Vec::new());
+                if image::write_buffer_with_format(
+                    &mut png_data,
+                    &pixels,
+                    bounds.0 as u32,
+                    bounds.1 as u32,
+                    image::ColorType::Rgb8,
+                    image::ImageFormat::Png,
+                )
+                .is_ok()
+                {
+                    log::info!("calculator: successfully generated PNG for segment {}, size: {} bytes", 
+                              index, png_data.get_ref().len());
+                    let encoded_png_data = hex::encode(png_data.into_inner());
+                    let redis_op = format!("{}:{}", index, encoded_png_data);
+                    // cast to redis
+                    cast("out", &redis_op.as_bytes());
+                } else {
+                    log::error!("calculator: failed to generate PNG for segment {}", index);
+                }
+                return;
             }
         }
-        log::error!("calculator: error parsing input string");
+        log::error!("calculator: error parsing input string - expected format: 'i={{index}},top_left_x={{x}},top_left_y={{y}},bottom_right_x={{x}},bottom_right_y={{y}}'");
     }
 
     fn handle_call(_src: InstanceId, _encoded_message: &[u8]) -> CallRet {
@@ -145,19 +157,24 @@ fn render(
     lower_right: Complex<f64>,
     colors: &Vec<Color>,
 ) {
-    assert!(pixels.len() == bounds.0 * bounds.1 * 3);
+    assert!(pixels.len() == bounds.0 * bounds.1 * bytes_per_pixel);
 
     for row in 0..bounds.1 {
         for column in 0..bounds.0 {
             let point = pixel_to_point(bounds, (column, row), upper_left, lower_right);
+            
+            // Calculate escape time for this point in the complex plane
             let value: usize = match escape_time(point, 255) {
-                None => 0,
-                Some(count) => (255 - count) as usize,
+                None => 0,        // Point is in the Mandelbrot set (black)
+                Some(count) => (255 - count) as usize,  // Point escaped after 'count' iterations
             };
+            
+            // Map escape time to color
             let rgba = colors[value].to_rgba8();
-            pixels[row * bounds.0 * bytes_per_pixel + column * bytes_per_pixel] = rgba[0];
-            pixels[row * bounds.0 * bytes_per_pixel + column * bytes_per_pixel + 1] = rgba[1];
-            pixels[row * bounds.0 * bytes_per_pixel + column * bytes_per_pixel + 2] = rgba[2];
+            let pixel_index = row * bounds.0 * bytes_per_pixel + column * bytes_per_pixel;
+            pixels[pixel_index] = rgba[0];     // Red
+            pixels[pixel_index + 1] = rgba[1]; // Green  
+            pixels[pixel_index + 2] = rgba[2]; // Blue
         }
     }
 }
