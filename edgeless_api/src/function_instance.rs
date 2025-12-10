@@ -58,7 +58,7 @@ pub struct SpawnFunctionRequest {
     pub annotations: std::collections::HashMap<String, String>,
     pub state_specification: StateSpecification,
     pub workflow_id: String,
-    pub replication_factor: Option<u32>
+    pub replication_factor: Option<u32>,
 }
 
 impl SpawnFunctionRequest {

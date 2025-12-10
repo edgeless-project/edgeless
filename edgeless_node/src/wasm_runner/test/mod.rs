@@ -276,7 +276,7 @@ async fn messaging_test_setup() -> (
             state_policy: edgeless_api::function_instance::StatePolicy::Transient,
         },
         workflow_id: "workflow_1".to_string(),
-        replication_factor: Some(1)
+        replication_factor: Some(1),
     };
 
     assert!(telemetry_mock_receiver.try_recv().is_err());
@@ -587,7 +587,7 @@ async fn state_management() {
             state_policy: edgeless_api::function_instance::StatePolicy::Transient,
         },
         workflow_id: "workflow_1".to_string(),
-        replication_factor: Some(1)
+        replication_factor: Some(1),
     };
 
     assert!(telemetry_mock_receiver.try_recv().is_err());

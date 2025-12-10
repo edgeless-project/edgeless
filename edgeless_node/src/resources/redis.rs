@@ -77,7 +77,7 @@ impl Drop for RedisResource {
 /// 2. The key can be specified in the message data as "key:value"
 ///   (i.e., the message contains a colon). In this case, the part before the colon
 ///   is used as the key.
-/// 
+///
 /// If the resource configuration contains the "add-workflow-id" parameter,
 /// the workflow ID is prepended to the key used in both GET and SET operations.
 impl RedisResource {
