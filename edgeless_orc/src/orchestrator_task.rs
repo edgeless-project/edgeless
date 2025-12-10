@@ -136,8 +136,8 @@ impl OrchestratorTask {
                     .iter()
                     .map(|x| {
                         Pid::Function(edgeless_api::function_instance::InstanceId {
-                            node_id: x.node_id,
-                            function_id: x.function_id,
+                            node_id: x.0.node_id,
+                            function_id: x.0.function_id,
                         })
                     })
                     .collect(),
@@ -154,11 +154,11 @@ impl OrchestratorTask {
 
     /// Deploy an instance to a new set of targets, if possible. No repatching.
     ///
-    /// If the component cannot be migrate to the target, then the current
-    /// component instances is not stopped.
+    /// If the component cannot be migrated to the target, then the current
+    /// component instances are not stopped.
     ///
     /// If the component is already allocated precisely on the same targets
-    /// the nothing happens.
+    /// then nothing happens.
     ///
     /// * `lid` - The LID of the function/resource to be migrated.
     /// * `targets` - The set of nodes to which the instance has to be migrated.
@@ -177,7 +177,7 @@ impl OrchestratorTask {
         let (spawn_req, resource_req, origin_instances) = match self.active_instances.get(lid) {
             Some(active_instance) => match active_instance {
                 crate::active_instance::ActiveInstance::Function(spawn_req, origin_instances) => {
-                    (Some(spawn_req.clone()), None, origin_instances.clone())
+                    (Some(spawn_req.clone()), None, origin_instances.iter().map(|(id, _)| *id).collect())
                 }
                 crate::active_instance::ActiveInstance::Resource(resource_spec, origin_lid) => (None, Some(resource_spec.clone()), vec![*origin_lid]),
             },
@@ -293,7 +293,7 @@ impl OrchestratorTask {
                 None => continue,
             };
 
-            // Transform logical identifiers (LIDs) into internal ones (PIDs).
+            // Transform logical identifiers (LIDs) into internal ones (PIDs). Multiple PIDs can be associated with a single LID.
             for source in self.lid_to_pid(origin_lid) {
                 let mut physical_output_mapping = std::collections::HashMap::new();
                 for (channel, target_lid) in logical_output_mapping {
@@ -514,7 +514,7 @@ impl OrchestratorTask {
                     crate::active_instance::ActiveInstance::Function(_req, instances) => {
                         // Stop all the instances of this function.
                         for instance_id in instances {
-                            self.stop_function(&instance_id).await;
+                            self.stop_function(&instance_id.0).await;
                         }
                     }
                     crate::active_instance::ActiveInstance::Resource(_, _) => {
@@ -585,7 +585,8 @@ impl OrchestratorTask {
 
         // Finally try to spawn the function instance on the
         // selected client.
-        // [TODO] Issue#96 We assume that one instance is spawned.
+        // [TODO] Issue#96 We assume that one "active" instance is spawned per node. 
+        // Other instances, spawned on other nodes are considered "hot-standby" ones.
         match fn_client.start(spawn_req.clone()).await {
             Ok(res) => match res {
                 edgeless_api::common::StartComponentResponse::ResponseError(err) => {
@@ -593,18 +594,26 @@ impl OrchestratorTask {
                 }
                 edgeless_api::common::StartComponentResponse::InstanceId(id) => {
                     assert!(*node_id == id.node_id);
+                    // if the lid is already present, append the new instance id to the list
+                    if let Some(existing_instance) = self.active_instances.get_mut(lid) {
+                        existing_instance.instance_ids_mut().append(&mut vec![(edgeless_api::function_instance::InstanceId {
+                            node_id: *node_id,
+                            function_id: id.function_id,
+                        }, false)]); // not a hot-standby instance
+                    } else {
                     self.active_instances.insert(
                         *lid,
                         crate::active_instance::ActiveInstance::Function(
                             spawn_req.clone(),
-                            vec![edgeless_api::function_instance::InstanceId {
+                                vec![(edgeless_api::function_instance::InstanceId {
                                 node_id: *node_id,
                                 function_id: id.function_id,
-                            }],
+                                }, true)], // only the first started instance is "used" - the rest are hot standby
                         ),
                     );
+                    }
                     self.active_instances_changed = true;
-                    log::info!("Spawned at node_id {}, LID {}, pid {}", node_id, &lid, id.function_id);
+                    log::info!("Spawned instance number {} at node_id {}, LID {}, pid {}", self.active_instances.len(), node_id, &lid, id.function_id);
 
                     Ok(edgeless_api::common::StartComponentResponse::InstanceId(*lid))
                 }
@@ -893,7 +902,7 @@ impl OrchestratorTask {
         for (_origin_lid, instance) in self.active_instances.iter_mut() {
             match instance {
                 crate::active_instance::ActiveInstance::Function(_start_req, ref mut instances) => {
-                    instances.retain(|cur_node_id| node_id != cur_node_id.node_id);
+                    instances.retain(|cur_node_id| node_id != cur_node_id.0.node_id);
                 }
                 crate::active_instance::ActiveInstance::Resource(_start_req, ref mut instance) => {
                     if instance.node_id == node_id {
@@ -926,10 +935,8 @@ impl OrchestratorTask {
     async fn refresh(&mut self) {
         //
         // Make sure that all active logical functions are assigned
-        // to one instance: for all the function instances that
-        // were running in disconnected nodes, create new function
-        // instances on other nodes, if possible and there were no
-        // other running function instances.
+        // to at least one instance: for all the function instances that
+        // were running on disconnected nodes, create new instances.
         //
 
         // List of LIDs that will have to be repatched
@@ -961,7 +968,7 @@ impl OrchestratorTask {
         for (origin_lid, instance) in self.active_instances.iter() {
             match instance {
                 crate::active_instance::ActiveInstance::Function(start_req, instances) => {
-                    let num_disconnected = instances.iter().filter(|x| !self.nodes.contains_key(&x.node_id)).count();
+                    let num_disconnected = instances.iter().filter(|x| !self.nodes.contains_key(&x.0.node_id)).count();
                     assert!(num_disconnected <= instances.len());
                     if instances.is_empty() || num_disconnected > 0 {
                         to_be_repatched.push(*origin_lid);
@@ -1011,7 +1018,7 @@ impl OrchestratorTask {
                 Some(active_instance) => match active_instance {
                     crate::active_instance::ActiveInstance::Resource(_, _) => panic!("expecting a function, found a resource for lid {}", lid),
                     crate::active_instance::ActiveInstance::Function(_, instances) => {
-                        instances.retain(|x| self.nodes.contains_key(&x.node_id));
+                        instances.retain(|x| self.nodes.contains_key(&x.0.node_id));
                         self.active_instances_changed = true;
                     }
                 },
