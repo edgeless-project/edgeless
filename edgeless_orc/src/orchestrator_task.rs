@@ -586,6 +586,7 @@ impl OrchestratorTask {
         // Finally try to spawn the function instance on the
         // selected client.
         // [TODO] Issue#96 We assume that one "active" instance is spawned per node.
+        // When replication_factor is specifid, we start more instances in standby mode.
         // Other instances, spawned on other nodes are considered "hot-standby" ones.
         match fn_client.start(spawn_req.clone()).await {
             Ok(res) => match res {
@@ -596,25 +597,19 @@ impl OrchestratorTask {
                     assert!(*node_id == id.node_id);
                     // if the lid is already present, append the new instance id to the list
                     if let Some(existing_instance) = self.active_instances.get_mut(lid) {
-                        existing_instance.instance_ids_mut().append(&mut vec![(
-                            edgeless_api::function_instance::InstanceId {
+                        existing_instance.instance_ids_mut().append(&mut vec![(edgeless_api::function_instance::InstanceId {
                                 node_id: *node_id,
                                 function_id: id.function_id,
-                            },
-                            false,
-                        )]); // not a hot-standby instance
+                        }, false)]); // not a hot-standby instance
                     } else {
                         self.active_instances.insert(
                             *lid,
                             crate::active_instance::ActiveInstance::Function(
                                 spawn_req.clone(),
-                                vec![(
-                                    edgeless_api::function_instance::InstanceId {
+                                vec![(edgeless_api::function_instance::InstanceId {
                                         node_id: *node_id,
                                         function_id: id.function_id,
-                                    },
-                                    true,
-                                )], // only the first started instance is "used" - the rest are hot standby
+                                }, true)], // only the first started instance is "used" - the rest are hot standby
                             ),
                         );
                     }
@@ -948,7 +943,16 @@ impl OrchestratorTask {
         //
         // Make sure that all active logical functions are assigned
         // to at least one instance: for all the function instances that
-        // were running on disconnected nodes, create new instances.
+        // were running on disconnected nodes, create new instances. If
+        // replication is enabled, make sure to gracefully failover.
+        // 
+        // Default behavior: (no replication_factor): every LID has exactly
+        // one physical function instance and failover can only be done
+        // after a new instance of the function has been started in the cluster.
+        // 
+        // KPI-13: If the replication_factor for a function is > 1, then we do a 
+        // graceful failover to a hot-standby function and then make sure
+        // that enough copies are still available in the cluster.
         //
 
         // List of LIDs that will have to be repatched
@@ -968,7 +972,8 @@ impl OrchestratorTask {
         // value: resource specs
         let mut res_to_be_created = std::collections::HashMap::new();
 
-        // List of lid that will have to be repatched.
+        // List of lid that will have to be repatched. These are active
+        // instances where at least one more instance is running.
         let mut active_instances_to_be_updated = vec![];
 
         // Find all the functions/resources affected.
@@ -982,20 +987,41 @@ impl OrchestratorTask {
                 crate::active_instance::ActiveInstance::Function(start_req, instances) => {
                     let num_disconnected = instances.iter().filter(|x| !self.nodes.contains_key(&x.0.node_id)).count();
                     assert!(num_disconnected <= instances.len());
-                    if instances.is_empty() || num_disconnected > 0 {
-                        to_be_repatched.push(*origin_lid);
-                        if instances.is_empty() || num_disconnected == instances.len() {
-                            // If all the function instances
-                            // disappared, then we must enforce the
-                            // creation of (at least) a new
-                            // function instance.
-                            fun_to_be_created.insert(*origin_lid, start_req.clone());
+                    let default_behavior = start_req.replication_factor.is_none() || start_req.replication_factor == Some(1);
+
+                    if default_behavior {
+                        // Default mechanism
+                        if instances.is_empty() || num_disconnected > 0 {
+                            to_be_repatched.push(*origin_lid);
+                            if instances.is_empty() || num_disconnected == instances.len() {
+                                // If all the function instances
+                                // disappared, then we must enforce the
+                                // creation of (at least) a new
+                                // function instance.
+                                fun_to_be_created.insert(*origin_lid, start_req.clone());
+                            } else {
+                                // Otherwise, we just remove the
+                                // disappeared function instances and
+                                // let the others still alive handle
+                                // the logical function.
+                                active_instances_to_be_updated.push(*origin_lid);
+                            }
+                        }
+                    } else {
+                        let replicas = start_req.replication_factor.expect("this is not possible");
+                        // KPI-13 hot redundancy mechanism
+                        if num_disconnected == replicas as usize {
+                            log::warn!("All function replicas have died - graceful failover not possible, we need to start at least one instance first");
                         } else {
-                            // Otherwise, we just remove the
-                            // disappeared function instances and
-                            // let the others still alive handle
-                            // the logical function.
-                            active_instances_to_be_updated.push(*origin_lid);
+                            // We need to check if the "active" replica (the one serving traffic) or one of the "hot-standby" replicas have been disconnected
+                            // If the "active replica died, we need to repatch as fast as possible due to KPI-13"
+                            // If one of the "hot-standby" replicas died, we simply start it on another node. In case there is no other node that can host it, we show an error message.
+                            let active_replica_died = instances.iter().filter(|x| !self.nodes.contains_key(&x.0.node_id) && x.1).count() == 1;
+                            if active_replica_died {
+                                log::info!("Graceful failover possible! (at least one hot-standby replica is available)");
+                            } else {
+                                log::info!("Active replica still works! Restarting a replica");
+                            }
                         }
                     }
                 }
