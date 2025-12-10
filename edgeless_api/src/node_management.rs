@@ -10,6 +10,7 @@ pub enum UpdatePeersRequest {
     Clear,
 }
 
+#[cfg_attr(feature = "mocks", mockall::automock)]
 #[async_trait::async_trait]
 pub trait NodeManagementAPI: NodeManagementAPIClone + Sync + Send {
     async fn update_peers(&mut self, request: UpdatePeersRequest) -> anyhow::Result<()>;
@@ -31,5 +32,12 @@ where
 impl Clone for Box<dyn NodeManagementAPI> {
     fn clone(&self) -> Box<dyn NodeManagementAPI> {
         self.clone_box()
+    }
+}
+
+#[cfg(feature = "mocks")]
+impl NodeManagementAPIClone for MockNodeManagementAPI {
+    fn clone_box(&self) -> Box<dyn NodeManagementAPI> {
+        Box::new(MockNodeManagementAPI::new())
     }
 }

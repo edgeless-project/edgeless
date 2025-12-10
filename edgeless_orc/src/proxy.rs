@@ -21,6 +21,7 @@ pub type NodeHealthStatuses = std::collections::HashMap<
     Vec<(chrono::DateTime<chrono::Utc>, edgeless_api::node_registration::NodeHealthStatus)>,
 >;
 
+#[cfg_attr(test, mockall::automock)]
 #[async_trait::async_trait]
 pub trait Proxy: Sync + Send {
     /// Update the info on the currently actives nodes as given.

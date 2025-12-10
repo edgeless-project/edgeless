@@ -49,3 +49,9 @@ serial_test = { version = "3" }
 itertools = "0.13.0"
 chrono = "0.4.38"
 rustls = { version = "0.23.29", features = ["ring"] }
+
+[dev-dependencies]
+mockall = "0.14"
+
+[target.'cfg(test)'.dependencies]
+edgeless_api = {path = "../edgeless_api", features = ["mocks"]} # enable mocks in edgeless_api for tests

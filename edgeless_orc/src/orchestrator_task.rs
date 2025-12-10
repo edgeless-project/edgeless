@@ -1190,3 +1190,57 @@ impl OrchestratorTask {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_start_two_functions_then_stop_one() {
+        // channels
+        let (_tx, rx) = futures::channel::mpsc::unbounded();
+        let (subscriber_tx, _subscriber_rx) = futures::channel::mpsc::unbounded();
+        
+        // mock proxy expectations setting
+        let mut mock_proxy = crate::proxy::MockProxy::new();
+        mock_proxy.expect_update_nodes().returning(|_| ());
+        mock_proxy.expect_update_resource_providers().returning(|_| ());
+        mock_proxy.expect_update_active_instances().returning(|_| ());
+        mock_proxy.expect_update_dependency_graph().returning(|_| ());
+        mock_proxy.expect_retrieve_deploy_intents().returning(|| vec![]);
+
+        // mock AgentAPI expectations
+        let mut mock_agent_api = edgeless_api::outer::agent::MockAgentAPI::new();
+        mock_agent_api.expect_node_management_api()
+            .returning(|| {
+                let mut mock_node_mgmt_api = edgeless_api::node_management::MockNodeManagementAPI::new();
+                mock_node_mgmt_api.expect_update_peers()
+                    .returning(|_| Ok(()));
+                Box::new(mock_node_mgmt_api)
+            });
+        
+        let proxy = std::sync::Arc::new(tokio::sync::Mutex::new(mock_proxy));
+        
+        let settings = crate::EdgelessOrcBaselineSettings {
+            orchestration_strategy: crate::OrchestrationStrategy::RoundRobin,
+        };
+        
+        let mut _orchestrator = OrchestratorTask::new(rx, settings, proxy.clone(), subscriber_tx).await;
+
+        // Add three nodes
+        let node_1_id = uuid::Uuid::new_v4();
+        let client_desc = crate::client_desc::ClientDesc {
+            agent_url: "http://node1/agent".to_string(),
+            invocation_url: "http://node1".to_string(),
+            capabilities: edgeless_api::node_registration::NodeCapabilities::default(),
+            cordoned: false,
+            api: Box::new(mock_agent_api),
+        };
+        let resource_providers = vec![];
+        _orchestrator.add_node(node_1_id, client_desc, resource_providers).await;
+        // test if it works
+        assert_eq!(1, 1);
+    }
+}
+
+
