@@ -32,7 +32,7 @@ impl ActiveInstance {
     pub fn instance_ids_mut(&mut self) -> &mut Vec<(edgeless_api::function_instance::InstanceId, bool)> {
         match self {
             Self::Function(_, ids) => ids,
-            Self::Resource(_, id) => {
+            Self::Resource(_, _) => {
                 panic!("Cannot get mutable reference to instance ids of a resource instance - there is always only one instance");
             }
         }
