@@ -9,6 +9,7 @@ pub struct ClientDesc {
     pub cordoned: bool,
 }
 
+#[cfg_attr(test, mockall::automock)]
 impl ClientDesc {
     pub async fn from(request: &edgeless_api::node_registration::UpdateNodeRequest) -> anyhow::Result<Self> {
         // Return immediately if the node has an invalid agent or invocation URL.

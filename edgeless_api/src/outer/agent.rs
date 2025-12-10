@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+#[cfg_attr(feature = "mocks", mockall::automock)]
 pub trait AgentAPI {
     fn function_instance_api(&mut self) -> Box<dyn crate::function_instance::FunctionInstanceAPI<edgeless_api_core::instance_id::InstanceId>>;
     fn node_management_api(&mut self) -> Box<dyn crate::node_management::NodeManagementAPI>;
