@@ -232,7 +232,7 @@ impl ProxyRedis {
                                 let mut instance_ids = vec![];
                                 for instance_id_str in instance_ids_str {
                                     if let Ok(instance_id) = string_to_instance_id(&instance_id_str) {
-                                        instance_ids.push(instance_id);
+                                        instance_ids.push((instance_id, false));
                                     }
                                 }
                                 if !instance_ids.is_empty() {
@@ -354,9 +354,10 @@ impl super::proxy::Proxy for ProxyRedis {
                 serde_json::to_string(&active_instance.strip()).unwrap_or_default().as_str(),
             );
             let new_instance_ids = active_instance.instance_ids();
+            let new_instance_ids_only = new_instance_ids.iter().map(|x| x.0).collect();
             if let Some(outfile) = &mut self.mapping_to_instance_id_file {
                 let write = if let Some(old_instance_ids) = self.mapping_to_instance_id.get(lid) {
-                    *old_instance_ids != new_instance_ids
+                    *old_instance_ids != new_instance_ids_only
                 } else {
                     true
                 };
@@ -370,13 +371,13 @@ impl super::proxy::Proxy for ProxyRedis {
                         active_instance.workflow_id(),
                         new_instance_ids
                             .iter()
-                            .map(|x| format!("{},{}", x.node_id, x.function_id))
+                            .map(|x| format!("{},{}", x.0.node_id, x.0.function_id))
                             .collect::<Vec<String>>()
                             .join(",")
                     );
                 }
             }
-            new_mapping_to_instance_id.insert(*lid, new_instance_ids);
+            new_mapping_to_instance_id.insert(*lid, new_instance_ids_only);
         }
         let _ = std::mem::replace(&mut self.mapping_to_instance_id, new_mapping_to_instance_id);
 
@@ -689,7 +690,7 @@ impl super::proxy::Proxy for ProxyRedis {
         let mut instances = std::collections::HashMap::new();
         for (logical_id, instance) in self.fetch_instances() {
             if let crate::active_instance::ActiveInstance::Function(_, instance_ids) = instance {
-                instances.insert(logical_id, instance_ids.iter().map(|x| x.node_id).collect());
+                instances.insert(logical_id, instance_ids.iter().map(|x| x.0.node_id).collect());
             }
         }
         instances
@@ -702,7 +703,7 @@ impl super::proxy::Proxy for ProxyRedis {
         for (logical_id, instance) in self.fetch_instances() {
             match instance {
                 crate::active_instance::ActiveInstance::Function(_, instance_ids) => {
-                    instances.insert(logical_id, instance_ids.iter().map(|x| x.function_id).collect());
+                    instances.insert(logical_id, instance_ids.iter().map(|x| x.0.function_id).collect());
                 }
                 crate::active_instance::ActiveInstance::Resource(_, instance_id) => {
                     instances.insert(logical_id, vec![instance_id.function_id]);
@@ -730,7 +731,7 @@ impl super::proxy::Proxy for ProxyRedis {
             match instance {
                 crate::active_instance::ActiveInstance::Function(_, instance_ids) => {
                     for instance_id in instance_ids {
-                        let res = nodes_mapping.entry(instance_id.node_id).or_insert(vec![]);
+                        let res = nodes_mapping.entry(instance_id.0.node_id).or_insert(vec![]);
                         res.push(crate::proxy::Instance::Function(logical_id));
                     }
                 }
@@ -866,11 +867,12 @@ mod test {
                             state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
                         },
                         workflow_id: "workflow_1".to_string(),
+                        replication_factor: Some(1)
                     },
-                    vec![edgeless_api::function_instance::InstanceId {
+                    vec![(edgeless_api::function_instance::InstanceId {
                         node_id: node1_id,
                         function_id: logical_physical_ids.last().unwrap().1,
-                    }],
+                    }, true)],
                 ),
             );
         }

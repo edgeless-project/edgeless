@@ -7,10 +7,10 @@ use serde::ser::SerializeTupleVariant;
 #[derive(Clone)]
 pub enum ActiveInstance {
     // 0: request
-    // 1: [ (node_id, lid) ]
+    // 1: [ ((node_id, lid), is_used) ] - is_used indicates whether the instance is currently used by a workflow or kept as a hot-standby. Hot-standbys are running on other nodes.
     Function(
         edgeless_api::function_instance::SpawnFunctionRequest,
-        Vec<edgeless_api::function_instance::InstanceId>,
+        Vec<(edgeless_api::function_instance::InstanceId, bool)>,
     ),
 
     // 0: request
@@ -23,10 +23,18 @@ pub enum ActiveInstance {
 
 impl ActiveInstance {
     /// Return the physical identifier(s) associated with this instance.
-    pub fn instance_ids(&self) -> Vec<edgeless_api::function_instance::InstanceId> {
+    pub fn instance_ids(&self) -> Vec<(edgeless_api::function_instance::InstanceId, bool)> {
         match self {
             Self::Function(_, ids) => ids.clone(),
-            Self::Resource(_, id) => vec![*id],
+            Self::Resource(_, id) => vec![(*id, true)], // resources are always warm as we don't do redundancy for them
+        }
+    }
+    pub fn instance_ids_mut(&mut self) -> &mut Vec<(edgeless_api::function_instance::InstanceId, bool)> {
+        match self {
+            Self::Function(_, ids) => ids,
+            Self::Resource(_, id) => {
+                panic!("Cannot get mutable reference to instance ids of a resource instance - there is always only one instance");
+            }
         }
     }
     /// Return the workflow identifier of this instance.
@@ -57,7 +65,7 @@ impl serde::Serialize for ActiveInstance {
             ActiveInstance::Function(ref req, ref ids) => {
                 let mut tv = serializer.serialize_tuple_variant("ActiveInstance", 0, "Function", 2)?;
                 tv.serialize_field(req)?;
-                tv.serialize_field::<Vec<String>>(ids.iter().map(|x| x.to_string()).collect::<Vec<String>>().as_ref())?;
+                tv.serialize_field::<Vec<String>>(ids.iter().map(|x| format!("({}, {})", x.0, x.1)).collect::<Vec<String>>().as_ref())?;
                 tv.end()
             }
             ActiveInstance::Resource(ref req, ref id) => {
@@ -78,7 +86,7 @@ impl std::fmt::Display for ActiveInstance {
                 "function, instances {}",
                 instances
                     .iter()
-                    .map(|x| format!("node_id {}, lid {}", x.node_id, x.function_id))
+                    .map(|x| format!("node_id {}, lid {}, is_warm {}", x.0.node_id, x.0.function_id, x.1))
                     .collect::<Vec<String>>()
                     .join(",")
             ),
