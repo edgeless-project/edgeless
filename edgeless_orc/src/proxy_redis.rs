@@ -110,8 +110,20 @@ impl ProxyRedis {
         dataset_path: String,
         append: bool,
         additional_header: String,
-    ) -> (Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>, Option<std::fs::File>) {
-        let filenames = ["performance_samples", "mapping_to_instance_id", "capabilities", "health_status", "application_logs"];
+    ) -> (
+        Option<std::fs::File>,
+        Option<std::fs::File>,
+        Option<std::fs::File>,
+        Option<std::fs::File>,
+        Option<std::fs::File>,
+    ) {
+        let filenames = [
+            "performance_samples",
+            "mapping_to_instance_id",
+            "capabilities",
+            "health_status",
+            "application_logs",
+        ];
         let headers = [
             "identifier,metric,timestamp,value".to_string(),
             "timestamp,logical_id,workflow_id,node_id,physical_id".to_string(),
@@ -150,7 +162,7 @@ impl ProxyRedis {
             outfiles.pop().unwrap(),
             outfiles.pop().unwrap(),
             outfiles.pop().unwrap(),
-            outfiles.pop().unwrap()
+            outfiles.pop().unwrap(),
         )
     }
 
@@ -867,12 +879,15 @@ mod test {
                             state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
                         },
                         workflow_id: "workflow_1".to_string(),
-                        replication_factor: Some(1)
+                        replication_factor: Some(1),
                     },
-                    vec![(edgeless_api::function_instance::InstanceId {
-                        node_id: node1_id,
-                        function_id: logical_physical_ids.last().unwrap().1,
-                    }, true)],
+                    vec![(
+                        edgeless_api::function_instance::InstanceId {
+                            node_id: node1_id,
+                            function_id: logical_physical_ids.last().unwrap().1,
+                        },
+                        true,
+                    )],
                 ),
             );
         }

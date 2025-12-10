@@ -585,7 +585,7 @@ impl OrchestratorTask {
 
         // Finally try to spawn the function instance on the
         // selected client.
-        // [TODO] Issue#96 We assume that one "active" instance is spawned per node. 
+        // [TODO] Issue#96 We assume that one "active" instance is spawned per node.
         // Other instances, spawned on other nodes are considered "hot-standby" ones.
         match fn_client.start(spawn_req.clone()).await {
             Ok(res) => match res {
@@ -596,24 +596,36 @@ impl OrchestratorTask {
                     assert!(*node_id == id.node_id);
                     // if the lid is already present, append the new instance id to the list
                     if let Some(existing_instance) = self.active_instances.get_mut(lid) {
-                        existing_instance.instance_ids_mut().append(&mut vec![(edgeless_api::function_instance::InstanceId {
-                            node_id: *node_id,
-                            function_id: id.function_id,
-                        }, false)]); // not a hot-standby instance
-                    } else {
-                    self.active_instances.insert(
-                        *lid,
-                        crate::active_instance::ActiveInstance::Function(
-                            spawn_req.clone(),
-                                vec![(edgeless_api::function_instance::InstanceId {
+                        existing_instance.instance_ids_mut().append(&mut vec![(
+                            edgeless_api::function_instance::InstanceId {
                                 node_id: *node_id,
                                 function_id: id.function_id,
-                                }, true)], // only the first started instance is "used" - the rest are hot standby
-                        ),
-                    );
+                            },
+                            false,
+                        )]); // not a hot-standby instance
+                    } else {
+                        self.active_instances.insert(
+                            *lid,
+                            crate::active_instance::ActiveInstance::Function(
+                                spawn_req.clone(),
+                                vec![(
+                                    edgeless_api::function_instance::InstanceId {
+                                        node_id: *node_id,
+                                        function_id: id.function_id,
+                                    },
+                                    true,
+                                )], // only the first started instance is "used" - the rest are hot standby
+                            ),
+                        );
                     }
                     self.active_instances_changed = true;
-                    log::info!("Spawned instance number {} at node_id {}, LID {}, pid {}", self.active_instances.len(), node_id, &lid, id.function_id);
+                    log::info!(
+                        "Spawned instance number {} at node_id {}, LID {}, pid {}",
+                        self.active_instances.len(),
+                        node_id,
+                        &lid,
+                        id.function_id
+                    );
 
                     Ok(edgeless_api::common::StartComponentResponse::InstanceId(*lid))
                 }
