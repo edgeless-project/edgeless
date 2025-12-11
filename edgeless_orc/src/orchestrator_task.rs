@@ -134,6 +134,8 @@ impl OrchestratorTask {
             Some(active_instance) => match active_instance {
                 crate::active_instance::ActiveInstance::Function(_req, instances) => instances
                     .iter()
+                    // NOTE: this is important: we only patch active instances, not hot-standby ones!
+                    .filter(|x| x.1) // only include active instances (x.1 == true), not hot-standby - hot-standby are special
                     .map(|x| {
                         Pid::Function(edgeless_api::function_instance::InstanceId {
                             node_id: x.0.node_id,
@@ -482,16 +484,18 @@ impl OrchestratorTask {
         }
     }
 
-    /// Start a new function instance on node assigned by orchestration's logic.
+    /// Start a new logical function in this orchestration domain, as assigned
+    /// by the controller
     async fn start_function(
         &mut self,
         spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest,
     ) -> anyhow::Result<edgeless_api::common::StartComponentResponse<uuid::Uuid>> {
-        // Create a new lid for this resource.
+        // Create a new lid for this function.
         let lid = uuid::Uuid::new_v4();
+        let mut results: Vec<anyhow::Result<edgeless_api::common::StartComponentResponse<uuid::Uuid>>> = vec![];
 
         // Select the target node.
-        match self.select_node(spawn_req) {
+        let res = match self.select_node(spawn_req) {
             Ok(node_id) => {
                 // Start the function instance.
                 self.start_function_in_node(spawn_req, &lid, &node_id).await
@@ -502,6 +506,87 @@ impl OrchestratorTask {
                     detail: Some(err.to_string()),
                 },
             )),
+        };
+        results.push(res);
+
+        // start the replicas for hot-standby redundancy, if replication factor is > 1
+        if let Some(replication_factor) = spawn_req.replication_factor {
+            if replication_factor > 1 {
+                // TODO:2 start replicas on different nodes to provide good coverage and good fault tolerance
+                for _ in 1..replication_factor {
+                    let res = match self.select_node(spawn_req) {
+                        Ok(node_id) => {
+                            // Start the function instance.
+                            self.start_function_in_node(spawn_req, &lid, &node_id).await
+                        }
+                        Err(err) => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
+                            edgeless_api::common::ResponseError {
+                                summary: format!("Could not start replica function {}", spawn_req.spec.to_short_string()),
+                                detail: Some(err.to_string()),
+                            },
+                        )),
+                    };
+                    results.push(res);
+                }
+            }
+        }
+
+        // Check if there was any error along the way
+        let mut error_count = 0;
+        let mut last_error: Option<String> = None;
+
+        for result in &results {
+            match result {
+                Ok(edgeless_api::common::StartComponentResponse::ResponseError(err)) => {
+                    error_count += 1;
+                    last_error = Some(format!("{}: {}", err.summary, err.detail.as_ref().unwrap_or(&String::new())));
+                }
+                Err(err) => {
+                    error_count += 1;
+                    last_error = Some(err.to_string());
+                }
+                Ok(edgeless_api::common::StartComponentResponse::InstanceId(_)) => {
+                    // Success case - no action needed
+                }
+            }
+        }
+
+        // If all instances failed, return error and clean up
+        if error_count == results.len() {
+            // Clean up any partial state
+            if self.active_instances.contains_key(&lid) {
+                self.active_instances.remove(&lid);
+                self.active_instances_changed = true;
+            }
+            
+            return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
+                edgeless_api::common::ResponseError {
+                    summary: "Failed to start function".to_string(),
+                    detail: last_error,
+                },
+            ));
+        }
+
+        // even if some replicas failed, we consider this a success as long as
+        // the first instance is running - check it, if not clean up and return the error
+        match &results[0] {
+            Ok(edgeless_api::common::StartComponentResponse::InstanceId(_)) => {
+                Ok(edgeless_api::common::StartComponentResponse::InstanceId(lid))
+            }
+            _ => {
+                // first instance failed, clean up and return error
+                if self.active_instances.contains_key(&lid) {
+                    self.active_instances.remove(&lid);
+                    self.active_instances_changed = true;
+                }
+
+                Ok(edgeless_api::common::StartComponentResponse::ResponseError(
+                    edgeless_api::common::ResponseError {
+                        summary: "Failed to start first function instance".to_string(),
+                        detail: last_error,
+                    },
+                ))
+            }
         }
     }
 
@@ -597,10 +682,11 @@ impl OrchestratorTask {
                     assert!(*node_id == id.node_id);
                     // if the lid is already present, append the new instance id to the list
                     if let Some(existing_instance) = self.active_instances.get_mut(lid) {
+                        let is_active = existing_instance.instance_ids().len() == 0;
                         existing_instance.instance_ids_mut().append(&mut vec![(edgeless_api::function_instance::InstanceId {
                                 node_id: *node_id,
                                 function_id: id.function_id,
-                        }, false)]); // not a hot-standby instance
+                        }, is_active)]); // hot-standby instance (false = standby, true = active)
                     } else {
                         self.active_instances.insert(
                             *lid,
@@ -609,7 +695,7 @@ impl OrchestratorTask {
                                 vec![(edgeless_api::function_instance::InstanceId {
                                         node_id: *node_id,
                                         function_id: id.function_id,
-                                }, true)], // only the first started instance is "used" - the rest are hot standby
+                                }, true)], // first instance is active (true = active, false = standby)
                             ),
                         );
                     }
@@ -957,76 +1043,108 @@ impl OrchestratorTask {
 
         // List of LIDs that will have to be repatched
         // because of the allocation of new function instances
-        // following node disconnection.
-        let mut to_be_repatched = vec![]; // lid
+        // following node disconnection. We just add to this array
+        // and later figure out how to repatch them.
+        let mut to_be_repatched: Vec<uuid::Uuid> = vec![]; // lid
 
-        // Function instances that have to be created to make up for
+        struct PhysicalFunctionInstance {
+            original_start_req: edgeless_api::function_instance::SpawnFunctionRequest,
+            // TODO:2 next patch, takes into account where the other replicas reside to make sure replicas only start
+            // on different nodes
+            nodes_blacklist: Option<std::collections::HashSet<edgeless_api::function_instance::NodeId>>,
+        }
+
+        // Functions that have to have some instances created to make up for
         // the loss of those assigned to disconnected nodes.
         // key:   lid
-        // value: function request
-        let mut fun_to_be_created = std::collections::HashMap::new();
+        // value: Vec<PhysicalFunctionInstance> - it is possible that multiple physical instances need
+        // to be recreated for the same logical function after some of the nodes have failed
+        let mut fun_to_be_created: std::collections::HashMap<uuid::Uuid, Vec<PhysicalFunctionInstance>> = std::collections::HashMap::new();
 
         // Resources that have to be created to make up for the
         // loss of those assigned to disconnected nodes.
         // key:   lid
         // value: resource specs
-        let mut res_to_be_created = std::collections::HashMap::new();
+        let mut res_to_be_created: std::collections::HashMap<uuid::Uuid, edgeless_api::resource_configuration::ResourceInstanceSpecification> = std::collections::HashMap::new();
 
-        // List of lid that will have to be repatched. These are active
-        // instances where at least one more instance is running.
-        let mut active_instances_to_be_updated = vec![];
-
+        // Look at all of the function and resources that this 
+        // orchestrator is managing.
         // Find all the functions/resources affected.
         // Also attempt to start functions and resources that
         // are active but for which no active instance is present
         // (this happens because in the past a node with active
         // functions/resources has disappeared and it was not
-        // possible to fix the situation immediately).
-        for (origin_lid, instance) in self.active_instances.iter() {
+        // possible to fix the situation immediately due to e.g.
+        // lack of nodes that could host the new functions).
+        for (origin_lid, instance) in self.active_instances.iter_mut() {
             match instance {
                 crate::active_instance::ActiveInstance::Function(start_req, instances) => {
-                    let num_disconnected = instances.iter().filter(|x| !self.nodes.contains_key(&x.0.node_id)).count();
-                    assert!(num_disconnected <= instances.len());
-                    let default_behavior = start_req.replication_factor.is_none() || start_req.replication_factor == Some(1);
+                    if let Some(replicas) = start_req.replication_factor {
+                        let num_disconnected = instances.iter().filter(|x| !self.nodes.contains_key(&x.0.node_id)).count();
+                        assert!(num_disconnected <= instances.len()); // this would be disastrous :(
 
-                    if default_behavior {
-                        // Default mechanism
-                        if instances.is_empty() || num_disconnected > 0 {
-                            to_be_repatched.push(*origin_lid);
-                            if instances.is_empty() || num_disconnected == instances.len() {
-                                // If all the function instances
-                                // disappared, then we must enforce the
-                                // creation of (at least) a new
-                                // function instance.
-                                fun_to_be_created.insert(*origin_lid, start_req.clone());
+                        if num_disconnected == 0 && instances.len() == replicas as usize {
+                            // all physical instances of this function are alive and none got disconnected
+                            log::info!("no disconnected functions, num_nodes {}", self.nodes.len());
+                            continue;
+                        }
+
+                        // some physical instances of this function got disconnected - need to handle this by repatching
+                        to_be_repatched.push(*origin_lid);
+
+                        // remove all disconected instances from the active instance; handles the case where a node has been disconnected
+                        // without the DelNode functionality (network error)
+                        instances.retain(|x| self.nodes.contains_key(&x.0.node_id));
+
+                        let active_replica_died = !instances.iter().any(|x| x.1 && !self.nodes.contains_key(&x.0.node_id));
+                        let hot_standby_available = instances.iter().any(|x| !x.1 && self.nodes.contains_key(&x.0.node_id));
+
+                        if active_replica_died {
+                            // active replica died - promote a hot-standby to active if possible
+                            log::info!("Active replica died for LID {}, trying to gracefully failover to hot-standby", origin_lid);
+                            if hot_standby_available {
+                                // we have at least one hot-standby replica available
+                                log::info!("We will attempt a graceful failover {}", origin_lid);
+                                // FEAT: how to intelligently select the next standby to promote?
+                                // promote a random standby instance to active
+                                if let Some((instance_id, _is_active)) = instances.iter_mut().find(|x| !x.1) {
+                                    log::info!("Promoting hot-standby instance {:?} to active for LID {}", instance_id, origin_lid);
+                                    *_is_active = true;
+                                } else {
+                                    panic!("Inconsistent state: no hot-standby replica found for LID {} despite having replicas < replication_factor", origin_lid);
+                                }
                             } else {
-                                // Otherwise, we just remove the
-                                // disappeared function instances and
-                                // let the others still alive handle
-                                // the logical function.
-                                active_instances_to_be_updated.push(*origin_lid);
+                                // no hot-standby replicas available - need to start a new instance
+                                log::warn!("KPI-13 not possible. No hot-standby replica available for LID {}, starting a completely new instance and making it active", origin_lid);
+                            }     
+                        }
+
+                        // now we need to create new hot-standby replicas to keep the replication factor
+                        if instances.len() < replicas as usize {
+                            for _ in 0..(replicas as usize - instances.len()) {
+                                log::info!("Creating a new replica for LID {} to keep replication factor", origin_lid);
+                                // prepare the physical function instance to be created
+                                // FEAT: fill out the blacklist
+                                let physical_instance = PhysicalFunctionInstance {
+                                    original_start_req: start_req.clone(),
+                                    nodes_blacklist: None,
+                                };
+                                // TODO:2 handle the error properly here
+                                fun_to_be_created.entry(*origin_lid).or_insert_with(Vec::new).push(physical_instance);
                             }
                         }
                     } else {
-                        let replicas = start_req.replication_factor.expect("this is not possible");
-                        // KPI-13 hot redundancy mechanism
-                        if num_disconnected == replicas as usize {
-                            log::warn!("All function replicas have died - graceful failover not possible, we need to start at least one instance first");
-                        } else {
-                            // We need to check if the "active" replica (the one serving traffic) or one of the "hot-standby" replicas have been disconnected
-                            // If the "active replica died, we need to repatch as fast as possible due to KPI-13"
-                            // If one of the "hot-standby" replicas died, we simply start it on another node. In case there is no other node that can host it, we show an error message.
-                            let active_replica_died = instances.iter().filter(|x| !self.nodes.contains_key(&x.0.node_id) && x.1).count() == 1;
-                            if active_replica_died {
-                                log::info!("Graceful failover possible! (at least one hot-standby replica is available)");
-                            } else {
-                                log::info!("Active replica still works! Restarting a replica");
-                            }
+                        // By default, if there is no replication_factor a workflow fails when any of its functions fail
+                        if instances.is_empty() || instances.iter().all(|x| !self.nodes.contains_key(&x.0.node_id)) {
+                            // function has completely died
+                            log::warn!("Function with LID {} has completely died, need to start a new instance", origin_lid);
+                            todo!("Default behavior: no replication_factor - need to start a new instance when the function has completely died");
                         }
                     }
                 }
                 crate::active_instance::ActiveInstance::Resource(start_req, instance) => {
                     if instance.is_none() || !self.nodes.contains_key(&instance.node_id) {
+                        // resource is missing - need to start a new one - simple.
                         to_be_repatched.push(*origin_lid);
                         res_to_be_created.insert(*origin_lid, start_req.clone());
                     }
@@ -1038,8 +1156,8 @@ impl OrchestratorTask {
         // depend on the functions/resources modified.
         for (origin_lid, output_mapping) in self.dependency_graph.iter() {
             for (_output, target_lid) in output_mapping.iter() {
-                if active_instances_to_be_updated.contains(target_lid)
-                    || fun_to_be_created.contains_key(target_lid)
+                // TODO:2 do something about the funcs that have died and there was no replication configured for them 
+                if fun_to_be_created.contains_key(target_lid)
                     || res_to_be_created.contains_key(target_lid)
                 {
                     to_be_repatched.push(*origin_lid);
@@ -1047,46 +1165,37 @@ impl OrchestratorTask {
             }
         }
 
-        // Update the active instances of logical functions
-        // where at least one function instance went missing but
-        // there are others that are still assigned and alive.
-        for lid in active_instances_to_be_updated.iter() {
-            match self.active_instances.get_mut(lid) {
-                None => panic!("lid {} just disappeared", lid),
-                Some(active_instance) => match active_instance {
-                    crate::active_instance::ActiveInstance::Resource(_, _) => panic!("expecting a function, found a resource for lid {}", lid),
-                    crate::active_instance::ActiveInstance::Function(_, instances) => {
-                        instances.retain(|x| self.nodes.contains_key(&x.0.node_id));
-                        self.active_instances_changed = true;
-                    }
-                },
-            }
-        }
 
         // Create the functions that went missing.
         // If the operation fails for a function now, then the
         // function remains in the active_instances, but it is
         // assigned no function instance.
-        for (lid, spawn_req) in fun_to_be_created.into_iter() {
-            let res = match self.select_node(&spawn_req) {
-                Ok(node_id) => {
-                    // Start the function instance.
-                    match self.start_function_in_node(&spawn_req, &lid, &node_id).await {
-                        Ok(_) => Ok(()),
-                        Err(err) => Err(err),
+        for (lid, physical_function_instances) in fun_to_be_created.into_iter() {
+            for physical_instance in physical_function_instances.into_iter() {
+                let spawn_req = physical_instance.original_start_req;
+                // TODO: 2 if blacklist is specified, use the special node selection that avoids blacklisted nodes? maybe just repeat it many times until a non-blacklisted node is found?
+                // Active instances will be automatically correctly updated once the functions start successfully
+                let res = match self.select_node(&spawn_req) {
+                    Ok(node_id) => {
+                        log::info!("Creating a new physical function instance for LID {} on node {} to make up for disconnected nodes", lid, node_id);
+                        // Start the function instance.
+                        match self.start_function_in_node(&spawn_req, &lid, &node_id).await {
+                            Ok(_) => Ok(()),
+                            Err(err) => Err(err),
+                        }
                     }
-                }
-                Err(err) => Err(err),
-            };
-            if let Err(err) = res {
-                log::error!("Error when creating a new function assigned with lid {}: {}", lid, err);
-                match self.active_instances.get_mut(&lid).unwrap() {
-                    crate::active_instance::ActiveInstance::Function(_spawn_req, instances) => {
-                        instances.clear();
-                        self.active_instances_changed = true;
-                    }
-                    crate::active_instance::ActiveInstance::Resource(_, _) => {
-                        panic!("Expecting a function to be associated with LID {}, found a resource", lid)
+                    Err(err) => Err(err),
+                };
+                if let Err(err) = res {
+                    log::error!("Error when creating a new function assigned with lid {}: {}", lid, err);
+                    match self.active_instances.get_mut(&lid).unwrap() {
+                        crate::active_instance::ActiveInstance::Function(_spawn_req, instances) => {
+                            instances.clear();
+                            self.active_instances_changed = true;
+                        }
+                        crate::active_instance::ActiveInstance::Resource(_, _) => {
+                            panic!("Expecting a function to be associated with LID {}, found a resource", lid)
+                        }
                     }
                 }
             }
@@ -1242,5 +1351,3 @@ mod tests {
         assert_eq!(1, 1);
     }
 }
-
-

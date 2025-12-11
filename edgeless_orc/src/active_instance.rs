@@ -3,8 +3,8 @@
 
 use serde::ser::SerializeTupleVariant;
 
-/// Activeinstance of a function or resource.
-#[derive(Clone)]
+/// ActiveInstance of a function or resource.
+#[derive(Clone, Debug)]
 pub enum ActiveInstance {
     // 0: request
     // 1: [ ((node_id, lid), is_used) ] - is_used indicates whether the instance is currently used by a workflow or kept as a hot-standby. Hot-standbys are running on other nodes.

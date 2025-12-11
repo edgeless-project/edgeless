@@ -12,6 +12,10 @@ use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 
 use super::*;
 
+fn init_logger() {
+    let _ = env_logger::builder().is_test(true).try_init();
+}
+
 pub enum MockAgentEvent {
     StartFunction(
         (
