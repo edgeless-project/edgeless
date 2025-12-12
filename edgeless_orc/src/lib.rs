@@ -20,6 +20,9 @@ pub mod proxy_none;
 pub mod proxy_redis;
 pub mod resource_provider;
 
+#[cfg(test)]
+mod tests;
+
 use futures::join;
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
