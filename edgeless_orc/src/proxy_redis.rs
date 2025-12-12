@@ -1152,13 +1152,13 @@ mod test {
 
         let node_id = uuid::Uuid::new_v4();
         let mut nodes = std::collections::HashMap::new();
-        let (mock_node_sender, _mock_node_receiver) = futures::channel::mpsc::unbounded::<crate::tests::orchestrator_tests::MockAgentEvent>();
+        let (mock_node_sender, _mock_node_receiver) = futures::channel::mpsc::unbounded::<crate::tests::test_utils::MockAgentEvent>();
         nodes.insert(
             node_id,
             crate::client_desc::ClientDesc {
                 agent_url: "http://127.0.0.1:10000".to_string(),
                 invocation_url: "http://127.0.0.1:10001".to_string(),
-                api: Box::new(crate::tests::orchestrator_tests::MockNode {
+                api: Box::new(crate::tests::test_utils::MockNode {
                     node_id,
                     sender: mock_node_sender,
                 }) as Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
