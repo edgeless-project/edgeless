@@ -199,14 +199,14 @@ struct SetupResult {
     stable_node_id: uuid::Uuid,
     subscriber_receiver: UnboundedReceiver<DomainSubscriberRequest>,
     orc_sender: UnboundedSender<OrchestratorRequest>,
-    proxy: std::sync::Arc<tokio::sync::Mutex<proxy_test::ProxyTest>>,
+    proxy: std::sync::Arc<tokio::sync::Mutex<dyn Proxy>>,
 }
 
 async fn setup(num_nodes: u32, num_resources_per_node: u32) -> SetupResult {
     let (mut nodes, client_descs_resources, stable_node_id) = create_clients_resources(num_nodes, num_resources_per_node);
     let (subscriber_sender, subscriber_receiver) = futures::channel::mpsc::unbounded();
 
-    let proxy = std::sync::Arc::new(tokio::sync::Mutex::new(proxy_test::ProxyTest::default()));
+    let proxy = std::sync::Arc::new(tokio::sync::Mutex::new(proxy_local::ProxyLocal::default()));
     let (mut orchestrator, orchestrator_task, _refresh_task) = Orchestrator::new(
         crate::EdgelessOrcBaselineSettings {
             orchestration_strategy: crate::OrchestrationStrategy::Random,
