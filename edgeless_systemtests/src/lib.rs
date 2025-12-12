@@ -793,8 +793,8 @@ mod system_tests {
         let mut nodes_with_functions = std::collections::HashSet::new();
         for (logical_fid, nodes) in &instances {
             assert!(nodes.len() == 1);
-            println!("before function {} -> node {}", logical_fid, nodes.first().unwrap());
-            nodes_with_functions.insert(*nodes.first().unwrap());
+            println!("before function {} -> node {} ({})", logical_fid, nodes.first().unwrap().0, if nodes.first().unwrap().1 { "active" } else { "hot-standby" });
+            nodes_with_functions.insert(nodes.first().unwrap().0);
         }
 
         // Add intents to migrate the function instances.
@@ -811,7 +811,7 @@ mod system_tests {
             assert!(nodes.len() == 1);
             intents.push(edgeless_orc::deploy_intent::DeployIntent::Migrate(
                 *logical_fid,
-                vec![other(nodes.first().unwrap())],
+                vec![other(&nodes.first().unwrap().0)],
             ));
         }
         redis_proxy.add_deploy_intents(intents);
@@ -825,8 +825,8 @@ mod system_tests {
             for (logical_fid, nodes) in &instances {
                 if let Some(new_nodes) = new_instances.get(logical_fid) {
                     assert!(new_nodes.len() == 1);
-                    let new_node = new_nodes.first().unwrap();
-                    let node = nodes.first().unwrap();
+                    let new_node = &new_nodes.first().unwrap().0;
+                    let node = &nodes.first().unwrap().0;
                     if new_node != &other(node) {
                         not_done = true;
                         break;
@@ -845,7 +845,7 @@ mod system_tests {
         instances = redis_proxy.fetch_function_instances_to_nodes();
         for (logical_fid, nodes) in instances {
             assert!(nodes.len() == 1);
-            println!("after function {} -> node {}", logical_fid, nodes.first().unwrap());
+            println!("after function {} -> node {} ({})", logical_fid, nodes.first().unwrap().0, if nodes.first().unwrap().1 { "active" } else { "hot-standby" });
         }
 
         // Check that the intents have been cleared.

@@ -698,11 +698,11 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_function_instances_to_nodes(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::NodeId>> {
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<(edgeless_api::function_instance::NodeId, bool)>> {
         let mut instances = std::collections::HashMap::new();
         for (logical_id, instance) in self.fetch_instances() {
             if let crate::active_instance::ActiveInstance::Function(_, instance_ids) = instance {
-                instances.insert(logical_id, instance_ids.iter().map(|x| x.0.node_id).collect());
+                instances.insert(logical_id, instance_ids.iter().map(|x| (x.0.node_id, x.1)).collect());
             }
         }
         instances
@@ -710,15 +710,15 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn fetch_instances_to_physical_ids(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::ComponentId>> {
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<(edgeless_api::function_instance::ComponentId, bool)>> {
         let mut instances = std::collections::HashMap::new();
         for (logical_id, instance) in self.fetch_instances() {
             match instance {
                 crate::active_instance::ActiveInstance::Function(_, instance_ids) => {
-                    instances.insert(logical_id, instance_ids.iter().map(|x| x.0.function_id).collect());
+                    instances.insert(logical_id, instance_ids.iter().map(|x| (x.0.function_id, x.1)).collect());
                 }
                 crate::active_instance::ActiveInstance::Resource(_, instance_id) => {
-                    instances.insert(logical_id, vec![instance_id.function_id]);
+                    instances.insert(logical_id, vec![(instance_id.function_id, true)]);
                 }
             }
         }
@@ -939,7 +939,8 @@ mod test {
         for (_instance, nodes) in function_instances {
             assert_eq!(nodes.len(), 1);
             assert!(!nodes.is_empty());
-            assert!(nodes.first().unwrap() == &node1_id);
+            assert_eq!(nodes.first().unwrap().0, node1_id);
+            assert!(nodes.first().unwrap().1); // all instances are active in this test
         }
 
         let resources_instances = redis_proxy.fetch_resource_instances_to_nodes();
@@ -962,11 +963,12 @@ mod test {
         for mapping in logical_to_physical {
             let logical = mapping.0;
             assert_eq!(1, mapping.1.len());
-            let physical = mapping.1.first().unwrap();
+            let (physical, is_active) = mapping.1.first().unwrap();
 
             let elem = logical_physical_ids.iter().find(|x| x.0 == logical).unwrap();
             assert_eq!(logical, elem.0);
             assert_eq!(*physical, elem.1);
+            assert!(*is_active); // all instances are active in this test
         }
     }
 
@@ -1268,5 +1270,141 @@ mod test {
                 }
             }
         }
+    }
+
+    #[serial_test::serial]
+    #[test]
+    fn test_redis_proxy_hot_standby_instances() {
+        let mut redis_proxy = match get_proxy() {
+            Some(redis_proxy) => redis_proxy,
+            None => return,
+        };
+
+        // Create active instances with hot-standby replicas
+        let mut active_instances = std::collections::HashMap::new();
+        let node1_id = uuid::Uuid::new_v4();
+        let node2_id = uuid::Uuid::new_v4();
+        let node3_id = uuid::Uuid::new_v4();
+        
+        // Function with one active instance and one hot-standby
+        let logical_id_1 = uuid::Uuid::new_v4();
+        let physical_id_1a = uuid::Uuid::new_v4();
+        let physical_id_1b = uuid::Uuid::new_v4();
+        active_instances.insert(
+            logical_id_1,
+            crate::active_instance::ActiveInstance::Function(
+                SpawnFunctionRequest {
+                    spec: edgeless_api::function_instance::FunctionClassSpecification {
+                        id: "fun1".to_string(),
+                        function_type: "class".to_string(),
+                        version: "1.0".to_string(),
+                        binary: None,
+                        code: None,
+                        outputs: vec!["out".to_string()],
+                    },
+                    annotations: std::collections::HashMap::new(),
+                    state_specification: edgeless_api::function_instance::StateSpecification {
+                        state_id: uuid::Uuid::new_v4(),
+                        state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
+                    },
+                    workflow_id: "workflow_1".to_string(),
+                    replication_factor: Some(2),
+                },
+                vec![
+                    (edgeless_api::function_instance::InstanceId {
+                        node_id: node1_id,
+                        function_id: physical_id_1a,
+                    }, true),  // active instance
+                    (edgeless_api::function_instance::InstanceId {
+                        node_id: node2_id,
+                        function_id: physical_id_1b,
+                    }, false), // hot-standby instance
+                ],
+            ),
+        );
+
+        // Function with three replicas: one active, two hot-standby
+        let logical_id_2 = uuid::Uuid::new_v4();
+        let physical_id_2a = uuid::Uuid::new_v4();
+        let physical_id_2b = uuid::Uuid::new_v4();
+        let physical_id_2c = uuid::Uuid::new_v4();
+        active_instances.insert(
+            logical_id_2,
+            crate::active_instance::ActiveInstance::Function(
+                SpawnFunctionRequest {
+                    spec: edgeless_api::function_instance::FunctionClassSpecification {
+                        id: "fun2".to_string(),
+                        function_type: "class".to_string(),
+                        version: "1.0".to_string(),
+                        binary: None,
+                        code: None,
+                        outputs: vec!["out".to_string()],
+                    },
+                    annotations: std::collections::HashMap::new(),
+                    state_specification: edgeless_api::function_instance::StateSpecification {
+                        state_id: uuid::Uuid::new_v4(),
+                        state_policy: edgeless_api::function_instance::StatePolicy::NodeLocal,
+                    },
+                    workflow_id: "workflow_1".to_string(),
+                    replication_factor: Some(3),
+                },
+                vec![
+                    (edgeless_api::function_instance::InstanceId {
+                        node_id: node1_id,
+                        function_id: physical_id_2a,
+                    }, true),  // active instance
+                    (edgeless_api::function_instance::InstanceId {
+                        node_id: node2_id,
+                        function_id: physical_id_2b,
+                    }, false), // hot-standby instance
+                    (edgeless_api::function_instance::InstanceId {
+                        node_id: node3_id,
+                        function_id: physical_id_2c,
+                    }, false), // hot-standby instance
+                ],
+            ),
+        );
+
+        redis_proxy.update_active_instances(&active_instances);
+
+        // Fetch function instances to nodes and verify active/standby status
+        let function_instances = redis_proxy.fetch_function_instances_to_nodes();
+        assert_eq!(function_instances.len(), 2);
+        
+        let nodes_1 = function_instances.get(&logical_id_1).unwrap();
+        assert_eq!(nodes_1.len(), 2);
+        assert_eq!(nodes_1[0].0, node1_id);
+        assert!(nodes_1[0].1); // active
+        assert_eq!(nodes_1[1].0, node2_id);
+        assert!(!nodes_1[1].1); // standby
+
+        let nodes_2 = function_instances.get(&logical_id_2).unwrap();
+        assert_eq!(nodes_2.len(), 3);
+        assert_eq!(nodes_2[0].0, node1_id);
+        assert!(nodes_2[0].1); // active
+        assert_eq!(nodes_2[1].0, node2_id);
+        assert!(!nodes_2[1].1); // standby
+        assert_eq!(nodes_2[2].0, node3_id);
+        assert!(!nodes_2[2].1); // standby
+
+        // Fetch instances to physical IDs and verify active/standby status
+        let logical_to_physical = redis_proxy.fetch_instances_to_physical_ids();
+        assert_eq!(logical_to_physical.len(), 2);
+        
+        let physical_1 = logical_to_physical.get(&logical_id_1).unwrap();
+        assert_eq!(physical_1.len(), 2);
+        assert_eq!(physical_1[0].0, physical_id_1a);
+        assert!(physical_1[0].1); // active
+        assert_eq!(physical_1[1].0, physical_id_1b);
+        assert!(!physical_1[1].1); // standby
+
+        let physical_2 = logical_to_physical.get(&logical_id_2).unwrap();
+        assert_eq!(physical_2.len(), 3);
+        assert_eq!(physical_2[0].0, physical_id_2a);
+        assert!(physical_2[0].1); // active
+        assert_eq!(physical_2[1].0, physical_id_2b);
+        assert!(!physical_2[1].1); // standby
+        assert_eq!(physical_2[2].0, physical_id_2c);
+        assert!(!physical_2[2].1); // standby
     }
 }

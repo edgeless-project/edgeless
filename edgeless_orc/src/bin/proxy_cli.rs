@@ -142,7 +142,7 @@ fn main() -> anyhow::Result<()> {
                     println!(
                         "{} -> {}",
                         function,
-                        nodes.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                        nodes.iter().map(|x| format!("{}({})", x.0, if x.1 { "active" } else { "hot-standby" })).collect::<Vec<String>>().join(",")
                     );
                 }
             }
@@ -156,7 +156,7 @@ fn main() -> anyhow::Result<()> {
                     println!(
                         "{} -> {}",
                         logical,
-                        physical.iter().map(|x| x.to_string()).collect::<Vec<String>>().join(",")
+                        physical.iter().map(|x| format!("{}({})", x.0, if x.1 { "active" } else { "standby" })).collect::<Vec<String>>().join(",")
                     );
                 }
             }

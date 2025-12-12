@@ -84,15 +84,19 @@ pub trait Proxy: Sync + Send {
     ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, edgeless_api::resource_configuration::ResourceInstanceSpecification>;
 
     /// Fetch the mapping between active function instances and nodes.
+    /// Returns a map from logical function ID to a vector of (node_id, is_active) tuples.
+    /// is_active=true means the instance is actively used, false means it's a hot-standby.
     fn fetch_function_instances_to_nodes(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::NodeId>>;
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<(edgeless_api::function_instance::NodeId, bool)>>;
 
     /// Fetch the mapping between active function/resource instances and their
     /// physical identifiers.
+    /// For functions, returns a map from logical ID to a vector of (physical_id, is_active) tuples.
+    /// For resources, returns a single physical ID with is_active=true.
     fn fetch_instances_to_physical_ids(
         &mut self,
-    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::function_instance::ComponentId>>;
+    ) -> std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<(edgeless_api::function_instance::ComponentId, bool)>>;
 
     /// Fetch the mapping between active resources instances and nodes.
     fn fetch_resource_instances_to_nodes(
