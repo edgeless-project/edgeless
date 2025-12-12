@@ -7,15 +7,16 @@ use crate::deployment_requirements::DeploymentRequirements;
 use crate::domain_subscriber::DomainSubscriberRequest;
 use crate::proxy::Proxy;
 use crate::{affinity_level::AffinityLevel, deploy_intent};
+use crate::orchestrator::*;
 use edgeless_api::function_instance::{FunctionClassSpecification, StatePolicy, StateSpecification};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-
-use super::*;
+use futures::SinkExt;
 
 fn init_logger() {
     let _ = env_logger::builder().is_test(true).try_init();
 }
 
+#[allow(dead_code)]
 pub enum MockAgentEvent {
     StartFunction(
         (
@@ -206,7 +207,7 @@ async fn setup(num_nodes: u32, num_resources_per_node: u32) -> SetupResult {
     let (mut nodes, client_descs_resources, stable_node_id) = create_clients_resources(num_nodes, num_resources_per_node);
     let (subscriber_sender, subscriber_receiver) = futures::channel::mpsc::unbounded();
 
-    let proxy = std::sync::Arc::new(tokio::sync::Mutex::new(proxy_local::ProxyLocal::default()));
+    let proxy = std::sync::Arc::new(tokio::sync::Mutex::new(crate::orchestrator::proxy_local::ProxyLocal::default()));
     let (mut orchestrator, orchestrator_task, _refresh_task) = Orchestrator::new(
         crate::EdgelessOrcBaselineSettings {
             orchestration_strategy: crate::OrchestrationStrategy::Random,
@@ -1696,7 +1697,7 @@ async fn test_orc_invalid_migration() {
 
     let (subscriber_sender, _subscriber_receiver) = futures::channel::mpsc::unbounded();
 
-    let proxy = std::sync::Arc::new(tokio::sync::Mutex::new(proxy_test::ProxyTest::default()));
+    let proxy = std::sync::Arc::new(tokio::sync::Mutex::new(crate::orchestrator::proxy_test::ProxyTest::default()));
     let (mut orchestrator, orchestrator_task, _refresh_task) = Orchestrator::new(
         crate::EdgelessOrcBaselineSettings {
             orchestration_strategy: crate::OrchestrationStrategy::Random,

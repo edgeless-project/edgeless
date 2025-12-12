@@ -7,8 +7,6 @@ use futures::{Future, SinkExt};
 
 pub mod proxy_local;
 pub mod proxy_test;
-#[cfg(test)]
-pub mod test;
 
 pub struct Orchestrator {
     sender: futures::channel::mpsc::UnboundedSender<OrchestratorRequest>,
