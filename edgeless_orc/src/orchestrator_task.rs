@@ -83,6 +83,7 @@ impl OrchestratorTask {
                     if let Err(err) = reply_channel.send(res) {
                         log::error!("Orchestrator channel error in SPAWN: {:?}", err);
                     }
+                    self.refresh().await;
                 }
                 crate::orchestrator::OrchestratorRequest::StopFunction(lid) => {
                     log::debug!("Orchestrator StopFunction {:?}", lid);
@@ -484,6 +485,17 @@ impl OrchestratorTask {
         }
     }
 
+    fn select_node_excluding(
+        &mut self,
+        spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest,
+        exclude_node_ids: &Vec<edgeless_api::function_instance::NodeId>,
+    ) -> anyhow::Result<edgeless_api::function_instance::NodeId> {
+        match self.orchestration_logic.next_excluding(spawn_req, exclude_node_ids) {
+            Some(node_id) => Ok(node_id),
+            None => Err(anyhow::anyhow!("no valid node found (redundancy requires that there are enough nodes)")),
+        }
+    }
+
     /// Start a new logical function in this orchestration domain, as assigned
     /// by the controller
     async fn start_function(
@@ -495,29 +507,33 @@ impl OrchestratorTask {
         let mut results: Vec<anyhow::Result<edgeless_api::common::StartComponentResponse<uuid::Uuid>>> = vec![];
 
         // Select the target node.
-        let res = match self.select_node(spawn_req) {
+        let (res, active_instance_node_id) = match self.select_node(spawn_req) {
             Ok(node_id) => {
                 // Start the function instance.
-                self.start_function_in_node(spawn_req, &lid, &node_id).await
+                (self.start_function_in_node(spawn_req, &lid, &node_id).await, node_id)
             }
-            Err(err) => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
+            Err(err) => (Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                 edgeless_api::common::ResponseError {
                     summary: format!("Could not start function {}", spawn_req.spec.to_short_string()),
                     detail: Some(err.to_string()),
                 },
-            )),
+            )), uuid::Uuid::nil())
         };
         results.push(res);
 
         // start the replicas for hot-standby redundancy, if replication factor is > 1
         if let Some(replication_factor) = spawn_req.replication_factor {
             if replication_factor > 1 {
-                // TODO:2 start replicas on different nodes to provide good coverage and good fault tolerance
+                // start replicas on different nodes to provide good coverage and good fault tolerance
+                let mut used_node_ids = vec![active_instance_node_id];
                 for _ in 1..replication_factor {
-                    let res = match self.select_node(spawn_req) {
+                    let res = match self.select_node_excluding(spawn_req, &used_node_ids) {
                         Ok(node_id) => {
                             // Start the function instance.
-                            self.start_function_in_node(spawn_req, &lid, &node_id).await
+                            let res = self.start_function_in_node(spawn_req, &lid, &node_id).await;
+                            // update the list of used node ids
+                            used_node_ids.push(node_id);
+                            res
                         }
                         Err(err) => Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                             edgeless_api::common::ResponseError {
@@ -687,6 +703,14 @@ impl OrchestratorTask {
                                 node_id: *node_id,
                                 function_id: id.function_id,
                         }, is_active)]); // hot-standby instance (false = standby, true = active)
+                        log::info!(
+                            "Spawned {} instance number {} at node_id {}, LID {}, pid {}",
+                            if is_active { "active" } else { "hot-standby" },
+                            self.active_instances.get(lid).unwrap().instance_ids().len(),
+                            node_id,
+                            &lid,
+                            id.function_id
+                        );
                     } else {
                         self.active_instances.insert(
                             *lid,
@@ -698,15 +722,15 @@ impl OrchestratorTask {
                                 }, true)], // first instance is active (true = active, false = standby)
                             ),
                         );
+                        log::info!(
+                            "Spawned active instance number {} at node_id {}, LID {}, pid {}",
+                            self.active_instances.get(lid).unwrap().instance_ids().len(),
+                            node_id,
+                            &lid,
+                            id.function_id
+                        );
                     }
                     self.active_instances_changed = true;
-                    log::info!(
-                        "Spawned instance number {} at node_id {}, LID {}, pid {}",
-                        self.active_instances.len(),
-                        node_id,
-                        &lid,
-                        id.function_id
-                    );
 
                     Ok(edgeless_api::common::StartComponentResponse::InstanceId(*lid))
                 }
@@ -1088,6 +1112,7 @@ impl OrchestratorTask {
                             log::info!("no disconnected functions, num_nodes {}", self.nodes.len());
                             continue;
                         }
+                        self.active_instances_changed = true;
 
                         // some physical instances of this function got disconnected - need to handle this by repatching
                         to_be_repatched.push(*origin_lid);

@@ -178,6 +178,43 @@ impl OrchestrationLogic {
             }
         }
     }
+
+    pub fn next_excluding(
+        &mut self,
+        spawn_req: &edgeless_api::function_instance::SpawnFunctionRequest,
+        exclude: &Vec<uuid::Uuid>,
+    ) -> Option<uuid::Uuid> {
+        let feasible_nodes = self.feasible_nodes(spawn_req, &self.nodes);
+        let candidates: Vec<uuid::Uuid> = feasible_nodes
+            .into_iter()
+            .filter(|node_id| !exclude.contains(node_id))
+            .collect();
+        if candidates.is_empty() {
+            return None;
+        }
+        match self.orchestration_strategy {
+            crate::OrchestrationStrategy::Random => {
+                let rv = rand::distributions::Uniform::new(0, candidates.len());
+                let rnd = rv.sample(&mut self.rng);
+                Some(candidates[rnd])
+            }
+            crate::OrchestrationStrategy::RoundRobin => {
+                // Prevent infinite loop: evaluate each node at most once.
+                for _ in 0..candidates.len() {
+                    // Wrap-around if the current index is out of bounds.
+                    if self.round_robin_current_index >= candidates.len() {
+                        self.round_robin_current_index = 0;
+                    }
+
+                    let cand_ndx = self.round_robin_current_index;
+                    self.round_robin_current_index += 1;
+
+                    return Some(candidates[cand_ndx]);
+                }
+                None
+            }
+        }
+    }
 }
 
 /// Tests
