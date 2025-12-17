@@ -1050,6 +1050,7 @@ impl OrchestratorTask {
     }
 
     async fn refresh(&mut self) {
+        log::info!("refresh called");
         //
         // Make sure that all active logical functions are assigned
         // to at least one instance: for all the function instances that
@@ -1075,7 +1076,7 @@ impl OrchestratorTask {
             original_start_req: edgeless_api::function_instance::SpawnFunctionRequest,
             // TODO:2 next patch, takes into account where the other replicas reside to make sure replicas only start
             // on different nodes
-            nodes_blacklist: Option<std::collections::HashSet<edgeless_api::function_instance::NodeId>>,
+            _nodes_blacklist: Option<std::collections::HashSet<edgeless_api::function_instance::NodeId>>,
         }
 
         // Functions that have to have some instances created to make up for
@@ -1152,7 +1153,7 @@ impl OrchestratorTask {
                                 // FEAT: fill out the blacklist
                                 let physical_instance = PhysicalFunctionInstance {
                                     original_start_req: start_req.clone(),
-                                    nodes_blacklist: None,
+                                    _nodes_blacklist: None,
                                 };
                                 // TODO:2 handle the error properly here
                                 fun_to_be_created.entry(*origin_lid).or_insert_with(Vec::new).push(physical_instance);
