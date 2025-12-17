@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-FileCopyrightText: © 2023 Siemens AG
 // SPDX-License-Identifier: MIT
+pub mod control_plane_tracer;
 pub mod performance_target;
 pub mod prometheus_target;
 pub mod telemetry_events;

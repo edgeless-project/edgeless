@@ -924,6 +924,7 @@ impl OrchestratorTask {
     }
 
     async fn refresh(&mut self) {
+        log::info!("refresh called");
         //
         // Make sure that all active logical functions are assigned
         // to one instance: for all the function instances that
