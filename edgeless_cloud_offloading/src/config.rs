@@ -68,7 +68,7 @@ impl Default for AwsConfig {
     fn default() -> Self {
         Self {
             region: "eu-west-1".to_string(),
-            ami_id: "ami-035085b5449b0383a".to_string(),
+            ami_id: "ami-035e603844e2f4e76".to_string(),
             instance_type: "t2.medium".to_string(),
             security_group_id: "sg-xxxxxxxxxxxxxxxxx".to_string(),
         }

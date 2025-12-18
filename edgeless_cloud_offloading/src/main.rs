@@ -14,7 +14,7 @@ use tokio::time::sleep;
 const DEFAULT_CONFIG_FILENAME: &str = "cloud_offloading.toml";
 
 #[derive(Parser, Debug)]
-#[command(author, version, about, long_about = None)]
+#[command(author, about, long_about = None)]
 struct Args {
     /// Generate templates instead of running the services.
     #[arg(long, short)]
