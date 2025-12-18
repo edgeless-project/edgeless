@@ -82,10 +82,10 @@ $EDGELESS_DIR/target/debug/edgeless_node_d -t $EDGELESS_DIR/target/debug/node.to
 sed -i.bak \
     -e "s#^\\(\\s*node_id\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1${NODE_ID}\\2#" \
     -e "s#^\\(\\s*node_register_url\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1http://${ORCHESTRATOR_URL}:7004\\2#" \
-    -e 's#^\(\s*agent_url\s*=\s*"\)[^"]*\(".*\)#\1http://0.0.0.0:7021\2#' \
-    -e "s#^\\(\\s*agent_url_announced\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1http://${NODE_URL}:7021\\2#" \
-    -e 's#^\(\s*invocation_url\s*=\s*"\)[^"]*\(".*\)#\1http://0.0.0.0:7002\2#' \
-    -e "s#^\\(\\s*invocation_url_announced\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1http://${NODE_URL}:7002\\2#" \
+    -e 's#^\(\s*agent_url\s*=\s*"\)[^"]*\(".*\)#\1http://0.0.0.0:7005\2#' \
+    -e "s#^\\(\\s*agent_url_announced\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1http://${NODE_URL}:7005\\2#" \
+    -e 's#^\(\s*invocation_url\s*=\s*"\)[^"]*\(".*\)#\1http://0.0.0.0:7006\2#' \
+    -e "s#^\\(\\s*invocation_url_announced\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1http://${NODE_URL}:7006\\2#" \
     -e "s#^\\(\\s*http_ingress_provider\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1http-ingress-${INSTANCE_ID}\\2#" \
     -e "s#^\\(\\s*http_egress_provider\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1http-egress-${INSTANCE_ID}\\2#" \
     -e "s#^\\(\\s*file_log_provider\\s*=\\s*\\\"\\)[^\\\"]*\\(\\\".*\\)#\\1file-log-${INSTANCE_ID}\\2#" \
