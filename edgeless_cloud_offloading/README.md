@@ -9,12 +9,21 @@
 
 ## Prerequisites
 
+Enable this component in the main Edgeless Cargo.toml by uncommenting the following line:
+
+```toml
+"edgeless_cloud_offloading",
+```
+
+Then, run `cargo build` to compile the project with the Cloud Offloading component.
+
 Before using the EDGELESS Cloud Offloading package, ensure you have the following:
 
 - An AWS account and appropriate permissions to create and manage EC2 instances.
 - An AWS EC2 Image (AMI) ID for the region you are working in, with EDGELESS installed.
 - A security group that allows inbound traffic for the TCP ports used by EDGELESS (default ports in range 7000-7200).
 - An EDGELESS orchestrator running and accessible from the internet.
+
 
 ## General Configurations
 
