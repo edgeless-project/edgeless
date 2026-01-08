@@ -12,6 +12,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 const DEFAULT_CONFIG_FILENAME: &str = "cloud_offloading.toml";
+const NODE_STABILIZATION_TIME_SECS: u64 = 120;
 
 #[derive(Parser, Debug)]
 #[command(author, about, long_about = None)]
@@ -90,6 +91,7 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
         for node in cloud_nodes.iter_mut() {
             if !node.active && active_orc_nodes.contains(&node.node_id) {
                 node.active = true;
+                node.activation_time = Some(std::time::Instant::now());
                 log::info!("Cloud node {} is now active in the orchestrator!", node.node_id);
                 // After a node becomes active, we force a rebalance to ensure it receives load
                 rebalancer.rebalance_cluster();
@@ -138,7 +140,9 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
         // 2. DECIDE WHETHER TO CREATE A NEW NODE
         // Only create a new node if there isn't one already being created.
         // If the total number of active nodes is less than the minimum required, we also create a new node.
-        let is_creating_node = cloud_nodes.iter().any(|n| !n.active);
+        let is_creating_node = cloud_nodes.iter().any(|n| {
+            !n.active || n.creation_time.elapsed().as_secs() < NODE_STABILIZATION_TIME_SECS
+        });
         if !is_creating_node
             && (rebalancer.should_create_node(
                 config.scaling.thresholds.credit_overload,
@@ -182,9 +186,21 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
             // We only delete a node if there are more nodes available
             if active_orc_nodes.len() > 1 {
                 // If there's no node being created or emptied, check if we can find an underutilized node to delete
-                let managed_cloud_node_ids: HashSet<String> = cloud_nodes.iter().map(|n| n.node_id.clone()).collect();
+                // and consider only nodes that have been active for a certain stabilization time
+                let stable_managed_node_ids: HashSet<String> = cloud_nodes
+                    .iter()
+                    .filter(|n| {
+                        if let Some(activation_time) = n.activation_time {
+                            activation_time.elapsed().as_secs() >= NODE_STABILIZATION_TIME_SECS
+                        } else {
+                            true // If activation_time is None, consider it stable (it was never active)
+                        }
+                    })
+                    .map(|n| n.node_id.clone())
+                    .collect();
+
                 if let Some(victim_id) = rebalancer.find_node_to_delete(
-                    &managed_cloud_node_ids,
+                    &stable_managed_node_ids,
                     config.scaling.thresholds.cpu_low_percent,
                     config.scaling.thresholds.mem_low_percent,
                 ) {

@@ -24,6 +24,7 @@ pub struct CloudNodeData {
     pub node_id: String,
     pub active: bool,
     pub creation_time: Instant,
+    pub activation_time: Option<Instant>,
 }
 
 fn generate_instance_name() -> String {
@@ -84,6 +85,7 @@ pub async fn create_cloud_node(input_data: CloudNodeInputData) -> Result<CloudNo
         node_id,
         active: false,
         creation_time: Instant::now(),
+        activation_time: None,
     };
 
     Ok(cloud_node)
