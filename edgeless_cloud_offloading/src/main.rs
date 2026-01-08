@@ -140,9 +140,9 @@ async fn run_cloud_offloading_delegated_orc(config: Config) -> anyhow::Result<()
         // 2. DECIDE WHETHER TO CREATE A NEW NODE
         // Only create a new node if there isn't one already being created.
         // If the total number of active nodes is less than the minimum required, we also create a new node.
-        let is_creating_node = cloud_nodes.iter().any(|n| {
-            !n.active || n.creation_time.elapsed().as_secs() < NODE_STABILIZATION_TIME_SECS
-        });
+        let is_creating_node = cloud_nodes
+            .iter()
+            .any(|n| !n.active || n.creation_time.elapsed().as_secs() < NODE_STABILIZATION_TIME_SECS);
         if !is_creating_node
             && (rebalancer.should_create_node(
                 config.scaling.thresholds.credit_overload,
