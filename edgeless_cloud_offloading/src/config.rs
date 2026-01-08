@@ -78,11 +78,11 @@ impl Default for AwsConfig {
 impl Default for ThresholdsConfig {
     fn default() -> Self {
         Self {
-            credit_overload: 1.0,
-            cpu_high_percent: 80.0,
-            mem_high_percent: 80.0,
-            cpu_low_percent: 30.0,
-            mem_low_percent: 40.0,
+            credit_overload: 2.0,
+            cpu_high_percent: 75.0,
+            mem_high_percent: 75.0,
+            cpu_low_percent: 20.0,
+            mem_low_percent: 20.0,
             delete_cooldown_seconds: 30,
         }
     }

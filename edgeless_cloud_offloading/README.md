@@ -56,15 +56,15 @@ security_group_id = "sg-xxxxxxxxxxxxxxxxx"
 [scaling.thresholds]
 # --- Scale-Up Triggers ---
 # Sum of "credits" from overloaded nodes to trigger a scale-up
-credit_overload = 1.0
+credit_overload = 2.0
 # CPU percentage above which a node is considered saturated
-cpu_high_percent = 80.0
+cpu_high_percent = 75.0
 # Memory percentage above which a node is considered saturated
-mem_high_percent = 80.0
+mem_high_percent = 75.0
 
 # --- Scale-Down Triggers ---
 # CPU percentage below which a node is considered underutilized
-cpu_low_percent = 10.0
+cpu_low_percent = 20.0
 # Memory percentage below which a node is considered underutilized
 mem_low_percent = 20.0
 # Time in seconds a node must remain underutilized before being deleted
