@@ -49,6 +49,7 @@ impl ControlPlaneTracer {
         TraceSpan {
             correlation_id,
             target: self.target.clone(),
+            ended: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 
@@ -64,6 +65,7 @@ impl ControlPlaneTracer {
 pub struct TraceSpan {
     correlation_id: uuid::Uuid,
     target: std::sync::Arc<std::sync::Mutex<CsvTracerTarget>>,
+    ended: std::sync::Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl TraceSpan {
@@ -77,6 +79,7 @@ impl TraceSpan {
         TraceSpan {
             correlation_id: child_id,
             target: self.target.clone(),
+            ended: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 
@@ -91,14 +94,25 @@ impl TraceSpan {
     pub fn id(&self) -> uuid::Uuid {
         self.correlation_id
     }
+
+    /// Manually end the span. Safe to call multiple times - only the first call records the end.
+    pub fn end(&self) {
+        if !self.ended.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            let _ = self.target.lock().unwrap().record(TraceEvent::SpanEnd {
+                correlation_id: self.correlation_id,
+            });
+        }
+    }
 }
 
 // automatically record span end on drop of the object
 impl Drop for TraceSpan {
     fn drop(&mut self) {
-        let _ = self.target.lock().unwrap().record(TraceEvent::SpanEnd {
-            correlation_id: self.correlation_id,
-        });
+        if !self.ended.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            let _ = self.target.lock().unwrap().record(TraceEvent::SpanEnd {
+                correlation_id: self.correlation_id,
+            });
+        }
     }
 }
 

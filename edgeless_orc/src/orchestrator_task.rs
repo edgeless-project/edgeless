@@ -9,6 +9,7 @@ use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
 use crate::active_instance::ActiveInstance;
+use edgeless_telemetry::control_plane_tracer::TraceSpan;
 
 #[derive(Debug)]
 enum Pid {
@@ -48,6 +49,7 @@ pub(crate) struct OrchestratorTask {
     //        value: lid (target function)
     dependency_graph: std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
     dependency_graph_changed: bool,
+    tracer: Option<edgeless_telemetry::control_plane_tracer::ControlPlaneTracer>,
 }
 
 impl OrchestratorTask {
@@ -69,6 +71,9 @@ impl OrchestratorTask {
             active_instances_changed: false,
             dependency_graph: std::collections::HashMap::new(),
             dependency_graph_changed: false,
+            tracer: edgeless_telemetry::control_plane_tracer::ControlPlaneTracer::new(
+                "orchestrator_kpi_samples.csv".to_string()
+            ).ok(),
         }
     }
 
@@ -83,6 +88,7 @@ impl OrchestratorTask {
                     if let Err(err) = reply_channel.send(res) {
                         log::error!("Orchestrator channel error in SPAWN: {:?}", err);
                     }
+                    self.refresh(None).await;
                 }
                 crate::orchestrator::OrchestratorRequest::StopFunction(lid) => {
                     log::debug!("Orchestrator StopFunction {:?}", lid);
@@ -108,17 +114,18 @@ impl OrchestratorTask {
                     let _ = client_desc.api.node_management_api().reset().await;
                     self.add_node(node_id, client_desc, resource_providers).await;
                     self.update_domain().await;
-                    self.refresh().await;
+                    self.refresh(None).await;
                 }
                 crate::orchestrator::OrchestratorRequest::DelNode(node_id) => {
                     log::debug!("Orchestrator DelNode {:?}", node_id);
+                    let del_node_span = self.tracer.as_ref().map(|t| t.start_span("del_node"));
                     self.del_node(node_id).await;
                     self.update_domain().await;
-                    self.refresh().await;
+                    self.refresh(del_node_span.as_ref()).await;
                 }
                 crate::orchestrator::OrchestratorRequest::Refresh(reply_sender) => {
                     log::debug!("Orchestrator Refresh");
-                    self.refresh().await;
+                    self.refresh(None).await;
                     let _ = reply_sender.send(());
                 }
                 crate::orchestrator::OrchestratorRequest::Reset() => {
@@ -286,7 +293,9 @@ impl OrchestratorTask {
     ///
     /// * `origin_lids` - The logical resource identifiers for which patches
     ///   must be applied.
-    async fn apply_patches(&mut self, origin_lids: Vec<edgeless_api::function_instance::ComponentId>) {
+    /// * `parent_span` - Optional parent tracing span for KPI measurement.
+    async fn apply_patches(&mut self, origin_lids: Vec<edgeless_api::function_instance::ComponentId>, parent_span: Option<&TraceSpan>) {
+        let _span = parent_span.map(|s| s.child("apply_patches"));
         for origin_lid in origin_lids.iter() {
             let logical_output_mapping = match self.dependency_graph.get(origin_lid) {
                 Some(x) => x,
@@ -521,7 +530,7 @@ impl OrchestratorTask {
                         log::error!("Request to stop a function but the lid is associated with a resource: lid {}", lid);
                     }
                 };
-                self.apply_patches(self.dependencies(&lid)).await;
+                self.apply_patches(self.dependencies(&lid), None).await;
                 self.dependency_graph.remove(&lid);
                 self.dependency_graph_changed = true;
             }
@@ -548,7 +557,7 @@ impl OrchestratorTask {
         self.dependency_graph_changed = true;
 
         // Apply the patch.
-        self.apply_patches(vec![origin_lid]).await;
+        self.apply_patches(vec![origin_lid], None).await;
     }
 
     /// Start a new function instance on a specific node.
@@ -706,7 +715,7 @@ impl OrchestratorTask {
                         self.stop_resource(&instance_id).await;
                     }
                 }
-                self.apply_patches(self.dependencies(&lid)).await;
+                self.apply_patches(self.dependencies(&lid), None).await;
                 self.dependency_graph.remove(&lid);
                 self.dependency_graph_changed = true;
             }
@@ -923,7 +932,9 @@ impl OrchestratorTask {
         proxy.update_resource_providers(&self.resource_providers);
     }
 
-    async fn refresh(&mut self) {
+    async fn refresh(&mut self, parent_span: Option<&TraceSpan>) {
+        let refresh_span = parent_span.map(|s| s.child("refresh"));
+        let kpi_13_span = refresh_span.as_ref().map(|s| s.child("kpi_13_failover"));
         log::info!("refresh called");
         //
         // Make sure that all active logical functions are assigned
@@ -1113,8 +1124,13 @@ impl OrchestratorTask {
             self.orchestration_logic.update_nodes(&self.nodes, &self.resource_providers);
         }
 
+        // End the KPI-13 failover span before repatching
+        if let Some(span) = kpi_13_span {
+            span.end();
+        }
+
         // Repatch everything that needs to be repatched.
-        self.apply_patches(to_be_repatched).await;
+        self.apply_patches(to_be_repatched, refresh_span.as_ref()).await;
 
         // Update the proxy.
         let mut proxy = self.proxy.lock().await;
