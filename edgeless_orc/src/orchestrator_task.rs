@@ -72,7 +72,7 @@ impl OrchestratorTask {
             dependency_graph: std::collections::HashMap::new(),
             dependency_graph_changed: false,
             tracer: edgeless_telemetry::control_plane_tracer::ControlPlaneTracer::new(
-                "orchestrator_kpi_samples.csv".to_string()
+                "/tmp/orchestrator_kpi_samples.csv".to_string()
             ).ok(),
         }
     }
@@ -111,7 +111,17 @@ impl OrchestratorTask {
                 }
                 crate::orchestrator::OrchestratorRequest::AddNode(node_id, mut client_desc, resource_providers) => {
                     log::debug!("Orchestrator AddNode {}", client_desc.to_string_short());
-                    let _ = client_desc.api.node_management_api().reset().await;
+                    
+                    // Reset the node to clean state before adding - this removes any stale
+                    // function/resource instances that may have survived a temporary disconnection
+                    if let Err(err) = client_desc.api.node_management_api().reset().await {
+                        log::error!(
+                            "Failed to reset node '{}' before adding, node may have stale state: {}",
+                            node_id,
+                            err
+                        );
+                    }
+                    
                     self.add_node(node_id, client_desc, resource_providers).await;
                     self.update_domain().await;
                     self.refresh(None).await;
@@ -1060,7 +1070,6 @@ impl OrchestratorTask {
     async fn refresh(&mut self, parent_span: Option<&TraceSpan>) {
         let refresh_span = parent_span.map(|s| s.child("refresh"));
         let kpi_13_span = refresh_span.as_ref().map(|s| s.child("kpi_13_failover"));
-        log::info!("refresh called");
         //
         // Make sure that all active logical functions are assigned
         // to at least one instance: for all the function instances that
@@ -1120,9 +1129,9 @@ impl OrchestratorTask {
 
                         if num_disconnected == 0 && instances.len() == replicas as usize {
                             // all physical instances of this function are alive and none got disconnected
-                            log::info!("no disconnected functions, num_nodes {}", self.nodes.len());
+                            // log::info!("no disconnected functions, num_nodes {}", self.nodes.len());
                             continue;
-                        }
+                        } 
                         self.active_instances_changed = true;
 
                         // some physical instances of this function got disconnected - need to handle this by repatching

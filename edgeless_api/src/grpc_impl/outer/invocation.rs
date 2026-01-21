@@ -84,7 +84,7 @@ impl InvocationAPIClient {
 
         loop {
             if tls_config.is_tpm_enabled() {
-                log::info!("Created InvocationAPI client with TPM integration");
+                // log::info!("Created InvocationAPI client with TPM integration");
                 match tls_config.create_channel_with_tpm(&server_addr).await {
                     Ok(channel) => {
                         let client = crate::grpc_impl::api::function_invocation_client::FunctionInvocationClient::new(channel)
@@ -96,7 +96,7 @@ impl InvocationAPIClient {
                     }
                 }
             } else {
-                log::info!("Created InvocationAPI client");
+                // log::info!("Created InvocationAPI client");
                 let client_tls_config = match tls_config.create_client_tls_config() {
                     Ok(cfg) => cfg,
                     Err(err) => {
