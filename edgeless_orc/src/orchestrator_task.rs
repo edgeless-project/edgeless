@@ -100,9 +100,7 @@ impl OrchestratorTask {
             critical_lids: std::collections::HashSet::new(),
             dependency_graph: std::collections::HashMap::new(),
             dependency_graph_changed: false,
-            tracer: edgeless_telemetry::control_plane_tracer::ControlPlaneTracer::new(
-                "/tmp/orchestrator_kpi_samples.csv".to_string()
-            ).ok(),
+            tracer: edgeless_telemetry::control_plane_tracer::ControlPlaneTracer::new("/tmp/orchestrator_kpi_samples.csv".to_string()).ok(),
         }
     }
 
@@ -140,17 +138,13 @@ impl OrchestratorTask {
                 }
                 crate::orchestrator::OrchestratorRequest::AddNode(node_id, mut client_desc, resource_providers) => {
                     log::debug!("Orchestrator AddNode {}", client_desc.to_string_short());
-                    
+
                     // Reset the node to clean state before adding - this removes any stale
                     // function/resource instances that may have survived a temporary disconnection
                     if let Err(err) = client_desc.api.node_management_api().reset().await {
-                        log::error!(
-                            "Failed to reset node '{}' before adding, node may have stale state: {}",
-                            node_id,
-                            err
-                        );
+                        log::error!("Failed to reset node '{}' before adding, node may have stale state: {}", node_id, err);
                     }
-                    
+
                     self.add_node(node_id, client_desc, resource_providers).await;
                     self.update_domain().await;
                     self.refresh(None).await;
@@ -336,7 +330,7 @@ impl OrchestratorTask {
     /// patch data is prepared ahead of time.
     fn precompute_patches(&self, origin_lids: &[edgeless_api::function_instance::ComponentId]) -> Vec<PrecomputedPatch> {
         let mut patches = Vec::new();
-        
+
         for origin_lid in origin_lids.iter() {
             let logical_output_mapping = match self.dependency_graph.get(origin_lid) {
                 Some(x) => x,
@@ -357,23 +351,20 @@ impl OrchestratorTask {
                         physical_output_mapping.insert(channel.clone(), target.instance_id());
                     }
                 }
-                
+
                 patches.push(PrecomputedPatch {
                     source_pid: source,
                     output_mapping: physical_output_mapping,
                 });
             }
         }
-        
+
         patches
     }
 
     /// Send a single precomputed patch to the appropriate node.
     /// This is a low-level operation that performs the actual I/O.
-    async fn send_patch(
-        nodes: &mut std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>,
-        patch: PrecomputedPatch,
-    ) {
+    async fn send_patch(nodes: &mut std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>, patch: PrecomputedPatch) {
         match patch.source_pid {
             Pid::Function(instance_id) => {
                 if let Some(client_desc) = nodes.get_mut(&instance_id.node_id) {
@@ -440,10 +431,10 @@ impl OrchestratorTask {
     /// * `parent_span` - Optional parent tracing span for KPI measurement.
     async fn apply_patches(&mut self, origin_lids: Vec<edgeless_api::function_instance::ComponentId>, parent_span: Option<&TraceSpan>) {
         let _span = parent_span.map(|s| s.child("apply_patches"));
-        
+
         // Precompute all patches first
         let patches = self.precompute_patches(&origin_lids);
-        
+
         // Send patches sequentially (for backward compatibility)
         for patch in patches {
             Self::send_patch(&mut self.nodes, patch).await;
@@ -593,7 +584,7 @@ impl OrchestratorTask {
                 // get all feasible nodes without modifying any state
                 let all_node_ids: Vec<uuid::Uuid> = self.nodes.keys().cloned().collect();
                 let feasible_nodes = self.orchestration_logic.feasible_nodes(spawn_req, &all_node_ids);
-                
+
                 if (feasible_nodes.len() as u32) < replication_factor {
                     return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                         edgeless_api::common::ResponseError {
@@ -615,12 +606,15 @@ impl OrchestratorTask {
                 // Start the function instance.
                 (self.start_function_in_node(spawn_req, &lid, &node_id).await, node_id)
             }
-            Err(err) => (Ok(edgeless_api::common::StartComponentResponse::ResponseError(
-                edgeless_api::common::ResponseError {
-                    summary: format!("Could not start function {}", spawn_req.spec.to_short_string()),
-                    detail: Some(err.to_string()),
-                },
-            )), uuid::Uuid::nil())
+            Err(err) => (
+                Ok(edgeless_api::common::StartComponentResponse::ResponseError(
+                    edgeless_api::common::ResponseError {
+                        summary: format!("Could not start function {}", spawn_req.spec.to_short_string()),
+                        detail: Some(err.to_string()),
+                    },
+                )),
+                uuid::Uuid::nil(),
+            ),
         };
         results.push(res);
 
@@ -677,7 +671,7 @@ impl OrchestratorTask {
                 self.active_instances.remove(&lid);
                 self.active_instances_changed = true;
             }
-            
+
             return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
                 edgeless_api::common::ResponseError {
                     summary: "Failed to start function".to_string(),
@@ -806,11 +800,14 @@ impl OrchestratorTask {
                     assert!(*node_id == id.node_id);
                     // if the lid is already present, append the new instance id to the list
                     if let Some(existing_instance) = self.active_instances.get_mut(lid) {
-                        let is_active = existing_instance.instance_ids().len() == 0;
-                        existing_instance.instance_ids_mut().append(&mut vec![(edgeless_api::function_instance::InstanceId {
+                        let is_active = existing_instance.instance_ids().is_empty();
+                        existing_instance.instance_ids_mut().append(&mut vec![(
+                            edgeless_api::function_instance::InstanceId {
                                 node_id: *node_id,
                                 function_id: id.function_id,
-                        }, is_active)]); // hot-standby instance (false = standby, true = active)
+                            },
+                            is_active,
+                        )]); // hot-standby instance (false = standby, true = active)
                         log::info!(
                             "Spawned {} instance number {} at node_id {}, LID {}, pid {}",
                             if is_active { "active" } else { "hot-standby" },
@@ -824,10 +821,13 @@ impl OrchestratorTask {
                             *lid,
                             crate::active_instance::ActiveInstance::Function(
                                 spawn_req.clone(),
-                                vec![(edgeless_api::function_instance::InstanceId {
+                                vec![(
+                                    edgeless_api::function_instance::InstanceId {
                                         node_id: *node_id,
                                         function_id: id.function_id,
-                                }, true)], // first instance is active (true = active, false = standby)
+                                    },
+                                    true,
+                                )], // first instance is active (true = active, false = standby)
                             ),
                         );
                         log::info!(
@@ -1163,7 +1163,7 @@ impl OrchestratorTask {
     /// detect failures in critical functions and prepare for fast-path failover.
     /// this method only iterates over functions with replication_factor set,
     /// making it efficient for the time-critical KPI-13 path.
-    /// 
+    ///
     /// returns information needed for immediate repatching and background replica creation.
     fn detect_critical_failures(&mut self) -> CriticalFailoverResult {
         let mut to_repatch: Vec<uuid::Uuid> = Vec::new();
@@ -1215,7 +1215,11 @@ impl OrchestratorTask {
                     }
                 } else {
                     // no hot-standby available - stop the workflow, as the kpi-13 cannot be guaranteed
-                    log::error!("kpi-13 not possible: no hot-standby for lid {}, stopping workflow '{}'", lid, spawn_req.workflow_id);
+                    log::error!(
+                        "kpi-13 not possible: no hot-standby for lid {}, stopping workflow '{}'",
+                        lid,
+                        spawn_req.workflow_id
+                    );
                     workflows_to_stop.push(spawn_req.workflow_id.clone());
                 }
             } else if num_disconnected > 0 {
@@ -1244,10 +1248,13 @@ impl OrchestratorTask {
 
     /// detect failures in non-critical instances (resources, non-replicated functions).
     /// also finds dependencies that need repatching due to critical function changes.
-    fn detect_non_critical_failures(&mut self, critical_result: &CriticalFailoverResult) -> (
-        Vec<uuid::Uuid>,  // to_repatch
-        Vec<(uuid::Uuid, edgeless_api::resource_configuration::ResourceInstanceSpecification)>,  // resources_to_create
-        Vec<String>,  // workflows_to_stop (non-replicated function died)
+    fn detect_non_critical_failures(
+        &mut self,
+        critical_result: &CriticalFailoverResult,
+    ) -> (
+        Vec<uuid::Uuid>,                                                                        // to_repatch
+        Vec<(uuid::Uuid, edgeless_api::resource_configuration::ResourceInstanceSpecification)>, // resources_to_create
+        Vec<String>,                                                                            // workflows_to_stop (non-replicated function died)
     ) {
         let mut to_repatch: Vec<uuid::Uuid> = Vec::new();
         let mut resources_to_create = Vec::new();
@@ -1276,12 +1283,15 @@ impl OrchestratorTask {
             match instance {
                 crate::active_instance::ActiveInstance::Function(spawn_req, instances) => {
                     // non-replicated function (replication_factor is None)
-                    if spawn_req.replication_factor.is_none() {
-                        if instances.is_empty() || instances.iter().all(|x| !self.nodes.contains_key(&x.0.node_id)) {
-                            log::error!("non-replicated function lid {} has died, stopping workflow '{}'", lid, spawn_req.workflow_id);
+                    if spawn_req.replication_factor.is_none()
+                        && (instances.is_empty() || instances.iter().all(|x| !self.nodes.contains_key(&x.0.node_id))) {
+                            log::error!(
+                                "non-replicated function lid {} has died, stopping workflow '{}'",
+                                lid,
+                                spawn_req.workflow_id
+                            );
                             workflows_to_stop.push(spawn_req.workflow_id.clone());
                         }
-                    }
                 }
                 crate::active_instance::ActiveInstance::Resource(spec, instance) => {
                     if instance.is_none() || !self.nodes.contains_key(&instance.node_id) {
@@ -1341,7 +1351,8 @@ impl OrchestratorTask {
         // stop workflows that failed KPI-13 (no hot-standby was available)
         if !critical_result.workflows_to_stop.is_empty() {
             log::warn!("stopping {} workflows due to KPI-13 failure", critical_result.workflows_to_stop.len());
-            let lids_to_stop: Vec<uuid::Uuid> = self.active_instances
+            let lids_to_stop: Vec<uuid::Uuid> = self
+                .active_instances
                 .iter()
                 .filter_map(|(lid, instance)| {
                     if let crate::active_instance::ActiveInstance::Function(req, _) = instance {
@@ -1352,7 +1363,7 @@ impl OrchestratorTask {
                     None
                 })
                 .collect();
-            
+
             for lid in lids_to_stop {
                 log::info!("stopping function lid {} due to workflow KPI-13 failure", lid);
                 self.stop_function_lid(lid).await;
@@ -1364,8 +1375,12 @@ impl OrchestratorTask {
 
         // stop workflows where non-replicated functions died
         if !non_critical_workflows_to_stop.is_empty() {
-            log::warn!("stopping {} workflows due to non-replicated function failure", non_critical_workflows_to_stop.len());
-            let lids_to_stop: Vec<uuid::Uuid> = self.active_instances
+            log::warn!(
+                "stopping {} workflows due to non-replicated function failure",
+                non_critical_workflows_to_stop.len()
+            );
+            let lids_to_stop: Vec<uuid::Uuid> = self
+                .active_instances
                 .iter()
                 .filter_map(|(lid, instance)| {
                     match instance {
@@ -1383,7 +1398,7 @@ impl OrchestratorTask {
                     None
                 })
                 .collect();
-            
+
             for lid in lids_to_stop {
                 log::info!("stopping component lid {} due to non-replicated function failure in workflow", lid);
                 self.stop_function_lid(lid).await;
@@ -1397,9 +1412,7 @@ impl OrchestratorTask {
                     log::info!("creating new replica for lid {} on node {}", req.lid, node_id);
                     if let Err(err) = self.start_function_in_node(&req.spawn_req, &req.lid, &node_id).await {
                         log::error!("failed to create replica for lid {}: {}", req.lid, err);
-                        if let Some(crate::active_instance::ActiveInstance::Function(_, instances)) =
-                            self.active_instances.get_mut(&req.lid)
-                        {
+                        if let Some(crate::active_instance::ActiveInstance::Function(_, instances)) = self.active_instances.get_mut(&req.lid) {
                             instances.clear();
                             self.active_instances_changed = true;
                         }
@@ -1415,9 +1428,7 @@ impl OrchestratorTask {
         for (lid, spec) in resources_to_create {
             if let Err(err) = self.start_resource(spec, lid).await {
                 log::error!("failed to create resource lid {}: {}", lid, err);
-                if let Some(crate::active_instance::ActiveInstance::Resource(_, instance_id)) =
-                    self.active_instances.get_mut(&lid)
-                {
+                if let Some(crate::active_instance::ActiveInstance::Resource(_, instance_id)) = self.active_instances.get_mut(&lid) {
                     *instance_id = edgeless_api::function_instance::InstanceId::none();
                     self.active_instances_changed = true;
                 }
@@ -1516,7 +1527,7 @@ mod tests {
         // channels
         let (_tx, rx) = futures::channel::mpsc::unbounded();
         let (subscriber_tx, _subscriber_rx) = futures::channel::mpsc::unbounded();
-        
+
         // mock proxy expectations setting
         let mut mock_proxy = crate::proxy::MockProxy::new();
         mock_proxy.expect_update_nodes().returning(|_| ());
@@ -1527,20 +1538,18 @@ mod tests {
 
         // mock AgentAPI expectations
         let mut mock_agent_api = edgeless_api::outer::agent::MockAgentAPI::new();
-        mock_agent_api.expect_node_management_api()
-            .returning(|| {
-                let mut mock_node_mgmt_api = edgeless_api::node_management::MockNodeManagementAPI::new();
-                mock_node_mgmt_api.expect_update_peers()
-                    .returning(|_| Ok(()));
-                Box::new(mock_node_mgmt_api)
-            });
-        
+        mock_agent_api.expect_node_management_api().returning(|| {
+            let mut mock_node_mgmt_api = edgeless_api::node_management::MockNodeManagementAPI::new();
+            mock_node_mgmt_api.expect_update_peers().returning(|_| Ok(()));
+            Box::new(mock_node_mgmt_api)
+        });
+
         let proxy = std::sync::Arc::new(tokio::sync::Mutex::new(mock_proxy));
-        
+
         let settings = crate::EdgelessOrcBaselineSettings {
             orchestration_strategy: crate::OrchestrationStrategy::RoundRobin,
         };
-        
+
         let mut _orchestrator = OrchestratorTask::new(rx, settings, proxy.clone(), subscriber_tx).await;
 
         // Add three nodes

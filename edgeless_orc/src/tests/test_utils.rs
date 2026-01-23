@@ -1,8 +1,8 @@
 #![allow(clippy::all)]
 
 use crate::domain_subscriber::DomainSubscriberRequest;
-use crate::proxy::Proxy;
 use crate::orchestrator::*;
+use crate::proxy::Proxy;
 use edgeless_api::function_instance::{FunctionClassSpecification, StatePolicy, StateSpecification};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::SinkExt;
@@ -282,6 +282,7 @@ pub async fn wait_for_event_multiple(
     panic!("timeout while waiting for an event");
 }
 
+#[allow(dead_code)]
 pub async fn wait_for_event_at_node(receiver: &mut futures::channel::mpsc::UnboundedReceiver<MockAgentEvent>) -> MockAgentEvent {
     for _ in 0..100 {
         if let Ok(Some(event)) = receiver.try_next() {

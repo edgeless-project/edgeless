@@ -90,8 +90,8 @@ impl super::tls_config::TlsConfig {
             log::info!("Client CA specified: TLS will be enforced.");
             tls_config = tls_config.ca_certificate(tonic::transport::Certificate::from_pem(std::fs::read(ca_path)?));
         } /* else {
-            log::info!("No Client CA specified: no TLS will be enforced.");
-        } */
+              log::info!("No Client CA specified: no TLS will be enforced.");
+          } */
 
         // Configure client certificate for mTLS
         if let Some(cert_path) = &self.client_cert_path {
@@ -174,11 +174,11 @@ impl super::tls_config::TlsConfig {
                 Ok(endpoint.connect().await?)
             }
             Err(e) => {
-                // if e.to_string().contains("not found") {
-                //     log::warn!("TLS configuration file 'tls_config.toml' not found. Continuing with plaintext connection (no TLS).");
-                // } else {
-                //     log::warn!("Failed to load TLS configuration: {}. Continuing with plaintext connection (no TLS).", e);
-                // }
+                if e.to_string().contains("not found") {
+                    log::warn!("TLS configuration file 'tls_config.toml' not found. Continuing with plaintext connection (no TLS).");
+                } else {
+                    log::warn!("Failed to load TLS configuration: {}. Continuing with plaintext connection (no TLS).", e);
+                }
                 let endpoint = tonic::transport::Endpoint::from_shared(server_addr.to_string())?;
                 Ok(endpoint.connect().await?)
             }
@@ -190,11 +190,11 @@ impl super::tls_config::TlsConfig {
         SERVER_TLS_CONFIG.get_or_init(|| match CombinedTlsConfig::from_file("tls_config.toml") {
             Ok(cfg) => cfg.server.unwrap_or_else(super::tls_config::TlsConfig::default),
             Err(err) => {
-                // if err.to_string().contains("not found") {
-                //     log::warn!("TLS configuration file 'tls_config.toml' not found. Using default TLS configuration (no TLS).");
-                // } else {
-                //     log::warn!("Failed to load server TLS config: {}. Using default TLS configuration (no TLS).", err);
-                // }
+                if err.to_string().contains("not found") {
+                    log::warn!("TLS configuration file 'tls_config.toml' not found. Using default TLS configuration (no TLS).");
+                } else {
+                    log::warn!("Failed to load server TLS config: {}. Using default TLS configuration (no TLS).", err);
+                }
                 super::tls_config::TlsConfig::default()
             }
         })
