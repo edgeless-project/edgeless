@@ -72,7 +72,7 @@ impl OrchestratorTask {
             dependency_graph: std::collections::HashMap::new(),
             dependency_graph_changed: false,
             tracer: edgeless_telemetry::control_plane_tracer::ControlPlaneTracer::new(
-                "orchestrator_kpi_samples.csv".to_string()
+                "/tmp/orchestrator_kpi_samples.csv".to_string()
             ).ok(),
         }
     }
@@ -935,7 +935,6 @@ impl OrchestratorTask {
     async fn refresh(&mut self, parent_span: Option<&TraceSpan>) {
         let refresh_span = parent_span.map(|s| s.child("refresh"));
         let kpi_13_span = refresh_span.as_ref().map(|s| s.child("kpi_13_failover"));
-        log::info!("refresh called");
         //
         // Make sure that all active logical functions are assigned
         // to one instance: for all the function instances that
@@ -1126,6 +1125,7 @@ impl OrchestratorTask {
 
         // End the KPI-13 failover span before repatching
         if let Some(span) = kpi_13_span {
+            log::info!("KPI-13 Failover handled");
             span.end();
         }
 
