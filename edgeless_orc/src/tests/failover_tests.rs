@@ -203,8 +203,109 @@ async fn test_orc_node_hot_redundancy_graceful() {
 #[tokio::test]
 #[serial_test::serial]
 async fn test_orc_node_hot_redundancy_replica_dies() {
-    // TODO:1 add test for: a node with redundant function fails, it gets created again, no patching needed
-    todo!();
+    // Test: a node with redundant function (hot-standby) fails, it gets created again on another node, no patching needed
+    // 3 nodes, one function, replication_factor == 2
+    // ensure that when the node where the hot-standby replica is running dies, a new hot-standby replica gets started on the remaining node, but no patching runs
+    init_logger();
+    
+    // Setup with 3 nodes (1 stable + 2 unstable)
+    let mut setup = setup(3, 0).await;
+
+    // Start a function with replication_factor = 2 on any two nodes (one will be active, one will be hot-standby)
+    let mut spawn_req = make_spawn_function_request("f1");
+    spawn_req.replication_factor = Some(2);
+    let lid = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
+        edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+        edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+    };
+
+    // Figure out which node has the active instance and which has the standby
+    let active_instances = setup.proxy.lock().await.fetch_function_instances_to_nodes();
+    let active_function_node_id = active_instances.get(&lid).unwrap().iter().find(|(_node_id, is_active)| *is_active).unwrap().0;
+    let standby_replica_node_id = active_instances.get(&lid).unwrap().iter().find(|(_node_id, is_active)| !*is_active).unwrap().0;
+
+    // Find the third node (the one that doesn't have any replica yet)
+    let all_node_ids: Vec<uuid::Uuid> = setup.nodes.keys().cloned().collect();
+    let third_node_id = all_node_ids
+        .iter()
+        .find(|id| **id != active_function_node_id && **id != standby_replica_node_id)
+        .expect("Should have a third node");
+
+    // Wait for both replicas to start
+    let mut replicas_started = 0;
+    while replicas_started < 2 {
+        if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+            assert_eq!(spawn_req, spawn_req_rcvd);
+            assert!(node_id == active_function_node_id || node_id == standby_replica_node_id);
+            assert_eq!(node_id, new_instance_id.node_id);
+        }
+        replicas_started += 1;
+    }
+
+    // Make sure there are no pending events
+    no_function_event(&mut setup.nodes).await;
+
+    // Disconnect the node with the STANDBY replica (not the active one)
+    let _ = setup.orc_sender.send(OrchestratorRequest::DelNode(standby_replica_node_id)).await;
+
+    // Track events - we expect:
+    // - update-peers on remaining nodes (2 nodes)
+    // - start-function on the third node (new standby replica)
+    // - NO patch-function events (since the active function is still alive, so no patching is needed)
+    let mut num_events = std::collections::HashMap::new();
+    let mut new_standby_node_id = uuid::Uuid::nil();
+    
+    loop {
+        if let Some((node_id, event)) = wait_for_events_if_any(&mut setup.nodes).await {
+            if num_events.contains_key(event_to_string(&event)) {
+                *num_events.get_mut(event_to_string(&event)).unwrap() += 1;
+            } else {
+                num_events.insert(event_to_string(&event), 1);
+            }
+            match event {
+                MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd)) => {
+                    log::info!("start-function on node {}", node_id);
+                    // The new standby should be started on the third node (the one without any replica)
+                    assert_eq!(node_id, *third_node_id);
+                    assert_eq!("f1", spawn_req_rcvd.spec.id);
+                    new_standby_node_id = new_instance_id.node_id;
+                }
+                MockAgentEvent::PatchFunction(_patch_request) => {
+                    panic!("No patching should occur when only the standby replica dies");
+                }
+                MockAgentEvent::UpdatePeers(req) => {
+                    log::info!("update-peers on node {}", node_id);
+                    match req {
+                        edgeless_api::node_management::UpdatePeersRequest::Del(del_node_id) => {
+                            assert_eq!(standby_replica_node_id, del_node_id);
+                        }
+                        _ => panic!("wrong UpdatePeersRequest message"),
+                    }
+                }
+                _ => panic!("unexpected event type: {}", event_to_string(&event)),
+            };
+        } else {
+            break;
+        }
+    }
+
+    // Verify expected events:
+    // - 2 update-peers (one for each remaining node)
+    // - 1 start-function (new standby replica)
+    // - 0 patch-function (no patching needed)
+    assert_eq!(Some(&2), num_events.get("update-peers"));
+    assert_eq!(Some(&1), num_events.get("start-function"));
+    assert_eq!(None, num_events.get("patch-function"));
+
+    // Verify the new standby was created on the third node
+    assert_eq!(*third_node_id, new_standby_node_id);
+
+    // The active function should still be on its original node
+    let active_instances = setup.proxy.lock().await.fetch_function_instances_to_nodes();
+    let current_active_node_id = active_instances.get(&lid).unwrap().iter().find(|(_node_id, is_active)| *is_active).unwrap().0;
+    assert_eq!(active_function_node_id, current_active_node_id);
+
+    no_function_event(&mut setup.nodes).await;
 }
 
 #[tokio::test]
