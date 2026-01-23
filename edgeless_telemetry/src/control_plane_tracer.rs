@@ -26,9 +26,7 @@ pub struct ControlPlaneTracer {
 
 impl Clone for ControlPlaneTracer {
     fn clone(&self) -> Self {
-        Self {
-            target: self.target.clone(),
-        }
+        Self { target: self.target.clone() }
     }
 }
 
@@ -123,7 +121,7 @@ struct CsvTracerTarget {
 impl CsvTracerTarget {
     fn new(output_path: String) -> anyhow::Result<Self> {
         let (sender, receiver) = std::sync::mpsc::channel::<String>();
-        
+
         // Spawn background thread for disk writes
         std::thread::spawn(move || {
             let writer: Box<dyn Write + Send> = if output_path.is_empty() || output_path == "-" {
@@ -137,15 +135,18 @@ impl CsvTracerTarget {
                     }
                 }
             };
-            
+
             let mut writer = writer;
-            
+
             // Write header
-            if let Err(e) = writeln!(writer, "timestamp_sec,timestamp_ns,event_type,correlation_id,parent_id,name,level,message") {
+            if let Err(e) = writeln!(
+                writer,
+                "timestamp_sec,timestamp_ns,event_type,correlation_id,parent_id,name,level,message"
+            ) {
                 eprintln!("Failed to write trace header: {}", e);
                 return;
             }
-            
+
             // Process messages from the channel
             while let Ok(line) = receiver.recv() {
                 if let Err(e) = writeln!(writer, "{}", line) {
@@ -161,8 +162,6 @@ impl CsvTracerTarget {
 
         Ok(Self { sender })
     }
-
-
 
     fn record(&self, event: TraceEvent) -> anyhow::Result<()> {
         let now = chrono::Utc::now();
@@ -182,10 +181,7 @@ impl CsvTracerTarget {
                 parent_id.map(|id| id.to_string()).unwrap_or_default(),
                 name
             ),
-            TraceEvent::SpanEnd { correlation_id } => format!(
-                "{},{},span_end,{},,,,",
-                timestamp_sec, timestamp_ns, correlation_id
-            ),
+            TraceEvent::SpanEnd { correlation_id } => format!("{},{},span_end,{},,,,", timestamp_sec, timestamp_ns, correlation_id),
             TraceEvent::Log {
                 correlation_id,
                 level,
@@ -202,7 +198,7 @@ impl CsvTracerTarget {
 
         // Send to background thread - this is non-blocking
         self.sender.send(line).map_err(|e| anyhow::anyhow!("Failed to send trace event: {}", e))?;
-        
+
         Ok(())
     }
 }
@@ -264,11 +260,7 @@ mod tests {
             })
             .unwrap();
 
-        target
-            .record(TraceEvent::SpanEnd {
-                correlation_id: child_id,
-            })
-            .unwrap();
+        target.record(TraceEvent::SpanEnd { correlation_id: child_id }).unwrap();
 
         target
             .record(TraceEvent::SpanEnd {

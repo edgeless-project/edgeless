@@ -1,13 +1,13 @@
 // SPDX-FileCopyrightText: © 2024 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
 // SPDX-License-Identifier: MIT
 
-use crate::tests::test_utils::*;
-use crate::orchestrator::*;
-use crate::deployment_requirements::DeploymentRequirements;
-use crate::domain_subscriber::DomainSubscriberRequest;
 use crate::affinity_level::AffinityLevel;
 use crate::deploy_intent;
+use crate::deployment_requirements::DeploymentRequirements;
+use crate::domain_subscriber::DomainSubscriberRequest;
+use crate::orchestrator::*;
 use crate::proxy::Proxy;
+use crate::tests::test_utils::*;
 use futures::SinkExt;
 
 #[tokio::test]
@@ -333,11 +333,9 @@ async fn test_orc_node_with_fun_disconnects() {
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
     let mut unstable_node_id = uuid::Uuid::nil();
-    let mut pid_2 = uuid::Uuid::nil();
-    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+    if let (node_id, MockAgentEvent::StartFunction((_, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
         assert_ne!(node_id, setup.stable_node_id);
         unstable_node_id = node_id;
-        pid_2 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
@@ -456,7 +454,7 @@ async fn test_orc_node_with_fun_disconnects() {
     let mut num_events = std::collections::HashMap::new();
     let mut stopped_pids = Vec::new();
     loop {
-        if let Some((node_id, event)) = wait_for_events_if_any(&mut setup.nodes).await {
+        if let Some((_, event)) = wait_for_events_if_any(&mut setup.nodes).await {
             if num_events.contains_key(event_to_string(&event)) {
                 *num_events.get_mut(event_to_string(&event)).unwrap() += 1;
             } else {
@@ -485,10 +483,10 @@ async fn test_orc_node_with_fun_disconnects() {
             break;
         }
     }
-    
+
     // Verify update-peers was sent to remaining nodes
     assert_eq!(Some(&9), num_events.get("update-peers"));
-    
+
     // Verify that functions f1, f3, f4 were stopped (they are on the stable node)
     // f2 was on the unstable node that disconnected, so it won't receive a stop
     assert_eq!(Some(&3), num_events.get("stop-function"));

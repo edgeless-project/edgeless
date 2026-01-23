@@ -206,7 +206,11 @@ fn string_to_instance_id_with_active(val: &str) -> anyhow::Result<(edgeless_api:
     //          (InstanceId(node_id:  uuid, function_id:       uuid),     true/false)
     let tokens: Vec<&str> = val.split(' ').collect();
     if tokens.len() != 5 {
-        anyhow::bail!("invalid number of tokens in InstanceId with active flag: {} (expected 5), value: '{}'", tokens.len(), val);
+        anyhow::bail!(
+            "invalid number of tokens in InstanceId with active flag: {} (expected 5), value: '{}'",
+            tokens.len(),
+            val
+        );
     }
 
     let node_id = match uuid::Uuid::from_str(&tokens[1][0..tokens[1].len() - 1]) {
@@ -218,7 +222,7 @@ fn string_to_instance_id_with_active(val: &str) -> anyhow::Result<(edgeless_api:
         Ok(val) => val,
         Err(err) => anyhow::bail!("invalid function_id in InstanceId: {}", err),
     };
-    
+
     // Parse the boolean (remove trailing ")")
     let is_active_str = &tokens[4][0..tokens[4].len() - 1];
     let is_active = is_active_str == "true";
@@ -1314,7 +1318,7 @@ mod test {
         let node1_id = uuid::Uuid::new_v4();
         let node2_id = uuid::Uuid::new_v4();
         let node3_id = uuid::Uuid::new_v4();
-        
+
         // Function with one active instance and one hot-standby
         let logical_id_1 = uuid::Uuid::new_v4();
         let physical_id_1a = uuid::Uuid::new_v4();
@@ -1340,14 +1344,20 @@ mod test {
                     replication_factor: Some(2),
                 },
                 vec![
-                    (edgeless_api::function_instance::InstanceId {
-                        node_id: node1_id,
-                        function_id: physical_id_1a,
-                    }, true),  // active instance
-                    (edgeless_api::function_instance::InstanceId {
-                        node_id: node2_id,
-                        function_id: physical_id_1b,
-                    }, false), // hot-standby instance
+                    (
+                        edgeless_api::function_instance::InstanceId {
+                            node_id: node1_id,
+                            function_id: physical_id_1a,
+                        },
+                        true,
+                    ), // active instance
+                    (
+                        edgeless_api::function_instance::InstanceId {
+                            node_id: node2_id,
+                            function_id: physical_id_1b,
+                        },
+                        false,
+                    ), // hot-standby instance
                 ],
             ),
         );
@@ -1378,18 +1388,27 @@ mod test {
                     replication_factor: Some(3),
                 },
                 vec![
-                    (edgeless_api::function_instance::InstanceId {
-                        node_id: node1_id,
-                        function_id: physical_id_2a,
-                    }, true),  // active instance
-                    (edgeless_api::function_instance::InstanceId {
-                        node_id: node2_id,
-                        function_id: physical_id_2b,
-                    }, false), // hot-standby instance
-                    (edgeless_api::function_instance::InstanceId {
-                        node_id: node3_id,
-                        function_id: physical_id_2c,
-                    }, false), // hot-standby instance
+                    (
+                        edgeless_api::function_instance::InstanceId {
+                            node_id: node1_id,
+                            function_id: physical_id_2a,
+                        },
+                        true,
+                    ), // active instance
+                    (
+                        edgeless_api::function_instance::InstanceId {
+                            node_id: node2_id,
+                            function_id: physical_id_2b,
+                        },
+                        false,
+                    ), // hot-standby instance
+                    (
+                        edgeless_api::function_instance::InstanceId {
+                            node_id: node3_id,
+                            function_id: physical_id_2c,
+                        },
+                        false,
+                    ), // hot-standby instance
                 ],
             ),
         );
@@ -1399,7 +1418,7 @@ mod test {
         // Fetch function instances to nodes and verify active/standby status
         let function_instances = redis_proxy.fetch_function_instances_to_nodes();
         assert_eq!(function_instances.len(), 2);
-        
+
         let nodes_1 = function_instances.get(&logical_id_1).unwrap();
         assert_eq!(nodes_1.len(), 2);
         assert_eq!(nodes_1[0].0, node1_id);
@@ -1419,7 +1438,7 @@ mod test {
         // Fetch instances to physical IDs and verify active/standby status
         let logical_to_physical = redis_proxy.fetch_instances_to_physical_ids();
         assert_eq!(logical_to_physical.len(), 2);
-        
+
         let physical_1 = logical_to_physical.get(&logical_id_1).unwrap();
         assert_eq!(physical_1.len(), 2);
         assert_eq!(physical_1[0].0, physical_id_1a);

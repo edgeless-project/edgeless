@@ -1,0 +1,7 @@
+# Custom Redis Dockerfile with keyspace notifications enabled
+FROM redis:7-alpine
+
+# Add custom redis.conf
+COPY redis.conf /usr/local/etc/redis/redis.conf
+
+CMD ["redis-server", "/usr/local/etc/redis/redis.conf"]

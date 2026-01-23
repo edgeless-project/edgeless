@@ -185,10 +185,7 @@ impl OrchestrationLogic {
         exclude: &Vec<uuid::Uuid>,
     ) -> Option<uuid::Uuid> {
         let feasible_nodes = self.feasible_nodes(spawn_req, &self.nodes);
-        let candidates: Vec<uuid::Uuid> = feasible_nodes
-            .into_iter()
-            .filter(|node_id| !exclude.contains(node_id))
-            .collect();
+        let candidates: Vec<uuid::Uuid> = feasible_nodes.into_iter().filter(|node_id| !exclude.contains(node_id)).collect();
         if candidates.is_empty() {
             return None;
         }
@@ -200,7 +197,7 @@ impl OrchestrationLogic {
             }
             crate::OrchestrationStrategy::RoundRobin => {
                 // Prevent infinite loop: evaluate each node at most once.
-                for _ in 0..candidates.len() {
+                if let Some(_) = (0..candidates.len()).next() {
                     // Wrap-around if the current index is out of bounds.
                     if self.round_robin_current_index >= candidates.len() {
                         self.round_robin_current_index = 0;

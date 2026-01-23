@@ -1,0 +1,32 @@
+# SPDX-FileCopyrightText: © 2023 Claudio Cicconetti <c.cicconetti@iit.cnr.it>
+# SPDX-FileCopyrightText: © 2024 Siemens AG
+# SPDX-License-Identifier: MIT
+[workspace]
+
+[profile.release]
+lto = true
+opt-level = "s"
+
+[package]
+name = "edgeless_fractal_demo_calculator"
+version = "0.1.0"
+authors = [
+    "steffen.gerhold@siemens.com",
+    "zalewski.lukasz@siemens.com"
+]
+edition = "2021"
+
+[lib]
+name = "calculator"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+colorgrad = "0.6.2"
+edgeless_function = { path = "../../../edgeless/edgeless_function" }
+hex = "0.4.3"
+log = "0.4"
+image = { version = "0.25.1", default-features = false, features = ["png"] }
+num = "0.4.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  # Redis Container with some key watchtables
+  redis:
+    build:
+      context: ./redis
+      dockerfile: Dockerfile.redis
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # Redis WebSocket Backend Container
+  redis-ws-backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.redis-ws-backend
+    container_name: redis-ws-backend
+    environment:
+      - REDIS_HOST=redis
+    ports:
+      - "3002:3002"
+    depends_on:
+      - redis
+    restart: unless-stopped
+
+  # WebUI Container (serves the built React app)
+  webui:
+    build:
+      context: ./webui
+      dockerfile: Dockerfile.webui
+    container_name: webui
+    ports:
+      - "3000:80"
+    depends_on:
+      - redis-ws-backend
