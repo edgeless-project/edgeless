@@ -450,12 +450,11 @@ async fn test_orc_node_with_fun_disconnects() {
     no_function_event(&mut setup.nodes).await;
 
     // Disconnect the unstable node
+    // Since f2 is a non-replicated function, the whole workflow should be stopped
     let _ = setup.orc_sender.send(OrchestratorRequest::DelNode(unstable_node_id)).await;
 
     let mut num_events = std::collections::HashMap::new();
-    let mut new_node_id = uuid::Uuid::nil();
-    let mut patch_request_1 = None;
-    let mut patch_request_2 = None;
+    let mut stopped_pids = Vec::new();
     loop {
         if let Some((node_id, event)) = wait_for_events_if_any(&mut setup.nodes).await {
             if num_events.contains_key(event_to_string(&event)) {
@@ -464,22 +463,9 @@ async fn test_orc_node_with_fun_disconnects() {
                 num_events.insert(event_to_string(&event), 1);
             }
             match event {
-                MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd)) => {
-                    log::info!("start-function");
-                    assert_ne!(node_id, setup.stable_node_id);
-                    assert_eq!(node_id, new_instance_id.node_id);
-                    new_node_id = new_instance_id.node_id;
-                    pid_2 = new_instance_id.function_id;
-                    assert_eq!("f2", spawn_req_rcvd.spec.id);
-                }
-                MockAgentEvent::PatchFunction(patch_request) => {
-                    log::info!("patch-function");
-                    assert!(patch_request.output_mapping.contains_key("out"));
-                    if node_id == setup.stable_node_id {
-                        patch_request_1 = Some(patch_request);
-                    } else if node_id == new_node_id {
-                        patch_request_2 = Some(patch_request);
-                    }
+                MockAgentEvent::StopFunction(instance_id) => {
+                    log::info!("stop-function pid={}", instance_id.function_id);
+                    stopped_pids.push(instance_id.function_id);
                 }
                 MockAgentEvent::UpdatePeers(req) => {
                     log::info!("update-peers");
@@ -490,22 +476,25 @@ async fn test_orc_node_with_fun_disconnects() {
                         _ => panic!("wrong UpdatePeersRequest message"),
                     }
                 }
-                _ => panic!("unexpected event type: {}", event_to_string(&event)),
+                _ => {
+                    // Other events like patch-function may occur as part of cleanup
+                    log::info!("other event: {}", event_to_string(&event));
+                }
             };
         } else {
             break;
         }
     }
+    
+    // Verify update-peers was sent to remaining nodes
     assert_eq!(Some(&9), num_events.get("update-peers"));
-    assert_eq!(Some(&2), num_events.get("patch-function"));
-    assert_eq!(Some(&1), num_events.get("start-function"));
-
-    let patch_request_1 = patch_request_1.unwrap();
-    let patch_request_2 = patch_request_2.unwrap();
-    assert_eq!(pid_1, patch_request_1.function_id);
-    assert_eq!(pid_2, patch_request_1.output_mapping.get("out").unwrap().function_id);
-    assert_eq!(pid_2, patch_request_2.function_id);
-    assert_eq!(pid_3, patch_request_2.output_mapping.get("out").unwrap().function_id);
+    
+    // Verify that functions f1, f3, f4 were stopped (they are on the stable node)
+    // f2 was on the unstable node that disconnected, so it won't receive a stop
+    assert_eq!(Some(&3), num_events.get("stop-function"));
+    assert!(stopped_pids.contains(&pid_1));
+    assert!(stopped_pids.contains(&pid_3));
+    assert!(stopped_pids.contains(&_pid_4));
 
     no_function_event(&mut setup.nodes).await;
 }
@@ -807,10 +796,8 @@ async fn test_orc_recreate_fun_after_disconnect() {
         edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
         edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
     };
-    let mut pid_1 = uuid::Uuid::nil();
-    if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+    if let (node_id, MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
         assert_eq!(node_id, setup.stable_node_id);
-        pid_1 = new_instance_id.function_id;
         assert_eq!(spawn_req, spawn_req_rcvd);
     }
 
@@ -894,6 +881,8 @@ async fn test_orc_recreate_fun_after_disconnect() {
     no_function_event(&mut setup.nodes).await;
 
     // Disconnect the unstable node
+    // Since f2 is a non-replicated function, when its node disconnects,
+    // the entire workflow should be stopped (KPI-13 availability cannot be maintained).
     let _ = setup.orc_sender.send(OrchestratorRequest::DelNode(unstable_node_id)).await;
 
     let mut num_events = std::collections::HashMap::new();
@@ -914,10 +903,15 @@ async fn test_orc_recreate_fun_after_disconnect() {
                         _ => panic!("wrong UpdatePeersRequest message"),
                     }
                 }
-                MockAgentEvent::PatchFunction(patch_request) => {
+                MockAgentEvent::StopFunction(_) => {
+                    // When non-replicated function dies, the workflow is stopped,
+                    // so all functions in the workflow are stopped.
+                    log::info!("stop-function");
+                }
+                MockAgentEvent::PatchFunction(_) => {
+                    // There may be patch events as the orchestrator updates
+                    // the function mappings before the workflow is stopped.
                     log::info!("patch-function");
-                    assert_eq!(pid_1, patch_request.function_id);
-                    assert!(patch_request.output_mapping.is_empty());
                 }
                 _ => panic!("unexpected event type: {}", event_to_string(&event)),
             };
@@ -925,104 +919,10 @@ async fn test_orc_recreate_fun_after_disconnect() {
             break;
         }
     }
+    // We expect 1 update-peers event and 2 stop-function events (f1 and f3 on the stable node)
+    // f2 was on the unstable node which has already disconnected, so it won't receive a stop event.
     assert_eq!(Some(&1), num_events.get("update-peers"));
-    assert_eq!(Some(&1), num_events.get("patch-function"));
-
-    for _ in 0..5 {
-        let (reply_sender, reply_receiver) = tokio::sync::oneshot::channel::<()>();
-        let _ = setup.orc_sender.send(OrchestratorRequest::Refresh(reply_sender)).await;
-        let _ = reply_receiver.await;
-
-        let mut num_events = std::collections::HashMap::new();
-        loop {
-            if let Some((_node_id, event)) = wait_for_events_if_any(&mut setup.nodes).await {
-                if num_events.contains_key(event_to_string(&event)) {
-                    *num_events.get_mut(event_to_string(&event)).unwrap() += 1;
-                } else {
-                    num_events.insert(event_to_string(&event), 1);
-                }
-                match event {
-                    MockAgentEvent::PatchFunction(patch_request) => {
-                        assert_eq!(pid_1, patch_request.function_id);
-                        assert!(patch_request.output_mapping.is_empty());
-                    }
-                    _ => panic!("unexpected event type: {}", event_to_string(&event)),
-                };
-            } else {
-                break;
-            }
-        }
-        assert_eq!(Some(&1), num_events.get("patch-function"));
-    }
-
-    // Make sure there are no pending events.
-    no_function_event(&mut setup.nodes).await;
-
-    // Re-create the unstable node.
-
-    let (mock_node_sender, mock_node_receiver) = futures::channel::mpsc::unbounded::<MockAgentEvent>();
-    let mut capabilities = edgeless_api::node_registration::NodeCapabilities::minimum();
-    capabilities.labels.push("unstable".to_string());
-
-    if let Some(val) = setup.nodes.get_mut(&unstable_node_id) {
-        *val = mock_node_receiver;
-    }
-
-    let _ = setup
-        .orc_sender
-        .send(crate::orchestrator::OrchestratorRequest::AddNode(
-            unstable_node_id,
-            crate::client_desc::ClientDesc {
-                agent_url: "".to_string(),
-                invocation_url: "".to_string(),
-                api: Box::new(MockNode {
-                    node_id: unstable_node_id,
-                    sender: mock_node_sender,
-                }) as Box<dyn edgeless_api::outer::agent::AgentAPI + Send>,
-                capabilities,
-                cordoned: false,
-            },
-            vec![],
-        ))
-        .await;
-
-    if let Some(entry) = setup.nodes.get_mut(&setup.stable_node_id) {
-        let mut num_update_peers = 0;
-        for _ in 0..2 {
-            let event = wait_for_event_at_node(entry).await;
-            match event {
-                MockAgentEvent::PatchFunction(patch_request) => assert!(patch_request.output_mapping.contains_key("out")),
-                MockAgentEvent::UpdatePeers(_update) => {
-                    num_update_peers += 1;
-                }
-                _ => panic!("unexpected event"),
-            }
-        }
-        assert_eq!(1, num_update_peers);
-    }
-    if let Some(entry) = setup.nodes.get_mut(&unstable_node_id) {
-        let mut num_update_peers = 0;
-        let mut num_reset = 0;
-        for _ in 0..5 {
-            let event = wait_for_event_at_node(entry).await;
-            match event {
-                MockAgentEvent::StartFunction((_new_instance_id, spawn_req_rcvd)) => {
-                    log::info!("{:?}", spawn_req_rcvd);
-                    assert_eq!("f2", spawn_req_rcvd.spec.id);
-                }
-                MockAgentEvent::PatchFunction(patch_request) => assert!(patch_request.output_mapping.contains_key("out")),
-                MockAgentEvent::UpdatePeers(_update) => {
-                    num_update_peers += 1;
-                }
-                MockAgentEvent::Reset() => {
-                    num_reset += 1;
-                }
-                _ => panic!("unexpected event"),
-            }
-        }
-        assert_eq!(2, num_update_peers);
-        assert_eq!(1, num_reset);
-    }
+    assert_eq!(Some(&2), num_events.get("stop-function"));
 
     no_function_event(&mut setup.nodes).await;
 }

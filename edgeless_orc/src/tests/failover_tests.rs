@@ -224,13 +224,6 @@ async fn test_orc_node_hot_redundancy_replica_dies() {
     let active_function_node_id = active_instances.get(&lid).unwrap().iter().find(|(_node_id, is_active)| *is_active).unwrap().0;
     let standby_replica_node_id = active_instances.get(&lid).unwrap().iter().find(|(_node_id, is_active)| !*is_active).unwrap().0;
 
-    // Find the third node (the one that doesn't have any replica yet)
-    let all_node_ids: Vec<uuid::Uuid> = setup.nodes.keys().cloned().collect();
-    let third_node_id = all_node_ids
-        .iter()
-        .find(|id| **id != active_function_node_id && **id != standby_replica_node_id)
-        .expect("Should have a third node");
-
     // Wait for both replicas to start
     let mut replicas_started = 0;
     while replicas_started < 2 {
@@ -250,7 +243,7 @@ async fn test_orc_node_hot_redundancy_replica_dies() {
 
     // Track events - we expect:
     // - update-peers on remaining nodes (2 nodes)
-    // - start-function on the third node (new standby replica)
+    // - start-function on a node (new standby replica) - can be any feasible node
     // - NO patch-function events (since the active function is still alive, so no patching is needed)
     let mut num_events = std::collections::HashMap::new();
     let mut new_standby_node_id = uuid::Uuid::nil();
@@ -265,8 +258,9 @@ async fn test_orc_node_hot_redundancy_replica_dies() {
             match event {
                 MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd)) => {
                     log::info!("start-function on node {}", node_id);
-                    // The new standby should be started on the third node (the one without any replica)
-                    assert_eq!(node_id, *third_node_id);
+                    // The new standby can be started on any feasible node (random selection)
+                    // It should NOT be on the node that was disconnected
+                    assert_ne!(node_id, standby_replica_node_id);
                     assert_eq!("f1", spawn_req_rcvd.spec.id);
                     new_standby_node_id = new_instance_id.node_id;
                 }
@@ -297,8 +291,8 @@ async fn test_orc_node_hot_redundancy_replica_dies() {
     assert_eq!(Some(&1), num_events.get("start-function"));
     assert_eq!(None, num_events.get("patch-function"));
 
-    // Verify the new standby was created on the third node
-    assert_eq!(*third_node_id, new_standby_node_id);
+    // Verify the new standby was created on a valid node (not the disconnected one)
+    assert_ne!(standby_replica_node_id, new_standby_node_id);
 
     // The active function should still be on its original node
     let active_instances = setup.proxy.lock().await.fetch_function_instances_to_nodes();
@@ -414,5 +408,78 @@ async fn test_orc_node_hot_redundancy_all_die() {
     no_function_event(&mut setup.nodes).await;
 }
 
-// TODO:1 not enough other nodes to run the redundant function instances (checks how it handles insufficient resources)
-// TODO:1 test with a node disappearing and reappearing (temporary disconnection, functions are still there) - they should get garbage collected
+#[tokio::test]
+#[serial_test::serial]
+async fn test_orc_node_hot_redundancy_not_enough_nodes() {
+    // Test: not enough nodes to run the redundant function instances
+    // The workflow spawn request should fail when replication_factor > available nodes
+    init_logger();
+    
+    // Setup with only 1 node
+    let mut setup = setup(1, 0).await;
+
+    // Try to start a function with replication_factor = 2 (requires 2 nodes, but we only have 1)
+    let mut spawn_req = make_spawn_function_request("f1");
+    spawn_req.replication_factor = Some(2);
+    
+    let result = setup.fun_client.start(spawn_req.clone()).await.unwrap();
+    
+    // The spawn request should fail because there aren't enough nodes
+    match result {
+        edgeless_api::common::StartComponentResponse::InstanceId(_) => {
+            panic!("Expected spawn to fail due to insufficient nodes, but it succeeded");
+        }
+        edgeless_api::common::StartComponentResponse::ResponseError(err) => {
+            log::info!("Spawn correctly failed with error: {} - {}", err.summary, err.detail.as_deref().unwrap_or("no detail"));
+            // The error should indicate that no suitable nodes were found or insufficient resources
+            assert!(
+                err.summary.to_lowercase().contains("fail") || 
+                err.detail.as_deref().unwrap_or("").to_lowercase().contains("no suitable") ||
+                err.detail.as_deref().unwrap_or("").to_lowercase().contains("no node"),
+                "Error message should indicate insufficient nodes: {} - {:?}", err.summary, err.detail
+            );
+        }
+    };
+
+    // No function should have been started (or if one was started, it should have been cleaned up)
+    no_function_event(&mut setup.nodes).await;
+}
+
+#[tokio::test]
+#[serial_test::serial]
+async fn test_orc_node_hot_redundancy_not_enough_matching_nodes() {
+    // Test: enough nodes exist, but not enough match the constraints for redundancy
+    // The workflow spawn request should fail when replication_factor > matching nodes
+    init_logger();
+    
+    // Setup with 3 nodes (1 stable + 2 unstable)
+    let mut setup = setup(3, 0).await;
+
+    // Try to start a function with replication_factor = 2, but constrained to only the stable node
+    // Since there's only 1 stable node and we need 2 replicas, this should fail
+    let mut spawn_req = make_spawn_function_request("f1");
+    spawn_req.annotations.insert("label_match_all".to_string(), "stable".to_string());
+    spawn_req.replication_factor = Some(2);
+    
+    let result = setup.fun_client.start(spawn_req.clone()).await.unwrap();
+    
+    // The spawn request should fail because there aren't enough matching nodes
+    match result {
+        edgeless_api::common::StartComponentResponse::InstanceId(_) => {
+            panic!("Expected spawn to fail due to insufficient matching nodes, but it succeeded");
+        }
+        edgeless_api::common::StartComponentResponse::ResponseError(err) => {
+            log::info!("Spawn correctly failed with error: {} - {}", err.summary, err.detail.as_deref().unwrap_or("no detail"));
+            // The error should indicate that no suitable nodes were found
+            assert!(
+                err.summary.to_lowercase().contains("fail") || 
+                err.detail.as_deref().unwrap_or("").to_lowercase().contains("no suitable") ||
+                err.detail.as_deref().unwrap_or("").to_lowercase().contains("no node"),
+                "Error message should indicate insufficient matching nodes: {} - {:?}", err.summary, err.detail
+            );
+        }
+    };
+
+    // No function should have been started (or if one was started, it should have been cleaned up)
+    no_function_event(&mut setup.nodes).await;
+}

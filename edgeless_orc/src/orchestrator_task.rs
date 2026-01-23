@@ -586,6 +586,29 @@ impl OrchestratorTask {
         let lid = uuid::Uuid::new_v4();
         let mut results: Vec<anyhow::Result<edgeless_api::common::StartComponentResponse<uuid::Uuid>>> = vec![];
 
+        // check if we have enough nodes to satisfy the replication factor before starting anything
+        // this prevents the situation in which a workflow gets partially started
+        if let Some(replication_factor) = spawn_req.replication_factor {
+            if replication_factor > 1 {
+                // get all feasible nodes without modifying any state
+                let all_node_ids: Vec<uuid::Uuid> = self.nodes.keys().cloned().collect();
+                let feasible_nodes = self.orchestration_logic.feasible_nodes(spawn_req, &all_node_ids);
+                
+                if (feasible_nodes.len() as u32) < replication_factor {
+                    return Ok(edgeless_api::common::StartComponentResponse::ResponseError(
+                        edgeless_api::common::ResponseError {
+                            summary: "Failed to start function".to_string(),
+                            detail: Some(format!(
+                                "Not enough suitable nodes to satisfy replication_factor={}. Found {} suitable nodes.",
+                                replication_factor,
+                                feasible_nodes.len()
+                            )),
+                        },
+                    ));
+                }
+            }
+        }
+
         // Select the target node.
         let (res, active_instance_node_id) = match self.select_node(spawn_req) {
             Ok(node_id) => {
@@ -1224,9 +1247,11 @@ impl OrchestratorTask {
     fn detect_non_critical_failures(&mut self, critical_result: &CriticalFailoverResult) -> (
         Vec<uuid::Uuid>,  // to_repatch
         Vec<(uuid::Uuid, edgeless_api::resource_configuration::ResourceInstanceSpecification)>,  // resources_to_create
+        Vec<String>,  // workflows_to_stop (non-replicated function died)
     ) {
         let mut to_repatch: Vec<uuid::Uuid> = Vec::new();
         let mut resources_to_create = Vec::new();
+        let mut workflows_to_stop: Vec<String> = Vec::new();
         let mut lids_with_new_instances: std::collections::HashSet<uuid::Uuid> = std::collections::HashSet::new();
 
         // track lids from critical path that will have new replicas
@@ -1253,8 +1278,8 @@ impl OrchestratorTask {
                     // non-replicated function (replication_factor is None)
                     if spawn_req.replication_factor.is_none() {
                         if instances.is_empty() || instances.iter().all(|x| !self.nodes.contains_key(&x.0.node_id)) {
-                            log::warn!("non-replicated function lid {} has died completely", lid);
-                            todo!("handle non-replicated function death");
+                            log::error!("non-replicated function lid {} has died, stopping workflow '{}'", lid, spawn_req.workflow_id);
+                            workflows_to_stop.push(spawn_req.workflow_id.clone());
                         }
                     }
                 }
@@ -1283,7 +1308,11 @@ impl OrchestratorTask {
         let critical_set: std::collections::HashSet<_> = critical_result.to_repatch.iter().copied().collect();
         to_repatch.retain(|lid| !critical_set.contains(lid));
 
-        (to_repatch, resources_to_create)
+        // deduplicate workflows to stop
+        workflows_to_stop.sort();
+        workflows_to_stop.dedup();
+
+        (to_repatch, resources_to_create, workflows_to_stop)
     }
 
     async fn refresh(&mut self, parent_span: Option<&TraceSpan>) {
@@ -1331,7 +1360,35 @@ impl OrchestratorTask {
         }
 
         // 2. now handle the non-critical functions
-        let (mut non_critical_to_repatch, resources_to_create) = self.detect_non_critical_failures(&critical_result);
+        let (mut non_critical_to_repatch, resources_to_create, non_critical_workflows_to_stop) = self.detect_non_critical_failures(&critical_result);
+
+        // stop workflows where non-replicated functions died
+        if !non_critical_workflows_to_stop.is_empty() {
+            log::warn!("stopping {} workflows due to non-replicated function failure", non_critical_workflows_to_stop.len());
+            let lids_to_stop: Vec<uuid::Uuid> = self.active_instances
+                .iter()
+                .filter_map(|(lid, instance)| {
+                    match instance {
+                        crate::active_instance::ActiveInstance::Function(req, _) => {
+                            if non_critical_workflows_to_stop.contains(&req.workflow_id) {
+                                return Some(*lid);
+                            }
+                        }
+                        crate::active_instance::ActiveInstance::Resource(req, _) => {
+                            if non_critical_workflows_to_stop.contains(&req.workflow_id) {
+                                return Some(*lid);
+                            }
+                        }
+                    }
+                    None
+                })
+                .collect();
+            
+            for lid in lids_to_stop {
+                log::info!("stopping component lid {} due to non-replicated function failure in workflow", lid);
+                self.stop_function_lid(lid).await;
+            }
+        }
 
         // create new function replicas (to maintain replication factor)
         for req in critical_result.replicas_to_create {

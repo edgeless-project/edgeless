@@ -191,7 +191,7 @@ impl ProxyRedis {
 #[derive(Clone, serde::Deserialize, Debug)]
 pub enum ActiveInstanceClone {
     // 0: request
-    // 1: [ (node_id, lid) ]
+    // 1: [ "(InstanceId { node_id: UUID, function_id: UUID }, bool)" ]
     Function(edgeless_api::function_instance::SpawnFunctionRequest, Vec<String>),
 
     // 0: request
@@ -199,7 +199,35 @@ pub enum ActiveInstanceClone {
     Resource(edgeless_api::resource_configuration::ResourceInstanceSpecification, String),
 }
 
+/// Parse a string like "(InstanceId(node_id: UUID, function_id: UUID), bool)" into an InstanceId and boolean.
+fn string_to_instance_id_with_active(val: &str) -> anyhow::Result<(edgeless_api::function_instance::InstanceId, bool)> {
+    // Format: "(InstanceId(node_id: UUID, function_id: UUID), bool)"
+    // Tokens:  0                     1     2                  3          4
+    //          (InstanceId(node_id:  uuid, function_id:       uuid),     true/false)
+    let tokens: Vec<&str> = val.split(' ').collect();
+    if tokens.len() != 5 {
+        anyhow::bail!("invalid number of tokens in InstanceId with active flag: {} (expected 5), value: '{}'", tokens.len(), val);
+    }
+
+    let node_id = match uuid::Uuid::from_str(&tokens[1][0..tokens[1].len() - 1]) {
+        Ok(val) => val,
+        Err(err) => anyhow::bail!("invalid node_id in InstanceId: {}", err),
+    };
+    // function_id ends with ")," so we need to strip 2 characters
+    let function_id = match uuid::Uuid::from_str(&tokens[3][0..tokens[3].len() - 2]) {
+        Ok(val) => val,
+        Err(err) => anyhow::bail!("invalid function_id in InstanceId: {}", err),
+    };
+    
+    // Parse the boolean (remove trailing ")")
+    let is_active_str = &tokens[4][0..tokens[4].len() - 1];
+    let is_active = is_active_str == "true";
+
+    Ok((edgeless_api::function_instance::InstanceId { node_id, function_id }, is_active))
+}
+
 fn string_to_instance_id(val: &str) -> anyhow::Result<edgeless_api::function_instance::InstanceId> {
+    // Format: "InstanceId(node_id: UUID, function_id: UUID)"
     let tokens: Vec<&str> = val.split(' ').collect();
     if tokens.len() != 4 {
         anyhow::bail!("invalid number of tokens in InstanceId: {}", tokens.len());
@@ -209,6 +237,7 @@ fn string_to_instance_id(val: &str) -> anyhow::Result<edgeless_api::function_ins
         Ok(val) => val,
         Err(err) => anyhow::bail!("invalid node_id in InstanceId: {}", err),
     };
+    // function_id ends with ")" so we need to strip 1 character
     let function_id = match uuid::Uuid::from_str(&tokens[3][0..tokens[3].len() - 1]) {
         Ok(val) => val,
         Err(err) => anyhow::bail!("invalid function_id in InstanceId: {}", err),
@@ -242,9 +271,9 @@ impl ProxyRedis {
                         match val {
                             ActiveInstanceClone::Function(spawn_req, instance_ids_str) => {
                                 let mut instance_ids = vec![];
-                                for instance_id_str in instance_ids_str {
-                                    if let Ok(instance_id) = string_to_instance_id(&instance_id_str) {
-                                        instance_ids.push((instance_id, false));
+                                for instance_id_str in &instance_ids_str {
+                                    if let Ok((instance_id, is_active)) = string_to_instance_id_with_active(instance_id_str) {
+                                        instance_ids.push((instance_id, is_active));
                                     }
                                 }
                                 if !instance_ids.is_empty() {
