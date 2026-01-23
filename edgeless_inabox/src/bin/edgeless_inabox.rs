@@ -107,7 +107,7 @@ fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16
     let orc_conf = edgeless_orc::EdgelessOrcSettings {
         general: edgeless_orc::EdgelessOrcGeneralSettings {
             domain_register_url: domain_register_url.clone(),
-            subscription_refresh_interval_sec: 2,
+            subscription_refresh_interval_sec: 2.0,
             domain_id: format!("domain-{}", initial_port),
             orchestrator_url: orchestrator_url.clone(),
             orchestrator_url_announced: announced_url(orchestrator_url),
@@ -148,7 +148,7 @@ fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16
                 invocation_url_coap: None,
                 invocation_url_announced_coap: None,
                 node_register_url: orc_conf.general.node_register_url.clone(),
-                subscription_refresh_interval_sec: 2,
+                subscription_refresh_interval_sec: 2.0,
             },
             telemetry: EdgelessNodeTelemetrySettings {
                 metrics_url: next_url(false),

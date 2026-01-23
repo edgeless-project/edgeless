@@ -22,7 +22,7 @@ impl DomainSubscriber {
         domain_id: String,
         orchestrator_url: String,
         controller_url: String,
-        subscription_refresh_interval_sec: u64,
+        subscription_refresh_interval_sec: f64,
     ) -> (
         Self,
         std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
@@ -52,9 +52,9 @@ impl DomainSubscriber {
         (Self { sender }, main_task, refresh_task)
     }
 
-    async fn refresh_task(sender: futures::channel::mpsc::UnboundedSender<DomainSubscriberRequest>, subscription_refresh_interval_sec: u64) {
+    async fn refresh_task(sender: futures::channel::mpsc::UnboundedSender<DomainSubscriberRequest>, subscription_refresh_interval_sec: f64) {
         let mut sender = sender;
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(subscription_refresh_interval_sec));
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs_f64(subscription_refresh_interval_sec));
         loop {
             interval.tick().await;
             let _ = sender.send(DomainSubscriberRequest::Refresh()).await;
@@ -65,7 +65,7 @@ impl DomainSubscriber {
         domain_id: String,
         orchestrator_url: String,
         controller_url: String,
-        subscription_refresh_interval_sec: u64,
+        subscription_refresh_interval_sec: f64,
         nonce: u64,
         receiver: futures::channel::mpsc::UnboundedReceiver<DomainSubscriberRequest>,
     ) {
@@ -101,7 +101,7 @@ impl DomainSubscriber {
                         domain_id: domain_id.clone(),
                         orchestrator_url: orchestrator_url.clone(),
                         capabilities: last_caps.clone(),
-                        refresh_deadline: std::time::SystemTime::now() + std::time::Duration::from_secs(subscription_refresh_interval_sec * 2),
+                        refresh_deadline: std::time::SystemTime::now() + std::time::Duration::from_secs_f64(subscription_refresh_interval_sec * 2.0),
                         counter,
                         nonce,
                     };

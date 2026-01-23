@@ -174,7 +174,7 @@ pub fn edgeless_bal_default_conf() -> String {
             invocation_url_coap: None,
             invocation_url_announced_coap: None,
             node_register_url: String::from("http://127.0.0.1:7104"),
-            subscription_refresh_interval_sec: 2,
+            subscription_refresh_interval_sec: 2.0,
         },
         telemetry: edgeless_node::EdgelessNodeTelemetrySettings::default(),
     };

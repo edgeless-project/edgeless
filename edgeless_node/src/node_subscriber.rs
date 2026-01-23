@@ -53,9 +53,9 @@ impl NodeSubscriber {
         (Self { sender }, main_task, refresh_task)
     }
 
-    async fn refresh_task(sender: futures::channel::mpsc::UnboundedSender<NodeSubscriberRequest>, subscription_refresh_interval_sec: u64) {
+    async fn refresh_task(sender: futures::channel::mpsc::UnboundedSender<NodeSubscriberRequest>, subscription_refresh_interval_sec: f64) {
         let mut sender = sender;
-        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(subscription_refresh_interval_sec));
+        let mut interval = tokio::time::interval(tokio::time::Duration::from_secs_f64(subscription_refresh_interval_sec));
         loop {
             interval.tick().await;
             let _ = sender.send(NodeSubscriberRequest::Refresh()).await;
@@ -143,7 +143,7 @@ impl NodeSubscriber {
                         agent_url: agent_url.clone(),
                         resource_providers: resource_providers.clone(),
                         capabilities: capabilities.clone(),
-                        refresh_deadline: std::time::SystemTime::now() + std::time::Duration::from_secs(subscription_refresh_interval_sec * 2),
+                        refresh_deadline: std::time::SystemTime::now() + std::time::Duration::from_secs_f64(subscription_refresh_interval_sec * 2.0),
                         nonce,
                         health_status: Self::get_health_status(&mut sys, &mut networks, &mut disks, own_pid, &mut power_info).await,
                         performance_samples: edgeless_api::node_registration::NodePerformanceSamples {

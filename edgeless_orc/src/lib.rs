@@ -37,7 +37,7 @@ pub struct EdgelessOrcGeneralSettings {
     /// The URL of the domain register.
     pub domain_register_url: String,
     /// The interval at which the orchestrator refreshes subscription, s.
-    pub subscription_refresh_interval_sec: u64,
+    pub subscription_refresh_interval_sec: f64,
     /// The identifier of the orchestration domain managed by this orchestrator.
     pub domain_id: String,
     /// The URL to which the orchestrator is bound.
@@ -205,7 +205,7 @@ pub fn edgeless_orc_default_conf() -> String {
     let orc_conf = EdgelessOrcSettings {
         general: EdgelessOrcGeneralSettings {
             domain_register_url: String::from("http://127.0.0.1:7002"),
-            subscription_refresh_interval_sec: 2,
+            subscription_refresh_interval_sec: 2.0,
             domain_id: String::from("domain-7000"),
             orchestrator_url: String::from("http://127.0.0.1:7003"),
             orchestrator_url_announced: String::from("http://127.0.0.1:7003"),

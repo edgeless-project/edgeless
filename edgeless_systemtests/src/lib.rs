@@ -56,7 +56,7 @@ mod system_tests {
             let (task, handle) = futures::future::abortable(edgeless_orc::edgeless_orc_main(edgeless_orc::EdgelessOrcSettings {
                 general: edgeless_orc::EdgelessOrcGeneralSettings {
                     domain_register_url: domain_register_url.clone(),
-                    subscription_refresh_interval_sec: 5,
+                    subscription_refresh_interval_sec: 5.0,
                     domain_id: domain_id.clone(),
                     orchestrator_url: orchestrator_url.to_string(),
                     orchestrator_url_announced: orchestrator_url.to_string(),
@@ -104,7 +104,7 @@ mod system_tests {
                         invocation_url_coap: None,
                         invocation_url_announced_coap: None,
                         node_register_url: node_register_url.clone(),
-                        subscription_refresh_interval_sec: 5,
+                        subscription_refresh_interval_sec: 5.0,
                     },
                     telemetry: edgeless_node::EdgelessNodeTelemetrySettings {
                         metrics_url: format!("http://{}:{}", address, next_port()),
@@ -164,7 +164,7 @@ mod system_tests {
         let (task, handle) = futures::future::abortable(edgeless_orc::edgeless_orc_main(edgeless_orc::EdgelessOrcSettings {
             general: edgeless_orc::EdgelessOrcGeneralSettings {
                 domain_register_url: setup_conf.domain_register_url.to_string(),
-                subscription_refresh_interval_sec: 5,
+                subscription_refresh_interval_sec: 5.0,
                 domain_id: domain_portal.clone(),
                 orchestrator_url: orchestrator_url.to_string(),
                 orchestrator_url_announced: orchestrator_url.to_string(),
@@ -206,7 +206,7 @@ mod system_tests {
                     invocation_url_coap: None,
                     invocation_url_announced_coap: None,
                     node_register_url: node_register_url_local,
-                    subscription_refresh_interval_sec: 5,
+                    subscription_refresh_interval_sec: 5.0,
                 },
                 portal: edgeless_node::EdgelessNodeGeneralSettings {
                     node_id: node_id_portal,
@@ -217,7 +217,7 @@ mod system_tests {
                     invocation_url_coap: None,
                     invocation_url_announced_coap: None,
                     node_register_url: node_register_url_portal.clone(),
-                    subscription_refresh_interval_sec: 5,
+                    subscription_refresh_interval_sec: 5.0,
                 },
                 telemetry: edgeless_node::EdgelessNodeTelemetrySettings {
                     metrics_url: format!("http://{}:{}", address, next_port()),

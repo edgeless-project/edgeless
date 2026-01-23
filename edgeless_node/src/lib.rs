@@ -99,7 +99,7 @@ pub struct EdgelessNodeGeneralSettings {
     /// The URL of the node register server.
     pub node_register_url: String,
     /// The interval at which the node refreshes subscription, s.
-    pub subscription_refresh_interval_sec: u64,
+    pub subscription_refresh_interval_sec: f64,
 }
 
 impl Default for EdgelessNodeGeneralSettings {
@@ -113,7 +113,7 @@ impl Default for EdgelessNodeGeneralSettings {
             invocation_url_coap: None,
             invocation_url_announced_coap: None,
             node_register_url: String::from("http://127.0.0.1:7004"),
-            subscription_refresh_interval_sec: 2,
+            subscription_refresh_interval_sec: 2.0,
         }
     }
 }
