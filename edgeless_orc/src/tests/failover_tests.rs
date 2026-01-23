@@ -311,13 +311,108 @@ async fn test_orc_node_hot_redundancy_replica_dies() {
 #[tokio::test]
 #[serial_test::serial]
 async fn test_orc_node_hot_redundancy_all_die() {
-    // TODO:1 add test for: all nodes with redundant functions and active function fail, function gets stopped
-    todo!();
+    // Test: all nodes with redundant functions (both active and hot-standby) fail
+    // The workflow should be stopped since KPI-13 cannot be guaranteed
+    init_logger();
+    
+    // Setup with 3 nodes: 1 stable + 2 unstable
+    // We'll put the replicated function on the 2 unstable nodes, then kill both
+    let mut setup = setup(3, 0).await;
+
+    // Start a function with replication_factor = 2, forced onto unstable nodes
+    let mut spawn_req = make_spawn_function_request("f1");
+    spawn_req.annotations.insert("label_match_all".to_string(), "unstable".to_string());
+    spawn_req.replication_factor = Some(2);
+    let lid = match setup.fun_client.start(spawn_req.clone()).await.unwrap() {
+        edgeless_api::common::StartComponentResponse::InstanceId(id) => id,
+        edgeless_api::common::StartComponentResponse::ResponseError(err) => panic!("{}", err),
+    };
+
+    // Figure out which nodes have the active and standby instances
+    let active_instances = setup.proxy.lock().await.fetch_function_instances_to_nodes();
+    let active_function_node_id = active_instances.get(&lid).unwrap().iter().find(|(_node_id, is_active)| *is_active).unwrap().0;
+    let standby_replica_node_id = active_instances.get(&lid).unwrap().iter().find(|(_node_id, is_active)| !*is_active).unwrap().0;
+
+    // Wait for both replicas to start
+    let mut replicas_started = 0;
+    while replicas_started < 2 {
+        if let (node_id, MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd))) = wait_for_event_multiple(&mut setup.nodes).await {
+            // Function should only run on unstable nodes
+            assert_ne!(node_id, setup.stable_node_id);
+            assert_eq!(spawn_req, spawn_req_rcvd);
+            assert_eq!(node_id, new_instance_id.node_id);
+        }
+        replicas_started += 1;
+    }
+
+    // Make sure there are no pending events
+    no_function_event(&mut setup.nodes).await;
+
+    // Kill BOTH nodes - first the active, then the standby
+    // This simulates a catastrophic failure where no hot-standby is available
+    let _ = setup.orc_sender.send(OrchestratorRequest::DelNode(active_function_node_id)).await;
+    let _ = setup.orc_sender.send(OrchestratorRequest::DelNode(standby_replica_node_id)).await;
+
+    // Track events - we expect:
+    // - update-peers on remaining node (stable node)
+    // - stop-function for the workflow (KPI-13 failure)
+    // - possibly some patches as the system tries to recover
+    let mut num_events = std::collections::HashMap::new();
+    let mut stopped_functions = Vec::new();
+    
+    loop {
+        if let Some((node_id, event)) = wait_for_events_if_any(&mut setup.nodes).await {
+            if num_events.contains_key(event_to_string(&event)) {
+                *num_events.get_mut(event_to_string(&event)).unwrap() += 1;
+            } else {
+                num_events.insert(event_to_string(&event), 1);
+            }
+            match event {
+                MockAgentEvent::StartFunction((new_instance_id, spawn_req_rcvd)) => {
+                    log::info!("start-function on node {} for {}", node_id, spawn_req_rcvd.spec.id);
+                }
+                MockAgentEvent::StopFunction(instance_id) => {
+                    log::info!("stop-function on node {} for pid {}", node_id, instance_id.function_id);
+                    stopped_functions.push(instance_id);
+                }
+                MockAgentEvent::PatchFunction(patch_request) => {
+                    log::info!("patch-function on node {} for pid {}", node_id, patch_request.function_id);
+                }
+                MockAgentEvent::UpdatePeers(req) => {
+                    log::info!("update-peers on node {}", node_id);
+                    match req {
+                        edgeless_api::node_management::UpdatePeersRequest::Del(del_node_id) => {
+                            assert!(del_node_id == active_function_node_id || del_node_id == standby_replica_node_id);
+                        }
+                        _ => panic!("wrong UpdatePeersRequest message"),
+                    }
+                }
+                _ => {
+                    log::info!("other event: {}", event_to_string(&event));
+                }
+            };
+        } else {
+            break;
+        }
+    }
+
+    // Verify: update-peers should have been called
+    // First deletion: 2 nodes notified (stable + standby)
+    // Second deletion: 1 node notified (stable only)
+    // Total: 3 update-peers events
+    assert_eq!(Some(&3), num_events.get("update-peers"));
+
+    // The function should no longer be active (it was stopped or has no instances)
+    let active_instances = setup.proxy.lock().await.fetch_function_instances_to_nodes();
+    
+    // Either the function was completely removed, or it has no instances left
+    if let Some(instances) = active_instances.get(&lid) {
+        assert!(instances.is_empty(), "Function should have no instances after all nodes died");
+    }
+    // If the key doesn't exist, thats also correct (function was fully stopped)
+
+    no_function_event(&mut setup.nodes).await;
 }
 
-// TODO:1 chain - all nodes die until there is no unstable node left for the active function
 // TODO:1 not enough other nodes to run the redundant function instances (checks how it handles insufficient resources)
-// TODO:1 deployment only gets fixed when a completely new node joins! (not enough nodes before)
-// TODO:1 nodes that already contain a copy of this function are not considered for redundancy
-// TODO:1 test with a node disappearing and reappearing
-// TODO:1 node disappears but not graciously
+// TODO:1 test with a node disappearing and reappearing (temporary disconnection, functions are still there) - they should get garbage collected

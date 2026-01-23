@@ -43,6 +43,8 @@ struct CriticalFailoverResult {
     to_repatch: Vec<uuid::Uuid>,
     // new replicas needed to maintain replication factor
     replicas_to_create: Vec<NewReplicaRequest>,
+    // workflow_ids that should be stopped due to KPI-13 failure (no hot-standby available)
+    workflows_to_stop: Vec<String>,
 }
 
 /// information needed to create a new physical function instance
@@ -1143,6 +1145,7 @@ impl OrchestratorTask {
     fn detect_critical_failures(&mut self) -> CriticalFailoverResult {
         let mut to_repatch: Vec<uuid::Uuid> = Vec::new();
         let mut replicas_to_create: Vec<NewReplicaRequest> = Vec::new();
+        let mut workflows_to_stop: Vec<String> = Vec::new();
 
         // only iterate over critical functions (those with replication_factor)
         for lid in self.critical_lids.iter() {
@@ -1188,8 +1191,9 @@ impl OrchestratorTask {
                         to_repatch.push(*lid);
                     }
                 } else {
-                    // no hot-standby available - will be handled in non-critical path
-                    log::warn!("kpi-13 not possible: no hot-standby for lid {}", lid);
+                    // no hot-standby available - stop the workflow, as the kpi-13 cannot be guaranteed
+                    log::error!("kpi-13 not possible: no hot-standby for lid {}, stopping workflow '{}'", lid, spawn_req.workflow_id);
+                    workflows_to_stop.push(spawn_req.workflow_id.clone());
                 }
             } else if num_disconnected > 0 {
                 // some hot-standby replicas died but active is fine
@@ -1211,6 +1215,7 @@ impl OrchestratorTask {
         CriticalFailoverResult {
             to_repatch,
             replicas_to_create,
+            workflows_to_stop,
         }
     }
 
@@ -1301,6 +1306,27 @@ impl OrchestratorTask {
             log::info!("fast path: repatching {} critical functions", critical_patches.len());
             for patch in critical_patches {
                 Self::send_patch(&mut self.nodes, patch).await;
+            }
+        }
+
+        // stop workflows that failed KPI-13 (no hot-standby was available)
+        if !critical_result.workflows_to_stop.is_empty() {
+            log::warn!("stopping {} workflows due to KPI-13 failure", critical_result.workflows_to_stop.len());
+            let lids_to_stop: Vec<uuid::Uuid> = self.active_instances
+                .iter()
+                .filter_map(|(lid, instance)| {
+                    if let crate::active_instance::ActiveInstance::Function(req, _) = instance {
+                        if critical_result.workflows_to_stop.contains(&req.workflow_id) {
+                            return Some(*lid);
+                        }
+                    }
+                    None
+                })
+                .collect();
+            
+            for lid in lids_to_stop {
+                log::info!("stopping function lid {} due to workflow KPI-13 failure", lid);
+                self.stop_function_lid(lid).await;
             }
         }
 
