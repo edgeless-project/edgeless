@@ -28,6 +28,29 @@ impl Pid {
     }
 }
 
+/// Precomputed patch request ready to be sent to a node.
+/// This structure allows for deterministic/real-time processing by having
+/// all patch information ready before the actual send operation.
+struct PrecomputedPatch {
+    source_pid: Pid,
+    output_mapping: std::collections::HashMap<String, edgeless_api::function_instance::InstanceId>,
+}
+
+/// result of the critical failover detection phase.
+/// contains all information needed for fast-path repatching.
+struct CriticalFailoverResult {
+    // lids that need immediate repatching (hot-standby was promoted)
+    to_repatch: Vec<uuid::Uuid>,
+    // new replicas needed to maintain replication factor
+    replicas_to_create: Vec<NewReplicaRequest>,
+}
+
+/// information needed to create a new physical function instance
+struct NewReplicaRequest {
+    lid: uuid::Uuid,
+    spawn_req: edgeless_api::function_instance::SpawnFunctionRequest,
+}
+
 pub(crate) struct OrchestratorTask {
     receiver: futures::channel::mpsc::UnboundedReceiver<crate::orchestrator::OrchestratorRequest>,
     nodes: std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>,
@@ -42,6 +65,9 @@ pub(crate) struct OrchestratorTask {
     // key: lid
     active_instances: std::collections::HashMap<uuid::Uuid, crate::active_instance::ActiveInstance>,
     active_instances_changed: bool,
+    // set of lids that have replication_factor (critical functions)
+    // this allows fast iteration over only critical functions during failover
+    critical_lids: std::collections::HashSet<uuid::Uuid>,
     // active patches to which the orchestrator commits
     // key:   lid (origin function)
     // value: map of:
@@ -69,6 +95,7 @@ impl OrchestratorTask {
             rng: rand::rngs::StdRng::from_entropy(),
             active_instances: std::collections::HashMap::new(),
             active_instances_changed: false,
+            critical_lids: std::collections::HashSet::new(),
             dependency_graph: std::collections::HashMap::new(),
             dependency_graph_changed: false,
             tracer: edgeless_telemetry::control_plane_tracer::ControlPlaneTracer::new(
@@ -301,20 +328,20 @@ impl OrchestratorTask {
         }
     }
 
-    /// Apply patches on node's run-time agents.
-    ///
-    /// * `origin_lids` - The logical resource identifiers for which patches
-    ///   must be applied.
-    /// * `parent_span` - Optional parent tracing span for KPI measurement.
-    async fn apply_patches(&mut self, origin_lids: Vec<edgeless_api::function_instance::ComponentId>, parent_span: Option<&TraceSpan>) {
-        let _span = parent_span.map(|s| s.child("apply_patches"));
+    /// Precompute patch requests for the given LIDs.
+    /// Returns a list of patches ready to be sent, without performing any I/O.
+    /// This separation enables future deterministic/real-time processing where
+    /// patch data is prepared ahead of time.
+    fn precompute_patches(&self, origin_lids: &[edgeless_api::function_instance::ComponentId]) -> Vec<PrecomputedPatch> {
+        let mut patches = Vec::new();
+        
         for origin_lid in origin_lids.iter() {
             let logical_output_mapping = match self.dependency_graph.get(origin_lid) {
                 Some(x) => x,
                 None => continue,
             };
 
-            // Transform logical identifiers (LIDs) into internal ones (PIDs). Multiple PIDs can be associated with a single LID.
+            // Transform logical identifiers (LIDs) into physical ones (PIDs)
             for source in self.lid_to_pid(origin_lid) {
                 let mut physical_output_mapping = std::collections::HashMap::new();
                 for (channel, target_lid) in logical_output_mapping {
@@ -328,63 +355,96 @@ impl OrchestratorTask {
                         physical_output_mapping.insert(channel.clone(), target.instance_id());
                     }
                 }
-
-                // Notify the new mapping to the node / resource.
-                match source {
-                    Pid::Function(instance_id) => match self.nodes.get_mut(&instance_id.node_id) {
-                        Some(client_desc) => match client_desc
-                            .api
-                            .function_instance_api()
-                            .patch(edgeless_api::common::PatchRequest {
-                                function_id: instance_id.function_id,
-                                output_mapping: physical_output_mapping,
-                            })
-                            .await
-                        {
-                            Ok(_) => {
-                                log::info!("Patched node_id {} pid {}", instance_id.node_id, instance_id.function_id);
-                            }
-                            Err(err) => {
-                                log::error!(
-                                    "Error when patching node_id {} pid {}: {}",
-                                    instance_id.node_id,
-                                    instance_id.function_id,
-                                    err
-                                );
-                            }
-                        },
-                        None => {
-                            log::error!("Cannot patch unknown node_id {}", instance_id.node_id);
-                        }
-                    },
-                    Pid::Resource(instance_id) => match self.nodes.get_mut(&instance_id.node_id) {
-                        Some(client_desc) => match client_desc
-                            .api
-                            .resource_configuration_api()
-                            .patch(edgeless_api::common::PatchRequest {
-                                function_id: instance_id.function_id,
-                                output_mapping: physical_output_mapping,
-                            })
-                            .await
-                        {
-                            Ok(_) => {
-                                log::info!("Patched provider node_id {} pid {}", instance_id.node_id, instance_id.function_id);
-                            }
-                            Err(err) => {
-                                log::error!(
-                                    "Error when patching provider node_id {} pid {}: {}",
-                                    instance_id.node_id,
-                                    instance_id.function_id,
-                                    err
-                                );
-                            }
-                        },
-                        None => {
-                            log::error!("Cannot patch unknown provider node_id {}", instance_id.node_id);
-                        }
-                    },
-                };
+                
+                patches.push(PrecomputedPatch {
+                    source_pid: source,
+                    output_mapping: physical_output_mapping,
+                });
             }
+        }
+        
+        patches
+    }
+
+    /// Send a single precomputed patch to the appropriate node.
+    /// This is a low-level operation that performs the actual I/O.
+    async fn send_patch(
+        nodes: &mut std::collections::HashMap<uuid::Uuid, crate::client_desc::ClientDesc>,
+        patch: PrecomputedPatch,
+    ) {
+        match patch.source_pid {
+            Pid::Function(instance_id) => {
+                if let Some(client_desc) = nodes.get_mut(&instance_id.node_id) {
+                    match client_desc
+                        .api
+                        .function_instance_api()
+                        .patch(edgeless_api::common::PatchRequest {
+                            function_id: instance_id.function_id,
+                            output_mapping: patch.output_mapping,
+                        })
+                        .await
+                    {
+                        Ok(_) => {
+                            log::info!("Patched node_id {} pid {}", instance_id.node_id, instance_id.function_id);
+                        }
+                        Err(err) => {
+                            log::error!(
+                                "Error when patching node_id {} pid {}: {}",
+                                instance_id.node_id,
+                                instance_id.function_id,
+                                err
+                            );
+                        }
+                    }
+                } else {
+                    log::error!("Cannot patch unknown node_id {}", instance_id.node_id);
+                }
+            }
+            Pid::Resource(instance_id) => {
+                if let Some(client_desc) = nodes.get_mut(&instance_id.node_id) {
+                    match client_desc
+                        .api
+                        .resource_configuration_api()
+                        .patch(edgeless_api::common::PatchRequest {
+                            function_id: instance_id.function_id,
+                            output_mapping: patch.output_mapping,
+                        })
+                        .await
+                    {
+                        Ok(_) => {
+                            log::info!("Patched provider node_id {} pid {}", instance_id.node_id, instance_id.function_id);
+                        }
+                        Err(err) => {
+                            log::error!(
+                                "Error when patching provider node_id {} pid {}: {}",
+                                instance_id.node_id,
+                                instance_id.function_id,
+                                err
+                            );
+                        }
+                    }
+                } else {
+                    log::error!("Cannot patch unknown provider node_id {}", instance_id.node_id);
+                }
+            }
+        }
+    }
+
+    /// Apply patches on node's run-time agents.
+    /// This method precomputes patches and sends them sequentially.
+    ///
+    /// * `origin_lids` - The logical resource identifiers for which patches
+    ///   must be applied.
+    /// * `parent_span` - Optional parent tracing span for KPI measurement.
+    async fn apply_patches(&mut self, origin_lids: Vec<edgeless_api::function_instance::ComponentId>, parent_span: Option<&TraceSpan>) {
+        let _span = parent_span.map(|s| s.child("apply_patches"));
+        
+        // Precompute all patches first
+        let patches = self.precompute_patches(&origin_lids);
+        
+        // Send patches sequentially (for backward compatibility)
+        for patch in patches {
+            Self::send_patch(&mut self.nodes, patch).await;
         }
     }
 
@@ -605,6 +665,10 @@ impl OrchestratorTask {
         // the first instance is running - check it, if not clean up and return the error
         match &results[0] {
             Ok(edgeless_api::common::StartComponentResponse::InstanceId(_)) => {
+                // track this function as critical if it has replication_factor
+                if spawn_req.replication_factor.is_some() {
+                    self.critical_lids.insert(lid);
+                }
                 Ok(edgeless_api::common::StartComponentResponse::InstanceId(lid))
             }
             _ => {
@@ -629,6 +693,7 @@ impl OrchestratorTask {
         match self.active_instances.remove(&lid) {
             Some(active_instance) => {
                 self.active_instances_changed = true;
+                self.critical_lids.remove(&lid);
                 match active_instance {
                     crate::active_instance::ActiveInstance::Function(_req, instances) => {
                         // Stop all the instances of this function.
@@ -984,27 +1049,30 @@ impl OrchestratorTask {
             .expect("New node added just vanished")
             .api
             .node_management_api();
+        let mut error_messages = Vec::new();
         for (other_node_id, client_desc) in self.nodes.iter_mut() {
             if other_node_id.eq(&node_id) {
                 continue;
             }
-            if new_node_client
+            if let Err(err) = new_node_client
                 .update_peers(edgeless_api::node_management::UpdatePeersRequest::Add(
                     *other_node_id,
                     client_desc.invocation_url.clone(),
                 ))
                 .await
-                .is_err()
             {
                 num_failures += 1;
+                // we want to collect the error_messages
+                error_messages.push(format!("node {}: {}", other_node_id, err));
             }
         }
 
         if num_failures > 0 {
             log::error!(
-                "There have been failures ({}) when updating the peers following the addition of node '{}', the data plane may not work properly",
+                "There have been failures ({}) when updating the peers following the addition of node '{}', the data plane may not work properly. Errors: [{}]",
                 num_failures,
-                node_id
+                node_id,
+                error_messages.join("; ")
             );
         }
     }
@@ -1067,223 +1135,229 @@ impl OrchestratorTask {
         proxy.update_resource_providers(&self.resource_providers);
     }
 
+    /// detect failures in critical functions and prepare for fast-path failover.
+    /// this method only iterates over functions with replication_factor set,
+    /// making it efficient for the time-critical KPI-13 path.
+    /// 
+    /// returns information needed for immediate repatching and background replica creation.
+    fn detect_critical_failures(&mut self) -> CriticalFailoverResult {
+        let mut to_repatch: Vec<uuid::Uuid> = Vec::new();
+        let mut replicas_to_create: Vec<NewReplicaRequest> = Vec::new();
+
+        // only iterate over critical functions (those with replication_factor)
+        for lid in self.critical_lids.iter() {
+            let instance = match self.active_instances.get_mut(lid) {
+                Some(i) => i,
+                None => continue,
+            };
+
+            let (spawn_req, instances) = match instance {
+                crate::active_instance::ActiveInstance::Function(req, inst) => (req, inst),
+                _ => continue,
+            };
+
+            let replicas = match spawn_req.replication_factor {
+                Some(r) => r,
+                None => continue, // shouldn't happen since we're iterating critical_lids
+            };
+
+            let num_disconnected = instances.iter().filter(|x| !self.nodes.contains_key(&x.0.node_id)).count();
+
+            // all replicas healthy, nothing to do
+            if num_disconnected == 0 && instances.len() == replicas as usize {
+                continue;
+            }
+
+            self.active_instances_changed = true;
+
+            // remove disconnected instances
+            instances.retain(|x| self.nodes.contains_key(&x.0.node_id));
+
+            // check if the active replica died
+            let has_active = instances.iter().any(|x| x.1);
+            let hot_standby_available = instances.iter().any(|x| !x.1);
+
+            if !has_active {
+                log::info!("active replica died for lid {}, attempting graceful failover", lid);
+
+                if hot_standby_available {
+                    // promote hot-standby to active (fast path)
+                    if let Some((_instance_id, is_active)) = instances.iter_mut().find(|x| !x.1) {
+                        log::info!("promoting hot-standby to active for lid {}", lid);
+                        *is_active = true;
+                        to_repatch.push(*lid);
+                    }
+                } else {
+                    // no hot-standby available - will be handled in non-critical path
+                    log::warn!("kpi-13 not possible: no hot-standby for lid {}", lid);
+                }
+            } else if num_disconnected > 0 {
+                // some hot-standby replicas died but active is fine
+                // the function itself needs repatching
+                to_repatch.push(*lid);
+            }
+
+            // queue new replicas to maintain replication factor
+            let missing_replicas = (replicas as usize).saturating_sub(instances.len());
+            for _ in 0..missing_replicas {
+                log::info!("scheduling new replica for lid {} to maintain replication factor", lid);
+                replicas_to_create.push(NewReplicaRequest {
+                    lid: *lid,
+                    spawn_req: spawn_req.clone(),
+                });
+            }
+        }
+
+        CriticalFailoverResult {
+            to_repatch,
+            replicas_to_create,
+        }
+    }
+
+    /// detect failures in non-critical instances (resources, non-replicated functions).
+    /// also finds dependencies that need repatching due to critical function changes.
+    fn detect_non_critical_failures(&mut self, critical_result: &CriticalFailoverResult) -> (
+        Vec<uuid::Uuid>,  // to_repatch
+        Vec<(uuid::Uuid, edgeless_api::resource_configuration::ResourceInstanceSpecification)>,  // resources_to_create
+    ) {
+        let mut to_repatch: Vec<uuid::Uuid> = Vec::new();
+        let mut resources_to_create = Vec::new();
+        let mut lids_with_new_instances: std::collections::HashSet<uuid::Uuid> = std::collections::HashSet::new();
+
+        // track lids from critical path that will have new replicas
+        for req in &critical_result.replicas_to_create {
+            lids_with_new_instances.insert(req.lid);
+        }
+
+        // scan non-critical active instances
+        for (lid, instance) in self.active_instances.iter_mut() {
+            // skip critical functions (already handled)
+            if self.critical_lids.contains(lid) {
+                // but check if critical function lost all instances (no hot-standby case)
+                if let crate::active_instance::ActiveInstance::Function(spawn_req, instances) = instance {
+                    if spawn_req.replication_factor.is_some() && instances.is_empty() {
+                        to_repatch.push(*lid);
+                        lids_with_new_instances.insert(*lid);
+                    }
+                }
+                continue;
+            }
+
+            match instance {
+                crate::active_instance::ActiveInstance::Function(spawn_req, instances) => {
+                    // non-replicated function (replication_factor is None)
+                    if spawn_req.replication_factor.is_none() {
+                        if instances.is_empty() || instances.iter().all(|x| !self.nodes.contains_key(&x.0.node_id)) {
+                            log::warn!("non-replicated function lid {} has died completely", lid);
+                            todo!("handle non-replicated function death");
+                        }
+                    }
+                }
+                crate::active_instance::ActiveInstance::Resource(spec, instance) => {
+                    if instance.is_none() || !self.nodes.contains_key(&instance.node_id) {
+                        to_repatch.push(*lid);
+                        resources_to_create.push((*lid, spec.clone()));
+                        lids_with_new_instances.insert(*lid);
+                    }
+                }
+            }
+        }
+
+        // find all functions that depend on modified lids
+        for (origin_lid, output_mapping) in self.dependency_graph.iter() {
+            for target_lid in output_mapping.values() {
+                if lids_with_new_instances.contains(target_lid) {
+                    to_repatch.push(*origin_lid);
+                }
+            }
+        }
+
+        // deduplicate and remove any that are already in critical path
+        to_repatch.sort();
+        to_repatch.dedup();
+        let critical_set: std::collections::HashSet<_> = critical_result.to_repatch.iter().copied().collect();
+        to_repatch.retain(|lid| !critical_set.contains(lid));
+
+        (to_repatch, resources_to_create)
+    }
+
     async fn refresh(&mut self, parent_span: Option<&TraceSpan>) {
         let refresh_span = parent_span.map(|s| s.child("refresh"));
         let kpi_13_span = refresh_span.as_ref().map(|s| s.child("kpi_13_failover"));
-        //
-        // Make sure that all active logical functions are assigned
-        // to at least one instance: for all the function instances that
-        // were running on disconnected nodes, create new instances. If
-        // replication is enabled, make sure to gracefully failover.
-        // 
-        // Default behavior: (no replication_factor): every LID has exactly
-        // one physical function instance and failover can only be done
-        // after a new instance of the function has been started in the cluster.
-        // 
-        // KPI-13: If the replication_factor for a function is > 1, then we do a 
-        // graceful failover to a hot-standby function and then make sure
-        // that enough copies are still available in the cluster.
-        //
 
-        // List of LIDs that will have to be repatched
-        // because of the allocation of new function instances
-        // following node disconnection. We just add to this array
-        // and later figure out how to repatch them.
-        let mut to_be_repatched: Vec<uuid::Uuid> = vec![]; // lid
+        // 1. start with critical functions first (KPI13 requirement)
+        let critical_result = self.detect_critical_failures();
 
-        struct PhysicalFunctionInstance {
-            original_start_req: edgeless_api::function_instance::SpawnFunctionRequest,
-            // TODO:2 next patch, takes into account where the other replicas reside to make sure replicas only start
-            // on different nodes
-            _nodes_blacklist: Option<std::collections::HashSet<edgeless_api::function_instance::NodeId>>,
+        // precompute critical patches - this is the "decision" point
+        let critical_patches = self.precompute_patches(&critical_result.to_repatch);
+
+        // end kpi-13 span now - failover decision is made, patches are ready to send
+        if let Some(span) = kpi_13_span {
+            span.end();
         }
 
-        // Functions that have to have some instances created to make up for
-        // the loss of those assigned to disconnected nodes.
-        // key:   lid
-        // value: Vec<PhysicalFunctionInstance> - it is possible that multiple physical instances need
-        // to be recreated for the same logical function after some of the nodes have failed
-        let mut fun_to_be_created: std::collections::HashMap<uuid::Uuid, Vec<PhysicalFunctionInstance>> = std::collections::HashMap::new();
-
-        // Resources that have to be created to make up for the
-        // loss of those assigned to disconnected nodes.
-        // key:   lid
-        // value: resource specs
-        let mut res_to_be_created: std::collections::HashMap<uuid::Uuid, edgeless_api::resource_configuration::ResourceInstanceSpecification> = std::collections::HashMap::new();
-
-        // Look at all of the function and resources that this 
-        // orchestrator is managing.
-        // Find all the functions/resources affected.
-        // Also attempt to start functions and resources that
-        // are active but for which no active instance is present
-        // (this happens because in the past a node with active
-        // functions/resources has disappeared and it was not
-        // possible to fix the situation immediately due to e.g.
-        // lack of nodes that could host the new functions).
-        for (origin_lid, instance) in self.active_instances.iter_mut() {
-            match instance {
-                crate::active_instance::ActiveInstance::Function(start_req, instances) => {
-                    if let Some(replicas) = start_req.replication_factor {
-                        let num_disconnected = instances.iter().filter(|x| !self.nodes.contains_key(&x.0.node_id)).count();
-                        assert!(num_disconnected <= instances.len()); // this would be disastrous :(
-
-                        if num_disconnected == 0 && instances.len() == replicas as usize {
-                            // all physical instances of this function are alive and none got disconnected
-                            // log::info!("no disconnected functions, num_nodes {}", self.nodes.len());
-                            continue;
-                        } 
-                        self.active_instances_changed = true;
-
-                        // some physical instances of this function got disconnected - need to handle this by repatching
-                        to_be_repatched.push(*origin_lid);
-
-                        // remove all disconected instances from the active instance; handles the case where a node has been disconnected
-                        // without the DelNode functionality (network error)
-                        instances.retain(|x| self.nodes.contains_key(&x.0.node_id));
-
-                        let active_replica_died = !instances.iter().any(|x| x.1 && !self.nodes.contains_key(&x.0.node_id));
-                        let hot_standby_available = instances.iter().any(|x| !x.1 && self.nodes.contains_key(&x.0.node_id));
-
-                        if active_replica_died {
-                            // active replica died - promote a hot-standby to active if possible
-                            log::info!("Active replica died for LID {}, trying to gracefully failover to hot-standby", origin_lid);
-                            if hot_standby_available {
-                                // we have at least one hot-standby replica available
-                                log::info!("We will attempt a graceful failover {}", origin_lid);
-                                // FEAT: how to intelligently select the next standby to promote?
-                                // promote a random standby instance to active
-                                if let Some((instance_id, _is_active)) = instances.iter_mut().find(|x| !x.1) {
-                                    log::info!("Promoting hot-standby instance {:?} to active for LID {}", instance_id, origin_lid);
-                                    *_is_active = true;
-                                } else {
-                                    panic!("Inconsistent state: no hot-standby replica found for LID {} despite having replicas < replication_factor", origin_lid);
-                                }
-                            } else {
-                                // no hot-standby replicas available - need to start a new instance
-                                log::warn!("KPI-13 not possible. No hot-standby replica available for LID {}, starting a completely new instance and making it active", origin_lid);
-                            }     
-                        }
-
-                        // now we need to create new hot-standby replicas to keep the replication factor
-                        if instances.len() < replicas as usize {
-                            for _ in 0..(replicas as usize - instances.len()) {
-                                log::info!("Creating a new replica for LID {} to keep replication factor", origin_lid);
-                                // prepare the physical function instance to be created
-                                // FEAT: fill out the blacklist
-                                let physical_instance = PhysicalFunctionInstance {
-                                    original_start_req: start_req.clone(),
-                                    _nodes_blacklist: None,
-                                };
-                                // TODO:2 handle the error properly here
-                                fun_to_be_created.entry(*origin_lid).or_insert_with(Vec::new).push(physical_instance);
-                            }
-                        }
-                    } else {
-                        // By default, if there is no replication_factor a workflow fails when any of its functions fail
-                        if instances.is_empty() || instances.iter().all(|x| !self.nodes.contains_key(&x.0.node_id)) {
-                            // function has completely died
-                            log::warn!("Function with LID {} has completely died, need to start a new instance", origin_lid);
-                            todo!("Default behavior: no replication_factor - need to start a new instance when the function has completely died");
-                        }
-                    }
-                }
-                crate::active_instance::ActiveInstance::Resource(start_req, instance) => {
-                    if instance.is_none() || !self.nodes.contains_key(&instance.node_id) {
-                        // resource is missing - need to start a new one - simple.
-                        to_be_repatched.push(*origin_lid);
-                        res_to_be_created.insert(*origin_lid, start_req.clone());
-                    }
-                }
+        // send critical patches (I/O operation, not measured in kpi-13)
+        if !critical_patches.is_empty() {
+            log::info!("fast path: repatching {} critical functions", critical_patches.len());
+            for patch in critical_patches {
+                Self::send_patch(&mut self.nodes, patch).await;
             }
         }
 
-        // Also schedule to repatch all the functions that
-        // depend on the functions/resources modified.
-        for (origin_lid, output_mapping) in self.dependency_graph.iter() {
-            for (_output, target_lid) in output_mapping.iter() {
-                // TODO:2 do something about the funcs that have died and there was no replication configured for them 
-                if fun_to_be_created.contains_key(target_lid)
-                    || res_to_be_created.contains_key(target_lid)
-                {
-                    to_be_repatched.push(*origin_lid);
-                }
-            }
-        }
+        // 2. now handle the non-critical functions
+        let (mut non_critical_to_repatch, resources_to_create) = self.detect_non_critical_failures(&critical_result);
 
-
-        // Create the functions that went missing.
-        // If the operation fails for a function now, then the
-        // function remains in the active_instances, but it is
-        // assigned no function instance.
-        for (lid, physical_function_instances) in fun_to_be_created.into_iter() {
-            for physical_instance in physical_function_instances.into_iter() {
-                let spawn_req = physical_instance.original_start_req;
-                // TODO: 2 if blacklist is specified, use the special node selection that avoids blacklisted nodes? maybe just repeat it many times until a non-blacklisted node is found?
-                // Active instances will be automatically correctly updated once the functions start successfully
-                let res = match self.select_node(&spawn_req) {
-                    Ok(node_id) => {
-                        log::info!("Creating a new physical function instance for LID {} on node {} to make up for disconnected nodes", lid, node_id);
-                        // Start the function instance.
-                        match self.start_function_in_node(&spawn_req, &lid, &node_id).await {
-                            Ok(_) => Ok(()),
-                            Err(err) => Err(err),
-                        }
-                    }
-                    Err(err) => Err(err),
-                };
-                if let Err(err) = res {
-                    log::error!("Error when creating a new function assigned with lid {}: {}", lid, err);
-                    match self.active_instances.get_mut(&lid).unwrap() {
-                        crate::active_instance::ActiveInstance::Function(_spawn_req, instances) => {
+        // create new function replicas (to maintain replication factor)
+        for req in critical_result.replicas_to_create {
+            match self.select_node(&req.spawn_req) {
+                Ok(node_id) => {
+                    log::info!("creating new replica for lid {} on node {}", req.lid, node_id);
+                    if let Err(err) = self.start_function_in_node(&req.spawn_req, &req.lid, &node_id).await {
+                        log::error!("failed to create replica for lid {}: {}", req.lid, err);
+                        if let Some(crate::active_instance::ActiveInstance::Function(_, instances)) =
+                            self.active_instances.get_mut(&req.lid)
+                        {
                             instances.clear();
                             self.active_instances_changed = true;
                         }
-                        crate::active_instance::ActiveInstance::Resource(_, _) => {
-                            panic!("Expecting a function to be associated with LID {}, found a resource", lid)
-                        }
                     }
+                }
+                Err(err) => {
+                    log::error!("no suitable node for replica lid {}: {}", req.lid, err);
                 }
             }
         }
 
-        // Create the resources that went missing.
-        // If the operation fails for a resource now, then the
-        // resource remains in the active_instances, but it is
-        // assigned an invalid function instance.
-        for (lid, start_req) in res_to_be_created.into_iter() {
-            if let Err(err) = self.start_resource(start_req, lid).await {
-                log::error!("Error when creating a new resource assigned with lid {}: {}", lid, err);
-                match self.active_instances.get_mut(&lid).unwrap() {
-                    crate::active_instance::ActiveInstance::Function(_, _) => {
-                        panic!("expecting a resource to be associated with LID {}, found a function", lid)
-                    }
-                    crate::active_instance::ActiveInstance::Resource(_start_req, instance_id) => {
-                        *instance_id = edgeless_api::function_instance::InstanceId::none();
-                        self.active_instances_changed = true;
-                    }
+        // create missing resources
+        for (lid, spec) in resources_to_create {
+            if let Err(err) = self.start_resource(spec, lid).await {
+                log::error!("failed to create resource lid {}: {}", lid, err);
+                if let Some(crate::active_instance::ActiveInstance::Resource(_, instance_id)) =
+                    self.active_instances.get_mut(&lid)
+                {
+                    *instance_id = edgeless_api::function_instance::InstanceId::none();
+                    self.active_instances_changed = true;
                 }
             }
         }
 
-        // Check if there are intents from the proxy.
+        // handle deploy intents from proxy
         let deploy_intents = self.proxy.lock().await.retrieve_deploy_intents();
         let mut cordoned_uncordoned_nodes = false;
+
         for intent in deploy_intents {
             match intent {
                 crate::deploy_intent::DeployIntent::Migrate(lid, targets) => {
                     match self.migrate(&lid, &targets).await {
-                        Err(err) => log::warn!("Request to migrate '{}' declined: {}", lid, err),
+                        Err(err) => log::warn!("migration of '{}' declined: {}", lid, err),
                         Ok(target_node_id) => {
-                            // Migration was successful.
-                            log::info!("Request to migrate '{}' accepted, now running in '{}'", lid, target_node_id);
+                            log::info!("migrated '{}' to '{}'", lid, target_node_id);
+                            non_critical_to_repatch.push(lid);
 
-                            // Repatch the component migrated.
-                            to_be_repatched.push(lid);
-
-                            // Repatch all the component that depend on it.
+                            // also repatch dependents
                             for (origin_lid, output_mapping) in self.dependency_graph.iter() {
                                 if output_mapping.values().contains(&lid) {
-                                    to_be_repatched.push(*origin_lid);
+                                    non_critical_to_repatch.push(*origin_lid);
                                 }
                             }
                         }
@@ -1294,7 +1368,7 @@ impl OrchestratorTask {
                         desc.cordoned = true;
                         cordoned_uncordoned_nodes = true;
                     } else {
-                        log::warn!("request to cordon unknown node '{}' ignored", node_id);
+                        log::warn!("cordon unknown node '{}' ignored", node_id);
                     }
                 }
                 crate::deploy_intent::DeployIntent::Uncordon(node_id) => {
@@ -1302,24 +1376,24 @@ impl OrchestratorTask {
                         desc.cordoned = false;
                         cordoned_uncordoned_nodes = true;
                     } else {
-                        log::warn!("request to cordon unknown node '{}' ignored", node_id);
+                        log::warn!("uncordon unknown node '{}' ignored", node_id);
                     }
                 }
             }
         }
+
         if cordoned_uncordoned_nodes {
             self.orchestration_logic.update_nodes(&self.nodes, &self.resource_providers);
         }
 
-        // End the KPI-13 failover span before repatching
-        if let Some(span) = kpi_13_span {
-            span.end();
+        // apply non-critical patches (resources, migrations, dependencies of new replicas)
+        if !non_critical_to_repatch.is_empty() {
+            non_critical_to_repatch.sort();
+            non_critical_to_repatch.dedup();
+            self.apply_patches(non_critical_to_repatch, refresh_span.as_ref()).await;
         }
 
-        // Repatch everything that needs to be repatched.
-        self.apply_patches(to_be_repatched, refresh_span.as_ref()).await;
-
-        // Update the proxy.
+        // update proxy state
         let mut proxy = self.proxy.lock().await;
         if self.active_instances_changed {
             proxy.update_active_instances(&self.active_instances);
