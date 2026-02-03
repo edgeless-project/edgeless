@@ -202,13 +202,23 @@ mod tests {
             expected_transfer.push((1000 + i) as f64);
             expected_log_entries.push((format!("target{}", i), format!("message{}", i)));
             target.handle(
-                &crate::telemetry_events::TelemetryEvent::FunctionInit(std::time::Duration::from_secs(999)),
+                &&crate::telemetry_events::TelemetryEvent::FunctionInstantiate(std::time::Duration::from_secs(
+                    *expected_instantiate.last().unwrap() as u64
+                )),
+                &event_tags,
+            );
+            target.handle(
+                &&crate::telemetry_events::TelemetryEvent::FunctionInit(std::time::Duration::from_secs(*expected_init.last().unwrap() as u64)),
                 &event_tags,
             );
             target.handle(
                 &crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(std::time::Duration::from_secs(
                     *expected_execution.last().unwrap() as u64,
                 )),
+                &event_tags,
+            );
+            target.handle(
+                &&crate::telemetry_events::TelemetryEvent::FunctionStop(std::time::Duration::from_secs(*expected_stop.last().unwrap() as u64)),
                 &event_tags,
             );
             target.handle(
