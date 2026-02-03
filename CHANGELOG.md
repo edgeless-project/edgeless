@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+Improvements:
+
+- Telemetry: track the time required for the instantiation, initialization, and
+  stopping of function instances as performance samples (like invocation and
+  transfer times).
+
+API changes:
+
+- Add function instantiation/initialization/stopping times to
+  `NodePerformanceSamples`.
+
 ## [1.2.0] - 2025-11-28
 
 New features:

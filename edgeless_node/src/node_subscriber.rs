@@ -136,7 +136,17 @@ impl NodeSubscriber {
                     // The refresh deadline is set to twice the refresh period
                     // to reduce the likelihood of a race condition on the
                     // register side.
-                    let metrics = telemetry_performance_target.get_metrics();
+                    let mut metrics = telemetry_performance_target.get_metrics();
+                    let function_instantiate_times =
+                        std::mem::take(&mut metrics.function_times[edgeless_telemetry::performance_target::FunctionTime::Instantiate as usize]);
+                    let function_init_times =
+                        std::mem::take(&mut metrics.function_times[edgeless_telemetry::performance_target::FunctionTime::Init as usize]);
+                    let function_execution_times =
+                        std::mem::take(&mut metrics.function_times[edgeless_telemetry::performance_target::FunctionTime::Execution as usize]);
+                    let function_stop_times =
+                        std::mem::take(&mut metrics.function_times[edgeless_telemetry::performance_target::FunctionTime::Stop as usize]);
+                    let function_transfer_times =
+                        std::mem::take(&mut metrics.function_times[edgeless_telemetry::performance_target::FunctionTime::Transfer as usize]);
                     let update_node_request = edgeless_api::node_registration::UpdateNodeRequest {
                         node_id,
                         invocation_url: invocation_url.clone(),
@@ -147,8 +157,11 @@ impl NodeSubscriber {
                         nonce,
                         health_status: Self::get_health_status(&mut sys, &mut networks, &mut disks, own_pid, &mut power_info).await,
                         performance_samples: edgeless_api::node_registration::NodePerformanceSamples {
-                            function_execution_times: metrics.function_execution_times,
-                            function_transfer_times: metrics.function_transfer_times,
+                            function_instantiate_times,
+                            function_init_times,
+                            function_execution_times,
+                            function_stop_times,
+                            function_transfer_times,
                             function_log_entries: metrics.function_log_entries,
                         },
                     };

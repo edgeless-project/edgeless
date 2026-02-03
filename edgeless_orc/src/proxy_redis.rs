@@ -121,18 +121,18 @@ impl ProxyRedis {
 
     fn open_files(dataset_path: String, append: bool, additional_header: String) -> anyhow::Result<DatasetDumping> {
         let filenames = [
+            "application_logs",
             "performance_samples",
             "mapping_to_instance_id",
             "capabilities",
             "health_status",
-            "application_logs",
         ];
         let headers = [
+            "identifier,target,timestamp,value".to_string(), // named target after the argument name in telemetry_log call
             "identifier,metric,timestamp,value".to_string(),
             "timestamp,logical_id,workflow_id,node_id,physical_id".to_string(),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeCapabilities::csv_header()),
             format!("timestamp,node_id,{}", edgeless_api::node_registration::NodeHealthStatus::csv_header()),
-            "identifier,target,timestamp,value".to_string(), // named target after the argument name in telemetry_log call
         ];
 
         let mut outfiles = vec![];
@@ -453,7 +453,10 @@ impl super::proxy::Proxy for ProxyRedis {
 
     fn push_performance_samples(&mut self, _node_id: &uuid::Uuid, performance_samples: edgeless_api::node_registration::NodePerformanceSamples) {
         let all_sample_series = vec![
+            ("function_instantiate_time", &performance_samples.function_instantiate_times),
+            ("function_init_time", &performance_samples.function_init_times),
             ("function_execution_time", &performance_samples.function_execution_times),
+            ("function_stop_time", &performance_samples.function_stop_times),
             ("function_transfer_time", &performance_samples.function_transfer_times),
         ];
         for (name, series) in all_sample_series {
@@ -1060,7 +1063,10 @@ mod test {
         redis_proxy.push_performance_samples(
             &node_id_perf,
             edgeless_api::node_registration::NodePerformanceSamples {
+                function_instantiate_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
+                function_init_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
                 function_execution_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
+                function_stop_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
                 function_transfer_times: std::collections::HashMap::from([(fid_perf_1, samples_1.clone()), (fid_perf_2, samples_2.clone())]),
                 function_log_entries: std::collections::HashMap::from([(fid_perf_1, log_1.clone()), (fid_perf_2, log_2.clone())]),
             },
@@ -1087,8 +1093,23 @@ mod test {
         let samples = redis_proxy.fetch_performance_samples();
 
         let entry = samples.get(&fid_perf_1.to_string()).unwrap();
-        assert_eq!(3, entry.len());
+        assert_eq!(6, entry.len());
+        let actual_values = entry.get("function_instantiate_time").unwrap();
+        assert_eq!(
+            samples_1_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+        let actual_values = entry.get("function_init_time").unwrap();
+        assert_eq!(
+            samples_1_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
         let actual_values = entry.get("function_execution_time").unwrap();
+        assert_eq!(
+            samples_1_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+        let actual_values = entry.get("function_stop_time").unwrap();
         assert_eq!(
             samples_1_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
             actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
@@ -1105,8 +1126,23 @@ mod test {
         );
 
         let entry = samples.get(&fid_perf_2.to_string()).unwrap();
-        assert_eq!(3, entry.len());
+        assert_eq!(6, entry.len());
+        let actual_values = entry.get("function_instantiate_time").unwrap();
+        assert_eq!(
+            samples_2_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+        let actual_values = entry.get("function_init_time").unwrap();
+        assert_eq!(
+            samples_2_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
         let actual_values = entry.get("function_execution_time").unwrap();
+        assert_eq!(
+            samples_2_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
+            actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()
+        );
+        let actual_values = entry.get("function_stop_time").unwrap();
         assert_eq!(
             samples_2_values.iter().map(|x| x.to_string()).collect::<Vec<String>>(),
             actual_values.iter().map(|x| x.1.clone()).collect::<Vec<String>>()

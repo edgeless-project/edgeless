@@ -266,10 +266,22 @@ message NodeHealthStatus {
 
 // Node performance samples.
 message NodePerformanceSamples {
+    // Function instantiation times.
+    // The identifier is the physical component identifier.
+    // The samples are execution times, in fractional seconds.
+    repeated Samples function_instantiate_times = 90;
+    // Function initialization times.
+    // The identifier is the physical component identifier.
+    // The samples are execution times, in fractional seconds.
+    repeated Samples function_init_times = 95;
     // Function execution times.
     // The identifier is the physical component identifier.
     // The samples are execution times, in fractional seconds.
     repeated Samples function_execution_times = 100;
+    // Function stop times.
+    // The identifier is the physical component identifier.
+    // The samples are execution times, in fractional seconds.
+    repeated Samples function_stop_times = 105;
     // Function transfer times.
     // The identifier is the physical component identifier.
     // The samples are transfer times, in fractional seconds, from when the

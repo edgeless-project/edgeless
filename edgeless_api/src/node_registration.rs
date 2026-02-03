@@ -220,10 +220,15 @@ impl std::fmt::Display for FunctionLogEntry {
     }
 }
 
+type FunctionTimes = std::collections::HashMap<crate::function_instance::ComponentId, Vec<Sample>>;
+
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct NodePerformanceSamples {
-    pub function_execution_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<Sample>>,
-    pub function_transfer_times: std::collections::HashMap<crate::function_instance::ComponentId, Vec<Sample>>,
+    pub function_instantiate_times: FunctionTimes,
+    pub function_init_times: FunctionTimes,
+    pub function_execution_times: FunctionTimes,
+    pub function_stop_times: FunctionTimes,
+    pub function_transfer_times: FunctionTimes,
     pub function_log_entries: std::collections::HashMap<crate::function_instance::ComponentId, Vec<FunctionLogEntry>>,
 }
 

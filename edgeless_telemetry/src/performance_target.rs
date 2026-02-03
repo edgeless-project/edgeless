@@ -3,12 +3,19 @@
 
 use std::str::FromStr;
 
+pub enum FunctionTime {
+    Instantiate = 0,
+    Init,
+    Execution,
+    Stop,
+    Transfer,
+}
+
+pub type FunctionTimes = std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::node_registration::Sample>>;
+
 #[derive(Default)]
 pub struct Metrics {
-    pub function_execution_times:
-        std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::node_registration::Sample>>,
-    pub function_transfer_times:
-        std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::node_registration::Sample>>,
+    pub function_times: [FunctionTimes; 5],
     pub function_log_entries:
         std::collections::HashMap<edgeless_api::function_instance::ComponentId, Vec<edgeless_api::node_registration::FunctionLogEntry>>,
 }
@@ -23,8 +30,7 @@ impl PerformanceTarget {
     /// Return the current metrics and reset them.
     pub fn get_metrics(&mut self) -> Metrics {
         Metrics {
-            function_execution_times: std::mem::take(&mut self.metrics.function_execution_times),
-            function_transfer_times: std::mem::take(&mut self.metrics.function_transfer_times),
+            function_times: std::mem::take(&mut self.metrics.function_times),
             function_log_entries: std::mem::take(&mut self.metrics.function_log_entries),
         }
     }
@@ -36,31 +42,60 @@ impl crate::telemetry_events::EventProcessor for PerformanceTarget {
         event: &crate::telemetry_events::TelemetryEvent,
         event_tags: &std::collections::BTreeMap<String, String>,
     ) -> crate::telemetry_events::TelemetryProcessingResult {
+        let new_sample = |lat: &std::time::Duration| {
+            let now = chrono::Utc::now();
+            edgeless_api::node_registration::Sample {
+                timestamp_sec: now.timestamp(),
+                timestamp_ns: now.timestamp_subsec_nanos(),
+                sample: lat.as_secs_f64(),
+            }
+        };
+
         match event {
+            crate::telemetry_events::TelemetryEvent::FunctionInstantiate(lat) => {
+                if let Some(function_id) = event_tags.get("FUNCTION_ID")
+                    && let Ok(function_id) = uuid::Uuid::from_str(function_id)
+                {
+                    let res = self.metrics.function_times[FunctionTime::Instantiate as usize]
+                        .entry(function_id)
+                        .or_default();
+                    res.push(new_sample(lat));
+                }
+            }
+            crate::telemetry_events::TelemetryEvent::FunctionInit(lat) => {
+                if let Some(function_id) = event_tags.get("FUNCTION_ID")
+                    && let Ok(function_id) = uuid::Uuid::from_str(function_id)
+                {
+                    let res = self.metrics.function_times[FunctionTime::Init as usize].entry(function_id).or_default();
+                    res.push(new_sample(lat));
+                }
+            }
             crate::telemetry_events::TelemetryEvent::FunctionInvocationCompleted(lat) => {
                 if let Some(function_id) = event_tags.get("FUNCTION_ID")
                     && let Ok(function_id) = uuid::Uuid::from_str(function_id)
                 {
-                    let now = chrono::Utc::now();
-                    let res = self.metrics.function_execution_times.entry(function_id).or_default();
-                    res.push(edgeless_api::node_registration::Sample {
-                        timestamp_sec: now.timestamp(),
-                        timestamp_ns: now.timestamp_subsec_nanos(),
-                        sample: lat.as_secs_f64(),
-                    });
+                    let res = self.metrics.function_times[FunctionTime::Execution as usize]
+                        .entry(function_id)
+                        .or_default();
+                    res.push(new_sample(lat));
+                }
+            }
+            crate::telemetry_events::TelemetryEvent::FunctionStop(lat) => {
+                if let Some(function_id) = event_tags.get("FUNCTION_ID")
+                    && let Ok(function_id) = uuid::Uuid::from_str(function_id)
+                {
+                    let res = self.metrics.function_times[FunctionTime::Stop as usize].entry(function_id).or_default();
+                    res.push(new_sample(lat));
                 }
             }
             crate::telemetry_events::TelemetryEvent::FunctionTransfer(lat) => {
                 if let Some(function_id) = event_tags.get("FUNCTION_ID")
                     && let Ok(function_id) = uuid::Uuid::from_str(function_id)
                 {
-                    let now = chrono::Utc::now();
-                    let res = self.metrics.function_transfer_times.entry(function_id).or_default();
-                    res.push(edgeless_api::node_registration::Sample {
-                        timestamp_sec: now.timestamp(),
-                        timestamp_ns: now.timestamp_subsec_nanos(),
-                        sample: lat.as_secs_f64(),
-                    });
+                    let res = self.metrics.function_times[FunctionTime::Transfer as usize]
+                        .entry(function_id)
+                        .or_default();
+                    res.push(new_sample(lat));
                 }
             }
             crate::telemetry_events::TelemetryEvent::FunctionLogEntry(_lvl, target, message) => {
@@ -146,15 +181,24 @@ mod tests {
         let event_tags = std::collections::BTreeMap::from([("FUNCTION_ID".to_string(), fid.to_string())]);
 
         let metrics = target.get_metrics();
-        assert!(metrics.function_execution_times.is_empty());
-        assert!(metrics.function_transfer_times.is_empty());
+        assert!(metrics.function_times[FunctionTime::Instantiate as usize].is_empty());
+        assert!(metrics.function_times[FunctionTime::Init as usize].is_empty());
+        assert!(metrics.function_times[FunctionTime::Execution as usize].is_empty());
+        assert!(metrics.function_times[FunctionTime::Stop as usize].is_empty());
+        assert!(metrics.function_times[FunctionTime::Transfer as usize].is_empty());
         assert!(metrics.function_log_entries.is_empty());
 
+        let mut expected_instantiate = vec![];
+        let mut expected_init = vec![];
         let mut expected_execution = vec![];
+        let mut expected_stop = vec![];
         let mut expected_transfer = vec![];
         let mut expected_log_entries = vec![];
         for i in 0..10 {
-            expected_execution.push(i as f64);
+            expected_instantiate.push(i as f64 * 2.0);
+            expected_init.push(i as f64 * 3.0);
+            expected_execution.push(i as f64 * 4.0);
+            expected_stop.push(i as f64 * 5.0);
             expected_transfer.push((1000 + i) as f64);
             expected_log_entries.push((format!("target{}", i), format!("message{}", i)));
             target.handle(
@@ -184,10 +228,19 @@ mod tests {
 
         let metrics = target.get_metrics();
 
-        let samples = metrics.function_execution_times.get(&fid).cloned().unwrap();
+        let samples = metrics.function_times[FunctionTime::Instantiate as usize].get(&fid).cloned().unwrap();
+        assert_eq!(expected_instantiate, samples.iter().map(|x| x.sample).collect::<Vec<f64>>());
+
+        let samples = metrics.function_times[FunctionTime::Init as usize].get(&fid).cloned().unwrap();
+        assert_eq!(expected_init, samples.iter().map(|x| x.sample).collect::<Vec<f64>>());
+
+        let samples = metrics.function_times[FunctionTime::Execution as usize].get(&fid).cloned().unwrap();
         assert_eq!(expected_execution, samples.iter().map(|x| x.sample).collect::<Vec<f64>>());
 
-        let samples = metrics.function_transfer_times.get(&fid).cloned().unwrap();
+        let samples = metrics.function_times[FunctionTime::Stop as usize].get(&fid).cloned().unwrap();
+        assert_eq!(expected_stop, samples.iter().map(|x| x.sample).collect::<Vec<f64>>());
+
+        let samples = metrics.function_times[FunctionTime::Transfer as usize].get(&fid).cloned().unwrap();
         assert_eq!(expected_transfer, samples.iter().map(|x| x.sample).collect::<Vec<f64>>());
 
         let log_entries = metrics.function_log_entries.get(&fid).cloned().unwrap();
@@ -200,8 +253,11 @@ mod tests {
         );
 
         let metrics = target.get_metrics();
-        assert!(metrics.function_execution_times.is_empty());
-        assert!(metrics.function_transfer_times.is_empty());
+        assert!(metrics.function_times[FunctionTime::Instantiate as usize].is_empty());
+        assert!(metrics.function_times[FunctionTime::Init as usize].is_empty());
+        assert!(metrics.function_times[FunctionTime::Execution as usize].is_empty());
+        assert!(metrics.function_times[FunctionTime::Stop as usize].is_empty());
+        assert!(metrics.function_times[FunctionTime::Transfer as usize].is_empty());
         assert!(metrics.function_log_entries.is_empty());
     }
 }
