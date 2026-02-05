@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: If you use this software, please cite both the article from preferred-citation and the software itself.
+authors:
+  - family-names: Raphael
+    given-names: Hetzel
+  - family-names: Claudio 
+    given-names: Cicconetti
+  - family-names: Łukasz
+    given-names: Zalewski
+title: EDGELESS: A platform to develop and deploy stateful agents in the edge-cloud
+version: 1.2.0
+url: https://github.com/edgeless-project/edgeless/
+date-released: '2025-11-28'
+preferred-citation:
+  authors:
+    - family-names: Claudio
+      given-names: Cicconetti
+    - family-names: Emanuele
+      given-names: Carlini
+    - family-names: Chen
+      given-names: Chen
+    - family-names: Roman
+      given-names: Kolcun
+    - family-names: Richard
+      given-names: Mortier
+  title: Design and implementation of a platform for stateful agents at the edge
+  journal: Pervasive and Mobile Computing
+  doi: https://doi.org/10.1016/j.pmcj.2026.102175
+  url: https://www.sciencedirect.com/science/article/pii/S1574119226000167
+  type: article-journal
+  pages: '102175'
+  volume: '117'
+  year: '2026'
+  publisher: Elsevier
