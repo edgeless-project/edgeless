@@ -7,7 +7,7 @@ authors:
     given-names: Cicconetti
   - family-names: Łukasz
     given-names: Zalewski
-title: EDGELESS: A platform to develop and deploy stateful agents in the edge-cloud
+title: "EDGELESS: A platform to develop and deploy stateful agents in the edge-cloud"
 version: 1.2.0
 url: https://github.com/edgeless-project/edgeless/
 date-released: '2025-11-28'
@@ -23,12 +23,11 @@ preferred-citation:
       given-names: Kolcun
     - family-names: Richard
       given-names: Mortier
-  title: Design and implementation of a platform for stateful agents at the edge
-  journal: Pervasive and Mobile Computing
-  doi: https://doi.org/10.1016/j.pmcj.2026.102175
-  url: https://www.sciencedirect.com/science/article/pii/S1574119226000167
-  type: article-journal
+  title: "Design and implementation of a platform for stateful agents at the edge"
+  journal: "Pervasive and Mobile Computing"
+  doi: "10.1016/j.pmcj.2026.102175"
+  url: "https://www.sciencedirect.com/science/article/pii/S1574119226000167"
+  type: "article"
   pages: '102175'
   volume: '117'
   year: '2026'
-  publisher: Elsevier
