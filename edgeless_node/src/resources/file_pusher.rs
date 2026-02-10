@@ -83,11 +83,12 @@ impl FilePusherResource {
                 };
 
                 if let Some(instance) = inner.instances.get(&self_function_id)
-                    && let Some(instance_id) = instance.target {
-                        dataplane_handle
-                            .send(instance_id, msg, &edgeless_api::function_instance::EventMetadata::empty_new_root())
-                            .await;
-                    }
+                    && let Some(instance_id) = instance.target
+                {
+                    dataplane_handle
+                        .send(instance_id, msg, &edgeless_api::function_instance::EventMetadata::empty_new_root())
+                        .await;
+                }
 
                 // Move to the next file. Wrap-around, if needed.
                 cur += 1;
@@ -123,9 +124,10 @@ impl FilePusherResourceProvider {
                 let mut filenames = vec![];
                 for path in paths {
                     if let Ok(path) = path
-                        && let Some(filename) = path.path().as_os_str().to_str() {
-                            filenames.push(filename.to_string());
-                        }
+                        && let Some(filename) = path.path().as_os_str().to_str()
+                    {
+                        filenames.push(filename.to_string());
+                    }
                 }
                 filenames.sort();
                 for filename in filenames {
