@@ -76,21 +76,18 @@ impl FilePusherResource {
 
                 let msg = if num_files == 0 {
                     String::default()
+                } else if encode_base64 {
+                    base64::engine::general_purpose::STANDARD.encode(inner.files[cur].clone())
                 } else {
-                    if encode_base64 {
-                        base64::engine::general_purpose::STANDARD.encode(inner.files[cur].clone())
-                    } else {
-                        String::from_utf8(inner.files[cur].to_vec()).unwrap_or_default()
-                    }
+                    String::from_utf8(inner.files[cur].to_vec()).unwrap_or_default()
                 };
 
-                if let Some(instance) = inner.instances.get(&self_function_id) {
-                    if let Some(instance_id) = instance.target {
+                if let Some(instance) = inner.instances.get(&self_function_id)
+                    && let Some(instance_id) = instance.target {
                         dataplane_handle
                             .send(instance_id, msg, &edgeless_api::function_instance::EventMetadata::empty_new_root())
                             .await;
                     }
-                }
 
                 // Move to the next file. Wrap-around, if needed.
                 cur += 1;
@@ -125,11 +122,10 @@ impl FilePusherResourceProvider {
             Ok(paths) => {
                 let mut filenames = vec![];
                 for path in paths {
-                    if let Ok(path) = path {
-                        if let Some(filename) = path.path().as_os_str().to_str() {
+                    if let Ok(path) = path
+                        && let Some(filename) = path.path().as_os_str().to_str() {
                             filenames.push(filename.to_string());
                         }
-                    }
                 }
                 filenames.sort();
                 for filename in filenames {
