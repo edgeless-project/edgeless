@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+New features:
+
+- Add `file-pusher` resource provider, which reads content of files in a
+  directory and casts them in a round-robin fashion to an output channel.
+  The generation period can be configured. Optionally, the content can be
+  base64-encoded.
+
 Improvements:
 
 - Telemetry: track the time required for the instantiation, initialization, and

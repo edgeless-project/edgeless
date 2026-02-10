@@ -7,7 +7,7 @@ use std::path::Path;
 use clap::Parser;
 use edgeless_node::{
     EdgelessNodeContainerRuntimeSettings, EdgelessNodeGeneralSettings, EdgelessNodeResourceSettings, EdgelessNodeSettings,
-    EdgelessNodeTelemetrySettings, OllamaProviderSettings, ServerlessProviderSettings,
+    EdgelessNodeTelemetrySettings, FilePusherSettings, OllamaProviderSettings, ServerlessProviderSettings,
 };
 use std::fs;
 
@@ -159,6 +159,7 @@ fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16
                 http_ingress_provider: Some(format!("http-ingress-{}", counter + 1)),
                 http_egress_provider: Some(format!("http-egress-{}", counter + 1)),
                 http_poster_provider: Some(format!("http-poster-{}", counter + 1)),
+                file_pusher_provider: Some(FilePusherSettings::default()),
                 file_log_provider: Some(format!("file-log-{}", counter + 1)),
                 redis_provider: Some(format!("redis-{}", counter + 1)),
                 dda_provider: Some(format!("dda-{}", counter + 1)),

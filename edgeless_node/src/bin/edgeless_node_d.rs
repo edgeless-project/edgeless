@@ -5,8 +5,10 @@
 use clap::Parser;
 use edgeless_node::resources::dda::DdaResourceSpec;
 use edgeless_node::resources::file_log::FileLogResourceSpec;
+use edgeless_node::resources::file_pusher::FilePusherResourceSpec;
 use edgeless_node::resources::http_egress::HttpEgressResourceSpec;
 use edgeless_node::resources::http_ingress::HttpIngressResourceSpec;
+use edgeless_node::resources::http_poster::HttpPosterResourceSpec;
 #[cfg(feature = "rdkafka")]
 use edgeless_node::resources::kafka_egress::KafkaEgressResourceSpec;
 use edgeless_node::resources::ollama::OllamaResourceSpec;
@@ -33,9 +35,9 @@ struct Args {
 }
 
 fn read_conf_from_file(filename: &str) -> anyhow::Result<edgeless_node::EdgelessNodeSettings> {
-    Ok(toml::from_str::<edgeless_node::EdgelessNodeSettings>(&std::fs::read_to_string(
-        filename,
-    )?)?)
+    Ok(toml::from_str::<edgeless_node::EdgelessNodeSettings>(
+        &std::fs::read_to_string(filename)?,
+    )?)
 }
 
 fn main() -> anyhow::Result<()> {
@@ -51,14 +53,21 @@ fn main() -> anyhow::Result<()> {
             env!("CARGO_PKG_VERSION_MAJOR"),
             env!("CARGO_PKG_VERSION_MINOR"),
             env!("CARGO_PKG_VERSION_PATCH"),
-            if env!("CARGO_PKG_VERSION_PRE").is_empty() { "" } else { "-" },
+            if env!("CARGO_PKG_VERSION_PRE").is_empty() {
+                ""
+            } else {
+                "-"
+            },
             env!("CARGO_PKG_VERSION_PRE")
         );
         return Ok(());
     }
     // Create a template node configuration and exit.
     if !args.template.is_empty() {
-        edgeless_api::util::create_template(&args.template, edgeless_node::edgeless_node_default_conf().as_str())?;
+        edgeless_api::util::create_template(
+            &args.template,
+            edgeless_node::edgeless_node_default_conf().as_str(),
+        )?;
         return Ok(());
     }
 
@@ -73,6 +82,8 @@ fn main() -> anyhow::Result<()> {
             Box::new(FileLogResourceSpec {}),
             Box::new(HttpEgressResourceSpec {}),
             Box::new(HttpIngressResourceSpec {}),
+            Box::new(HttpPosterResourceSpec {}),
+            Box::new(FilePusherResourceSpec {}),
             Box::new(OllamaResourceSpec {}),
             Box::new(RedisResourceSpec {}),
             Box::new(SqlxResourceSpec {}),
@@ -84,15 +95,23 @@ fn main() -> anyhow::Result<()> {
             && let Some(serverless_providers) = &resources.serverless_provider
         {
             for settings in serverless_providers {
-                specs.push(Box::new(ServerlessResourceProviderSpec::new(&settings.class_type, &settings.version)))
+                specs.push(Box::new(ServerlessResourceProviderSpec::new(
+                    &settings.class_type,
+                    &settings.version,
+                )))
             }
         }
 
         if args.output_json {
             println!(
                 "{}",
-                serde_json::to_string(&specs.iter().map(|x| x.to_output()).collect::<Vec<ResourceProviderSpecOutput>>())
-                    .expect("could not serialize available resources to JSON")
+                serde_json::to_string(
+                    &specs
+                        .iter()
+                        .map(|x| x.to_output())
+                        .collect::<Vec<ResourceProviderSpecOutput>>()
+                )
+                .expect("could not serialize available resources to JSON")
             );
         } else {
             for spec in specs {
@@ -118,7 +137,9 @@ fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let async_runtime = tokio::runtime::Builder::new_multi_thread().enable_all().build()?;
+    let async_runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
     let async_tasks = vec![async_runtime.spawn(edgeless_node::edgeless_node_main(conf?))];
 
     async_runtime.block_on(async { futures::future::join_all(async_tasks).await });

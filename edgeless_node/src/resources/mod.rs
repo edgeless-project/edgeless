@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: MIT
 pub mod dda;
 pub mod file_log;
+pub mod file_pusher;
 pub mod http_egress;
 pub mod http_ingress;
 pub mod http_poster;

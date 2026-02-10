@@ -10,6 +10,7 @@ features provided by the platform.
 - `http_egress`: shows how to send HTTP commands to an external web servers via a function like `http_requestor`
 - `http_ingress`: shows how to ingest data from external HTTP clients
 - `http_poster`: shows how to forward the event message to a web server via HTTP POST directly 
+- `file_pusher`: shows how to use a file pusher resource as a source of images into EDGELESS from local filesystem
 - `kafka_egress`: shows host to use a resource that streams messages to an Apache Kafka server
 - `load_balance`: shows how to implement horizontal scalability in a workflow by deploying multiple instances fed by simple round-robin load balancer
 - `matrix_mul`: shows how to create a single function or a chain of three functions performing multiplication of two internal matrices to increase the CPU load

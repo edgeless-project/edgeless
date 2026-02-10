@@ -1,0 +1,25 @@
+{
+    "functions": [],
+    "resources": [
+        {
+            "name": "my-file-pusher",
+            "class_type": "file-pusher",
+            "output_mapping": {
+                "out": "my-log"
+            },
+            "configurations": {
+                "period-ms": "1000",
+                "encode-base64": "false"
+            }
+        },
+        {
+            "name": "my-log",
+            "class_type": "file-log",
+            "output_mapping": {},
+            "configurations": {
+                "filename": "my-local-file.log"
+            }
+        }
+    ],
+    "annotations": {}
+}
