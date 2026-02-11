@@ -1,9 +1,9 @@
-FROM rust:1.77
+FROM rust:1.90
 
 WORKDIR /usr/src/myapp
 
 RUN apt-get update -y
-RUN apt-get install protobuf-compiler -y
+RUN apt-get install protobuf-compiler curl git gcc libssl-dev pkg-config unzip make g++ libtss2-dev -y
 
 RUN git clone https://github.com/edgeless-project/edgeless.git
 WORKDIR /usr/src/myapp/edgeless/
