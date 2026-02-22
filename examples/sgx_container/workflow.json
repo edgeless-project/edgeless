@@ -1,0 +1,20 @@
+{
+    "functions": [
+        {
+            "name": "sgx",
+            "class_specification": {
+                "id": "sgx",
+                "function_type": "CONTAINER",
+                "version": "0.1",
+                "code": "container:edgeless-sgx-function-rust:dev",
+                "outputs": []
+            },
+            "output_mapping": {},
+            "annotations": {
+                "init-payload": "nothing interesting"
+            }
+        }
+    ],
+    "resources": [],
+    "annotations": {}
+}

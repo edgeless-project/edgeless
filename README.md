@@ -1,130 +1,156 @@
-![](documentation/edgeless-logo-alpha-200.png)
+# EDGELESS SGX Container Function Example (SCONE)
 
-# EDGELESS Reference Implementation
 
-This repository contains a research prototype of the EDGELESS platform, which is
-under active development within the project
-[EDGELESS](https://edgeless-project.eu/) (2023-2025).
+This example demonstrates how to run **EDGELESS** functions inside
+**Intel SGX–protected containers** using **SCONE** and the EDGELESS
+**container runtime**.
 
-## Introduction
+It provides a minimal, reproducible setup that:
+- Builds a **Rust-based function** as a container image
+- Cross-compiles the function with **SCONE**
+- Includes scripts to setup a local PCCS/DCAP service, SCONE's LAS and CAS
+- Includes a workflow containing a **single function**
 
-EDGELESS is a framework that enables
-[stateful FaaS agents](documentation/serverless_edge_computing.md) and
-is intended especially for edge nodes with limited computational capabilities.
+---
 
-An EDGELESS cluster is managed by an ε-CON (controller) and consists of one
-or more _orchestration domains_, each managed by an ε-ORC (orchestrator).
+## Prerequisites
 
-The ε-CON allows clients to request the creation of edge services (called
-_workflows_), which consist of a collection of interconnected _functions_
-and _resources_ and related annotations.
-The management of the lifecycle of any such logical functions/resources is 
-delegated by the ε-CON to one ε-ORC, which, in turn, manages the lifecycle
-of physical function/resource instances on EDGELESS nodes.
+To reproduce this example, the following requirements must be met.
 
-Each EDGELESS node may offer multiple run-time environments (e.g., WebAssembly
-or Docker) to run function instances and resource providers of different types
-(e.g., file logs or Kafka) to create resource instances.
+### 1. Local EDGELESS Build
 
-Orchestration in EDGELESS happens at two levels:
+You must build EDGELESS locally and configure it appropriately:
 
-- _higher level orchestration_ is done by the ε-CON at cluster level
-  and it maps logical functions/resources to orchestration domains;
-- _lower level orchestration_ is done by the ε-ORC within its orchestration
-  domain, and it maps every logical function/resource to physical instances
-  on its nodes.
+- Enable the **container runtime** in `node.toml`
+- Set `guest_api_host_url` to an address **reachable from inside containers**
+  - ❌ Do **not** use `127.0.0.1` or `0.0.0.0`
 
-## How to build
+---
 
-See [building instructions](BUILDING.md).
+### 2. SCONE Infrastructure Access
 
-## Quick start
+Access to the SCONE container registry is required in order to pull the appropriate images.
 
-It is recommended that you enable at least info-level log directives with:
+1. Register at <https://gitlab.scontain.com>
+2. Create a **Personal Access Token** with appropriate permissions
+3. Log in to the SCONE registry:
 
-```shell
-export RUST_LOG=info
+```bash
+docker login registry.scontain.com
+# username: <your username>
+# password: <your personal access token>
+```
+___
+## Function Logic
+
+The function logic must be implemented in:
+
+```text
+edgeless/edgeless_container_function/src/container_function.rs
+```
+Folder layout:
+
+```text
+~/edgeless/
+├── edgeless_container_function/
+│   └── src/container_function.rs <- Add your function logic here
+├── edgeless_api/
+├── Cargo.toml
+├── Cargo.lock
+└── examples/
+    └── sgx_container/
+        ├── Dockerfile <- Dockerfile lives here
+        ├── build.sh
+        ├── workflow.json
+        ├──  ...
+        └── modified_files <- files that were modified to run the example
+```
+### About modified files: 
+- `container_devices.rs` goes to `edgeless_node/src/container_runner/` in order to choose the in-tree SGX driver
+
+- `container_function.rs`: implements the function logic, see folder structure above.
+___
+## Building the function image
+
+To build the image, first generate an enclave signing private RSA key for scone-signer:
+
+```bash
+./generate-enclave-signing-key.sh
+```
+Then use the provided build script:
+```bash
+./build.sh
+```
+___
+## Setup SGX Provisioning Certificate Caching Service (PCCS)  
+
+Use the provided script to start a PCCS Docker container, generate and save admin/user auth tokens, patch the PCCS config with your Intel API key and token hashes, verify the service is reachable, and, optionally register the host platform with PCKIDRetrievalTool.
+
+
+```bash
+./setup-and-run-pccs.sh
 ```
 
-To get the basic system running, first create the default configuration files
-(they have fixed hardcoded values):
+---
 
-```shell
-target/debug/edgeless_inabox -t 
-target/debug/edgeless_cli -t cli.toml
+## Setup and run SCONE's Local Attestation Service (LAS)
+
+LAS runs on the node. It helps SGX apps create attestation quotes and connects them to the attestation infrastructure (like PCCS), so the enclave can prove it’s genuine and running trusted code.
+
+```bash
+./setup-las.sh
+docker compose -f docker-las-compose.yml up -d
+```
+___
+
+## Setup and run SCONE's Configuration and Attestation Service (CAS)
+The role of CAS is to verify enclave attestation and securely deliver the function’s secrets only to trusted enclaves.
+
+### CAS setup and run
+
+```bash
+./setup-cas.sh
+docker compose -f docker-cas-compose.yml up -d
 ```
 
-which will create:
+This script sets up CAS locally by preparing the CAS config files, detecting SGX devices and host SGX-related group IDs, generating the Docker Compose setup (including cas-init), computing and saving the CAS hash (SCONE_HASH=1), and mounting sgx_default_qcnl.conf if it exists next to the script.
 
-- `controller.toml`
-- `node.toml`
-- `orchestrator.toml`
-- `cli.toml`
+### SCONE CAS provisioning
 
-Then you can run the **EDGELESS-in-a-box**, which is a convenience binary that
-runs every necessary component as one, using the generated configuration files:
+CAS must first be provisioned, meaning it is initialized as a trusted service (with its own identity/keys) so it can securely manage secrets and attestation decisions.
 
-```
-target/debug/edgeless_inabox
+```bash
+./provision-cas.sh
 ```
 
-Congratulations 🎉 now that you have a complete EDGELESS system you may check
-our workflows/function examples, which are representative of the current
-EDGELESS features:
+The script provisions CAS in HW mode by detecting SGX devices/groups, asks whether to do attested provisioning, and then provisions cas in a Docker container using LAS and your provisioning token/key hash (optionally verifying CAS via CAS_MRENCLAVE).
+___
 
-- [Example workflows](examples/README.md)
-- [Example functions](functions/README.md)
+### Policy upload to CAS
 
-## Next steps
+After provisioning, CAS is ready to accept policies (i.e. security configuration and rules for apps). CAS uses those policies to decide which enclaves are allowed to receive secrets based on enclave identity measurements like:
 
-Basics:
+- MRENCLAVE: the exact enclave code hash (specific build)
+- MRSIGNER: the signer identity (who signed the enclave), allowing trust across compatible versions signed by the same key
 
-- [Workflows, resources, and functions](documentation/basic_concepts.md)
-- [ε-CON](documentation/controller.md)
-- [ε-ORC](documentation/orchestrator.md)
-- [EDGELESS node](documentation/node.md)
-- [EDGELESS command-line clients](documentation/cli.md)
-- [A step-by-step example](documentation/deploy_step_by_step.md)
 
-Advanced topics:
+```bash
+./attest-cas-upload_policy.sh
+```
 
-- [Repository layout](documentation/repository_layout.md)
-- [EDGELESS APIs](edgeless_api/README.md)
-- [How to create a new function](documentation/rust_functions.md)
-- [Local orchestration](documentation/local_orchestration.md)
-- [Benchmarking EDGELESS](documentation/benchmark.md)
-- [Docker container runtime](documentation/container-runtime.md)
-- [A multi-domain example](documentation/example_multidomain.md)
-- [Inter-domain workflows](documentation/interdomain_workflows.md)
-- [(m)TLS](edgeless_api/src/grpc_impl/tls_certs/README.md)
+This script attests CAS (optionally pinned to a specific MRENCLAVE), uploads a policy/session file to it, and finally verifies that the policy was stored successfully. 
 
-## Known limitations
+A dummy `policy.yml` file is provided. Also, in case you want to completely remove CAS by deleting the CAS container, remove the CAS data volume, and clean the generated local CAS files/artifacts, use:
 
-⚠️ There currently are no guarantees on stability, this software is not
-(yet) intended for production deployments.
+```bash
+./reset-cas.sh
+```
+___
 
-The open issues are tracked on
-[GitHub](https://github.com/edgeless-project/edgeless/issues).
 
-Stay tuned (star & watch
-[the GitHub project](https://github.com/edgeless-project/edgeless)) to remain
-up to date on future developments.
+## Notes
+1. SCONE cross-compilation currently uses an **older EDGELESS commit** that does **not** depend on `aws-lc-sys`. Newer versions introduce a dependency on `aws-lc-sys`, a low-level
+crate wrapping C and assembly code, which prevents successful cross-compilation. This does not refer to the local copy of your EDGELESS but to the commit brought in the build stage.
 
-## Contributing
+2. The image name *must* contain `edgeless-sgx-function- ` otherwise EDGELESS will not pass the sgx driver to docker. See [docker_utils.rs](https://github.com/edgeless-project/edgeless/blob/main/edgeless_node/src/container_runner/docker_utils.rs) and [container_devices.rs](https://github.com/edgeless-project/edgeless/blob/main/edgeless_node/src/container_runner/container_devices.rs)
 
-We love the open source community of developers ❤️ and we welcome contributions
-to EDGELESS.
-
-The [contributing guide](CONTRIBUTING_GUIDE.md) contains some rules you should
-adhere to when contributing to this repository.
-
-## License
-
-The Repository is licensed under the MIT License. Please refer to
-[LICENSE](LICENSE) and [CONTRIBUTORS.txt](CONTRIBUTORS.txt). 
-
-## Funding
-
-EDGELESS received funding from the [European Health and Digital Executive Agency
-(HADEA)](https://hadea.ec.europa.eu/) program under Grant Agreement No
-101092950.
