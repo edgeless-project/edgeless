@@ -1,0 +1,39 @@
+name: policy
+version: "0.3.10"
+#predecessor: "6bc7726822ae70d66b13673f54402b22d0b6d6d4062bf1bb4c4eb622e7a537ef"
+
+security:
+  attestation:
+    tolerate:
+      - "insecure-configuration"
+      - "outdated-tcb"
+    ignore_advisories:
+      - "INTEL-SA-00289"
+      - "INTEL-SA-00334"
+      - "INTEL-SA-00614"
+      - "INTEL-SA-00615"
+      - "INTEL-SA-00617"
+      - "INTEL-SA-00828"
+
+# A service in a SCONE session is a SCONE program with a specific software state and configuration
+services:
+  - name: edgeless_function
+    #the command to be executed; match the CMD in function's Dockerfile
+    command: ["edgeless_container_function",  "--endpoint", "http://0.0.0.0:7101"]
+    #the process working directory from which path resolution of relative paths starts
+    pwd: /
+    attestation:
+      mrenclave:
+        - b59a1afc14c69927bcd6847f033bff976e10e48c0a5c1b860576c70cd8ede1b1
+    environment:
+    #Values that are needed to provide the expected service 
+    #Pre-existing variables are not trusted, only those in the policy will be available to SCONE program
+      DEMO_SECRET: "$$SCONE::enclave_secret$$"
+      #used to inject the secret  into the service's environment
+      SCONE_ALLOW_DLOPEN: "2"
+      SCONE_LOG: "DEBUG"
+
+secrets:
+    - name: enclave_secret
+      kind: ascii
+      value: "hello, EDGELESS enclave"
