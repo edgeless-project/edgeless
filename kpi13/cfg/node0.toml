@@ -1,0 +1,33 @@
+[general]
+node_id = "f3cdeea0-9afd-4487-a78a-53cac5843b54"
+agent_url = "http://127.0.0.1:8005"
+agent_url_announced = "http://127.0.0.1:8005"
+invocation_url = "http://127.0.0.1:8006"
+invocation_url_announced = "http://127.0.0.1:8006"
+node_register_url = "http://127.0.0.1:7004"
+subscription_refresh_interval_sec = 2
+
+[telemetry]
+metrics_url = "http://127.0.0.1:8007"
+performance_samples = false
+
+[wasm_runtime]
+enabled = true
+
+[resources]
+prepend_hostname = false
+redis_provider = "redis-1"
+
+[user_node_capabilities]
+num_cpus = 6
+model_name_cpu = "QEMU Virtual CPU version 2.5+"
+clock_freq_cpu = 3504.0
+num_cores = 6
+mem_size = 32096
+labels = ["control"]
+is_tee_running = false
+has_tpm = false
+disk_tot_space = 255982
+num_gpus = 0
+model_name_gpu = ""
+mem_size_gpu = 0

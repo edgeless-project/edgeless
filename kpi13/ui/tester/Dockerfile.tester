@@ -1,0 +1,11 @@
+# Use official Node.js LTS image
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY package.json tsconfig.json ./
+RUN npm install
+
+COPY tester-mandelbrot-redis.ts ./
+
+CMD ["npx", "ts-node", "tester-mandelbrot-redis.ts"]

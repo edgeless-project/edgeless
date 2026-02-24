@@ -1,0 +1,21 @@
+{
+  "name": "redis-ws-backend",
+  "version": "1.0.0",
+  "main": "redis-ws-backend.ts",
+  "license": "MIT",
+  "scripts": {
+    "start": "npx ts-node redis-ws-backend.ts"
+  },
+  "dependencies": {
+    "ws": "^8.13.0",
+    "ioredis": "^5.3.2",
+    "pngjs": "^7.0.0",
+    "colorgrad-js": "^0.1.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.10",
+    "@types/node": "^20.11.30",
+    "typescript": "^5.3.3",
+    "ts-node": "^10.9.2"
+  }
+}

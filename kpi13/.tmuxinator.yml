@@ -1,0 +1,39 @@
+# .tmuxinator.yml
+
+name: kpi-13-demonstrator
+
+windows:
+  - main:
+      layout: tiled
+      panes:
+        # Column 1 - Row 1 - Edge Node
+        - sleep 6 && echo "Column 1, Row 1 - Node 1" && RUST_LOG=info build/edgeless_node_d -c cfg/node0.toml
+        
+        # Column 1 - Row 2 - Edge Node  
+        - sleep 6 && echo "Column 1, Row 2 - Node 2" && RUST_LOG=info build/edgeless_node_d -c cfg/node1.toml
+        
+        # Column 1 - Row 3 - Edge Node
+        - sleep 6 && echo "Column 1, Row 3 - Node 3" && RUST_LOG=info build/edgeless_node_d -c cfg/node2.toml
+
+        # Column 2 - Row 1 - Edge Node
+        - sleep 6 && echo "Column 2, Row 1 - Node 4" && RUST_LOG=info build/edgeless_node_d -c cfg/node3.toml
+        
+        # Column 2 - Row 2 - Edge Node
+        - sleep 6 && echo "Column 2, Row 2 - Node 5" && RUST_LOG=info build/edgeless_node_d -c cfg/node4.toml
+        
+        # Column 2 - Row 3 - Edge Node
+        - sleep 6 && echo "Column 2, Row 3 - Node 6" && RUST_LOG=info build/edgeless_node_d -c cfg/node5.toml
+
+        # Column 3 - Row 1 - Edge Node
+        - sleep 6 && echo "Column 3, Row 1 - Node 7" && RUST_LOG=info build/edgeless_node_d -c cfg/node6.toml
+        
+        # Column 3 - Row 2 - Edge Node
+        - sleep 6 && echo "Column 3, Row 2 - Node 8" && RUST_LOG=info build/edgeless_node_d -c cfg/node7.toml
+        
+        # Column 3 - Row 3 - Edge Node
+        - sleep 6 && echo "Column 3, Row 3 - Node 9" && RUST_LOG=info build/edgeless_node_d -c cfg/node8.toml
+
+        # last row
+        - echo "Column 2, Row 4 - Controller" && RUST_LOG=info build/edgeless_con_d -c cfg/controller.toml
+        - sleep 2 && echo "Column 1, Row 4 - Orchestrator" && RUST_LOG=info build/edgeless_orc_d -c cfg/orchestrator.toml
+        - cd ui && echo "Column 3, Row 4 - UI Services" && docker compose down && docker compose up --build

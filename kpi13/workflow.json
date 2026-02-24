@@ -1,0 +1,221 @@
+{
+    "functions": [
+        {
+            "name": "work_splitter",
+            "class_specification": {
+                "id": "work_splitter",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "functions/work_splitter/work_splitter.wasm",
+                "outputs": []
+            },
+            "output_mapping": {
+                "1": "calculator-1",
+                "2": "calculator-2",
+                "3": "calculator-3",
+                "4": "calculator-4",
+                "5": "calculator-5",
+                "6": "calculator-6",
+                "7": "calculator-7",
+                "8": "calculator-8",
+                "9": "calculator-9"
+            },
+            "annotations": {
+                "init-payload": "top_left_x=-2.5,top_left_y=1.5,bottom_right_x=1.0,bottom_right_y=-1.5,zoom_center_x=-0.7,zoom_center_y=0.0",
+                "label_match_all": "control"
+            }
+        },
+        {
+            "name": "calculator-1",
+            "class_specification": {
+                "id": "calculator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "functions/calculator/calculator.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "redis-server"
+            },
+            "annotations": {
+                "label_match_all": "rpi",
+                "critical": "2"
+            },
+            "replication_factor": 2
+        },
+        {
+            "name": "calculator-2",
+            "class_specification": {
+                "id": "calculator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "functions/calculator/calculator.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "redis-server"
+            },
+            "annotations": {
+                "label_match_all": "rpi",
+                "critical": "2"
+            },
+            "replication_factor": 2
+        },
+        {
+            "name": "calculator-3",
+            "class_specification": {
+                "id": "calculator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "functions/calculator/calculator.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "redis-server"
+            },
+            "annotations": {
+                "label_match_all": "rpi",
+                "critical": "2"
+            },
+            "replication_factor": 2
+        },
+        {
+            "name": "calculator-4",
+            "class_specification": {
+                "id": "calculator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "functions/calculator/calculator.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "redis-server"
+            },
+            "annotations": {
+                "label_match_all": "rpi",
+                "critical": "2"
+            },
+            "replication_factor": 2
+        },
+        {
+            "name": "calculator-5",
+            "class_specification": {
+                "id": "calculator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "functions/calculator/calculator.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "redis-server"
+            },
+            "annotations": {
+                "label_match_all": "rpi",
+                "critical": "2"
+            },
+            "replication_factor": 2
+        },
+        {
+            "name": "calculator-6",
+            "class_specification": {
+                "id": "calculator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "functions/calculator/calculator.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "redis-server"
+            },
+            "annotations": {
+                "label_match_all": "rpi",
+                "critical": "2"
+            },
+            "replication_factor": 2
+        },
+        {
+            "name": "calculator-7",
+            "class_specification": {
+                "id": "calculator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "functions/calculator/calculator.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "redis-server"
+            },
+            "annotations": {
+                "label_match_all": "rpi",
+                "critical": "2"
+            },
+            "replication_factor": 2
+        },
+        {
+            "name": "calculator-8",
+            "class_specification": {
+                "id": "calculator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "functions/calculator/calculator.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "redis-server"
+            },
+            "annotations": {
+                "label_match_all": "rpi",
+                "critical": "2"
+            },
+            "replication_factor": 2
+        },
+        {
+            "name": "calculator-9",
+            "class_specification": {
+                "id": "calculator",
+                "function_type": "RUST_WASM",
+                "version": "0.1",
+                "code": "functions/calculator/calculator.wasm",
+                "outputs": [
+                    "out"
+                ]
+            },
+            "output_mapping": {
+                "out": "redis-server"
+            },
+            "annotations": {
+                "label_match_all": "rpi",
+                "critical": "2"
+            },
+            "replication_factor": 2
+        }
+    ],
+    "resources": [
+        {
+            "name": "redis-server",
+            "class_type": "redis",
+            "output_mapping": {},
+            "configurations": {
+                "url": "redis://127.0.0.1:6379/",
+                "key": "foo-cause-we-dont-use-you"
+            }
+        }
+    ],
+    "annotations": {}
+}

@@ -1,0 +1,29 @@
+[general]
+node_id = "ff19f941-d842-434f-841e-a36708b5239d"
+agent_url = "http://127.0.0.1:7015"
+agent_url_announced = "http://127.0.0.1:7015"
+invocation_url = "http://127.0.0.1:7016"
+invocation_url_announced = "http://127.0.0.1:7016"
+node_register_url = "http://127.0.0.1:7004"
+subscription_refresh_interval_sec = 2
+
+[telemetry]
+metrics_url = "http://127.0.0.1:7017"
+performance_samples = false
+
+[wasm_runtime]
+enabled = true
+
+[user_node_capabilities]
+num_cpus = 1
+model_name_cpu = "rpi-cpu"
+clock_freq_cpu = 3504.0
+num_cores = 4
+mem_size = 8192
+labels = ["rpi"]
+is_tee_running = false
+has_tpm = false
+disk_tot_space = 256982
+num_gpus = 0
+model_name_gpu = ""
+mem_size_gpu = 0

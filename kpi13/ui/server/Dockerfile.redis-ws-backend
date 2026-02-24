@@ -1,0 +1,17 @@
+# Dockerfile for redis-ws-backend
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Copy package files first for better caching
+COPY package.json package-lock.json* ./
+
+# Install dependencies
+RUN npm install
+
+# Copy source files
+COPY redis-ws-backend.ts tsconfig.json ./
+
+EXPOSE 3002
+
+CMD ["npx", "ts-node", "redis-ws-backend.ts"]
