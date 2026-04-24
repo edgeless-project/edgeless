@@ -163,7 +163,10 @@ impl super::tls_config::TlsConfig {
                     return cfg.create_channel_with_tpm(server_addr).await;
                 }
 
-                let endpoint = tonic::transport::Endpoint::from_shared(server_addr.to_string())?;
+                let endpoint = tonic::transport::Endpoint::from_shared(server_addr.to_string())?
+                        .timeout(std::time::Duration::from_secs(1))
+                        .connect_timeout(std::time::Duration::from_secs(5))
+                        .tcp_keepalive(Some(std::time::Duration::from_secs(2)));
 
                 if cfg.client_ca_path.is_some() {
                     log::info!("Applying TLS configuration");
@@ -174,12 +177,15 @@ impl super::tls_config::TlsConfig {
                 Ok(endpoint.connect().await?)
             }
             Err(e) => {
-                if e.to_string().contains("not found") {
-                    log::warn!("TLS configuration file 'tls_config.toml' not found. Continuing with plaintext connection (no TLS).");
-                } else {
-                    log::warn!("Failed to load TLS configuration: {}. Continuing with plaintext connection (no TLS).", e);
-                }
-                let endpoint = tonic::transport::Endpoint::from_shared(server_addr.to_string())?;
+                // if e.to_string().contains("not found") {
+                //     log::warn!("TLS configuration file 'tls_config.toml' not found. Continuing with plaintext connection (no TLS).");
+                // } else {
+                //     log::warn!("Failed to load TLS configuration: {}. Continuing with plaintext connection (no TLS).", e);
+                // }
+                let endpoint = tonic::transport::Endpoint::from_shared(server_addr.to_string())?
+                    .timeout(std::time::Duration::from_secs(1))
+                    .connect_timeout(std::time::Duration::from_secs(5))
+                    .tcp_keepalive(Some(std::time::Duration::from_secs(2)));
                 Ok(endpoint.connect().await?)
             }
         }

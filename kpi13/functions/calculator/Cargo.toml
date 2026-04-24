@@ -23,7 +23,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 colorgrad = "0.6.2"
-edgeless_function = { path = "../../../edgeless/edgeless_function" }
+edgeless_function = { path = "../../../edgeless_function" }
 hex = "0.4.3"
 log = "0.4"
 image = { version = "0.25.1", default-features = false, features = ["png"] }

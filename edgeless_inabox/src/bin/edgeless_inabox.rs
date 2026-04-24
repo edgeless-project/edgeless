@@ -113,6 +113,7 @@ fn generate_configs(config_path: String, number_of_nodes: u32, initial_port: u16
             orchestrator_url_announced: announced_url(orchestrator_url),
             node_register_url: next_url(false),
             node_register_coap_url: None,
+            kpi13_redis_url: Some("redis://localhost:6379".to_string()),
         },
         baseline: edgeless_orc::EdgelessOrcBaselineSettings {
             orchestration_strategy: edgeless_orc::OrchestrationStrategy::Random,

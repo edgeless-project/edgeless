@@ -49,6 +49,11 @@ pub struct EdgelessOrcGeneralSettings {
     pub node_register_url: String,
     /// The CoAP URL of the node register.
     pub node_register_coap_url: Option<String>,
+    /// Optional Redis URL for publishing KPI-13 telemetry events
+    /// (failover latency, function counts) to a Redis instance for
+    /// real-time visualization in the web UI.
+    #[serde(default)]
+    pub kpi13_redis_url: Option<String>,
 }
 
 #[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
@@ -149,7 +154,7 @@ pub async fn edgeless_orc_main(settings: EdgelessOrcSettings) {
 
     // Create the orchestrator.
     let (mut orchestrator, orchestrator_task, orchestrator_refresh_task) =
-        orchestrator::Orchestrator::new(settings.baseline.clone(), proxy.clone(), subscriber.get_subscriber_sender()).await;
+        orchestrator::Orchestrator::new(settings.baseline.clone(), proxy.clone(), subscriber.get_subscriber_sender(), settings.general.kpi13_redis_url).await;
 
     let orchestrator_server = edgeless_api::grpc_impl::outer::orc::OrchestratorAPIServer::run(
         orchestrator.get_api_client(),
@@ -211,6 +216,7 @@ pub fn edgeless_orc_default_conf() -> String {
             orchestrator_url_announced: String::from("http://127.0.0.1:7003"),
             node_register_url: String::from("http://127.0.0.1:7004"),
             node_register_coap_url: None,
+            kpi13_redis_url: None,
         },
         baseline: EdgelessOrcBaselineSettings {
             orchestration_strategy: OrchestrationStrategy::Random,

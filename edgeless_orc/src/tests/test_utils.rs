@@ -209,6 +209,7 @@ pub async fn setup(num_nodes: u32, num_resources_per_node: u32) -> SetupResult {
         },
         proxy.clone(),
         subscriber_sender,
+        None,
     )
     .await;
     tokio::spawn(orchestrator_task);
@@ -349,7 +350,7 @@ pub fn make_spawn_function_request(class_id: &str) -> edgeless_api::function_ins
             state_policy: StatePolicy::NodeLocal,
         },
         workflow_id: "workflow_1".to_string(),
-        replication_factor: Some(1),
+        replication_factor: None,
     }
 }
 

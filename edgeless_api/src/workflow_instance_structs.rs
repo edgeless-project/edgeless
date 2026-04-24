@@ -15,7 +15,12 @@ pub struct WorkflowFunction {
     pub output_mapping: std::collections::HashMap<String, String>,
     /// Key-value pairs of annotations for the function.
     pub annotations: std::collections::HashMap<String, String>,
-    /// Replication factor for this function. If not specified, defaults to 1. If specified, this function will be replicated the given number of times across the cluster.
+    /// Replication factor for this function. Controls failure handling:
+    /// - `None`: workflow stops immediately if this function's node fails.
+    /// - `Some(0)`: expendable — silently removed from the workflow on failure.
+    /// - `Some(1)`: rescheduled on a surviving node (with downtime).
+    /// - `Some(2+)`: hot-standby replicas on distinct nodes; on failure the
+    ///   standby is promoted instantly and a new replica is spawned (KPI-13).
     pub replication_factor: Option<u32>,
 }
 

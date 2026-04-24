@@ -22,7 +22,10 @@ impl super::tls_config::TlsConfig {
     }
 
     pub async fn create_client_channel(&self, server_addr: &str) -> anyhow::Result<tonic::transport::Channel> {
-        let endpoint = tonic::transport::Endpoint::from_shared(server_addr.to_string())?;
+        let endpoint = tonic::transport::Endpoint::from_shared(server_addr.to_string())?
+            .timeout(std::time::Duration::from_secs(5))
+            .connect_timeout(std::time::Duration::from_secs(5))
+            .tcp_keepalive(Some(std::time::Duration::from_secs(2)));
         Ok(endpoint.connect().await?)
     }
 

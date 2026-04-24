@@ -18,7 +18,7 @@ struct CalculatorFun;
 impl EdgeFunction for CalculatorFun {
     fn handle_cast(_src: InstanceId, encoded_message: &[u8]) {
         let str_message = core::str::from_utf8(encoded_message).unwrap();
-        // log::info!("calculator: called with '{}'", str_message);
+        log::info!("calculator: called with '{}'", str_message);
         let tokens: Vec<&str> = str_message.split(",").collect();
 
         // Expecting input of the form: "i={},top_left_x={:.6},top_left_y={:.6},bottom_right_x={:.6},bottom_right_y={:.6}"
@@ -52,8 +52,8 @@ impl EdgeFunction for CalculatorFun {
                 let zoom_level = 3.5 / view_width; // 3.5 is approximately the initial full view width
                 let max_iterations = (255.0 + (zoom_level.log10() * 50.0).max(0.0)).min(10000.0) as usize;
                 
-                // log::info!("calculator: view_width={:.10}, zoom_level={:.2e}, max_iterations={}", 
-                //           view_width, zoom_level, max_iterations);
+                log::info!("calculator: view_width={:.10}, zoom_level={:.2e}, max_iterations={}", 
+                          view_width, zoom_level, max_iterations);
                 
                 let gradient = colorgrad::rainbow();
                 let colors = gradient.colors(255);
@@ -93,14 +93,18 @@ impl EdgeFunction for CalculatorFun {
                     let encoded_png_data = hex::encode(png_data.into_inner());
                     let redis_op = format!("{}:{}", index, encoded_png_data);
                     // cast to redis
+                    log::info!("calculator: writing to redis");
                     cast("out", &redis_op.as_bytes());
                 } else {
                     log::error!("calculator: failed to generate PNG for segment {}", index);
                 }
                 return;
+            } else {
+                log::error!("something went wrong");
             }
+        } else {
+            log::error!("calculator: error parsing input string - expected format: 'i={{index}},top_left_x={{x}},top_left_y={{y}},bottom_right_x={{x}},bottom_right_y={{y}}'");
         }
-        log::error!("calculator: error parsing input string - expected format: 'i={{index}},top_left_x={{x}},top_left_y={{y}},bottom_right_x={{x}},bottom_right_y={{y}}'");
     }
 
     fn handle_call(_src: InstanceId, _encoded_message: &[u8]) -> CallRet {

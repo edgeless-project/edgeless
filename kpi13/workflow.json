@@ -40,8 +40,7 @@
                 "out": "redis-server"
             },
             "annotations": {
-                "label_match_all": "rpi",
-                "critical": "2"
+                "label_match_all": "rpi"
             },
             "replication_factor": 2
         },
@@ -60,8 +59,7 @@
                 "out": "redis-server"
             },
             "annotations": {
-                "label_match_all": "rpi",
-                "critical": "2"
+                "label_match_all": "rpi"
             },
             "replication_factor": 2
         },
@@ -80,8 +78,7 @@
                 "out": "redis-server"
             },
             "annotations": {
-                "label_match_all": "rpi",
-                "critical": "2"
+                "label_match_all": "rpi"
             },
             "replication_factor": 2
         },
@@ -100,8 +97,7 @@
                 "out": "redis-server"
             },
             "annotations": {
-                "label_match_all": "rpi",
-                "critical": "2"
+                "label_match_all": "rpi"
             },
             "replication_factor": 2
         },
@@ -120,8 +116,7 @@
                 "out": "redis-server"
             },
             "annotations": {
-                "label_match_all": "rpi",
-                "critical": "2"
+                "label_match_all": "rpi"
             },
             "replication_factor": 2
         },
@@ -140,8 +135,7 @@
                 "out": "redis-server"
             },
             "annotations": {
-                "label_match_all": "rpi",
-                "critical": "2"
+                "label_match_all": "rpi"
             },
             "replication_factor": 2
         },
@@ -160,8 +154,7 @@
                 "out": "redis-server"
             },
             "annotations": {
-                "label_match_all": "rpi",
-                "critical": "2"
+                "label_match_all": "rpi"
             },
             "replication_factor": 2
         },
@@ -180,8 +173,7 @@
                 "out": "redis-server"
             },
             "annotations": {
-                "label_match_all": "rpi",
-                "critical": "2"
+                "label_match_all": "rpi"
             },
             "replication_factor": 2
         },
@@ -200,8 +192,7 @@
                 "out": "redis-server"
             },
             "annotations": {
-                "label_match_all": "rpi",
-                "critical": "2"
+                "label_match_all": "rpi"
             },
             "replication_factor": 2
         }

@@ -126,6 +126,13 @@ Functions contain the following elements:
   that is running in a Trusted Execution Environment.
   * `tpm`: if `"required"` then the function instance must be created on a node
   that has a Trusted Platform Module.
+* The `replication_factor` controls failure handling for this function
+  (see [Replication & Failover](orchestrator.md#replication--failover)):
+  * _not set_ (`null`): the workflow stops immediately if the function's node fails.
+  * `0`: expendable — the function is silently removed from the workflow on failure.
+  * `1`: the function is rescheduled on a surviving node (with downtime).
+  * `2+`: hot-standby replicas are placed on distinct nodes; on active-instance
+    failure a standby is promoted instantly and a replacement replica is spawned.
 
 Resources contain the following elements:
 
@@ -176,7 +183,8 @@ For example, we report below the JSON encoding of the following workflow.
                 "success_cb": "http_processor_stage_2",
                 "failure_cb": // unmapped, events generated are ignored
             },
-            "annotations": {}
+            "annotations": {},
+            "replication_factor": 2 // optional; null/0/1/2+ — see Replication & Failover
         },
         {
             "name": "http_processor_stage_2",

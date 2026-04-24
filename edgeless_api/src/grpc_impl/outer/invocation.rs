@@ -107,7 +107,10 @@ impl InvocationAPIClient {
                 };
 
                 let endpoint = match tonic::transport::Endpoint::from_shared(server_addr.clone()) {
-                    Ok(ep) => ep,
+                    Ok(ep) => ep
+                        .timeout(std::time::Duration::from_secs(1))
+                        .connect_timeout(std::time::Duration::from_secs(5))
+                        .tcp_keepalive(Some(std::time::Duration::from_secs(1))),
                     Err(err) => {
                         log::error!("Failed to create endpoint for InvocationAPI at {}: {}", server_addr, err);
                         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;

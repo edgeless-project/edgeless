@@ -1247,6 +1247,7 @@ async fn test_orc_invalid_migration() {
         },
         proxy.clone(),
         subscriber_sender,
+        None,
     )
     .await;
     tokio::spawn(orchestrator_task);

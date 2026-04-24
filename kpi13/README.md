@@ -6,17 +6,16 @@ This setup starts every component as a separate process in a tmux pane. The node
 
 ### Prerequisites
 
-1. Make sure that you've run `git submodule update --recursive` in the root of this repo.
-2. install tmuxinator (e.g. `sudo apt install tmuxinator`)
-3. `cd kpi13/`
+1. install tmuxinator (e.g. `sudo apt install tmuxinator`)
+2. `cd kpi13/`
 
 ### How to run
 
-- Run: `scripts/build.sh` to build the binaries for edgeless
+- Run: `cd scripts && ./build.sh` to build the binaries for edgeless
 - Run: `tmuxinator stop kpi-13-demonstrator && tmuxinator start kpi-13-demonstrator`
 - Run: `scripts/start_workflow.sh` to start the workflow (in a separate terminal window).
 
-You may find the UI at `http://localhost:3000. Press the **Connect** button to connect to the demonstrator cluster.
+You may find the UI at `http://localhost:3000`. Press the **Connect** button to connect to the demonstrator cluster.
 
 >IMPORTANT: if you are running the demo on a remote machine, make sure to tunnel ports 3000 and 3002 to see the results in the local browser.
 
@@ -35,16 +34,16 @@ cd kpi13/scripts
 
 1. Create Python Virtual Environment
 
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-```
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+    ```
 
 2. Install Python Dependencies
 
-```bash
-pip install pandas plotnine numpy
-```
+    ```bash
+    pip install pandas plotnine numpy
+    ```
 
-3. Open the notebook and run the cells.
+3. Open the `evaluate.ipynb`notebook and run the cells.

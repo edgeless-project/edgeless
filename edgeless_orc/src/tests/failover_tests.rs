@@ -73,6 +73,8 @@ async fn test_orc_node_hot_redundancy_graceful() {
             assert_eq!(spawn_req, spawn_req_rcvd);
             if node_id == standby_replica_node_id.0 {
                 pid_2_standby = new_instance_id.function_id;
+            } else if node_id == active_function_node_id {
+                // active instance event, expected
             } else {
                 panic!("f2 started on an unexpected node");
             }

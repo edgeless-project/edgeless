@@ -36,8 +36,62 @@ The ε-ORC has the following interfaces, also illustrated in the diagram below:
 
 ![](diagrams-orc.png)
 
+## Replication & Failover
+
+The ε-ORC monitors node health through periodic registration refreshes.
+When a node fails to refresh within its declared deadline, the ε-ORC considers
+it disconnected and handles all functions that were running on it according to
+their `replication_factor` setting.
+
+### `replication_factor` semantics
+
+Each function in a workflow may declare a `replication_factor` that controls
+how the ε-ORC reacts when the function's node fails:
+
+| `replication_factor` | Behaviour on node failure |
+| -------------------- | ------------------------- |
+| _not set_ (`null`)   | **Fail-fast.** The entire workflow is stopped immediately. This is the default. |
+| `0`                  | **Expendable.** The function is silently removed from the workflow; remaining functions continue operating. Useful for optional/best-effort functions like metrics collectors. |
+| `1`                  | **Reschedule.** The function is restarted on a surviving node. The workflow continues but the function experiences downtime during rescheduling. |
+| `≥ 2`               | **Hot-standby (KPI-13).** `N` replicas are started on distinct nodes: one _active_ instance processes events, while `N − 1` _standby_ instances are pre-deployed and receive dataplane patches so they can be promoted instantly. |
+
+### Hot-standby failover (KPI-13)
+
+When `replication_factor ≥ 2`, the ε-ORC implements a two-phase failure
+detection loop, prioritising critical (hot-standby) functions:
+
+1. **Critical path** — The ε-ORC iterates over all functions with
+   `replication_factor ≥ 2` (_critical LIDs_). For each one:
+   - Dead instances (on disconnected nodes) are removed.
+   - If the _active_ instance is dead and a standby exists, the standby is
+     promoted to active and all dataplane patches are recomputed and applied.
+   - A new standby replica is queued for creation to restore the desired
+     replication level.
+   - If no standby is available for promotion, the workflow is stopped.
+2. **Non-critical path** — All remaining functions on disconnected nodes are
+   handled according to their `replication_factor` (fail-fast / expendable /
+   reschedule, as described above).
+3. **Replica replenishment** — New standby replicas queued during the critical
+   path are spawned on surviving nodes.
+
+The critical path is instrumented with a `kpi_13_failover` tracing span so
+failover latency can be measured end-to-end.
+
+### Node placement
+
+For `replication_factor ≥ 2`, the ε-ORC ensures that each replica is placed on
+a **distinct node**. If there are not enough feasible nodes to satisfy the
+requested replication factor at deployment time, the workflow creation is
+rejected. Node selection follows the configured orchestration strategy
+(round-robin or random), excluding nodes that already host a replica of the
+same function.
+
 
 - [EDGELESS orchestrator (ε-ORC)](#edgeless-orchestrator-ε-orc)
+  - [Replication & Failover](#replication--failover)
+    - [`replication_factor` semantics](#replication_factor-semantics)
+    - [Hot-standby failover (KPI-13)](#hot-standby-failover-kpi-13)
+    - [Node placement](#node-placement)
   - [Proxy](#proxy)
     - [Intents](#intents)
     - [Redis schema](#redis-schema)

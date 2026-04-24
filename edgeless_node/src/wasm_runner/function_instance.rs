@@ -57,6 +57,7 @@ impl crate::base_runtime::FunctionInstance for WASMFunctionInstance {
         config.async_support(true);
         config.wasm_bulk_memory(true);
         config.wasm_function_references(true);
+        config.wasm_tail_call(true);
         let engine = wasmtime::Engine::new(&config).map_err(|_err| crate::base_runtime::FunctionInstanceError::InternalError)?;
         let module = wasmtime::Module::from_binary(&engine, binary)
             .map_err(|e| crate::base_runtime::FunctionInstanceError::BadCode(format!("instantiate failed: {}", e)))?;

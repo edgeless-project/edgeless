@@ -94,6 +94,7 @@ impl Orchestrator {
         settings: crate::EdgelessOrcBaselineSettings,
         proxy: std::sync::Arc<tokio::sync::Mutex<dyn super::proxy::Proxy>>,
         subscriber_sender: futures::channel::mpsc::UnboundedSender<super::domain_subscriber::DomainSubscriberRequest>,
+        kpi13_redis_url: Option<String>,
     ) -> (
         Self,
         std::pin::Pin<Box<dyn Future<Output = ()> + Send>>,
@@ -108,7 +109,7 @@ impl Orchestrator {
             .await;
 
         let main_task = Box::pin(async move {
-            let mut orchestrator_task = super::orchestrator_task::OrchestratorTask::new(receiver, settings, proxy, subscriber_sender).await;
+            let mut orchestrator_task = super::orchestrator_task::OrchestratorTask::new(receiver, settings, proxy, subscriber_sender, kpi13_redis_url).await;
             orchestrator_task.run().await;
         });
 

@@ -1,3 +1,3 @@
 #!/bin/bash
-cd ../ui
+cd ../ui || exit
 docker compose up

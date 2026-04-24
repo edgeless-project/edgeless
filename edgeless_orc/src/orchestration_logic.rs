@@ -196,17 +196,16 @@ impl OrchestrationLogic {
                 Some(candidates[rnd])
             }
             crate::OrchestrationStrategy::RoundRobin => {
-                // Prevent infinite loop: evaluate each node at most once.
-                if let Some(_) = (0..candidates.len()).next() {
-                    // Wrap-around if the current index is out of bounds.
-                    if self.round_robin_current_index >= candidates.len() {
-                        self.round_robin_current_index = 0;
+                // Pick the next candidate in global round-robin order without
+                // advancing the shared index. next_excluding is used for
+                // secondary selections (e.g. hot-standby replicas) and must
+                // not interfere with the primary round-robin rotation.
+                for offset in 0..self.nodes.len() {
+                    let idx = (self.round_robin_current_index + offset) % self.nodes.len();
+                    let node_id = self.nodes[idx];
+                    if candidates.contains(&node_id) {
+                        return Some(node_id);
                     }
-
-                    let cand_ndx = self.round_robin_current_index;
-                    self.round_robin_current_index += 1;
-
-                    return Some(candidates[cand_ndx]);
                 }
                 None
             }

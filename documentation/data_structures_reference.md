@@ -36,6 +36,10 @@ Field `"outputs"` contains the function's name in the workflow where the outputs
 
 #### `ActiveInstance`
 This data structure is different if the logical instance is from a resource or a function.
+For functions, each physical instance is a `(InstanceId, bool)` tuple where the boolean indicates
+whether the instance is currently _active_ (`true`) or kept as a _hot-standby_ (`false`).
+Hot-standbys are spawned on distinct nodes and promoted to active on failure (see
+[Replication & Failover](orchestrator.md#replication--failover)).
 ```json
 // Logical function instance
 {
@@ -50,18 +54,19 @@ This data structure is different if the logical instance is from a resource or a
             },
             "annotations": {},
             "state_specification": {
-                "state_id":"3f7ffd7b-a833-43c4-b7f0-e40690ab4b25",      // No idea
+                "state_id":"3f7ffd7b-a833-43c4-b7f0-e40690ab4b25",
                 "state_policy":"NodeLocal"
             },
             "workflow_id":"c7c1c9cf-5b38-40c2-aa35-6b298501759a"
         },
         [
-            "InstanceId(node_id: ceba52c2-8465-4519-805e-fcc5e9e0ff7b, function_id: 90082fba-348a-4d06-8151-2bcf215fcd71)"       // This is a single string. Not parseable
+            ["InstanceId(node_id: ceba52c2-..., function_id: 90082fba-...)", true],
+            ["InstanceId(node_id: a1b2c3d4-..., function_id: deadbeef-...)", false]
         ]
     ]
 }
 
-// Logical Resource Instance
+// Logical Resource Instance (resources do not support replication)
 {
     "Resource": [
         {
@@ -69,7 +74,7 @@ This data structure is different if the logical instance is from a resource or a
             "configuration": {},
             "workflow_id": "e196dc2c-a9c2-4a39-8869-e8eeabdb174f"
         },
-        "InstanceId(node_id: 18f367bb-8d21-445e-89db-6aec2bd23d7a, function_id: 2167edbc-888f-4ba6-9583-1bd2431feea7)"          // This is a single string. Not parseable
+        "InstanceId(node_id: 18f367bb-8d21-445e-89db-6aec2bd23d7a, function_id: 2167edbc-888f-4ba6-9583-1bd2431feea7)"
   ]
 }
 ```

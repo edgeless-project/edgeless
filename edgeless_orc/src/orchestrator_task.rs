@@ -67,7 +67,7 @@ pub(crate) struct OrchestratorTask {
     // key: lid
     active_instances: std::collections::HashMap<uuid::Uuid, crate::active_instance::ActiveInstance>,
     active_instances_changed: bool,
-    // set of lids that have replication_factor (critical functions)
+    // set of lids with replication_factor >= 2 (KPI-13 critical functions)
     // this allows fast iteration over only critical functions during failover
     critical_lids: std::collections::HashSet<uuid::Uuid>,
     // active patches to which the orchestrator commits
@@ -78,6 +78,10 @@ pub(crate) struct OrchestratorTask {
     dependency_graph: std::collections::HashMap<uuid::Uuid, std::collections::HashMap<String, uuid::Uuid>>,
     dependency_graph_changed: bool,
     tracer: Option<edgeless_telemetry::control_plane_tracer::ControlPlaneTracer>,
+    /// Optional Redis connection for publishing KPI-13 telemetry events
+    /// (failover latency, function counts) to the web UI.
+    kpi13_redis: Option<redis::Connection>,
+    kpi13_redis_url: Option<String>,
 }
 
 impl OrchestratorTask {
@@ -86,7 +90,20 @@ impl OrchestratorTask {
         orchestrator_settings: crate::EdgelessOrcBaselineSettings,
         proxy: std::sync::Arc<tokio::sync::Mutex<dyn super::proxy::Proxy>>,
         subscriber_sender: futures::channel::mpsc::UnboundedSender<super::domain_subscriber::DomainSubscriberRequest>,
+        kpi13_redis_url: Option<String>,
     ) -> Self {
+        let kpi13_redis = kpi13_redis_url.as_deref().and_then(|url| {
+            match redis::Client::open(url).and_then(|c| c.get_connection()) {
+                Ok(conn) => {
+                    log::info!("KPI-13 telemetry Redis connected at {}", url);
+                    Some(conn)
+                }
+                Err(err) => {
+                    log::warn!("KPI-13 telemetry Redis connection failed ({}): {}", url, err);
+                    None
+                }
+            }
+        });
         Self {
             receiver,
             nodes: std::collections::HashMap::new(),
@@ -101,14 +118,27 @@ impl OrchestratorTask {
             dependency_graph: std::collections::HashMap::new(),
             dependency_graph_changed: false,
             tracer: edgeless_telemetry::control_plane_tracer::ControlPlaneTracer::new("/tmp/orchestrator_kpi_samples.csv".to_string()).ok(),
+            kpi13_redis,
+            kpi13_redis_url,
         }
     }
 
     // Main orchestration loop.
     pub async fn run(&mut self) {
         self.update_domain().await;
-        while let Some(req) = self.receiver.next().await {
-            match req {
+
+        // Periodic KPI-13 tick: publish function counts every 2 seconds
+        let mut kpi13_interval = tokio::time::interval(std::time::Duration::from_secs(2));
+        kpi13_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+        loop {
+            tokio::select! {
+                req = self.receiver.next() => {
+                    let req = match req {
+                        Some(r) => r,
+                        None => break,
+                    };
+                    match req {
                 crate::orchestrator::OrchestratorRequest::StartFunction(spawn_req, reply_channel) => {
                     log::debug!("Orchestrator StartFunction {}", spawn_req.spec.to_short_string());
                     let res = self.start_function(&spawn_req).await;
@@ -164,6 +194,13 @@ impl OrchestratorTask {
                 crate::orchestrator::OrchestratorRequest::Reset() => {
                     log::debug!("Orchestrator Reset");
                     self.reset().await;
+                }
+            }
+            // Publish counts after every orchestrator event
+            self.publish_kpi13_function_counts();
+                }
+                _ = kpi13_interval.tick() => {
+                    self.publish_kpi13_function_counts();
                 }
             }
         }
@@ -684,8 +721,8 @@ impl OrchestratorTask {
         // the first instance is running - check it, if not clean up and return the error
         match &results[0] {
             Ok(edgeless_api::common::StartComponentResponse::InstanceId(_)) => {
-                // track this function as critical if it has replication_factor
-                if spawn_req.replication_factor.is_some() {
+                // track this function as critical only for KPI-13 (replication_factor >= 2)
+                if spawn_req.replication_factor.map_or(false, |r| r >= 2) {
                     self.critical_lids.insert(lid);
                 }
                 Ok(edgeless_api::common::StartComponentResponse::InstanceId(lid))
@@ -1255,10 +1292,12 @@ impl OrchestratorTask {
         Vec<uuid::Uuid>,                                                                        // to_repatch
         Vec<(uuid::Uuid, edgeless_api::resource_configuration::ResourceInstanceSpecification)>, // resources_to_create
         Vec<String>,                                                                            // workflows_to_stop (non-replicated function died)
+        Vec<NewReplicaRequest>,                                                                 // functions_to_reschedule (replication_factor=1)
     ) {
         let mut to_repatch: Vec<uuid::Uuid> = Vec::new();
         let mut resources_to_create = Vec::new();
         let mut workflows_to_stop: Vec<String> = Vec::new();
+        let mut functions_to_reschedule: Vec<NewReplicaRequest> = Vec::new();
         let mut lids_with_new_instances: std::collections::HashSet<uuid::Uuid> = std::collections::HashSet::new();
 
         // track lids from critical path that will have new replicas
@@ -1282,16 +1321,52 @@ impl OrchestratorTask {
 
             match instance {
                 crate::active_instance::ActiveInstance::Function(spawn_req, instances) => {
-                    // non-replicated function (replication_factor is None)
-                    if spawn_req.replication_factor.is_none()
-                        && (instances.is_empty() || instances.iter().all(|x| !self.nodes.contains_key(&x.0.node_id))) {
-                            log::error!(
-                                "non-replicated function lid {} has died, stopping workflow '{}'",
-                                lid,
-                                spawn_req.workflow_id
-                            );
-                            workflows_to_stop.push(spawn_req.workflow_id.clone());
+                    let is_dead = instances.is_empty() || instances.iter().all(|x| !self.nodes.contains_key(&x.0.node_id));
+                    if is_dead {
+                        match spawn_req.replication_factor {
+                            // no replication_factor: workflow fails immediately
+                            None => {
+                                log::error!(
+                                    "non-replicated function lid {} has died, stopping workflow '{}'",
+                                    lid,
+                                    spawn_req.workflow_id
+                                );
+                                workflows_to_stop.push(spawn_req.workflow_id.clone());
+                            }
+                            // replication_factor=0: expendable, silently remove from workflow
+                            Some(0) => {
+                                log::warn!(
+                                    "expendable function lid {} (rf=0) has died, removing from workflow '{}'",
+                                    lid,
+                                    spawn_req.workflow_id
+                                );
+                                instances.retain(|x| self.nodes.contains_key(&x.0.node_id));
+                                self.active_instances_changed = true;
+                                lids_with_new_instances.insert(*lid);
+                            }
+                            // replication_factor=1: reschedule on a surviving node (with downtime)
+                            Some(1) => {
+                                log::info!(
+                                    "reschedulable function lid {} (rf=1) has died, scheduling restart",
+                                    lid
+                                );
+                                instances.retain(|x| self.nodes.contains_key(&x.0.node_id));
+                                self.active_instances_changed = true;
+                                functions_to_reschedule.push(NewReplicaRequest {
+                                    lid: *lid,
+                                    spawn_req: spawn_req.clone(),
+                                });
+                                lids_with_new_instances.insert(*lid);
+                            }
+                            // replication_factor >= 2 should be in critical_lids
+                            Some(_) => {
+                                log::warn!(
+                                    "function lid {} with replication_factor >= 2 not in critical_lids, skipping",
+                                    lid
+                                );
+                            }
                         }
+                    }
                 }
                 crate::active_instance::ActiveInstance::Resource(spec, instance) => {
                     if instance.is_none() || !self.nodes.contains_key(&instance.node_id) {
@@ -1322,12 +1397,13 @@ impl OrchestratorTask {
         workflows_to_stop.sort();
         workflows_to_stop.dedup();
 
-        (to_repatch, resources_to_create, workflows_to_stop)
+        (to_repatch, resources_to_create, workflows_to_stop, functions_to_reschedule)
     }
 
     async fn refresh(&mut self, parent_span: Option<&TraceSpan>) {
         let refresh_span = parent_span.map(|s| s.child("refresh"));
         let kpi_13_span = refresh_span.as_ref().map(|s| s.child("kpi_13_failover"));
+        let kpi_13_start = std::time::Instant::now();
 
         // 1. start with critical functions first (KPI13 requirement)
         let critical_result = self.detect_critical_failures();
@@ -1335,9 +1411,16 @@ impl OrchestratorTask {
         // precompute critical patches - this is the "decision" point
         let critical_patches = self.precompute_patches(&critical_result.to_repatch);
 
+        let kpi_13_elapsed = kpi_13_start.elapsed();
+
         // end kpi-13 span now - failover decision is made, patches are ready to send
         if let Some(span) = kpi_13_span {
             span.end();
+        }
+
+        // publish failover event to Redis for UI visualization
+        if !critical_result.to_repatch.is_empty() || !critical_result.workflows_to_stop.is_empty() {
+            self.publish_kpi13_failover_event(kpi_13_elapsed.as_secs_f64() * 1000.0, "hot-standby");
         }
 
         // send critical patches (I/O operation, not measured in kpi-13)
@@ -1371,10 +1454,11 @@ impl OrchestratorTask {
         }
 
         // 2. now handle the non-critical functions
-        let (mut non_critical_to_repatch, resources_to_create, non_critical_workflows_to_stop) = self.detect_non_critical_failures(&critical_result);
+        let (mut non_critical_to_repatch, resources_to_create, non_critical_workflows_to_stop, functions_to_reschedule) = self.detect_non_critical_failures(&critical_result);
 
         // stop workflows where non-replicated functions died
         if !non_critical_workflows_to_stop.is_empty() {
+            self.publish_kpi13_failover_event(0.0, "fail-stop");
             log::warn!(
                 "stopping {} workflows due to non-replicated function failure",
                 non_critical_workflows_to_stop.len()
@@ -1420,6 +1504,29 @@ impl OrchestratorTask {
                 }
                 Err(err) => {
                     log::error!("no suitable node for replica lid {}: {}", req.lid, err);
+                }
+            }
+        }
+
+        // reschedule non-critical functions (replication_factor=1) on surviving nodes
+        let reschedule_start = std::time::Instant::now();
+        for req in functions_to_reschedule {
+            match self.select_node(&req.spawn_req) {
+                Ok(node_id) => {
+                    log::info!("rescheduling function lid {} on node {}", req.lid, node_id);
+                    match self.start_function_in_node(&req.spawn_req, &req.lid, &node_id).await {
+                        Ok(_) => {
+                            non_critical_to_repatch.push(req.lid);
+                            let elapsed = reschedule_start.elapsed().as_secs_f64() * 1000.0;
+                            self.publish_kpi13_failover_event(elapsed, "reschedule");
+                        }
+                        Err(err) => {
+                            log::error!("failed to reschedule function lid {}: {}", req.lid, err);
+                        }
+                    }
+                }
+                Err(err) => {
+                    log::error!("no suitable node to reschedule function lid {}: {}", req.lid, err);
                 }
             }
         }
@@ -1488,14 +1595,94 @@ impl OrchestratorTask {
         }
 
         // update proxy state
-        let mut proxy = self.proxy.lock().await;
-        if self.active_instances_changed {
-            proxy.update_active_instances(&self.active_instances);
-            self.active_instances_changed = false;
+        {
+            let mut proxy = self.proxy.lock().await;
+            if self.active_instances_changed {
+                proxy.update_active_instances(&self.active_instances);
+                self.active_instances_changed = false;
+            }
+            if self.dependency_graph_changed {
+                proxy.update_dependency_graph(&self.dependency_graph);
+                self.dependency_graph_changed = false;
+            }
         }
-        if self.dependency_graph_changed {
-            proxy.update_dependency_graph(&self.dependency_graph);
-            self.dependency_graph_changed = false;
+
+        // publish function counts for KPI-13 UI timeline
+        self.publish_kpi13_function_counts();
+    }
+
+    /// Publish a failover event to the KPI-13 Redis channel for UI visualization.
+    fn publish_kpi13_failover_event(&mut self, latency_ms: f64, failover_type: &str) {
+        self.ensure_kpi13_redis();
+        if let Some(ref mut conn) = self.kpi13_redis {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default();
+            let payload = format!(
+                r#"{{"timestamp":{},"latency_ms":{:.3},"type":"{}"}}"#,
+                now.as_secs_f64(),
+                latency_ms,
+                failover_type
+            );
+            log::info!("KPI-13 failover: {} latency={:.3}ms", failover_type, latency_ms);
+            let key = format!("kpi13:failover:{}", now.as_nanos());
+            if redis::Commands::set::<_, _, ()>(conn, &key, &payload).is_err()
+                || redis::Commands::expire::<_, ()>(conn, &key, 120).is_err()
+            {
+                log::warn!("KPI-13 Redis write failed, will reconnect on next publish");
+                self.kpi13_redis = None;
+            }
+        }
+    }
+
+    /// Publish current function counts (active vs hot-standby) to the KPI-13 Redis channel.
+    fn publish_kpi13_function_counts(&mut self) {
+        self.ensure_kpi13_redis();
+        if let Some(ref mut conn) = self.kpi13_redis {
+            let mut active_count: u32 = 0;
+            let mut standby_count: u32 = 0;
+            for instance in self.active_instances.values() {
+                if let crate::active_instance::ActiveInstance::Function(_, instances) = instance {
+                    for (_id, is_active) in instances {
+                        if *is_active {
+                            active_count += 1;
+                        } else {
+                            standby_count += 1;
+                        }
+                    }
+                }
+            }
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default();
+            let payload = format!(
+                r#"{{"timestamp":{},"active":{},"standby":{}}}"#,
+                now.as_secs_f64(),
+                active_count,
+                standby_count
+            );
+            // log::info!("KPI-13 counts: active={} standby={}", active_count, standby_count);
+            if redis::Commands::set::<_, _, ()>(conn, "kpi13:function_counts", &payload).is_err() {
+                log::warn!("KPI-13 Redis write failed, will reconnect on next publish");
+                self.kpi13_redis = None;
+            }
+        }
+    }
+
+    /// Attempt to (re)connect to Redis if we have a URL but no live connection.
+    fn ensure_kpi13_redis(&mut self) {
+        if self.kpi13_redis.is_some() || self.kpi13_redis_url.is_none() {
+            return;
+        }
+        let url = self.kpi13_redis_url.as_deref().unwrap();
+        match redis::Client::open(url).and_then(|c| c.get_connection()) {
+            Ok(conn) => {
+                log::info!("KPI-13 telemetry Redis reconnected at {}", url);
+                self.kpi13_redis = Some(conn);
+            }
+            Err(err) => {
+                log::debug!("KPI-13 telemetry Redis reconnect failed: {}", err);
+            }
         }
     }
 
